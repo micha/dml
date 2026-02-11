@@ -8,6 +8,10 @@ The canonical workflow is documented here:
 
 - `AGENTS.md` (Agent guide)
 
+To enforce commit message body wrapping locally:
+
+`cp scripts/commit-msg-hook.sh .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg`
+
 ## Build and Test
 
 Use `scripts/check.sh` as the standard validation entrypoint.

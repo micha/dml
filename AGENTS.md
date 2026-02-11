@@ -122,7 +122,17 @@ formatter or linter, defer to its rules and update this section accordingly.
 
 - Use a short imperative title (50-72 chars) plus a body that explains the why.
 - Prefer a 1-2 sentence body that captures intent and scope.
-- Wrap commit message body lines at 80 characters or less.
+- Commit message body lines MUST be wrapped at 80 characters or less.
+- Before committing, verify body line lengths in `git log -1 --pretty=%B`.
+- Install `scripts/commit-msg-hook.sh` as `.git/hooks/commit-msg` for local
+  enforcement.
+- Example:
+  ```
+  Add deterministic key ordering in map encoder
+
+  Canonical key ordering is required for stable object hashing across
+  platforms and to prevent hash drift between equivalent map values.
+  ```
 - Split commits when uncommitted changes include multiple, clearly differentiated tasks.
 
 ## API Stability
