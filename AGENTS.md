@@ -2,7 +2,8 @@
 
 ## MANDATORY: Use td for Task Management
 
-Run td usage --new-session at conversation start (or after /clear). This tells you what to work on next.
+Run td usage --new-session at conversation start (or after /clear). This tells
+you what to work on next.
 
 Sessions are automatic (based on terminal/agent context). Optional:
 - td session "name" to label the current session
@@ -116,9 +117,6 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Use a short imperative title (50-72 chars) plus a body that explains the why.
 - Prefer a 1-2 sentence body that captures intent and scope.
 - Wrap commit message body lines at 80 characters or less.
-- When asked to draft a commit, follow this format:
-  - Title: concise summary of the change
-  - Body: 1-2 sentences on motivation and impact
 - Split commits when uncommitted changes include multiple, clearly differentiated tasks.
 
 ## API Stability
