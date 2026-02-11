@@ -24,7 +24,7 @@ jobs:
             platform: unix
             dml_bin: build/check/dml
           - name: macOS x86_64
-            runs_on: macos-13
+            runs_on: macos-15-intel
             platform: unix
             dml_bin: build/check/dml
           - name: macOS arm64
@@ -75,24 +75,54 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Configure build
-        shell: ${{ matrix.platform == 'windows-msys2' && 'msys2 {0}' || 'bash' }}
+      - name: Configure build (unix)
+        if: matrix.platform == 'unix'
+        shell: bash
         run: |
           meson setup build/check \
             --wrap-mode=forcefallback \
             --force-fallback-for='*' \
             -Dbuildtype=debug
 
-      - name: Build
-        shell: ${{ matrix.platform == 'windows-msys2' && 'msys2 {0}' || 'bash' }}
+      - name: Configure build (Windows)
+        if: matrix.platform == 'windows-msys2'
+        shell: msys2 {0}
+        run: |
+          meson setup build/check \
+            --wrap-mode=forcefallback \
+            --force-fallback-for='*' \
+            -Dbuildtype=debug
+
+      - name: Build (unix)
+        if: matrix.platform == 'unix'
+        shell: bash
         run: meson compile -C build/check
 
-      - name: Run C tests
-        shell: ${{ matrix.platform == 'windows-msys2' && 'msys2 {0}' || 'bash' }}
+      - name: Build (Windows)
+        if: matrix.platform == 'windows-msys2'
+        shell: msys2 {0}
+        run: meson compile -C build/check
+
+      - name: Run C tests (unix)
+        if: matrix.platform == 'unix'
+        shell: bash
         run: meson test -C build/check --print-errorlogs
 
-      - name: Run Python tests
-        shell: ${{ matrix.platform == 'windows-msys2' && 'msys2 {0}' || 'bash' }}
+      - name: Run C tests (Windows)
+        if: matrix.platform == 'windows-msys2'
+        shell: msys2 {0}
+        run: meson test -C build/check --print-errorlogs
+
+      - name: Run Python tests (unix)
+        if: matrix.platform == 'unix'
+        shell: bash
+        env:
+          DML_BIN: ${{ matrix.dml_bin }}
+        run: python -m pytest -q
+
+      - name: Run Python tests (Windows)
+        if: matrix.platform == 'windows-msys2'
+        shell: msys2 {0}
         env:
           DML_BIN: ${{ matrix.dml_bin }}
         run: python -m pytest -q
