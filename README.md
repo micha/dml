@@ -1,5 +1,7 @@
 # DML
 
+[![CI](https://github.com/micha/dml/actions/workflows/ci.yml/badge.svg)](https://github.com/micha/dml/actions/workflows/ci.yml)
+
 Local-first development with lightweight workflow guidance.
 
 ## Workflow
@@ -41,6 +43,7 @@ targets `build/check/test_version` by default when present.
 ## Docs
 
 - `docs/documentation-guidelines.md` (How to write and maintain docs)
+- `docs/packaging-and-distribution.md` (Python package layout and release plan)
 - `docs/architecture.md` (Architecture overview)
 - `docs/spec/overview.md` (Specification)
 - `docs/spec/object-model.md` (Packed records, hashing, keyspace)
