@@ -5,6 +5,16 @@ Status: Draft.
 This document defines async execution behavior, execution caching/pinning, remote
 exchange mechanics, and adapter contracts for packed-record repositories.
 
+Authority boundary:
+
+- This document is authoritative for execution lifecycle, caching/retries,
+  remote snapshot flow, transfer mechanics, and adapter contracts.
+- For packed-record schemas, canonical encoding/hashing, keyspace, and
+  validation/error semantics, see `docs/spec/object-model.md`.
+- For CLI command contracts, see `docs/spec/cli.md`.
+- For Python API surface and binding behavior, see
+  `docs/spec/python-bindings.md`.
+
 ## 1. Execution Lifecycle
 
 Applies to `DML_NODE_CALL` nodes.
@@ -16,15 +26,17 @@ Applies to `DML_NODE_CALL` nodes.
 4. If execution is already in flight for `node_id`, attach caller to that
    in-flight attempt.
 5. Otherwise enqueue a new attempt and poll adapter until completion.
-6. On success write `DML_REC_EXEC(status=OK, result_value=<dag_id>)`.
-7. On failure write `DML_REC_EXEC(status=ERROR, error_value=<datum_id>)`.
+6. On success write an exec record per `docs/spec/object-model.md` Section 7.4
+   (`status=OK`, call result as DAG id).
+7. On failure write an exec record per `docs/spec/object-model.md` Section 7.4
+   (`status=ERROR`, error datum id).
 8. Commit pins accepted exec id in its exec map.
 
 No `DML_REC_EXEC` is written while a call is pending.
 
 ## 2. Call Result Semantics
 
-- `DML_NODE_CALL` success result is a DAG id in `DML_REC_EXEC.result_value`.
+- `DML_NODE_CALL` success result follows `docs/spec/object-model.md` Section 7.4.
 - The returned value is that DAG's `root_node`.
 - Tooling MAY add a convenience name `root`, but correctness MUST NOT depend on
   it.

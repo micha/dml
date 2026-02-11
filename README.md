@@ -10,17 +10,8 @@ The canonical workflow is documented here:
 
 ## Build and Test
 
-- Prereqs: Meson, clang-format, python3.
-- Configure: `meson setup build`
-- Build: `meson compile -C build`
-- Test: `python3 -m pytest tests/python`
-- Format: `meson compile -C build format`
-
-For the full rebuild/test/format-check/coverage workflow, use
-`scripts/check.sh`.
-Use `scripts/check.sh -f` to wipe existing build artifacts before running.
-
-See `AGENTS.md` for the full command reference.
+Build, test, and tooling guidance is being rewritten from scratch.
+Use `AGENTS.md` and the active spec docs for current workflow expectations.
 
 ## CLI Help
 
@@ -29,6 +20,7 @@ See `AGENTS.md` for the full command reference.
 
 ## Docs
 
+- `docs/documentation-guidelines.md` (How to write and maintain docs)
 - `docs/architecture.md` (Architecture overview)
 - `docs/spec/overview.md` (Specification)
 - `docs/spec/object-model.md` (Packed records, hashing, keyspace)

@@ -6,6 +6,17 @@ The CLI is repository-facing porcelain/plumbing over packed records and refs.
 DAG construction and execution orchestration are primarily handled by language
 bindings.
 
+Authority boundary:
+
+- This document is authoritative for CLI commands, arguments, and
+  repository-facing CLI behavior.
+- For packed-record schemas, canonical encoding/hashing, keyspace, and
+  validation/error semantics, see `docs/spec/object-model.md`.
+- For execution and remote transfer semantics, see
+  `docs/spec/execution-and-remotes.md`.
+- For Python API surface and binding behavior, see
+  `docs/spec/python-bindings.md`.
+
 ## 1. Scope
 
 - Repository administration.
@@ -54,15 +65,8 @@ bindings.
 
 ## 4. Error Surface
 
-CLI SHOULD preserve stable high-level error classes from core validation:
-
-- `invalid_header`
-- `invalid_bounds`
-- `invalid_kind`
-- `invalid_payload`
-- `invalid_utf8`
-
-Detailed reason strings SHOULD include `record_type` and a short `detail` key.
+CLI SHOULD preserve core validation error classes and reason-string structure as
+defined in `docs/spec/object-model.md` (Section 10 and Section 10.2).
 
 ## 5. Help and Documentation Surface
 

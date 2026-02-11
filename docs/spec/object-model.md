@@ -5,10 +5,20 @@ Status: Draft.
 This document defines the canonical on-disk model for DaggerML repositories.
 It is normative unless a section is marked Informative.
 
+Authority boundary:
+
+- This document is authoritative for packed-record schemas, canonical encoding
+  and hashing, keyspace, repository semantics, and core validation/error
+  semantics.
+- For execution lifecycle, remotes, transfer protocol, and adapter contracts,
+  see `docs/spec/execution-and-remotes.md`.
+- For CLI command contracts, see `docs/spec/cli.md`.
+- For Python API surface and binding behavior, see
+  `docs/spec/python-bindings.md`.
+
 ## 1. Decision Summary
 
-- Replace legacy `dml-json` + `lite3` persistence with packed binary records in
-  LMDB.
+- Use packed binary records in LMDB for repository persistence.
 - Preserve full DAG topology for provenance and reproducibility.
 - Keep immutable content-addressed objects and mutable refs (git-like model).
 - Require deterministic encoding, canonical ordering, and stable hashing.
@@ -94,6 +104,7 @@ Envelope rules:
 
 - Sets: sort by object id bytes; reject duplicates.
 - Maps: sort by key id bytes; reject duplicate keys.
+- Lists: preserve encoded order; MUST NOT be re-sorted during canonicalization.
 - Trees: sort by name bytes; reject duplicates.
 - DAG name entries: sort by name bytes; reject duplicates.
 - Commit exec entries: sort by node id bytes; reject duplicates.
@@ -155,8 +166,9 @@ enum dml_datum_kind {
   DML_DATUM_BYTES = 5,
   DML_DATUM_STRING = 6,
   DML_DATUM_URI = 7,
-  DML_DATUM_SET = 8,
-  DML_DATUM_MAP = 9,
+  DML_DATUM_LIST = 8,
+  DML_DATUM_SET = 9,
+  DML_DATUM_MAP = 10,
 };
 
 typedef struct {
@@ -171,11 +183,44 @@ Rules:
 
 - `STRING` payload is UTF-8 NFC bytes.
 - `URI` payload is canonical UTF-8 URI bytes.
+- `LIST` stores an ordered sequence of datum object ids.
+- `LIST` preserves element order and MAY contain duplicate ids.
 - `SET` stores sorted unique datum object ids.
 - `MAP` stores sorted unique `{key_id, value_id}` pairs.
 - Datum references in composite datums MUST reference datum ids only.
 - User-provided `dml:` URIs are reserved and MUST be rejected by core
   validation.
+
+Composite payload layouts:
+
+```c
+typedef struct {
+  uint32_t count;
+  dml_object_id elems[];  // count entries
+} dml_datum_list_payload;
+
+typedef struct {
+  uint32_t count;
+  dml_object_id elems[];  // count entries, sorted unique
+} dml_datum_set_payload;
+
+typedef struct {
+  dml_object_id key_id;
+  dml_object_id value_id;
+} dml_datum_map_entry;
+
+typedef struct {
+  uint32_t count;
+  dml_datum_map_entry entries[];  // count entries, sorted unique by key_id
+} dml_datum_map_payload;
+```
+
+Composite payload rules:
+
+- `count` is `u32` little-endian.
+- `LIST.elems` order is canonical as encoded and MUST be preserved.
+- `SET.elems` MUST be strictly increasing by id bytes.
+- `MAP.entries` MUST be strictly increasing by `key_id` bytes.
 
 ### 7.3 `DML_REC_NODE`
 
@@ -446,6 +491,137 @@ Common invariants:
 - All offsets in bounds.
 - UTF-8 validity and NFC normalization.
 - Canonical sorting and duplicate rejection where required.
+
+### 10.1 Composite payload validation example (informative)
+
+Example pseudocode for validating a `DML_DATUM_LIST` payload:
+
+```c
+bool validate_datum_list(const uint8_t *rec, uint32_t rec_len,
+                         uint64_t payload_ofs, uint64_t payload_len,
+                         char **reason) {
+  const uint32_t id_size = sizeof(dml_object_id);  // 16
+
+  // Base payload bounds.
+  if (payload_ofs > rec_len || payload_len > rec_len - payload_ofs) {
+    *reason = "record_type=datum;detail=list_payload_bounds";
+    return false;
+  }
+
+  // Payload must contain at least the count field.
+  if (payload_len < sizeof(uint32_t)) {
+    *reason = "record_type=datum;detail=list_payload_too_short";
+    return false;
+  }
+
+  const uint8_t *p = rec + payload_ofs;
+  uint32_t count = read_u32_le(p);
+
+  // Overflow-safe size check: payload_len == 4 + count * id_size
+  uint64_t body = payload_len - sizeof(uint32_t);
+  if (count > body / id_size || body != (uint64_t)count * id_size) {
+    *reason = "record_type=datum;detail=list_count_mismatch";
+    return false;
+  }
+
+  // LIST allows duplicates and preserves encoded order.
+  // No sort/uniqueness validation is applied.
+  return true;
+}
+```
+
+Example pseudocode for validating a `DML_DATUM_SET` payload:
+
+```c
+bool validate_datum_set(const uint8_t *rec, uint32_t rec_len,
+                        uint64_t payload_ofs, uint64_t payload_len,
+                        char **reason) {
+  const uint32_t id_size = sizeof(dml_object_id);  // 16
+
+  if (payload_ofs > rec_len || payload_len > rec_len - payload_ofs) {
+    *reason = "record_type=datum;detail=set_payload_bounds";
+    return false;
+  }
+  if (payload_len < sizeof(uint32_t)) {
+    *reason = "record_type=datum;detail=set_payload_too_short";
+    return false;
+  }
+
+  const uint8_t *p = rec + payload_ofs;
+  uint32_t count = read_u32_le(p);
+  uint64_t body = payload_len - sizeof(uint32_t);
+  if (count > body / id_size || body != (uint64_t)count * id_size) {
+    *reason = "record_type=datum;detail=set_count_mismatch";
+    return false;
+  }
+
+  const dml_object_id *ids = (const dml_object_id *)(p + sizeof(uint32_t));
+  for (uint32_t i = 1; i < count; i++) {
+    if (memcmp(ids[i - 1].bytes, ids[i].bytes, sizeof(dml_object_id)) >= 0) {
+      *reason = "record_type=datum;detail=set_not_strictly_sorted";
+      return false;
+    }
+  }
+  return true;
+}
+```
+
+Example pseudocode for validating a `DML_DATUM_MAP` payload:
+
+```c
+bool validate_datum_map(const uint8_t *rec, uint32_t rec_len,
+                        uint64_t payload_ofs, uint64_t payload_len,
+                        char **reason) {
+  const uint32_t entry_size = sizeof(dml_datum_map_entry);  // 32
+
+  if (payload_ofs > rec_len || payload_len > rec_len - payload_ofs) {
+    *reason = "record_type=datum;detail=map_payload_bounds";
+    return false;
+  }
+  if (payload_len < sizeof(uint32_t)) {
+    *reason = "record_type=datum;detail=map_payload_too_short";
+    return false;
+  }
+
+  const uint8_t *p = rec + payload_ofs;
+  uint32_t count = read_u32_le(p);
+  uint64_t body = payload_len - sizeof(uint32_t);
+  if (count > body / entry_size || body != (uint64_t)count * entry_size) {
+    *reason = "record_type=datum;detail=map_count_mismatch";
+    return false;
+  }
+
+  const dml_datum_map_entry *entries =
+      (const dml_datum_map_entry *)(p + sizeof(uint32_t));
+  for (uint32_t i = 1; i < count; i++) {
+    if (memcmp(entries[i - 1].key_id.bytes,
+               entries[i].key_id.bytes,
+               sizeof(dml_object_id)) >= 0) {
+      *reason = "record_type=datum;detail=map_keys_not_strictly_sorted";
+      return false;
+    }
+  }
+  return true;
+}
+```
+
+In all cases, decoders MUST also verify that referenced ids resolve to datum
+records when materializing composite values.
+
+### 10.2 Detail-to-error-class mapping (informative)
+
+Implementations should map the pseudocode `detail` reasons to stable high-level
+error codes as follows:
+
+- `*_payload_bounds` -> `invalid_bounds`
+- `*_payload_too_short` -> `invalid_bounds`
+- `*_count_mismatch` -> `invalid_bounds`
+- `set_not_strictly_sorted` -> `invalid_payload`
+- `map_keys_not_strictly_sorted` -> `invalid_payload`
+- `composite_ref_not_datum` (resolution/type check failure) -> `invalid_kind`
+
+When emitting reason strings, preserve `record_type=datum` and include the
+specific `detail` token for diagnostics.
 
 ## 11. Open Questions
 
