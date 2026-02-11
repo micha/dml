@@ -1,0 +1,158 @@
+.TH DML 1 "January 2026" "dml 0.0.0-dev" "User Commands"
+.SH NAME
+dml \- manage DaggerML repositories
+.SH SYNOPSIS
+.B dml
+.RB [ -h | --help | --version ]
+.br
+.B dml
+.RB [ --db
+.IR dir ]
+.I <command>
+.SH DESCRIPTION
+The
+.B dml
+command runs DaggerML CLI subcommands and emits JSON status output. When stdout
+is a TTY,
+.B --help
+and
+.B --version
+may print plain text.
+On errors, a plain-text diagnostic line is printed to stderr:
+.B error: <code>: <message>
+.TP
+.B --help and --version output
+.RS
+When stdout is not a TTY, these options emit JSON:
+.RS
+.B {"usage":[...],"options":[...],"commands":[...]}
+.br
+.B {"version":"<version>"}
+.RE
+.RE
+.SH OPTIONS
+.TP
+.B -h, --help
+Show help and exit.
+.TP
+.B --version
+Show version and exit.
+.TP
+.B --db dir
+Set the LMDB environment path for all commands. Defaults to
+.I <cwd>/.dml/db
+when omitted.
+.SH COMMANDS
+.SS init
+Initialize a new DaggerML repository at the requested path.
+.TP
+.B Usage
+.RS
+.B dml init
+\&[--db \fIdir\fR]
+.RE
+.TP
+.B Output
+.RS
+On success, stdout contains a JSON object with the repository path and whether
+the repository was created in this invocation:
+.RS
+.B {"path":"<resolved path>","created":true|false}
+.RE
+Errors use the
+.B {code,message,retry}
+format with a non-zero exit code.
+.RE
+.TP
+.B Exit Status
+.RS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Non-retryable error (validation or usage).
+.TP
+.B 2
+Retryable error (transient or resource-related; not used by init).
+.TP
+.B 3
+Other failure.
+.RE
+
+.SS put
+Store a JSON value in the repository for testing.
+.TP
+.B Usage
+.RS
+.B dml put
+\&[--db \fIdir\fR]
+.RE
+.TP
+.B Input
+.RS
+Reads any valid JSON document from stdin.
+.RE
+.TP
+.B Output
+.RS
+On success, stdout contains a JSON object with the stored key:
+.RS
+.B {"key":"<key>"}
+.RE
+.RE
+.TP
+.B Example
+.RS
+.B printf '{"a":1,"b":2}' | dml put
+.RE
+.TP
+.B Exit Status
+.RS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Non-retryable error (validation or usage).
+.TP
+.B 2
+Retryable error (transient or resource-related).
+.TP
+.B 3
+Other failure.
+.RE
+
+.SS get
+Read a JSON value from the repository for testing.
+.TP
+.B Usage
+.RS
+.B dml get
+.I key
+\&[--db \fIdir\fR]
+.RE
+.TP
+.B Output
+.RS
+On success, stdout contains a JSON object with the stored value:
+.RS
+.B {"value":<json>}
+.RE
+.RE
+.TP
+.B Exit Status
+.RS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Non-retryable error (validation or usage).
+.TP
+.B 2
+Retryable error (transient or resource-related).
+.TP
+.B 3
+Other failure.
+.RE
