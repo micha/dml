@@ -87,8 +87,19 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Keep tests deterministic; avoid time-dependent flakiness.
 - Prefer unit tests for pure logic; use integration tests for boundary
   interactions.
-- Prefer Python property/integration tests for CLI behavior; keep C tests only
-  when low-level fault injection or internal hooks are required.
+- Prefer Python Hypothesis property-based tests for Python bindings and CLI
+  behavior.
+- Keep C tests focused on low-level scenarios (for example fault injection or
+  internal hook validation).
+- Use Mull mutation testing to validate test effectiveness.
+- Use lcov/gcov for line, function, and branch coverage tracking; target 100%
+  coverage.
+- Use coverage.py for Python source coverage; target 100% line coverage.
+- If exclusions are needed to reach practical coverage goals, discuss and agree
+  on them before merging.
+- Use Valgrind for memory checks when requested or when touching memory-critical
+  code paths.
+- Use `scripts/check.sh` as the standard end-to-end validation entrypoint.
 - Use descriptive test names that capture the behavior.
 - Keep fixtures small and local to the test when possible.
 

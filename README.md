@@ -10,8 +10,24 @@ The canonical workflow is documented here:
 
 ## Build and Test
 
-Build, test, and tooling guidance is being rewritten from scratch.
-Use `AGENTS.md` and the active spec docs for current workflow expectations.
+Use `scripts/check.sh` as the standard validation entrypoint.
+
+- `scripts/check.sh` - build, run tests, and coverage reports
+- `scripts/check.sh -v` - also run C tests under Valgrind
+- `scripts/check.sh -f` - clean build artifacts before rebuilding
+- `scripts/check.sh -m` - enable Mull mutation testing
+
+The script enforces vendored dependency usage, runs coverage with gcov/lcov,
+and writes HTML reports under:
+
+- `build/coverage/html` (C coverage via gcov/lcov)
+- `build/coverage/python-html` (Python coverage via coverage.py, when Python
+  source files exist outside tests)
+
+Python test dependencies are in `requirements-dev.txt` (pytest + Hypothesis).
+
+Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
+targets `build/check/test_version` by default when present.
 
 ## CLI Help
 

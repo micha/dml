@@ -63,3 +63,20 @@ dkms.conf
 .sidecar-start.sh
 .sidecar-base
 .td-root
+
+# Meson build artifacts
+build/
+builddir/
+subprojects/packagecache/
+.cache/
+
+# Test and local tool artifacts
+.hypothesis/
+__pycache__/
+*.pyc
+*.mull.txt
+*.mull.txt.txt
+
+# Meson-downloaded wrap sources
+subprojects/xxHash-*/
+subprojects/lmdb-*/
