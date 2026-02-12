@@ -1,7 +1,5 @@
 # Agent Guide
 
-Use this guide for planning, design, and build/test decisions.
-
 ## MANDATORY: Use td for Task Management
 
 Run td usage --new-session at conversation start (or after /clear). This tells
@@ -13,8 +11,7 @@ Sessions are automatic (based on terminal/agent context). Optional:
 
 Use td usage -q after first read.
 
-After `td usage -q`, read `docs/agent_startup_contract.md` before taking any
-other action.
+Use this guide for planning, design, and build/test decisions.
 
 ## Code Style Guidelines
 
