@@ -236,6 +236,13 @@ Release workflow (`.github/workflows/release-python.yml`) should run on tags
 4. Run smoke installs from built artifacts.
 5. Publish with PyPI Trusted Publishing.
 
+Operational trigger behavior:
+
+- Tag pushes (`v*`) run build, smoke tests, and publish jobs.
+- `workflow_dispatch` runs build and smoke-test jobs by default.
+- Manual dispatch can opt into publish by setting workflow input
+  `publish=true`.
+
 Recommended runners for true native builds:
 
 - Linux x86_64 wheels: `ubuntu-24.04`
@@ -271,3 +278,22 @@ the native arch for that runner.
 - Use `release-python.yml` for package builds/publish only.
 - Store build artifacts from release jobs even on failure to debug platform
   packaging regressions.
+
+## 11. Trusted Publishing Setup
+
+Release publishing uses PyPI Trusted Publishing (OIDC) and does not use a
+long-lived API token.
+
+Repository requirements:
+
+- The release workflow publish jobs MUST grant `id-token: write` permission.
+- Publish jobs should keep `contents: read` permission for artifact download
+  steps.
+
+PyPI requirements:
+
+- Configure one trusted publisher entry per project (`daggerml`,
+  `daggerml-cli`, and each `daggerml-adapter-*`) tied to this repository and
+  workflow path (`.github/workflows/release-python.yml`).
+- Ensure the trusted publisher environment restrictions (if used) match the
+  publish job environments.

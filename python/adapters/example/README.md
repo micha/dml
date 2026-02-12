@@ -8,7 +8,7 @@ adapter entry point wiring.
 From this directory:
 
 ```bash
-python -m build
+python3 -m build
 ```
 
 This produces a pure Python wheel and an sdist in `dist/`.

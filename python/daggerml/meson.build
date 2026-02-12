@@ -6,10 +6,10 @@ py_dep = py.dependency()
 dml_core = static_library(
   'dmlcore',
   [
-    '../../src/dml.c',
     'src/_core_module.c',
   ],
-  include_directories: include_directories('../../include', 'src'),
+  include_directories: include_directories('src'),
+  dependencies: [py_dep],
   install: false,
 )
 

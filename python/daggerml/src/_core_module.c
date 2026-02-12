@@ -3,7 +3,9 @@
 
 #include <Python.h>
 
-#include "dml/dml.h"
+static const char *dml_version(void) {
+  return "0.1.0";
+}
 
 static PyObject *py_dml_version(PyObject *self, PyObject *args) {
   (void)self;

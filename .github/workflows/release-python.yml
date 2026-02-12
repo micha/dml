@@ -1,0 +1,262 @@
+name: Release Python
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to PyPI after successful build and smoke tests"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-daggerml-wheels:
+    name: Build daggerml wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            id: linux-x86_64
+            runner: ubuntu-24.04
+            cibw_archs: x86_64
+          - name: Linux aarch64
+            id: linux-aarch64
+            runner: ubuntu-24.04-arm
+            cibw_archs: aarch64
+          - name: macOS x86_64
+            id: macos-x86_64
+            runner: macos-15-intel
+            cibw_archs: x86_64
+          - name: macOS arm64
+            id: macos-arm64
+            runner: macos-14
+            cibw_archs: arm64
+          - name: Windows AMD64
+            id: windows-amd64
+            runner: windows-2022
+            cibw_archs: AMD64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build platform wheel with cibuildwheel
+        uses: pypa/cibuildwheel@v2.23.2
+        env:
+          CIBW_BUILD: cp312-*
+          CIBW_SKIP: "*-musllinux_* pp* *-win32"
+          CIBW_ARCHS: ${{ matrix.cibw_archs }}
+          CIBW_BUILD_FRONTEND: build
+        with:
+          package-dir: python/daggerml
+          output-dir: python/daggerml/dist
+
+      - name: Upload daggerml wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: daggerml-wheel-${{ matrix.id }}
+          path: python/daggerml/dist/*.whl
+          if-no-files-found: error
+
+  build-daggerml-sdist:
+    name: Build daggerml sdist
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build daggerml sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --sdist
+        working-directory: python/daggerml
+
+      - name: Upload daggerml sdist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: daggerml-sdist
+          path: python/daggerml/dist/*.tar.gz
+          if-no-files-found: error
+
+  build-python-tools:
+    name: Build daggerml-cli and adapter artifacts
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build
+
+      - name: Build daggerml-cli package
+        run: python -m build
+        working-directory: python/daggerml-cli
+
+      - name: Build adapter example package
+        run: python -m build
+        working-directory: python/adapters/example
+
+      - name: Upload pure Python artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-tools-dist
+          path: |
+            python/daggerml-cli/dist/*
+            python/adapters/example/dist/*
+          if-no-files-found: error
+
+  smoke-install:
+    name: Smoke-test install from artifacts
+    runs-on: ubuntu-24.04
+    needs:
+      - build-daggerml-wheels
+      - build-python-tools
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download Linux daggerml wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: daggerml-wheel-linux-x86_64
+          path: artifacts/daggerml
+
+      - name: Download pure Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-tools-dist
+          path: artifacts/tools
+
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pipx uv
+
+      - name: Smoke-test daggerml install with pip
+        run: |
+          python -m pip install --no-index --find-links artifacts/daggerml daggerml
+          python -c "import daggerml; print(daggerml.version())"
+
+      - name: Smoke-test CLI and adapter with pipx
+        run: |
+          CLI_WHL=$(ls artifacts/tools/daggerml_cli-*.whl)
+          ADAPTER_WHL=$(ls artifacts/tools/daggerml_adapter_example-*.whl)
+
+          pipx run --pip-args "--no-index --find-links $PWD/artifacts/daggerml --find-links $PWD/artifacts/tools" --spec "$CLI_WHL" dml --version
+          pipx run --pip-args "--no-index --find-links $PWD/artifacts/daggerml --find-links $PWD/artifacts/tools" --spec "$ADAPTER_WHL" daggerml-adapter-example
+
+      - name: Smoke-test CLI with uv tool semantics
+        run: |
+          CLI_WHL=$(ls artifacts/tools/daggerml_cli-*.whl)
+          ADAPTER_WHL=$(ls artifacts/tools/daggerml_adapter_example-*.whl)
+          DML_WHL=$(ls artifacts/daggerml/*.whl)
+
+          uv tool run --from "$CLI_WHL" --with "$DML_WHL" dml --version
+          uv tool run --from "$ADAPTER_WHL" --with "$DML_WHL" --with "$CLI_WHL" daggerml-adapter-example
+
+  publish-daggerml:
+    name: Publish daggerml (Trusted Publishing)
+    runs-on: ubuntu-24.04
+    environment: pypi
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true') }}
+    needs:
+      - smoke-install
+      - build-daggerml-wheels
+      - build-daggerml-sdist
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download daggerml artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: daggerml-*
+          path: dist/daggerml
+          merge-multiple: true
+
+      - name: Publish daggerml to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/daggerml
+
+  publish-daggerml-cli:
+    name: Publish daggerml-cli (Trusted Publishing)
+    runs-on: ubuntu-24.04
+    environment: pypi
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true') }}
+    needs:
+      - publish-daggerml
+      - build-python-tools
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download pure Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-tools-dist
+          path: dist/tools
+
+      - name: Collect daggerml-cli files
+        run: |
+          mkdir -p dist/daggerml-cli
+          cp dist/tools/daggerml_cli-* dist/daggerml-cli/
+
+      - name: Publish daggerml-cli to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/daggerml-cli
+
+  publish-adapters:
+    name: Publish adapters (Trusted Publishing)
+    runs-on: ubuntu-24.04
+    environment: pypi
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true') }}
+    needs:
+      - publish-daggerml-cli
+      - build-python-tools
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download pure Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-tools-dist
+          path: dist/tools
+
+      - name: Collect adapter files
+        run: |
+          mkdir -p dist/adapters
+          cp dist/tools/daggerml_adapter_example-* dist/adapters/
+
+      - name: Publish adapters to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/adapters
