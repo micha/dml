@@ -3,20 +3,12 @@ project('daggerml', 'c', version: '0.1.0', default_options: ['c_std=c11'])
 py = import('python').find_installation(pure: false)
 py_dep = py.dependency()
 
-dml_core = static_library(
-  'dmlcore',
+py.extension_module(
+  '_core',
   [
     'src/_core_module.c',
   ],
   include_directories: include_directories('src'),
-  dependencies: [py_dep],
-  install: false,
-)
-
-py.extension_module(
-  '_core',
-  [],
-  link_with: dml_core,
   dependencies: [py_dep],
   subdir: 'daggerml',
   install: true,
