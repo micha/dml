@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "daggerml-cli"
+version = "0.1.0"
+description = "DaggerML command-line interface"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "daggerml>=0.1.0,<0.2.0",
+]
+
+[project.scripts]
+dml = "daggerml_cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["daggerml_cli"]

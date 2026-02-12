@@ -1,0 +1,31 @@
+[build-system]
+requires = ["meson-python>=0.17", "meson>=1.4", "ninja>=1.11"]
+build-backend = "mesonpy"
+
+[project]
+name = "daggerml"
+version = "0.1.0"
+description = "DaggerML Python API and native bindings"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "DaggerML maintainers" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: C",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+]
+
+[tool.meson-python]
+limited-api = true
+
+[tool.meson-python.args]
+setup = [
+  "--wrap-mode=forcefallback",
+  "--force-fallback-for=*",
+  "--default-library=static",
+]
+install = ["--skip-subprojects"]

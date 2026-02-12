@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "daggerml-adapter-example"
+version = "0.1.0"
+description = "DaggerML adapter: example"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "daggerml>=0.1.0,<0.2.0",
+  "daggerml-cli>=0.1.0,<0.2.0",
+]
+
+[project.scripts]
+daggerml-adapter-example = "daggerml_adapter_example.main:main"
+
+[project.entry-points."daggerml.adapters"]
+example = "daggerml_adapter_example.main:adapter_entrypoint"
+
+[tool.hatch.build.targets.wheel]
+packages = ["daggerml_adapter_example"]
