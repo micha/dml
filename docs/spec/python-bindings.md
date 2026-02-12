@@ -41,7 +41,6 @@ Implementation target:
 - `Dag`
   - `literal(value, name=None) -> NodeHandle`
   - `call(function_node, args, name=None, cache=True) -> (NodeHandle, ExecutionHandle)`
-  - `builtin(function_node, args, name=None) -> NodeHandle`
   - `import(dag_id, name=None) -> NodeHandle`
   - `commit(result_node) -> Commit`
 
@@ -66,7 +65,8 @@ Implementation target:
 - `dag.literal(<datum>)` lowers values into canonical datum/node structures per
   `docs/spec/object-model.md` Section 7.2 and Section 7.3.
 - Passing an existing `NodeHandle` to `literal` is a no-op.
-- Collections lower recursively (post-order) through builtin constructors.
+- Collections lower recursively (post-order) through internal builtin
+  constructors.
 
 Lowering examples:
 
@@ -86,13 +86,21 @@ Lowering examples:
 - Default behavior reuses exec pinned in active index commit.
 - `cache=False` forces a new attempt.
 
-Builtin calls execute synchronously and do not return async handles.
+Builtin execution triggered by literal lowering is synchronous and internal to
+the bindings.
 
 ## 5. URI Helpers
 
-- `dml.Uri("...")` constructs URI datum values.
-- `dml.Uri.from_string(raw)` canonicalizes to RFC 3986 form before datum
-  creation.
+- `dml.Uri("...")` constructs a boxed Python URI value from canonical URI text.
+- `dml.Uri("...")` MUST reject non-canonical input with a Python exception.
+- `dml.Uri.from_string(raw)` accepts raw text and canonicalizes to RFC 3986
+  form before boxing.
+- URI datum creation happens during `dag.literal(...)` lowering (Section 3),
+  where boxed `dml.Uri` values are lowered as `DML_DATUM_URI` instead of
+  `DML_DATUM_STRING`.
+- Callers SHOULD use `dml.Uri.from_string(raw)` at input boundaries (CLI,
+  files, network, user input) and `dml.Uri("...")` when canonical form is
+  already guaranteed by program invariants.
 
 ## 6. Standard Library Builtin URIs
 
