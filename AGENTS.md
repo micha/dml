@@ -115,8 +115,6 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Keep diffs focused; avoid unrelated reformatting.
 - Prefer consistent terminology across code, docs, and tests.
 - Leave TODOs with an owner or clear next step.
-- This repo is local-only (no remotes configured); do not push or open PRs.
-- Do not push from the VM; pushes happen out-of-band from the host.
 
 ## Commit Messages
 
