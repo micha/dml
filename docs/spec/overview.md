@@ -13,10 +13,12 @@ Authority boundary:
 
 1. `docs/spec/object-model.md` - canonical object model, encoding, hashing,
    keyspace, validation, and repository semantics.
-2. `docs/spec/execution-and-remotes.md` - async execution lifecycle, caching,
-   remote transfer, and adapter contracts.
-3. `docs/spec/cli.md` - repository-facing CLI contract and admin operations.
-4. `docs/spec/python-bindings.md` - proposed high-level Python API over core
+2. `docs/spec/execution.md` - async execution lifecycle, caching, retries,
+   in-flight policy, and execution adapter contract.
+3. `docs/spec/remotes.md` - remote snapshot flow, ref/transfer protocol, and
+   remote adapter contract.
+4. `docs/spec/cli.md` - repository-facing CLI contract and admin operations.
+5. `docs/spec/python-bindings.md` - proposed high-level Python API over core
    records.
 
 ## Scope
@@ -34,10 +36,10 @@ Authority boundary:
   `docs/spec/object-model.md` (Sections 7 and 10)
 - Repository keyspace, refs, GC, and excision behavior:
   `docs/spec/object-model.md` (Sections 8-9)
-- Execution lifecycle, cache/retry behavior, in-flight policy, and remote
-  execution snapshot flow: `docs/spec/execution-and-remotes.md` (Sections 1-5)
-- Remote transfer protocol, adapter interfaces, and serverless/S3 model:
-  `docs/spec/execution-and-remotes.md` (Sections 6-8)
+- Execution lifecycle, cache/retry behavior, in-flight policy, and execution
+  adapter contract: `docs/spec/execution.md` (Sections 1-5)
+- Remote execution snapshot flow, transfer protocol, remote adapter interface,
+  and serverless/S3 model: `docs/spec/remotes.md` (Sections 1-4)
 - CLI command contract and repository-facing behavior:
   `docs/spec/cli.md` (Sections 2-3)
 - CLI validation error surface and reason-string structure:

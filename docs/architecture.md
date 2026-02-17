@@ -13,7 +13,8 @@ For current design and behavior, use the spec suite:
 
 - `docs/spec/overview.md`
 - `docs/spec/object-model.md`
-- `docs/spec/execution-and-remotes.md`
+- `docs/spec/execution.md`
+- `docs/spec/remotes.md`
 - `docs/spec/cli.md`
 - `docs/spec/python-bindings.md`
 

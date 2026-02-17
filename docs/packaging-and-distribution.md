@@ -8,7 +8,8 @@ Authority boundary:
   strategy.
 - For Python API behavior, see `docs/spec/python-bindings.md`.
 - For CLI command semantics, see `docs/spec/cli.md`.
-- For execution/remotes semantics, see `docs/spec/execution-and-remotes.md`.
+- For execution semantics, see `docs/spec/execution.md`.
+- For remotes semantics, see `docs/spec/remotes.md`.
 
 ## 1. Package Split
 

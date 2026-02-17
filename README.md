@@ -47,6 +47,7 @@ targets `build/check/test_version` by default when present.
 - `docs/architecture.md` (Architecture overview)
 - `docs/spec/overview.md` (Specification)
 - `docs/spec/object-model.md` (Packed records, hashing, keyspace)
-- `docs/spec/execution-and-remotes.md` (Execution lifecycle and remotes)
+- `docs/spec/execution.md` (Execution lifecycle, caching, adapters)
+- `docs/spec/remotes.md` (Remote snapshot flow and transfer)
 - `docs/spec/cli.md` (CLI contract and error codes)
 - `docs/spec/python-bindings.md` (Python API proposal)

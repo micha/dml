@@ -12,8 +12,9 @@ Authority boundary:
   binding behavior.
 - For packed-record schemas, canonical encoding/hashing, keyspace, and
   validation/error semantics, see `docs/spec/object-model.md`.
-- For execution lifecycle, cache/retry behavior, and remote execution protocol,
-  see `docs/spec/execution-and-remotes.md`.
+- For execution lifecycle and cache/retry behavior, see
+  `docs/spec/execution.md`.
+- For remote execution protocol, see `docs/spec/remotes.md`.
 - For CLI command contracts, see `docs/spec/cli.md`.
 
 ## 1. Scope
@@ -78,7 +79,7 @@ Lowering examples:
 ## 4. Async Call Semantics
 
 - `dag.call(...)` follows the execution lifecycle in
-  `docs/spec/execution-and-remotes.md` Section 1 and returns an
+  `docs/spec/execution.md` Section 1 and returns an
   `ExecutionHandle`.
 - `wait()` yields a DAG id on success.
 - Success/failure record writes follow `docs/spec/object-model.md` Section 7.4.

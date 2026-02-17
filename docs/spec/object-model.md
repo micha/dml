@@ -10,8 +10,10 @@ Authority boundary:
 - This document is authoritative for packed-record schemas, canonical encoding
   and hashing, keyspace, repository semantics, and core validation/error
   semantics.
-- For execution lifecycle, remotes, transfer protocol, and adapter contracts,
-  see `docs/spec/execution-and-remotes.md`.
+- For execution lifecycle, caching/retries, and execution adapter contracts,
+  see `docs/spec/execution.md`.
+- For remotes, transfer protocol, and remote adapter contracts, see
+  `docs/spec/remotes.md`.
 - For CLI command contracts, see `docs/spec/cli.md`.
 - For Python API surface and binding behavior, see
   `docs/spec/python-bindings.md`.

@@ -80,8 +80,10 @@ Before finishing doc changes, verify:
 
 - Packed-record model, encoding, hashing, keyspace, validation:
   `docs/spec/object-model.md`
-- Execution lifecycle, remotes, transfer, adapters:
-  `docs/spec/execution-and-remotes.md`
+- Execution lifecycle, caching/retries, in-flight policy, and execution
+  adapters: `docs/spec/execution.md`
+- Remotes, transfer protocol, and remote adapters:
+  `docs/spec/remotes.md`
 - CLI command contract and CLI-facing behavior:
   `docs/spec/cli.md`
 - Python API surface and binding behavior:

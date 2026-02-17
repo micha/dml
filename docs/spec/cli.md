@@ -12,8 +12,8 @@ Authority boundary:
   repository-facing CLI behavior.
 - For packed-record schemas, canonical encoding/hashing, keyspace, and
   validation/error semantics, see `docs/spec/object-model.md`.
-- For execution and remote transfer semantics, see
-  `docs/spec/execution-and-remotes.md`.
+- For execution semantics, see `docs/spec/execution.md`.
+- For remote transfer semantics, see `docs/spec/remotes.md`.
 - For Python API surface and binding behavior, see
   `docs/spec/python-bindings.md`.
 
