@@ -18,24 +18,85 @@ Authority boundary:
 - For Python API surface and binding behavior, see
   `docs/spec/python-bindings.md`.
 
+## Terminology
+
+- `Caller`: Client that requests execution (for example CLI or language
+  bindings).
+- `Executor`: Local DaggerML runtime responsible for call-node resolution,
+  cache checks, adapter polling, result integration, and pin updates.
+- `Execution Adapter`: Local adapter process invoked by the Executor.
+- `Repository Remote`: Remote DaggerML repository used for snapshots and result
+  integration.
+- `Execution Token`: Opaque continuation token returned by an Execution Adapter
+  while work is pending.
+- `Execution Attempt`: One logical run for a call node that can produce one
+  `DML_REC_EXEC`.
+
 ## 1. Execution Lifecycle
 
 Applies to `DML_NODE_CALL` nodes.
 
 1. A call node is created with deterministic identity from function ref + input
    node ids.
-2. Executor checks the active index commit exec map for `node_id`.
+2. The Executor checks the active index commit exec map for `node_id`.
 3. If an exec is pinned, return completed result without new execution.
-4. If execution is already in flight for `node_id`, attach caller to that
-   in-flight attempt.
-5. Otherwise enqueue a new attempt and poll adapter until completion.
-6. On success write an exec record per `docs/spec/object-model.md` Section 7.4
+4. Otherwise create or resume an `Execution Attempt` and invoke the
+   `Execution Adapter` with optional prior `Execution Token`.
+5. If the adapter reports `pending`, persist the newest `Execution Token` and
+   poll again.
+6. If the adapter reports `done`, fetch required result objects from the
+   `Repository Remote` and validate result availability.
+7. On success write an exec record per `docs/spec/object-model.md` Section 7.4
    (`status=OK`, call result as DAG id).
-7. On failure write an exec record per `docs/spec/object-model.md` Section 7.4
+8. On failure write an exec record per `docs/spec/object-model.md` Section 7.4
    (`status=ERROR`, error datum id).
-8. Commit pins accepted exec id in its exec map.
+9. Commit pins accepted exec id in its exec map.
 
 No `DML_REC_EXEC` is written while a call is pending.
+
+### 1.1 Local Executor state machine
+
+The `Executor` state machine is:
+
+- `resolve_call_node`
+  - The Executor MUST build or resolve deterministic `node_id` for the call.
+  - If the active index commit already pins `node_id`, transition to
+    `pinned_hit`.
+  - Otherwise transition to `poll_adapter`.
+- `poll_adapter`
+  - The Executor MUST invoke `Execution Adapter` with call context and an
+    optional prior `Execution Token`.
+  - `pending(token)` -> Executor MUST persist newest token and remain in
+    `poll_adapter`.
+  - `done(ok, result)` -> transition to `integrate_ok`.
+  - `done(error, result)` -> transition to `integrate_error`.
+  - transient failure -> transition to `retry_wait`.
+  - non-retryable failure -> transition to `failed_terminal`.
+- `integrate_ok`
+  - The Executor MUST fetch required result objects from `Repository Remote`.
+  - The Executor MUST validate availability of the terminal result DAG.
+  - The Executor MUST write `DML_REC_EXEC(status=OK)` and MUST atomically pin
+    the accepted exec id.
+  - success -> `completed_ok`; retryable integration failure -> `retry_wait`.
+- `integrate_error`
+  - The Executor MUST fetch required failure payload objects from
+    `Repository Remote`.
+  - The Executor MUST validate availability of terminal error payload.
+  - The Executor MUST write `DML_REC_EXEC(status=ERROR)` and MUST atomically
+    pin the accepted exec id.
+  - success -> `completed_error`; retryable integration failure -> `retry_wait`.
+- `retry_wait`
+  - The Executor SHOULD apply backoff and retry budget policy.
+  - Resume at last safe state (`poll_adapter`, `integrate_ok`, or
+    `integrate_error`).
+  - If retry budget is exhausted, transition to `failed_terminal`.
+
+Terminal states:
+
+- `pinned_hit`
+- `completed_ok`
+- `completed_error`
+- `failed_terminal`
 
 ## 2. Call Result Semantics
 
@@ -52,13 +113,18 @@ No `DML_REC_EXEC` is written while a call is pending.
 - Multiple exec records MAY exist per node id.
 - Retries MUST append new exec records and MUST NOT overwrite prior records.
 - `cache=False` semantics MAY force a new execution attempt.
+- A `done` result from adapter polling MUST NOT be surfaced as completed until
+  integration and pin update succeed.
 
 ## 4. In-Flight State
 
 - Canonical packed records do not currently persist pending state.
-- Pending state is tracked by executor runtime.
+- Pending state is tracked by `Execution Attempt` metadata and/or adapter
+  tokens managed by the Executor.
 - Tooling MAY maintain a derived, rebuildable in-flight index under separate
   prefixes.
+- Local in-memory in-flight deduplication is an optimization and is not
+  required for correctness.
 
 ## 5. Execution Adapter Contract
 
@@ -68,14 +134,16 @@ Adapter URI scheme:
 
 `<adapter>` resolves to an executable on `$PATH`.
 
-- Adapter is a stateless CLI.
+- The `Execution Adapter` is a stateless CLI.
 - Inputs include: call node id, function URI, input node ids, snapshot
   ref/remote URI, execution UUID, and optional prior token.
 - Adapter returns either:
   - `pending` + opaque token, or
   - `done` + result DAG id / error datum id.
-- Executor persists newest token and polls until done.
-- Adapter MUST NOT write `DML_REC_EXEC` directly; executor owns exec writes.
+- The Executor persists the newest token and polls until done.
+- The adapter MUST NOT write `DML_REC_EXEC` directly; the Executor owns exec
+  writes.
+- The adapter response token MUST be treated as opaque by the Executor.
 
 ## 6. Open Questions
 
