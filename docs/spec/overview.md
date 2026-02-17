@@ -36,10 +36,11 @@ Authority boundary:
   `docs/spec/object-model.md` (Sections 7 and 10)
 - Repository keyspace, refs, GC, and excision behavior:
   `docs/spec/object-model.md` (Sections 8-9)
-- Execution lifecycle, cache/retry behavior, in-flight policy, and execution
-  adapter contract: `docs/spec/execution.md` (Sections 1-5)
-- Remote execution snapshot flow, transfer protocol, remote adapter interface,
-  and serverless/S3 model: `docs/spec/remotes.md` (Sections 1-4)
+- Execution lifecycle, cache/retry behavior, in-flight policy, execution
+  adapter contract, and orchestrator claim/state semantics:
+  `docs/spec/execution.md` (Sections 1-5)
+- Remote execution snapshot exchange, transfer protocol, remote adapter
+  interface, and serverless/S3 model: `docs/spec/remotes.md` (Sections 1-4)
 - CLI command contract and repository-facing behavior:
   `docs/spec/cli.md` (Sections 2-3)
 - CLI validation error surface and reason-string structure:

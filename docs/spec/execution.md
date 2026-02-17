@@ -25,12 +25,18 @@ Authority boundary:
 - `Executor`: Local DaggerML runtime responsible for call-node resolution,
   cache checks, adapter polling, result integration, and pin updates.
 - `Execution Adapter`: Local adapter process invoked by the Executor.
+- `Orchestrator`: Control-plane service that handles idempotent claim, submit,
+  and polling for an execution attempt.
+- `Worker Backend`: Compute system where jobs actually run (for example AWS
+  Batch).
 - `Repository Remote`: Remote DaggerML repository used for snapshots and result
   integration.
 - `Execution Token`: Opaque continuation token returned by an Execution Adapter
   while work is pending.
 - `Execution Attempt`: One logical run for a call node that can produce one
   `DML_REC_EXEC`.
+- `Execution Key`: Deterministic idempotency key used by Orchestrator claim
+  logic.
 
 ## 1. Execution Lifecycle
 
@@ -49,7 +55,7 @@ Applies to `DML_NODE_CALL` nodes.
 7. On success write an exec record per `docs/spec/object-model.md` Section 7.4
    (`status=OK`, call result as DAG id).
 8. On failure write an exec record per `docs/spec/object-model.md` Section 7.4
-   (`status=ERROR`, error datum id).
+   (`status=ERROR`, failure-result DAG id).
 9. Commit pins accepted exec id in its exec map.
 
 No `DML_REC_EXEC` is written while a call is pending.
@@ -79,9 +85,9 @@ The `Executor` state machine is:
     the accepted exec id.
   - success -> `completed_ok`; retryable integration failure -> `retry_wait`.
 - `integrate_error`
-  - The Executor MUST fetch required failure payload objects from
+  - The Executor MUST fetch required failure-result DAG objects from
     `Repository Remote`.
-  - The Executor MUST validate availability of terminal error payload.
+  - The Executor MUST validate availability of the terminal failure-result DAG.
   - The Executor MUST write `DML_REC_EXEC(status=ERROR)` and MUST atomically
     pin the accepted exec id.
   - success -> `completed_error`; retryable integration failure -> `retry_wait`.
@@ -98,10 +104,59 @@ Terminal states:
 - `completed_error`
 - `failed_terminal`
 
+### 1.2 Remote Orchestrator state machine
+
+The `Orchestrator` state machine is:
+
+- `lookup_claim`
+  - The Orchestrator MUST resolve claim state for `Execution Key`.
+  - If no claim exists, attempt atomic claim create and transition to
+    `claimed_owner` on success.
+  - If a claim exists, transition to `follow_existing`.
+- `claimed_owner`
+  - The Orchestrator MUST perform idempotent submit to `Worker Backend`.
+  - The Orchestrator MUST persist backend job identity and lease metadata.
+  - Transition to `job_pending`.
+- `follow_existing`
+  - The Orchestrator MUST reuse existing claim/job identity for this
+    `Execution Key`.
+  - If lease is active, transition to `job_pending`.
+  - If lease is stale and takeover policy permits, atomically claim takeover and
+    transition to `claimed_owner`.
+- `job_pending`
+  - The Orchestrator MUST poll `Worker Backend` status and refresh lease
+    metadata.
+  - If job is still queued/running, return `pending(token)` to the
+    `Execution Adapter`.
+  - If job succeeds, the Orchestrator MUST publish terminal result
+    objects/refs and return `done(ok, result)`.
+  - If job fails, the Orchestrator MUST publish terminal failure-result DAG
+    objects/refs and return `done(error, result)`.
+
+Terminal outcomes exposed through adapter responses:
+
+- `done(ok, result)`
+- `done(error, result)`
+
+### 1.3 Idempotent claim model
+
+- Orchestrators SHOULD implement idempotent submit using a durable
+  `Execution Key` claim boundary.
+- A repository-backed claim namespace MAY be used (for example
+  `refs/exec-claims/<execution_key>`), with atomic compare-and-swap updates.
+- Claim contention MUST be scoped to a per-key claim ref and MUST NOT require
+  global ref quiescence.
+- Claim records SHOULD include lease metadata so stale owners can be detected
+  and safely taken over.
+- If a lease-based takeover policy is used, takeover MUST use an atomic
+  compare-and-swap update on the claim ref.
+
 ## 2. Call Result Semantics
 
 - `DML_NODE_CALL` success result follows `docs/spec/object-model.md` Section
   7.4.
+- `DML_NODE_CALL` failure result also follows `docs/spec/object-model.md`
+  Section 7.4 as a DAG whose root node encodes failure details.
 - The returned value is that DAG's `root_node`.
 - Tooling MAY add a convenience name `root`, but correctness MUST NOT depend on
   it.
@@ -139,7 +194,8 @@ Adapter URI scheme:
   ref/remote URI, execution UUID, and optional prior token.
 - Adapter returns either:
   - `pending` + opaque token, or
-  - `done` + result DAG id / error datum id.
+  - `done` + terminal result id.
+- For `CALL`, terminal result id MUST be a DAG id for both success and failure.
 - The Executor persists the newest token and polls until done.
 - The adapter MUST NOT write `DML_REC_EXEC` directly; the Executor owns exec
   writes.

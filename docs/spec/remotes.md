@@ -20,23 +20,16 @@ Authority boundary:
 
 ## Terminology
 
-- `Executor`: Local DaggerML runtime that invokes an `Execution Adapter` and
-  integrates terminal results.
-- `Execution Adapter`: Local adapter process invoked by the Executor.
-- `Orchestrator`: Remote control-plane service handling idempotent claim,
-  submit, and polling logic.
-- `Worker Backend`: Remote compute system where jobs run (for example AWS
-  Batch).
 - `Repository Remote`: Remote DaggerML repository used for snapshot and result
   exchange.
-- `Execution Key`: Deterministic idempotency key used by an Orchestrator claim
-  namespace.
-- `Execution Token`: Opaque continuation token passed between Executor and
-  adapter while work is pending.
+- `Remote Adapter`: Adapter process for repository IO operations.
 
 ## 1. Remote Execution Snapshot Protocol
 
 For external execution against a remote:
+
+Actor definitions for `Executor`, `Execution Adapter`, and `Orchestrator` are
+specified in `docs/spec/execution.md`.
 
 1. The Executor creates snapshot ref `refs/exec/<uuid>` at current index
    commit.
@@ -51,55 +44,6 @@ For external execution against a remote:
 6. Exec refs are ephemeral and MAY be pruned after integration.
 
 Local execution SHOULD follow the same protocol via `file://` remotes.
-
-### 1.1 Idempotent claim model
-
-- Orchestrators SHOULD implement idempotent submit using a durable
-  `Execution Key` claim boundary.
-- A repository-backed claim namespace MAY be used (for example
-  `refs/exec-claims/<execution_key>`), with atomic compare-and-swap updates.
-- Claim contention MUST be scoped to a per-key claim ref and MUST NOT require
-  global ref quiescence.
-- Claim records SHOULD include lease metadata so stale owners can be detected
-  and safely taken over.
-- If a lease-based takeover policy is used, takeover MUST use an atomic
-  compare-and-swap update on the claim ref.
-
-### 1.2 Remote Orchestrator state machine
-
-The `Orchestrator` state machine is:
-
-- `lookup_claim`
-  - The Orchestrator MUST resolve claim state for `Execution Key`.
-  - If no claim exists, attempt atomic claim create and transition to
-    `claimed_owner` on success.
-  - If a claim exists, transition to `follow_existing`.
-- `claimed_owner`
-  - The Orchestrator MUST perform idempotent submit to `Worker Backend`.
-  - The Orchestrator MUST persist backend job identity and lease metadata.
-  - Transition to `job_pending`.
-- `follow_existing`
-  - The Orchestrator MUST reuse existing claim/job identity for this
-    `Execution Key`.
-  - If lease is active, transition to `job_pending`.
-  - If lease is stale and takeover policy permits, atomically claim takeover and
-    transition to `claimed_owner`.
-- `job_pending`
-  - The Orchestrator MUST poll `Worker Backend` status and refresh lease
-    metadata.
-  - If job is still queued/running, return `pending(token)` to the
-    `Execution Adapter`.
-  - If job succeeds, the Orchestrator MUST publish terminal result
-    objects/refs and return
-    `done(ok, result)`.
-  - If job fails, the Orchestrator MUST publish terminal failure payload and
-    return
-    `done(error, result)`.
-
-Terminal outcomes exposed through adapter responses:
-
-- `done(ok, result)`
-- `done(error, result)`
 
 ## 2. Remote Refs and Transfer
 

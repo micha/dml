@@ -283,10 +283,13 @@ typedef struct {
 
 Rules:
 
-- `status=OK` uses `result_value`; `error_value` is zeroed.
-- `status=ERROR` uses `error_value`; `result_value` is zeroed.
-- For `CALL`, `result_value` is a DAG id (call-result DAG).
-- For `BUILTIN`, `result_value` is a datum id.
+- For `CALL`, `result_value` MUST be a DAG id for both `status=OK` and
+  `status=ERROR`; `error_value` MUST be zeroed.
+- For `CALL` with `status=ERROR`, the DAG root node encodes the failure result.
+- For `BUILTIN` with `status=OK`, `result_value` MUST be a datum id and
+  `error_value` MUST be zeroed.
+- For `BUILTIN` with `status=ERROR`, `error_value` MUST be a datum id and
+  `result_value` MUST be zeroed.
 
 ### 7.5 `DML_REC_EXEC_REQUEST`
 
