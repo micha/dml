@@ -71,10 +71,10 @@ Implementation target:
 
 Lowering examples:
 
-- `dag.literal([1, 2, n])` -> `dml://list/construct`
-- `dag.literal({"k": v})` -> `dml://map/construct`
-- `dag.literal({v1, v2})` -> `dml://set/construct`
-- `dml://list/construct` returns a `DML_DATUM_LIST` preserving element order.
+- `dag.literal([1, 2, n])` -> `dml://seq/new`
+- `dag.literal({"k": v})` -> `dml://map/new`
+- `dag.literal({v1, v2})` -> `dml://set/new`
+- `dml://seq/new` returns a `DML_DATUM_LIST` preserving element order.
 
 ## 4. Async Call Semantics
 
@@ -105,35 +105,49 @@ the bindings.
 
 ## 6. Standard Library Builtin URIs
 
-List:
+Collection builtins MUST use language-neutral names so core semantics are shared
+across bindings. Python dunder behavior is a porcelain mapping layer built on
+top of these operations.
 
-- `dml://list/construct`
-- `dml://list/get`
-- `dml://list/add`
-- `dml://list/prepend`
-- `dml://list/append`
-- `dml://list/remove`
-- `dml://list/union`
+Sequence (`seq`, ordered collection):
 
-Set:
+- `dml://seq/new`
+- `dml://seq/len`
+- `dml://seq/at`
+- `dml://seq/slice`
+- `dml://seq/concat`
+- `dml://seq/insert_at`
+- `dml://seq/remove_at`
+- `dml://seq/contains`
 
-- `dml://set/construct`
-- `dml://set/get`
+Set (`set`, unique unordered collection):
+
+- `dml://set/new`
+- `dml://set/len`
+- `dml://set/contains`
 - `dml://set/add`
 - `dml://set/remove`
 - `dml://set/union`
 - `dml://set/intersection`
 - `dml://set/difference`
+- `dml://set/symmetric_difference`
+- `dml://set/is_subset`
+- `dml://set/is_superset`
 
-Map:
+Map (`map`, key/value collection):
 
-- `dml://map/construct`
+- `dml://map/new`
+- `dml://map/len`
 - `dml://map/get`
-- `dml://map/assoc`
-- `dml://map/dissoc`
-- `dml://map/union`
-- `dml://map/intersection`
-- `dml://map/difference`
+- `dml://map/contains_key`
+- `dml://map/set`
+- `dml://map/remove`
+- `dml://map/merge`
+- `dml://map/keys`
+- `dml://map/values`
+- `dml://map/items`
+- `dml://map/project_keys`
+- `dml://map/difference_keys`
 
 ## 7. Example
 
