@@ -119,18 +119,7 @@ formatter or linter, defer to its rules and update this section accordingly.
 ## Commit Messages
 
 - Use a short imperative title (50-72 chars) plus a body that explains the why.
-- Prefer a 1-2 sentence body that captures intent and scope.
-- Commit message body lines MUST be wrapped at 80 characters or less.
-- Before committing, verify body line lengths in `git log -1 --pretty=%B`.
-- Install `scripts/commit-msg-hook.sh` as `.git/hooks/commit-msg` for local
-  enforcement.
-- Example:
-  ```
-  Add deterministic key ordering in map encoder
-
-  Canonical key ordering is required for stable object hashing across
-  platforms and to prevent hash drift between equivalent map values.
-  ```
+- Use markdown for the body where appropriate.
 - Split commits when uncommitted changes include multiple, clearly differentiated tasks.
 
 ## API Stability
@@ -140,6 +129,8 @@ formatter or linter, defer to its rules and update this section accordingly.
 
 ## Documentation Expectations
 
+- Before modifying any documentation file (for example `docs/**/*.md`), read
+  `docs/documentation-guidelines.md` in the current session.
 - Follow `docs/documentation-guidelines.md` for writing style, source-of-truth
   ownership, and cross-reference patterns.
 - Document new modules with a short overview and usage example.

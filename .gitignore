@@ -71,6 +71,7 @@ subprojects/packagecache/
 .cache/
 
 # Test and local tool artifacts
+.coverage
 .hypothesis/
 __pycache__/
 *.pyc
