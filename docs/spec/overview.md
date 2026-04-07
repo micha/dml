@@ -20,6 +20,8 @@ Authority boundary:
 4. `docs/spec/cli.md` - repository-facing CLI contract and admin operations.
 5. `docs/spec/python-bindings.md` - proposed high-level Python API over core
    records.
+6. `docs/spec/maintainability.md` - maintainability assessment rubric,
+   especially for AI-heavy authoring workflows.
 
 ## Scope
 
@@ -48,6 +50,8 @@ Authority boundary:
   `docs/spec/cli.md` (Section 4)
 - Python API shape and language-level behavior:
   `docs/spec/python-bindings.md` (Sections 2-7)
+- Maintainability assessment dimensions, AI-heavy weighting, and repository
+  evidence expectations: `docs/spec/maintainability.md` (Sections 1-7)
 
 ## Status
 

@@ -51,3 +51,4 @@ targets `build/check/test_version` by default when present.
 - `docs/spec/remotes.md` (Remote snapshot flow and transfer)
 - `docs/spec/cli.md` (CLI contract and error codes)
 - `docs/spec/python-bindings.md` (Python API proposal)
+- `docs/spec/maintainability.md` (Maintainability assessment rubric)
