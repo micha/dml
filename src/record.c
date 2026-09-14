@@ -377,9 +377,10 @@ dml_status dml_datum_encode(const dml_datum_input *input, dml_buffer *out,
       break;
   }
   dml_buffer_free(&normalized);
-  if (validate_datum(record, total_len, NULL, error) != DML_OK) {
+  dml_status status = validate_datum(record, total_len, NULL, error);
+  if (status != DML_OK) {
     free(record);
-    return error == NULL ? DML_INVALID_PAYLOAD : error->code;
+    return status;
   }
   out->data = record;
   out->len = total_len;

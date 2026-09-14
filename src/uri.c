@@ -104,6 +104,27 @@ dml_status dml_uri_canonicalize(const uint8_t *data, size_t len, dml_buffer *out
                            "record_type=datum;detail=uri_not_ascii");
     }
   }
+  /* Validate the original grammar before decoding escapes: schemes, ports,
+   * and IP literals do not permit arbitrary percent-encoded characters. */
+  status = uriParseSingleUriExA(&uri, (const char *)data,
+                                (const char *)data + len, &error_pos);
+  if (status != URI_SUCCESS) {
+    return dml_set_error(error, status == URI_ERROR_MALLOC ? DML_OUT_OF_MEMORY
+                                                           : DML_INVALID_PAYLOAD,
+                         status,
+                         "record_type=datum;detail=uri_syntax");
+  }
+  if (uri.scheme.first == NULL || uri.scheme.first == uri.scheme.afterLast) {
+    uriFreeUriMembersA(&uri);
+    return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
+                         "record_type=datum;detail=uri_not_absolute");
+  }
+  if (ascii_equal_ci(uri.scheme.first, uri.scheme.afterLast, "dml")) {
+    uriFreeUriMembersA(&uri);
+    return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
+                         "record_type=datum;detail=uri_reserved_scheme");
+  }
+  uriFreeUriMembersA(&uri);
   dml_result = normalize_escapes(data, len, &normalized_input, &normalized_len,
                                  error);
   if (dml_result != DML_OK) return dml_result;
@@ -111,20 +132,9 @@ dml_status dml_uri_canonicalize(const uint8_t *data, size_t len, dml_buffer *out
                                 normalized_input + normalized_len, &error_pos);
   if (status != URI_SUCCESS) {
     free(normalized_input);
-    return dml_set_error(error, DML_INVALID_PAYLOAD, status,
-                         "record_type=datum;detail=uri_syntax");
-  }
-  if (uri.scheme.first == NULL || uri.scheme.first == uri.scheme.afterLast) {
-    uriFreeUriMembersA(&uri);
-    free(normalized_input);
-    return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
-                         "record_type=datum;detail=uri_not_absolute");
-  }
-  if (ascii_equal_ci(uri.scheme.first, uri.scheme.afterLast, "dml")) {
-    uriFreeUriMembersA(&uri);
-    free(normalized_input);
-    return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
-                         "record_type=datum;detail=uri_reserved_scheme");
+    return dml_set_error(error, status == URI_ERROR_MALLOC ? DML_OUT_OF_MEMORY
+                                                           : DML_INVALID_PAYLOAD,
+                         status, "record_type=datum;detail=uri_syntax");
   }
   normalization_mask = URI_NORMALIZE_SCHEME | URI_NORMALIZE_USER_INFO |
                        URI_NORMALIZE_HOST | URI_NORMALIZE_QUERY |

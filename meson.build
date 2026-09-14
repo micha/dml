@@ -80,6 +80,15 @@ test_record = executable(
 
 test('test_record', test_record)
 
+test_record_failure = executable(
+  'test_record_failure',
+  'tests/c/test_record_failure.c',
+  include_directories: dml_inc,
+  dependencies: dml_dep,
+)
+
+test('test_record_failure', test_record_failure)
+
 test_repo = executable(
   'test_repo',
   'tests/c/test_repo.c',

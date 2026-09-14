@@ -85,6 +85,23 @@ def test_uri_profile_and_malformed_record_rejection() -> None:
   assert b"invalid_header" in result.stderr
 
 
+@given(
+  scheme=st.sampled_from(["http", "https", "urn"]),
+  escape_index=st.integers(min_value=0, max_value=2),
+  port=st.integers(min_value=0, max_value=65535),
+)
+def test_uri_rejects_escapes_in_scheme_and_port(scheme: str, escape_index: int, port: int) -> None:
+  escaped_scheme = (
+    scheme[:escape_index] + f"%{ord(scheme[escape_index]):02X}" + scheme[escape_index + 1:]
+  )
+  port_text = str(port)
+  escaped_port = f"%{ord(port_text[0]):02X}" + port_text[1:]
+  for uri in [f"{escaped_scheme}://example.com/", f"http://example.com:{escaped_port}/"]:
+    result = run_driver("normalize-uri", data=uri.encode("ascii"), check=False)
+    assert result.returncode != 0
+    assert b"invalid_payload: record_type=datum;detail=uri_syntax" in result.stderr
+
+
 def test_reviewed_golden_records_and_ids() -> None:
   fixture_path = pathlib.Path(__file__).parents[1] / "fixtures" / "records" / "datums.json"
   vectors = json.loads(fixture_path.read_text(encoding="ascii"))["vectors"]

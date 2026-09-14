@@ -95,6 +95,36 @@ static int test_text_and_uri(void) {
   return 0;
 }
 
+static int test_uri_syntax_before_normalization(void) {
+  static const char *const invalid[] = {
+      "%68ttp://example.com/",
+      "http://example.com:%38%30/",
+      "http://[::%31]/",
+  };
+  static const char *const valid[][2] = {
+      {"http://example.com/a/%2e%2E/b", "http://example.com/b"},
+      {"urn:a/%2e%2e/b", "urn:a/../b"},
+      {"http://%65XAMPLE.com:80/%7e?q=%2f#", "http://example.com:80/~?q=%2F#"},
+  };
+  dml_buffer normalized = {0};
+  dml_error error;
+
+  for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+    CHECK(dml_uri_canonicalize((const uint8_t *)invalid[i], strlen(invalid[i]),
+                               &normalized, &error) == DML_INVALID_PAYLOAD);
+    CHECK(strcmp(error.detail, "record_type=datum;detail=uri_syntax") == 0);
+    CHECK(normalized.data == NULL && normalized.len == 0);
+  }
+  for (size_t i = 0; i < sizeof(valid) / sizeof(valid[0]); i++) {
+    CHECK(dml_uri_canonicalize((const uint8_t *)valid[i][0], strlen(valid[i][0]),
+                               &normalized, &error) == DML_OK);
+    CHECK(normalized.len == strlen(valid[i][1]));
+    CHECK(memcmp(normalized.data, valid[i][1], normalized.len) == 0);
+    dml_buffer_free(&normalized);
+  }
+  return 0;
+}
+
 static int test_collections_and_ids(void) {
   dml_object_id ids[3] = {{{2}}, {{1}}, {{1}}};
   dml_datum_map_entry entries[2] = {{{{2}}, {{4}}}, {{{1}}, {{3}}}};
@@ -163,6 +193,7 @@ static int test_invalid_envelopes(void) {
 int main(void) {
   CHECK(test_scalars() == 0);
   CHECK(test_text_and_uri() == 0);
+  CHECK(test_uri_syntax_before_normalization() == 0);
   CHECK(test_collections_and_ids() == 0);
   CHECK(test_invalid_envelopes() == 0);
   return 0;
