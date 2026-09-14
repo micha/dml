@@ -81,3 +81,5 @@ __pycache__/
 # Meson-downloaded wrap sources
 subprojects/xxHash-*/
 subprojects/lmdb-*/
+subprojects/uriparser-*/
+subprojects/utf8proc-*/

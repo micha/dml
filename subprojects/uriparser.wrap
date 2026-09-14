@@ -1,0 +1,9 @@
+[wrap-file]
+directory = uriparser-1.0.2
+source_url = https://github.com/uriparser/uriparser/releases/download/uriparser-1.0.2/uriparser-1.0.2.tar.gz
+source_filename = uriparser-1.0.2.tar.gz
+source_hash = 963554c32d40fb6cba5644f1ba63e6dd7a182b2948bd71ee448c532f53b07f1e
+patch_directory = uriparser
+
+[provide]
+uriparser = uriparser_dep

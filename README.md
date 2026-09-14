@@ -45,6 +45,7 @@ targets `build/check/test_version` by default when present.
 - `docs/documentation-guidelines.md` (How to write and maintain docs)
 - `docs/packaging-and-distribution.md` (Python package layout and release plan)
 - `docs/architecture.md` (Architecture overview)
+- `docs/core-storage.md` (Native datum codec and local repository API)
 - `docs/spec/overview.md` (Specification)
 - `docs/spec/object-model.md` (Packed records, hashing, keyspace)
 - `docs/spec/execution.md` (Execution lifecycle, caching, adapters)

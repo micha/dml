@@ -15,22 +15,43 @@ xxhash_dep = xxhash_proj.get_variable('xxhash_dep')
 lmdb_proj = subproject('lmdb', default_options: ['default_library=static'])
 lmdb_dep = lmdb_proj.get_variable('lmdb_dep')
 
+utf8proc_proj = subproject('utf8proc', default_options: ['default_library=static'])
+utf8proc_dep = utf8proc_proj.get_variable('utf8proc_dep')
+
+uriparser_proj = subproject('uriparser', default_options: ['default_library=static'])
+uriparser_dep = uriparser_proj.get_variable('uriparser_dep')
+
 dml_inc = include_directories('include')
 
 libdml = static_library(
   'dml',
-  'src/dml.c',
+  files(
+    'src/dml.c',
+    'src/encoding.c',
+    'src/error.c',
+    'src/object_id.c',
+    'src/record.c',
+    'src/repo.c',
+    'src/text.c',
+    'src/uri.c',
+  ),
   include_directories: dml_inc,
-  dependencies: [xxhash_dep, lmdb_dep],
+  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
   install: true,
 )
 
-install_headers('include/dml/dml.h', subdir: 'dml')
+install_headers(
+  'include/dml/dml.h',
+  'include/dml/error.h',
+  'include/dml/record.h',
+  'include/dml/repo.h',
+  subdir: 'dml',
+)
 
 dml_dep = declare_dependency(
   link_with: libdml,
   include_directories: dml_inc,
-  dependencies: [xxhash_dep, lmdb_dep],
+  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
 )
 
 dml_cli = executable(
@@ -49,5 +70,30 @@ test_version = executable(
 )
 
 test('test_version', test_version)
+
+test_record = executable(
+  'test_record',
+  'tests/c/test_record.c',
+  include_directories: dml_inc,
+  dependencies: dml_dep,
+)
+
+test('test_record', test_record)
+
+test_repo = executable(
+  'test_repo',
+  'tests/c/test_repo.c',
+  include_directories: dml_inc,
+  dependencies: dml_dep,
+)
+
+test('test_repo', test_repo, is_parallel: false)
+
+test_core_driver = executable(
+  'test_core_driver',
+  'tests/c/core_driver.c',
+  include_directories: dml_inc,
+  dependencies: dml_dep,
+)
 
 meson.override_dependency('dml', dml_dep)

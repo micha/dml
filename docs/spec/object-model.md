@@ -71,8 +71,12 @@ typedef struct {
 Envelope rules:
 
 - `magic` MUST be `0x314C4D44` (`DML1`, little-endian).
+- The initial record format version is `1`. Readers implementing this version
+  MUST reject every other version.
 - `total_len` MUST equal LMDB value length and be at least header size.
 - Readers MUST reject trailing bytes.
+- Canonical writers MUST set reserved `flags` to zero. Version 1 readers MUST
+  reject nonzero flags.
 - Canonical stored records MUST set `checksum = 0`.
 - Checksums MAY be used in transfer streams (import/export/push/pull), but do
   not change object identity.
@@ -86,6 +90,8 @@ Envelope rules:
 - Disk encoding is always little-endian.
 - No pointers in persisted structs.
 - Variable data is stored in trailing blob regions addressed by offsets.
+- Fields following the header are serialized consecutively in declaration order
+  without C ABI padding. Native structure layout MUST NOT be persisted.
 
 ### 5.2 Offset safety
 
@@ -97,7 +103,20 @@ Envelope rules:
 
 - Strings and names MUST be valid UTF-8.
 - Strings and names MUST be normalized to NFC.
-- URI datums MUST be RFC 3986 canonical form.
+- URI datums MUST be absolute RFC 3986 URIs serialized as ASCII. Relative URI
+  references and raw non-ASCII input MUST be rejected.
+- Canonical URI syntax MUST lowercase the scheme and host, uppercase percent
+  escape digits, decode percent escapes for unreserved characters, and remove
+  dot segments from hierarchical paths. Escaped reserved delimiters, query
+  ordering, fragments, significant empty components, and explicit ports MUST be
+  preserved. Scheme-specific equivalences such as default-port removal MUST NOT
+  be applied.
+- Percent-escape normalization occurs before dot-segment removal, so escaped
+  unreserved dot characters participate in dot segments. Rootless,
+  scheme-specific paths retain their segment structure except for percent-escape
+  normalization.
+- URI text MUST NOT contain U+0000. A scheme equal to `dml`, after ASCII case
+  normalization, is reserved and MUST be rejected.
 - Names and URIs used in LMDB keys MUST be percent-encoded.
 - Name length MUST be <= 255 bytes after UTF-8 encoding and before
   percent-encoding.
@@ -114,15 +133,17 @@ Envelope rules:
 ### 5.5 Float canonicalization
 
 - `-0.0` MUST be normalized to `+0.0`.
-- NaN MUST be normalized to one fixed bit pattern.
+- NaN MUST be normalized to quiet-NaN bits `0x7ff8000000000000`.
 
 ## 6. Object IDs and Hashing
 
-- Object id algorithm: `XXH3_128`.
+- Object id algorithm: default, unseeded `XXH3_128`.
 - `dml_object_id` size: 16 bytes.
 - Hash input is the packed record byte sequence with `magic`, `total_len`, and
   `checksum` treated as zero.
 - `type` and `version` are included in the hash domain.
+- Digest bytes use xxHash's canonical 128-bit representation: the high 64 bits
+  followed by the low 64 bits, each in big-endian order.
 - Ref records are excluded from content-addressed hashing.
 
 ## 7. Record Types
@@ -147,6 +168,9 @@ enum dml_rec_type {
 ### 7.1 `DML_REC_META`
 
 Repository metadata.
+
+The initial repository schema version is `1`. The packed record is exactly 24
+bytes: the header followed immediately by little-endian `schema_version`.
 
 ```c
 typedef struct {
@@ -183,6 +207,16 @@ typedef struct {
 
 Rules:
 
+- The packed datum prefix is exactly 40 bytes. `kind` starts at byte 20,
+  `payload_len` at byte 24, and `payload_ofs` at byte 32.
+- `payload_ofs` MUST be 40, including for an empty payload. The payload MUST
+  occupy the remainder of the record without gaps or trailing bytes.
+- `NULL` has an empty payload.
+- `BOOL` has a one-byte payload equal to 0 or 1.
+- `I64` has an eight-byte little-endian two's-complement payload.
+- `F64` has an eight-byte little-endian IEEE-754 binary64 payload and obeys
+  Section 5.5.
+- `BYTES` contains its input bytes without transformation.
 - `STRING` payload is UTF-8 NFC bytes.
 - `URI` payload is canonical UTF-8 URI bytes.
 - `LIST` stores an ordered sequence of datum object ids.
@@ -423,6 +457,10 @@ typedef struct {
 } dml_rec_tombstone;
 ```
 
+The fixed prefix is 36 bytes: `reason_code` starts at byte 20, `message_ofs`
+at byte 24, and `message_len` at byte 32. `message_ofs` MUST be 36 and the
+message MUST occupy the remainder of the record without gaps or trailing bytes.
+
 ## 8. Keyspace
 
 ### 8.1 Object keys
@@ -437,6 +475,8 @@ Content-addressed objects MUST use type-prefixed keys:
 - `objects/execs/<id>`
 
 `<id>` is lowercase hex (32 chars for 16-byte ids).
+Keys contain exactly the displayed bytes and do not include a terminating NUL.
+Repositories use LMDB's main database rather than one named database per type.
 
 ### 8.2 Ref keys
 
@@ -453,7 +493,22 @@ Names MUST be UTF-8 NFC and percent-encoded in keys.
 
 ## 9. Repository Semantics
 
-### 9.1 Workflow sketch (informative)
+### 9.1 Local repository initialization
+
+- A repository schema is the canonical `DML_REC_META` value at `meta/schema`.
+- Opening without creation MUST reject missing paths, empty directories, and
+  environments without a valid supported schema.
+- Opening with creation MAY initialize a missing or empty environment whose
+  parent exists. It MUST NOT initialize a nonempty directory lacking a valid
+  schema or replace malformed or unsupported metadata.
+- Schema initialization MUST occur in one write transaction. Implementations
+  MUST use normal LMDB locking and durability semantics.
+- An empty LMDB main database left by an interrupted initializer remains
+  eligible for initialization. A main database with unrelated keys but no
+  schema MUST be rejected.
+- This version supports schema version `1` only and performs no migration.
+
+### 9.2 Workflow sketch (informative)
 
 1. Open or initialize repository.
 2. Resolve base head commit.
@@ -464,7 +519,7 @@ Names MUST be UTF-8 NFC and percent-encoded in keys.
 
 Index refs are recovery-friendly staging pointers and MUST be updated atomically.
 
-### 9.2 GC and excision
+### 9.3 GC and excision
 
 - Reachability roots: `refs/heads/*` and `refs/index/*`.
 - GC is mark-and-sweep over reachable content-addressed objects.
@@ -486,7 +541,7 @@ Error codes:
 - `invalid_payload`
 - `invalid_utf8`
 
-Reason strings SHOULD use this format:
+Reason strings MUST use this format:
 
 `record_type=<type>;detail=<short_reason>`
 
@@ -613,9 +668,9 @@ bool validate_datum_map(const uint8_t *rec, uint32_t rec_len,
 In all cases, decoders MUST also verify that referenced ids resolve to datum
 records when materializing composite values.
 
-### 10.2 Detail-to-error-class mapping (informative)
+### 10.2 Detail-to-error-class mapping
 
-Implementations should map the pseudocode `detail` reasons to stable high-level
+Implementations MUST map the pseudocode `detail` reasons to stable high-level
 error codes as follows:
 
 - `*_payload_bounds` -> `invalid_bounds`
