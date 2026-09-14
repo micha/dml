@@ -40,11 +40,11 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
         if: matrix.platform == 'unix'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -129,7 +129,7 @@ jobs:
 
       - name: Upload Meson logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}-meson-logs
           path: build/check/meson-logs
@@ -137,7 +137,7 @@ jobs:
 
       - name: Upload built binary
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}-dml-bin
           path: ${{ matrix.dml_bin }}
@@ -149,10 +149,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -168,7 +168,7 @@ jobs:
 
       - name: Upload strict check artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: strict-linux-check-artifacts
           path: |

@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build platform wheel with cibuildwheel
         uses: pypa/cibuildwheel@v2.23.2
@@ -60,7 +60,7 @@ jobs:
           output-dir: python/daggerml/dist
 
       - name: Upload daggerml wheel artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: daggerml-wheel-${{ matrix.id }}
           path: python/daggerml/dist/*.whl
@@ -72,10 +72,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -86,7 +86,7 @@ jobs:
         working-directory: python/daggerml
 
       - name: Upload daggerml sdist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: daggerml-sdist
           path: python/daggerml/dist/*.tar.gz
@@ -98,10 +98,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -117,7 +117,7 @@ jobs:
         working-directory: python/adapters/example
 
       - name: Upload pure Python artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-tools-dist
           path: |
@@ -134,18 +134,18 @@ jobs:
 
     steps:
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Download Linux daggerml wheel artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: daggerml-wheel-linux-x86_64
           path: artifacts/daggerml
 
       - name: Download pure Python artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: python-tools-dist
           path: artifacts/tools
@@ -192,7 +192,7 @@ jobs:
 
     steps:
       - name: Download daggerml artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: daggerml-*
           path: dist/daggerml
@@ -217,7 +217,7 @@ jobs:
 
     steps:
       - name: Download pure Python artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: python-tools-dist
           path: dist/tools
@@ -246,7 +246,7 @@ jobs:
 
     steps:
       - name: Download pure Python artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: python-tools-dist
           path: dist/tools
