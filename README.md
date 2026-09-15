@@ -30,7 +30,10 @@ and writes HTML reports under:
 - `build/coverage/python-html` (Python coverage via coverage.py, when Python
   source files exist outside tests)
 
-Python test dependencies are in `requirements-dev.txt` (pytest + Hypothesis).
+Python test dependencies are in `requirements-dev.txt` (pytest, Hypothesis, and
+coverage.py). Windows CI installs the corresponding UCRT64 packages through
+[MSYS2](https://www.msys2.org/docs/python/) so native extensions match its Python
+build.
 
 Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
 targets `build/check/test_version` by default when present.
