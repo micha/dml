@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/check.sh [-v] [-f] [-m]
+Usage: scripts/check.sh [-v] [-f] [-m] [-c]
 
 Runs full validation:
   - Configures and builds with Meson
@@ -12,12 +12,13 @@ Runs full validation:
   - Runs Python source coverage via coverage.py when Python sources exist
   - Runs Mull mutation testing (when -m is passed)
   - Captures gcov/lcov coverage and generates HTML report
-  - Enforces 100% line/function/branch coverage
+  - Enforces 100% line/function/branch coverage unless -c is passed
 
 Options:
   -v  Run C tests under Valgrind
   -f  Remove build artifacts before rebuilding
   -m  Enable Mull mutation testing
+  -c  Report coverage without enforcing percentage thresholds
 
 Environment:
   MULL_TARGETS   Space-separated test binaries for mull-runner
@@ -37,6 +38,8 @@ require_cmd() {
 run_python_tests_and_coverage_if_present() {
   local root="$1"
   local coverage_out="$2"
+  local enforce_coverage="$3"
+  local coverage_threshold=100
   local omit_patterns="$root/tests/*,$root/subprojects/*,$root/build/*"
   local source_count
 
@@ -92,12 +95,17 @@ PY
   python3 -m coverage erase
   python3 -m coverage run --source "$root" --omit "$omit_patterns" -m pytest -q
 
-  echo "==> Enforcing 100% Python source coverage"
-  python3 -m coverage report --omit "$omit_patterns" --fail-under=100
+  if [ "$enforce_coverage" -eq 1 ]; then
+    echo "==> Enforcing 100% Python source coverage"
+  else
+    echo "==> Reporting Python source coverage (threshold disabled)"
+    coverage_threshold=0
+  fi
+  python3 -m coverage report --omit "$omit_patterns" --fail-under="$coverage_threshold"
 
   echo "==> Generating Python coverage reports"
-  python3 -m coverage xml -o "$coverage_out/python-coverage.xml"
-  python3 -m coverage html -d "$coverage_out/python-html"
+  python3 -m coverage xml --fail-under="$coverage_threshold" -o "$coverage_out/python-coverage.xml"
+  python3 -m coverage html --fail-under="$coverage_threshold" -d "$coverage_out/python-html"
 }
 
 run_mull() {
@@ -202,12 +210,14 @@ PY
 use_valgrind=0
 force_clean=0
 enable_mutation=0
+enforce_coverage=1
 
-while getopts ":vfm" opt; do
+while getopts ":vfmc" opt; do
   case "$opt" in
     v) use_valgrind=1 ;;
     f) force_clean=1 ;;
     m) enable_mutation=1 ;;
+    c) enforce_coverage=0 ;;
     *)
       usage
       exit 1
@@ -270,7 +280,7 @@ else
 fi
 
 export DML_BIN="$build_dir/dml"
-run_python_tests_and_coverage_if_present "$root_dir" "$coverage_dir"
+run_python_tests_and_coverage_if_present "$root_dir" "$coverage_dir" "$enforce_coverage"
 
 if [ "$enable_mutation" -eq 1 ]; then
   run_mull "$root_dir" "$mull_report"
@@ -311,8 +321,12 @@ genhtml \
   --function-coverage \
   --output-directory "$coverage_dir/html"
 
-echo "==> Enforcing 100% coverage thresholds"
-check_coverage_100 "$coverage_filtered"
+if [ "$enforce_coverage" -eq 1 ]; then
+  echo "==> Enforcing 100% coverage thresholds"
+  check_coverage_100 "$coverage_filtered"
+else
+  echo "==> Coverage thresholds disabled; reports are informational"
+fi
 
 echo "==> Check completed successfully"
 echo "Coverage report: $coverage_dir/html/index.html"

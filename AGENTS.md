@@ -87,6 +87,8 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Use Valgrind for memory checks when requested or when touching memory-critical
   code paths.
 - Use `scripts/check.sh` as the standard end-to-end validation entrypoint.
+- CI uses `scripts/check.sh -c` to report coverage without percentage gates;
+  see `README.md` (Build and Test) for validation modes and Windows dependencies.
 - Use descriptive test names that capture the behavior.
 - Keep fixtures small and local to the test when possible.
 

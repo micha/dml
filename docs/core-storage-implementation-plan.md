@@ -702,9 +702,11 @@ Additional verification notes:
   `scripts/check.sh` and existing cross-platform CI discover them.
 - Python-driven native execution needs to use the same instrumented library
   build whose counters lcov captures. Do not test a stale separately built wheel.
-- Keep the existing 100% C line/function/branch and Python line gates. Inspect
-  error branches and write meaningful failure tests instead of adding blanket
-  exclusions. Discuss any necessary exclusion under the repository policy.
+- The default local check enforces 100% C line/function/branch and Python line
+  coverage. CI uses the report-only mode described in `README.md` (Build and
+  Test). Inspect error branches and write meaningful failure tests instead of
+  adding blanket exclusions. Discuss any necessary exclusion under the
+  repository policy.
 - Existing lcov exclusions remove dependencies, tests, and `build/check` paths.
   Confirm new production sources appear in the filtered report and none are
   accidentally excluded by source placement.

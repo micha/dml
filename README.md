@@ -18,10 +18,11 @@ To enforce commit message body wrapping locally:
 
 Use `scripts/check.sh` as the standard validation entrypoint.
 
-- `scripts/check.sh` - build, run tests, and coverage reports
+- `scripts/check.sh` - build, run tests, and enforce 100% coverage
 - `scripts/check.sh -v` - also run C tests under Valgrind
 - `scripts/check.sh -f` - clean build artifacts before rebuilding
 - `scripts/check.sh -m` - enable Mull mutation testing
+- `scripts/check.sh -c` - build, run tests, and report coverage without percentage gates (used by CI)
 
 The script enforces vendored dependency usage, runs coverage with gcov/lcov,
 and writes HTML reports under:
@@ -34,6 +35,9 @@ Python test dependencies are in `requirements-dev.txt` (pytest, Hypothesis, and
 coverage.py). Windows CI installs the corresponding UCRT64 packages through
 [MSYS2](https://www.msys2.org/docs/python/) so native extensions match its Python
 build.
+
+CI uses `scripts/check.sh -c`: coverage reports are informational, while build,
+test, and report-generation failures still fail the job.
 
 Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
 targets `build/check/test_version` by default when present.

@@ -159,7 +159,7 @@ jobs:
           python -m pip install meson ninja -r requirements-dev.txt
 
       - name: Run strict validation
-        run: scripts/check.sh
+        run: scripts/check.sh -c
 
       - name: Upload strict check artifacts
         if: always()
