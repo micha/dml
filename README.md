@@ -6,6 +6,10 @@ its existing draft specifications.
 
 ## Start here
 
+- [Glossary](../dml/docs/spec-next/glossary.md): shared vocabulary for maintained documentation and
+  best-effort use in design discussion; provisional terms are marked.
+- [New as-built specification](../dml/docs/spec-next/README.md): implemented behavior
+  in the evolving new direction.
 - [Observer experiment handoff](observer-study/HANDOFF.md): proposed stages,
   evidence corpus, acceptance criteria and delegation; implementation not started.
 - [Discussion checkpoint](discussion.md): goals, conceptual agreements,

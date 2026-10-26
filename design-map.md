@@ -5,6 +5,9 @@ The image is [design-map.png](design-map.png); a paginated version is
 `python3 diagrams/render-map.py` (requires `pdftoppm`, no Python packages).
 
 This maps all entity roles discussed so far, not every possible future entity.
+Terminology follows the [working glossary](../dml/docs/spec-next/glossary.md);
+the map does not define
+additional meanings or implementation contracts.
 **Storage objects and computational roles are different layers, not two competing
 object models.** Intents, closures, requests and attempts are being explored as
 ordinary DAG data, not assumed to be dedicated core record types.

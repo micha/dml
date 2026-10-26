@@ -3,7 +3,8 @@
 ## Scope
 
 This repository contains user-led exploratory DML design work. Read `README.md`
-and `discussion.md` before continuing the discussion.
+and `discussion.md` before continuing the discussion. Read the shared
+[glossary](../dml/docs/spec-next/glossary.md) for the vocabulary.
 
 - Keep conceptual agreements, tentative directions, assistant suggestions, and
   open questions distinguishable.
@@ -18,6 +19,17 @@ and `discussion.md` before continuing the discussion.
   into decisions.
 - Files under `archive/` are historical context, not active instructions. Do not
   execute their old coordinator or completion-marker protocols.
+
+## Vocabulary
+
+- Maintained documentation uses glossary terms consistently. Add or clarify a term
+  when needed; do not silently give an existing term a different meaning.
+- Design conversation follows the glossary on a best-effort basis. Informal phrasing
+  is acceptable; clarify ambiguities that affect design and record agreed corrections.
+- Keep provisional definitions provisional. Glossary inclusion does not imply an
+  implemented feature or select a schema/API.
+- Exact code identifiers, quotations, archived reports and frozen evidence may retain
+  their original vocabulary. Explain mappings where useful; do not rewrite history.
 
 ## Notes and commits
 

@@ -502,9 +502,27 @@ is subsequent conceptual discussion, not an approved schema or implementation.
   records this convention. See
   [the new spec orientation](../dml/docs/spec-next/README.md).
 
+## Shared glossary and vocabulary policy
+
+- The user requested a glossary before the first implementation iteration and agreed
+  that maintained documentation should use its vocabulary consistently. Design
+  conversation should follow those terms on a best-effort basis; informal wording
+  is sometimes useful and does not need rigid enforcement.
+- The [glossary](../dml/docs/spec-next/glossary.md) owns the working terminology.
+  At the user's correction it lives with the spec, not in this design repository.
+  Provisional meanings are
+  marked, and an entry does not claim that its concept is implemented. Technical
+  behavior remains owned by the as-built spec. New definitions are a draft of the
+  discussion so far, not approval of additional schema or protocol decisions.
+- Design and spec agent guides now require consistent documentation vocabulary and
+  preserve historical wording in archives, quotations and frozen evidence. The
+  as-built spec links to the glossary rather than duplicating it.
+
 ## Resume point
 
-Continue by agreeing the implementation scope/location for the first minimum-viable
+Review the working [glossary](../dml/docs/spec-next/glossary.md) as needed, then
+continue by agreeing the
+implementation scope/location for the first minimum-viable
 repository iteration: simplified entities, commit graphs and refs, without executions,
 intents, merge or rebase. The assistant's larger execution-oriented first slice was
 rejected as too ambitious. The new as-built specification has been created under
