@@ -7,7 +7,8 @@ Status: implemented datum storage, repository schema 1. Not yet a commit/ref API
 This document owns local repository initialization, datum keys and reference
 checks, transaction behavior and repository/transaction handle ownership in this
 as-built specification. For datum encoding, IDs, value buffers and errors, see
-[records.md](records.md). For implemented and missing layers, see [README.md](README.md).
+[records.md](records.md). For documented scope, see [README.md](README.md).
+Terms follow the shared [glossary](glossary.md).
 
 Normative sections describe current code. An LMDB transaction commit is **not** a
 DML history commit; history objects and refs have not been implemented.

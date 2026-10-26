@@ -20,6 +20,9 @@ implemented behavior or as a requirement of this new direction.
 
 - Humans: read this page, then the technical document relevant to your task.
 - Agents: also read [AGENTS.md](AGENTS.md).
+- Vocabulary: use the shared [glossary](glossary.md).
+  Glossary inclusion does not establish implemented behavior; technical contracts
+  remain in this specification.
 - Implementation: [C sources](../../src/) and [public headers](../../include/dml/).
 - Design discussion and iteration planning live separately in
   [dml-design](../../../dml-design/README.md), not in normative technical sections.
@@ -34,6 +37,7 @@ flowchart TD
     README["README.md<br/>Orientation, status and ownership map"]
     AGENTS["AGENTS.md<br/>Agent maintenance instructions"]
     GUIDE["../documentation-guidelines.md<br/>Shared writing rules"]
+    GLOSSARY["glossary.md<br/>Shared terminology"]
     RECORDS["records.md<br/>Datums, encoding, record identity and errors"]
     REPO["repository.md<br/>Local storage, transactions and ownership"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
@@ -42,6 +46,9 @@ flowchart TD
     README --> RECORDS
     README --> REPO
     AGENTS --> GUIDE
+    AGENTS --> GLOSSARY
+    RECORDS --> GLOSSARY
+    REPO --> GLOSSARY
     REPO --> RECORDS
     RECORDS --> CODE
     RECORDS --> TESTS
@@ -56,6 +63,7 @@ flowchart TD
 | Navigation and documented scope | This README |
 | Agent maintenance procedure | [AGENTS.md](AGENTS.md) |
 | Shared documentation style and authority conventions | [Documentation Writing Guidelines](../documentation-guidelines.md) |
+| Shared vocabulary, not implementation contracts | [Glossary](glossary.md) |
 | Datum kinds, canonical records, record IDs, URI/text behavior and error representation | [records.md](records.md) |
 | Repository initialization, storage keys, transactions, reference checks and handle ownership | [repository.md](repository.md) |
 

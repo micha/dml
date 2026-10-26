@@ -8,6 +8,7 @@ This document owns the implemented datum kinds, packed encoding, canonicalizatio
 record hashing, value-buffer ownership and error representation in this as-built
 specification. For persistence, reference validation and transaction ownership, see
 [repository.md](repository.md). For implementation status, see [README.md](README.md).
+Terms follow the shared [glossary](glossary.md).
 
 Normative sections describe current code. No computational identity mask or general
 node identity API is implied by the datum ID API.

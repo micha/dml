@@ -3,6 +3,7 @@
 Read the repository [AGENTS.md](../../AGENTS.md),
 [Documentation Writing Guidelines](../documentation-guidelines.md) completely,
 and this specification's [README.md](README.md) before modifying this directory.
+Read the shared [glossary](glossary.md) for terminology.
 
 ## Scope
 
@@ -24,6 +25,9 @@ and this specification's [README.md](README.md) before modifying this directory.
 - Apply the shared guidelines: one owning document per concept, authority boundaries
   near the top, direct section references, concise prose and explicitly informative
   examples.
+- Use glossary vocabulary consistently in maintained documentation. Define a new
+  term or explicitly qualify a local one instead of silently changing meanings.
+  Glossary entries, including provisional ones, do not establish implementation.
 - Use RFC 2119 keywords only for implemented technical contracts, not plans.
 - Maintain the README's concept map, documented scope and Mermaid diagram when
   adding or changing document ownership. The README is for human orientation; do
