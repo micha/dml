@@ -392,13 +392,138 @@ or UI has been implemented. Retrospective curation cannot recover facts that the
 original executions did not capture. That limitation is not itself a requirement
 for additional observer machinery in DML.
 
+## Execution environments and identity facets
+
+The user requested a checkpoint commit before continuing; `021b077` records the
+preceding design notes, feasibility work and Observer Stage 0 corpus. The following
+is subsequent conceptual discussion, not an approved schema or implementation.
+
+### Clarification: execution always produces a sub-DAG
+
+- Executing a DML node produces a result sub-DAG. An external Python program either
+  builds it using DML, just as the top-level program does, or its adapter wraps the
+  returned result in a DAG. A bare external value is not the DML execution result.
+- The researcher designs programs and adapters to record the desired detail.
+  DML needs no special observability facilities for this: ordinary DAG construction,
+  publication and inspection suffice. The assistant's earlier boundary/internals
+  framing conflated viewing a sub-DAG at different levels with unrecorded external
+  computation; it does not establish separate execution modes or capture policies.
+
+### Proposed execution environment
+
+- The user proposed building and committing the execution sub-DAG under a repository
+  ref, illustratively `exec/<execution-id>`. Exact naming and whether this identifier
+  denotes an attempt remain open; separate per-attempt refs are an assistant suggestion.
+- Explicit arguments are input nodes. Implicit arguments are dependencies captured
+  when the intent is created; closure-level dependencies are also being considered.
+- Intents and closures are created by a DAG built on a specific commit and included
+  in a new commit. Their node references are within that resulting commit, including
+  nodes carried forward. A separate source-snapshot pin is not needed merely to fix
+  these captured bindings. Transfer into the execution environment remains open.
+- The user proposed named and anonymous DAG nodes, with a built-in named-node lookup,
+  and potentially requiring arguments/dependencies to be named. Explicit lookup scope
+  was provisionally accepted. Separate argument/dependency namespaces and exact lookup
+  syntax remain illustrative.
+- Caller and callee synchronize through a DML repository remote. Published progress
+  is discoverable by involved parties and supports recovery. Launch/publication gaps,
+  ref ownership, completion, bootstrap and synchronization semantics remain open.
+  Published history is evidence of recorded progress, not exactly-once external effects.
+
+### Conceptual agreement: purpose-specific identity facets
+
+- The discussion now treats full-record identity and reuse/cache identity as two
+  facets derived from a node's recorded description, rather than one universal node
+  identity plus an exceptional cache key. Additional facets should be motivated by
+  concrete operations, not invented in advance.
+- The user proposed dimensions and a mask: reuse identity can ignore a dimension
+  by substituting a canonical sentinel/NULL before hashing. For example, distinct
+  adapter bindings may intentionally share reuse identity. Actual bindings remain
+  recorded; ignored does not mean unknown.
+- The user agreed that the mask contributes to full node identity. Exact facet
+  names, dimension sets, mask ownership/defaults and encoding are not selected.
+  Whether all future facets are expressible as masks remains open.
+- Equality under one facet has a purpose: reuse equality does not imply full-record
+  equality, universal substitutability or another independent observation. Request
+  and attempt occurrence identifiers continue to distinguish events even when their
+  computational facets match.
+- The assistant's prior suggestion to use the full invocation DAG identity directly
+  as the reuse key was corrected: a full closure identity could indirectly preserve
+  an ignored adapter's contribution. Facet derivation must respect the intended
+  projection rather than simply hashing opaque full identities.
+- A reused attempt may have different actual bindings in ignored dimensions. Preserve
+  the current request's binding and the historical attempt's binding rather than
+  treating a shared reuse identity as proof that those records are identical.
+
+## Design spiral and pre-1.0 compatibility policy
+
+- The user proposes developing the full functionality incrementally through a
+  design spiral rather than requiring a complete up-front design. The assistant
+  suggested concrete vertical slices: design enough for a workflow, prototype it,
+  exercise failures, review evidence, and revise. The proposed slice sequence is
+  not an approved implementation plan.
+- The user favors minimal feature prototypes and more iterations, incrementally
+  building toward final functionality. Iterations can go broad to explore integration
+  or deep to develop a particular capability, whichever is useful; completing or
+  hardening each layer before exploring the next is not required. Prototype shortcuts
+  and untested behavior must remain distinguishable from demonstrated functionality.
+- The user explicitly directs that DML repositories and other DML development
+  state be treated as ephemeral until `v1.0.0`. Spiral iterations should not require
+  version increments, data migrations, or backward-compatibility machinery merely
+  to accommodate evolving designs. Incompatible development state can be recreated.
+- This is a development compatibility policy, not a deletion command or an exception
+  to immutable-history semantics within a repository. It does not authorize deleting
+  unrelated data, weakening resource-cleanup obligations, modifying the implementation
+  checkout, or launching further observer stages.
+- Exact post-1.0 compatibility guarantees remain open; this policy establishes the
+  absence of a pre-1.0 persistence/compatibility obligation, not a migration design.
+
+## New as-built specification and first-iteration scope
+
+- The user corrected the assistant's initial execution-oriented iteration as too
+  ambitious. The first iteration should instead implement a minimum viable repo:
+  simplified entities as needed, immutable snapshots, a commit graph and refs pointing
+  to commits. Merge, rebase and other advanced repo operations are unnecessary.
+  Execution, intents and closures are deferred. Exact implementation scope/location
+  still needs approval.
+- The user requested a new specification describing actually implemented behavior,
+  following the existing documentation guidelines, with `AGENTS.md` for agents and
+  `README.md` for human orientation, including a Mermaid document/reference map.
+- The user selected `/work/repos/micha/dml/docs/spec-next/` and explicitly authorized
+  creation of that new documentation directory. The old `docs/spec/` suite remains
+  untouched. This authorization does not extend to implementation changes.
+- The initial as-built documents cover the already implemented datum/record foundation
+  and LMDB local storage API, inspected at `638cc42`; they do not claim that the first
+  iteration has been implemented. Existing tests were inspected, not freshly rerun.
+  Technical documents should grow with implemented capabilities rather than serving
+  as an up-front design of future subsystems. The user clarified that documented
+  functionality itself defines the implemented scope; the spec should not maintain
+  a separate "what does not exist yet" inventory. The initial inventory and
+  first-iteration planning text were removed from its README, and its agent guidance
+  records this convention. See
+  [the new spec orientation](../dml/docs/spec-next/README.md).
+
 ## Resume point
 
-The latest agreement is researcher-controlled capture with inspectable evidence
-boundaries: observability is enabled by the core's uniform structure, not a core
-observer subsystem or research-certification policy. Continue discussing how the
-computational model naturally preserves those distinctions. Observer Stage 0 is
-complete; do not launch later implementation stages without further instruction.
+Continue by agreeing the implementation scope/location for the first minimum-viable
+repository iteration: simplified entities, commit graphs and refs, without executions,
+intents, merge or rebase. The assistant's larger execution-oriented first slice was
+rejected as too ambitious. The new as-built specification has been created under
+`../dml/docs/spec-next/`; only that documentation change is authorized in `../dml` so far.
+
+Favor minimal prototypes and frequent iterations, broad or deep as appropriate.
+DML repositories/state are ephemeral until `v1.0.0`, without per-iteration version
+increments or required migrations. No implementation sequence or code changes have
+been approved.
+
+Purpose-specific node identity facets remain agreed, initially full-record and reuse
+identity. A [draft entity and identity map](design-map.md) provides a visual reference;
+its boxes are conceptual roles, not approved core record types. The user found the
+full map too much to take in and favors concrete incremental work. Remote execution
+remains a major open challenge. Named-node lookup has provisionally explicit DAG scope.
+
+Researcher-controlled detail uses ordinary result sub-DAGs, not special observability
+facilities. Observer Stage 0 is complete; do not launch later implementation stages
+without further instruction.
 
 The completed study demonstrated narrow cooperative journal/provider/admission
 mechanisms and exposed remaining Delete-authority, input-directory capture,

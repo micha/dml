@@ -1,0 +1,3 @@
+# Rendered documentation assets are binary, not line-oriented text.
+*.pdf binary
+*.png binary
