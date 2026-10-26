@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "verdict": "needs corrections",
+  "authority": "Independent exploratory review; no user policy approved. Model counterexamples are not actual cloud mutations.",
+  "ranked_findings": [
+    {"id": "R2", "priority": "high", "state": "new", "type": "executed_cli_counterexample", "finding": "Saved destroy plan applies after HCL is changed to add prevent_destroy=true and a new retention-related input, removes its synthetic marker, and leaves empty state. New unapplied HCL/research retention does not invalidate OpenTofu state serial.", "correction": "Bind actual apply admission to plan digest, configuration/root/membership revision, physical identities and live fence; disclose guarantees as cooperative only if independent deployment can bypass it."},
+    {"id": "R3", "priority": "medium", "state": "new", "type": "model_coverage_gap", "finding": "Publishing a new adopted result depending on withdrawn compute before disposal succeeds, re-retains compute, and passes assert_safety although the result is unavailable.", "correction": "Choose explicit withdrawal-versus-new-publication policy; distinguish operational dependencies from historical provenance and test each lifecycle boundary."},
+    {"id": "R4", "priority": "medium", "state": "new", "type": "model_validation_gap", "finding": "Manager.add overwrites an external identity as provisioned; GC deletes its synthetic file and invariants pass.", "correction": "Reject duplicate canonical identities/ownership rebinding; use distinct replacement identities before treating invariants as admission-policy evidence."},
+    {"id": "R5", "priority": "medium", "state": "new", "type": "executed_cli_counterexample", "finding": "Output A paired with state B across replacement has same lineage, serial 1 versus 2 and different IDs.", "correction": "Extract manifest and lineage/serial from one snapshot or reject mismatched receipts; separately handle external drift."},
+    {"id": "R6", "priority": "medium", "state": "disclosed_limitation_needs_gate", "type": "integration_scope_gap", "finding": "Integration drops synthetic retention heads while history model head stays rooted. Disposal validates manually supplied resource exports, not full-history root extraction/completeness.", "correction": "Validate root-export mapping before claiming end-to-end GC safety; current integration is real local glue with simulated retention/adoption."},
+    {"id": "R7", "priority": "medium", "state": "new", "type": "standalone_safety_gap", "finding": "Standalone adversarial entrypoint rmtree removes an existing fixed sandbox; retention tests overwrite fixed runtime fixtures. Fresh-only guarantee is provided by copied wrappers, not those standalone entrypoints.", "correction": "Allocate new ignored run roots without pruning existing artifacts; preserve old synthetic evidence."},
+    {"id": "R1", "priority": "high_when_present", "state": "corrected_and_disclosed_by_integration", "type": "reproduction_defect", "finding": "Deep copied lab paths exceeded Go provider Unix socket limit. Initial integration run failed; shorter owned layout now passes byte-identical scripts. Review separately reproduced failure and passed using a disclosed copy-local TMPDIR shortening.", "remaining": "Standalone lab relocation remains path-sensitive; retain diagnosis and clean rerun evidence."}
+  ],
+  "evidence": {
+    "reruns": "runtime/latest-rerun.json",
+    "additional_checks": "runtime/latest-adversarial.json",
+    "integration": "runtime/latest-integration.json",
+    "independent_sources": "runtime/latest-sources.json",
+    "socket_diagnosis": "runtime/plugin-diagnosis.log"
+  }
+}

@@ -1,0 +1,262 @@
+{
+  "sandbox": "/work/repos/micha/dml-design/feasibility/gate/runtime/followup/run-b51b898c",
+  "python": "3.13.15 (main, Aug  5 2026, 12:25:43) [GCC 15.3.0]",
+  "kernel": "6.18.55",
+  "sqlite": "3.51.2",
+  "tool": {
+    "terraform_version": "1.13.2",
+    "platform": "linux_amd64",
+    "provider_selections": {}
+  },
+  "regression": {
+    "sandbox": "/work/repos/micha/dml-design/feasibility/gate/runtime/followup/run-b51b898c/regression",
+    "python": "3.13.15 (main, Aug  5 2026, 12:25:43) [GCC 15.3.0]",
+    "tool": {
+      "terraform_version": "1.13.2",
+      "platform": "linux_amd64",
+      "provider_selections": {}
+    },
+    "cases": {
+      "saved_plan_gate": "stale configuration/input",
+      "saved_plan_raw_hazard": {
+        "destroyed": "94390e19-c705-dc4b-980a-1bf0c0b3d61b",
+        "despite_unapplied_prevent_destroy": true
+      },
+      "retained_update": "retained actual identity",
+      "retained_replace": "retained actual identity",
+      "retained_destroy": "retained actual identity",
+      "explicit_disposition_cleanup": {
+        "before": "df4f02f7-02d3-59fe-a159-8d4d8d08e753",
+        "after": {
+          "lineage": "2dc8ab06-765f-9c1e-d8b2-76e22865503b",
+          "serial": 2,
+          "manifest": {},
+          "snapshot_digest": "517a5a6de94c1b33e8d1faf7724fc7c82d3969e9bcffed3b31e1c0067f146b61"
+        }
+      },
+      "input_changed": "stale configuration/input",
+      "plan_bytes_changed": "changed plan bytes",
+      "membership_changed": "stale root/membership revision",
+      "roots_changed": "stale root/membership revision",
+      "mixed_receipt": "malformed identity mapping",
+      "address_not_identity": {
+        "before": {
+          "lineage": "cf203d46-f17e-6153-452f-d1ecafe42aa5",
+          "serial": 1,
+          "manifest": {
+            "terraform_data.victim": "386ab039-b6a2-8616-51fa-7a5042c7cafc"
+          },
+          "snapshot_digest": "9992fd0cf6028b35595524f3f646dba15a33c29fc40b42afa5c7758fb6ae59d5"
+        },
+        "after": {
+          "lineage": "cf203d46-f17e-6153-452f-d1ecafe42aa5",
+          "serial": 2,
+          "manifest": {
+            "terraform_data.victim": "f54ff1d2-37bf-452c-a592-4ce2618b972f"
+          },
+          "snapshot_digest": "006582d0589809a47d8467600e7cbe88290ef826482ccc87572ee8f56df1db11"
+        }
+      },
+      "receipt_missing": "missing/nonpublic receipt",
+      "receipt_sensitive": "missing/nonpublic receipt",
+      "receipt_serial": "unknown state",
+      "receipt_mapping": "malformed identity mapping",
+      "old_observation": "stale manager receipt",
+      "omitted_ticket_victims": "ticket victim/plan mismatch",
+      "old_identity_does_not_retain_successor": {
+        "admitted_current_uuid": {
+          "terraform_data.victim": "f54ff1d2-37bf-452c-a592-4ce2618b972f"
+        },
+        "retained_old_uuid": {
+          "terraform_data.victim": "386ab039-b6a2-8616-51fa-7a5042c7cafc"
+        }
+      },
+      "interrupted_apply": {
+        "exitcode": 73,
+        "durable_status": "unknown",
+        "side_effect_started": false,
+        "new_publisher": "live/unknown reservation",
+        "blind_retry": "missing/mismatched/live reservation"
+      },
+      "completed_effect_unknown_outcome": {
+        "exitcode": 73,
+        "durable_status": "unknown",
+        "manager_manifest": {},
+        "automatic_acknowledgement": false
+      },
+      "publisher_between_check_and_effect": {
+        "excluded_while_apply_transaction": true,
+        "after_apply": "published",
+        "note": "manual fake member publication after completed cleanup; real root acquisition must also reject disposed identities"
+      },
+      "durable_reservation_fence": "live/unknown reservation",
+      "missing_reservation": "missing/mismatched/live reservation",
+      "unavailable_member": "unavailable member",
+      "deployment_neutral_cli_driver": {
+        "actions": [
+          "plan",
+          "reserve",
+          "apply"
+        ],
+        "after": {
+          "lineage": "d1f63e81-bcef-1054-c3b8-809bb111c1b6",
+          "serial": 2,
+          "manifest": {},
+          "snapshot_digest": "cd7119595c0a7b3379a20bb48987c7a6127f708b441af8ee0074d3f6a2a857e6"
+        }
+      },
+      "unsupported_material": "unsupported material",
+      "real_journal_adapter_attempt": {
+        "contract": "journal-v2",
+        "journal_source_digest": "fc178a5fdcf0150de37b9cbd0a70d727903926e5fc2d95793cba5a39912a7912",
+        "adapter_status": "identity/backend integration blocked",
+        "actual_full_history_retention": "full-history retained",
+        "actual_stale_membership": "stale revision / empty plan",
+        "physical_bridge_rejection": "unsupported physical identity bridge",
+        "actual_durable_publication_fence": "global destruction fence active",
+        "mismatched_effect_ack_rejection": "absence not observed",
+        "durable_status_after_mismatch": "intent",
+        "file_backend_recovery": "acknowledged",
+        "limitations": "No managed terraform_data registration or equivalent file backend mapping; generic gate rejects rather than inventing one."
+      }
+    },
+    "passed": true
+  },
+  "adversarial": {
+    "sealed_plan_survives_actual_final_barrier_swap": {
+      "barrier": {
+        "seal_mask": 15,
+        "denied": {
+          "write": "EPERM",
+          "shrink": "EPERM",
+          "grow": "EPERM",
+          "change_seals": "EPERM"
+        },
+        "approved_digest": "4581bca3b26814b97105ce497a276c39fbbea1b19bd198deea6631a0e94d7011",
+        "mutable_path_changed": true
+      },
+      "retained_uuid_survives": "10f3287f-6d71-7d8c-071f-3271305af526",
+      "victim_absent": true,
+      "apply_uses_passed_fd": true
+    },
+    "original_targeted_delete_incomplete_receipt_rejected": {
+      "error": "incomplete planned resource census",
+      "both_resources_preserved": true
+    },
+    "swap_before_snapshot_rejected_before_cli": "changed plan bytes",
+    "config_change_at_barrier_rejected_before_apply": "stale configuration/input at effect boundary",
+    "unexported_resource_rejected_before_planning": {
+      "error": "incomplete resource census",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "empty_manifest_rejected_before_planning": {
+      "error": "incomplete resource census",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "missing_manifest_rejected_before_planning": {
+      "error": "missing/unsupported manifest output",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "wrong_identity_expression_rejected_before_planning": {
+      "error": "malformed resource census identity expression",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "file_expression_rejected_before_planning": {
+      "error": "unsupported evaluation expression/input",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "sensitive_expression_rejected_before_planning": {
+      "error": "unsupported evaluation expression/input",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "unknown_variable_rejected_before_planning": {
+      "error": "unknown variable reference",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "template_directive_rejected_before_planning": {
+      "error": "unsupported evaluation expression/input",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "sensitive_variable_rejected_before_planning": {
+      "error": "unsupported variable",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "expression_default_rejected_before_planning": {
+      "error": "unsupported evaluation expression/input",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "unknown_tfvars_rejected_before_planning": "unknown variable input",
+    "duplicate_json_keys_rejected_before_planning": "duplicate JSON key",
+    "complete_census_creation_and_unknown_id_admitted": {
+      "census": {
+        "before": [
+          "terraform_data.victim"
+        ],
+        "after": [
+          "terraform_data.other",
+          "terraform_data.victim"
+        ]
+      },
+      "after": {
+        "terraform_data.other": "9b669de7-3fd2-3989-998e-3bf5a0c67fba",
+        "terraform_data.victim": "1fc7e2a9-f186-8020-7d7d-a9723cdd8a57"
+      }
+    },
+    "missing_planned_unknown_id_rejected": "incomplete planned manifest census",
+    "missing_saved_configuration_census_rejected": "incomplete resource census",
+    "memfd_unavailable_fails_closed": "Linux plan sealing unavailable: OSError",
+    "sealing_denied_fails_closed": "Linux plan sealing unavailable: PermissionError",
+    "state_bodies_not_logged_no_secret_filter": {
+      "metadata_log_mode": "0600",
+      "state_owner_only": true,
+      "raw_value_returned_in_memory": true,
+      "raw_value_persisted_in_manager_state": true,
+      "raw_value_not_logged": true
+    }
+  },
+  "baseline_replay": {
+    "initial_plan_swap_destroys_retained_other": {
+      "retained_uuid": "e52e649c-735a-61ca-2489-f1ea64dc7652",
+      "after_effect_error": "missing/nonpublic receipt"
+    },
+    "initial_unexported_create_before_rejection": "malformed identity mapping",
+    "initial_file_dependency_change_accepted": true,
+    "initial_sensitive_expression_raw_log": {
+      "synthetic_marker_present": true,
+      "mode": "0600"
+    }
+  },
+  "code_checksums": {
+    "gate.py": "37f33708aef5ef78a8fec32d466b04aa46602d7f8c5ff1f2cebc4d464cdb5afb",
+    "apply_input.py": "651bfe485502122c461e41588b479a96ead10d50ede7b09d03a536d4f7b3fa8f",
+    "fixture_language.py": "c768e80f5536e2443bd449497374ebdec04fa528834fe79d54a948b9448e94eb",
+    "run_tests.py": "fa6c531c33a1cc57be4073fc22abe557449306c51280b9bbd3ce51eaa4316510",
+    "followup_tests.py": "cc21c85408f9d61f72e785700b230d5e9acac04fff61aded127659c7fb7954ce",
+    "journal_adapter.py": "ad253cb9648155c28e01184de1a1d324a0ca9db465b5675301a8abe814bed2c1"
+  },
+  "documentation_checksums": {
+    "python-subprocess.html": "fcd111f110ab101e637e3b30cee3f2915822997632acbaa360c1d79fba375609",
+    "memfd.html": "fdeca1263da1a2b63aa145d9ddd619cd85fd1b0fbd1c2b6f820c65880081eb61",
+    "seals.html": "d3fe3c1aa5800eabf146bb7f9f7d68e4bed91650bed4f2f1ff480d6e0b7921eb",
+    "python-os.html": "0fd84c38d2e757f36c26ddbc67e4b7f26be99f220389756dcaa6ee59bbf800cd"
+  },
+  "counts": {
+    "regression_groups": 28,
+    "adversarial_groups": 22,
+    "baseline_replay_groups": 4,
+    "opentofu_cli_invocations": 285,
+    "wrapper_cli_subprocesses": 3,
+    "abrupt_os_exits": 2
+  },
+  "passed": true
+}

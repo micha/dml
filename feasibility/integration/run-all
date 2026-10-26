@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Reviewed-source replay in fresh integration-owned sandboxes; no installation.
+Usage: ./feasibility/integration/run-all [--models-only] [--refresh-sources]
+At most eight retained runs. Never prune existing runs automatically.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import urllib.request
+
+HERE = Path(__file__).resolve().parent
+BASE = HERE.parent
+RUNTIME = HERE / 'runtime'
+PIN = '949061cbb3c3d4558928ca9a459a5052b8c5e5545d17656f33316d2e3bc335f2'
+FILES = {
+    'history': ['model.py', 'test_model.py', 'run_scenarios.py', 'scenario-results.json'],
+    'retention': ['model.py', 'test_model.py'],
+    'opentofu': ['probe.py', 'local-provider.lock.hcl', 'closure/main.tf'],
+    'adversarial': ['experiments.py', 'sources.json'],
+}
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def atomic(path, value):
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
+    tmp.replace(path)
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--models-only', action='store_true')
+    parser.add_argument('--refresh-sources', action='store_true', help='Fetch three pinned public AWS source files once each')
+    args = parser.parse_args()
+    RUNTIME.mkdir(exist_ok=True)
+    # go-plugin sockets include TMPDIR; short names keep sockaddr_un below 108
+    # bytes. First, long-layout failure is retained rather than hidden/retried.
+    retained = [p for p in RUNTIME.iterdir() if p.is_dir() and (p.name.isdigit() or p.name.startswith('run-'))]
+    if len(retained) >= 8:
+        raise SystemExit('Eight retained runs already exist; inspect/archive manually before another run.')
+    for number in range(8):
+        run = RUNTIME / str(number)
+        try:
+            run.mkdir()
+            break
+        except FileExistsError:
+            continue
+    else:
+        raise SystemExit('No bounded fresh sandbox slot available')
+    result = {'run': str(run), 'mode': 'models-only' if args.models_only else 'full',
+              'python': sys.version, 'sources': {}, 'tests': {}, 'limitations': [
+                  'Models are simulations, not DML C integration or distributed safety.',
+                  'AWS source assertions do not execute cloud behavior.',
+                  'Original scripts replayed byte-for-byte with __file__ relocated by copying.']}
+    result['integration_scripts'] = {p.name: digest(p) for p in (HERE / 'run-all', HERE / 'scenario.py', HERE / 'audit.py')}
+    reviewed = json.loads((HERE / 'reviewed-sources.json').read_text())
+    for worker, names in FILES.items():
+        for name in names:
+            src, dst = BASE / worker / name, run / ('o' if worker == 'opentofu' else worker) / name
+            if digest(src) != reviewed.get(f'{worker}/{name}'):
+                raise SystemExit(f'Unreviewed source change: {src}; refuse to execute')
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dst)
+            assert digest(src) == digest(dst)
+            result['sources'][str(src)] = digest(dst)
+    (run / 'home').mkdir()
+    (run / 'tmp').mkdir()
+    (run / 'tofurc').write_text('')
+    env = {k: os.environ[k] for k in ('PATH', 'SSL_CERT_FILE', 'NIX_SSL_CERT_FILE') if k in os.environ}
+    env.update(HOME=str(run / 'home'), TMPDIR=str(run / 'tmp'),
+               XDG_CONFIG_HOME=str(run / 'home/config'), XDG_DATA_HOME=str(run / 'home/data'),
+               TF_CLI_CONFIG_FILE=str(run / 'tofurc'), TF_IN_AUTOMATION='1',
+               CHECKPOINT_DISABLE='1', PYTHONDONTWRITEBYTECODE='1')
+
+    def save():
+        atomic(run / 'condensed.json', result)
+        atomic(HERE / 'test-results.json', result)
+        history = []
+        for path in sorted(RUNTIME.glob('*/condensed.json')):
+            previous = json.loads(path.read_text())
+            history.append({'run': previous['run'], 'mode': previous['mode'], 'status': previous.get('status', 'running'),
+                            'tests': {k: v['status'] for k, v in previous['tests'].items()}})
+        atomic(HERE / 'run-index.json', history)
+
+    def execute(name, argv, cwd, timeout=600):
+        try:
+            p = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout)
+            (run / (name + '.stdout')).write_text(p.stdout)
+            (run / (name + '.stderr')).write_text(p.stderr)
+            row = {'status': 'passed' if p.returncode == 0 else 'failed', 'returncode': p.returncode,
+                   'argv': argv, 'cwd': str(cwd)}
+            match = re.search(r'Ran (\d+) tests', p.stderr)
+            if match:
+                row['tests_run'] = int(match.group(1))
+        except subprocess.TimeoutExpired:
+            row = {'status': 'failed', 'reason': 'bounded subprocess timeout', 'argv': argv}
+        result['tests'][name] = row
+        save()
+        return row['status'] == 'passed'
+
+    execute('history', [sys.executable, '-B', '-m', 'unittest', '-v'], run / 'history')
+    execute('history-fixture', [sys.executable, '-B', 'run_scenarios.py'], run / 'history')
+    if result['tests']['history-fixture']['status'] == 'passed':
+        identical = (run / 'history-fixture.stdout').read_bytes() == (run / 'history/scenario-results.json').read_bytes()
+        result['tests']['history-fixture']['byte_identical'] = identical
+        if not identical:
+            result['tests']['history-fixture']['status'] = 'failed'
+    execute('retention', [sys.executable, '-B', 'test_model.py'], run / 'retention')
+    trace = run / 'retention/runtime/traces.jsonl'
+    if trace.exists():
+        expected = json.loads((BASE / 'retention/summary.json').read_text())['trace_sha256']
+        result['tests']['retention']['trace_sha256'] = digest(trace)
+        result['tests']['retention']['original_trace_match'] = digest(trace) == expected
+        if digest(trace) != expected:
+            result['tests']['retention']['status'] = 'failed'
+
+    tofu = BASE / 'tools/tofu'
+    usable = tofu.is_file() and digest(tofu) == PIN and os.access(tofu, os.X_OK)
+    if args.models_only or not usable:
+        reason = 'Explicit model-only mode' if args.models_only else 'Verified lab executable unavailable; no installation attempted'
+        for name in ('opentofu', 'adversarial', 'evidence-audit', 'cross-lifecycle'):
+            result['tests'][name] = {'status': 'skipped', 'reason': reason}
+    else:
+        result['tofu_executable_sha256'] = digest(tofu)
+        execute('version', [str(tofu), 'version', '-json'], run, timeout=30)
+        if result['tests']['version']['status'] == 'passed':
+            result['versions'] = json.loads((run / 'version.stdout').read_text())
+        (run / 'tools').mkdir()
+        # Metadata only; never modify shared tools or download/install an executable.
+        atomic(run / 'tools/ready.json', {'executable': str(tofu), 'version': '1.13.2', 'sha256': PIN,
+                                         'sha256_kind': 'executable, not release archive'})
+        manifest = json.loads((run / 'adversarial/sources.json').read_text())
+        source_dir = run / 'adversarial/runtime/sources'
+        source_dir.mkdir(parents=True)
+        source_status = {}
+        for name in ('aws_s3_object.go', 'aws_s3_delete.go', 'aws_s3_object.md'):
+            entry = manifest['sources'][name]
+            try:
+                if args.refresh_sources:
+                    req = urllib.request.Request(entry['url'], headers={'User-Agent': 'DML-integration-public-source'})
+                    with urllib.request.urlopen(req, timeout=30) as response:
+                        data = response.read(2_000_001)
+                    if len(data) > 2_000_000:
+                        raise ValueError('Public source exceeded size cap')
+                else:
+                    data = (BASE / 'adversarial/runtime/sources' / name).read_bytes()
+                if hashlib.sha256(data).hexdigest() != entry['sha256']:
+                    raise ValueError('Pinned source checksum mismatch')
+                (source_dir / name).write_bytes(data)
+                source_status[name] = {'status': 'verified', **entry,
+                                       'retrieval': 'independent public download' if args.refresh_sources else 'checksum-verified first-wave source copy'}
+            except Exception as exc:
+                source_status[name] = {'status': 'failed', 'reason': str(exc), 'url': entry['url']}
+        result['provider_source_verification'] = source_status
+        execute('opentofu', [sys.executable, '-B', 'probe.py', '--tofu', str(tofu)], run / 'o')
+        lab = run / 'o/evidence.json'
+        if lab.exists():
+            evidence = json.loads(lab.read_text())
+            result['tests']['opentofu'].update(command_count=evidence['command_count'], probes=len(evidence['probes']),
+                provider=evidence['provider'], evidence_path=str(lab), observed_actions={
+                    'lost_state': evidence['probes']['loss']['lost_state_actions'],
+                    'declarative_import': evidence['probes']['surrogate_import']['declarative_change']['actions'],
+                    'post_cli_import': evidence['probes']['surrogate_import']['cli_outputs_immediately_after_import']['binding']['value']})
+        if all(s['status'] == 'verified' for s in source_status.values()):
+            execute('evidence-audit', [sys.executable, '-B', str(HERE / 'audit.py'), '--sources', str(source_dir)], run, timeout=30)
+            if result['tests']['evidence-audit']['status'] == 'passed':
+                result['tests']['evidence-audit']['observed'] = json.loads((run / 'evidence-audit.stdout').read_text())
+            execute('adversarial', [sys.executable, '-B', 'experiments.py'], run / 'adversarial')
+            path = run / 'adversarial/runtime/results.json'
+            if path.exists():
+                experiments = json.loads(path.read_text())['experiments']
+                result['tests']['adversarial'].update(experiment_count=len(experiments), cli_cases=6,
+                    simulation_cases=1, source_assertion_cases=1, cloud_executed=False, observed=experiments)
+        else:
+            result['tests']['adversarial'] = {'status': 'blocked', 'reason': 'Pinned source unavailable or mismatched'}
+            result['tests']['evidence-audit'] = {'status': 'blocked', 'reason': 'Pinned source unavailable or mismatched'}
+        execute('cross-lifecycle', [sys.executable, '-B', str(HERE / 'scenario.py'), '--sandbox', str(run / 'cross'),
+                                  '--models', str(run), '--tofu', str(tofu)], run, timeout=600)
+        scenario = run / 'cross/scenario.json'
+        if scenario.exists():
+            result['tests']['cross-lifecycle']['observed'] = json.loads(scenario.read_text())
+    result['status'] = 'failed' if any(r['status'] in ('failed', 'blocked') for r in result['tests'].values()) else (
+        'partial' if any(r['status'] == 'skipped' for r in result['tests'].values()) else 'passed')
+    save()
+    print(json.dumps({'status': result['status'], 'run': str(run), 'tests': {k: v['status'] for k, v in result['tests'].items()}}, indent=2))
+    return 1 if result['status'] == 'failed' else 0
+
+if __name__ == '__main__':
+    sys.exit(main())

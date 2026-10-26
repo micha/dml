@@ -1,0 +1,83 @@
+{
+  "evidence": "executed model / simulated executor",
+  "model_version": 1,
+  "scenarios": [
+    {
+      "changed_binding_changes_closure": true,
+      "equal_closures": true,
+      "hcl_is_dag_data": true,
+      "installations_distinct": true,
+      "scenario": "installation"
+    },
+    {
+      "distinct_attempts": true,
+      "distinct_requests": true,
+      "result_roots": 1,
+      "scenario": "identical_trials"
+    },
+    {
+      "actual_trials": 2,
+      "naive_unique_records": 1,
+      "scenario": "counterexample_content_identity"
+    },
+    {
+      "default_off": null,
+      "default_on_reuses_original": true,
+      "explicit_off_override_reuses_original": true,
+      "fresh_returns_no_cached_attempt": true,
+      "scenario": "reuse"
+    },
+    {
+      "historical_retains_original": true,
+      "main_selects_fresh": true,
+      "other_retains_original": true,
+      "scenario": "adoption"
+    },
+    {
+      "first_outcome": "unknown",
+      "retry_outcome_before_dispatch": "unknown",
+      "same_request": true,
+      "scenario": "multiple_attempts"
+    },
+    {
+      "cleanup": "failed",
+      "computation": "success",
+      "external_jobs": 1,
+      "outcome_after_crash": "unknown",
+      "partial_published": true,
+      "scenario": "crash_and_incremental_publication",
+      "statuses": [
+        "working",
+        "working",
+        "done"
+      ]
+    },
+    {
+      "attempt_unchanged": true,
+      "computation_after": "success",
+      "original_cleanup": "failed",
+      "scenario": "remediation"
+    },
+    {
+      "both_observations_retained": true,
+      "correlated_git": "synthetic:M",
+      "merge_parents": 2,
+      "scenario": "merge",
+      "selection_conflict_rejected": true,
+      "stale_publish_rejected": true
+    },
+    {
+      "physical_deletion_evidence": "simulated assertion only",
+      "result_retained": true,
+      "scenario": "resource_retirement",
+      "selected_execution_survives": true,
+      "sensitive_content_erased": false
+    },
+    {
+      "actual_simulated_executions": 2,
+      "difference_detectable_without_executor_reporting": false,
+      "modeled_attempts": 1,
+      "scenario": "counterexample_hidden_retries"
+    }
+  ]
+}

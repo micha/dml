@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/history/report.md",
+  "summary": "Completed standard-library immutable DAG model: 24 passing tests and 11 reproducible scenarios. Distinct occurrences, reuse/adoption, installations, recovery, cleanup and merges work under explicit assumptions; six naive-design counterexamples expose identity, hidden retry, and overwrite gaps. No production DML changes."
+}

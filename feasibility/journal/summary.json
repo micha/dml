@@ -1,0 +1,48 @@
+{
+  "workstream": "journal",
+  "status": "completed",
+  "contract_version": "journal-v2",
+  "assignment": "immutable-history and creation-intent follow-up",
+  "report": "/work/repos/micha/dml-design/feasibility/journal/report.md",
+  "contract": "/work/repos/micha/dml-design/feasibility/journal/contract.md",
+  "command": "python3 -B feasibility/journal/test_followup.py",
+  "versions": {"python": "3.13.15", "sqlite": "3.51.2"},
+  "executed": {
+    "tests": 35,
+    "baseline_tests": 20,
+    "focused_tests": 15,
+    "failures": 0,
+    "errors": 0,
+    "abrupt_os_process_exits": 12,
+    "destruction_exits": 6,
+    "creation_exits": 6,
+    "latest_run": "runtime/followup-run-nyyr0_se",
+    "log": "runtime/tests-followup-final.log",
+    "prior_ticket_states_preserved": ["reserved", "intent", "acknowledged"],
+    "snapshot_cost_example": {"snapshots": 20, "total_json_bytes": 39661, "final_snapshot_bytes": 3071}
+  },
+  "verdict": "Targeted corrections pass within a cooperative local boundary: transactional append-only snapshots and durable pre-effect creation claims remove the demonstrated invisible creation orphan. No exactly-once, hostile-filesystem or production lifecycle guarantee.",
+  "fixes": [
+    "Whole-projection snapshots append in the same transaction as successful logical changes; prior states/outcomes remain inspectable after reopen.",
+    "Hash/parent/sequence and latest projection consistency are validated; API has no history update/delete methods; SQL guards reject update/delete/replacement on the candidate connection.",
+    "Creation intent persists unique identity/path/digest/size, alias and cleanup obligation before external creation; physical receipt follows observation.",
+    "Absent intent can be explicitly replayed with matching supplied bytes; matching present file can be reconciled without rewriting it.",
+    "Mutated or unsafe files are sticky quarantined, preserved, and keep cleanup prerequisites pinned.",
+    "Effect-boundary revalidation prevents a delayed cooperating dispatcher from recreating an identity already completed and disposed."
+  ],
+  "surviving_counterexample": "An identical-byte different-inode replacement before the first physical receipt is accepted; the original unreceipted inode is unknowable from the intent. A moved old file remains. Unique capability ownership and cooperative writers are assumed.",
+  "compatibility": "Existing create_file/resource/retention/ticket call shapes retained. Version is journal-v2; v1 databases explicitly rejected without implicit migration. Pending managed resources have null dev/ino and cannot be operationally acquired or disposed until receipt.",
+  "limitations": [
+    "Direct privileged database tampering, dropped guards, whole-chain rewrite and file replacement are outside the trust boundary; no external signed history anchor.",
+    "Complete registered membership/dependencies and cooperative publishers/deployments remain assumptions.",
+    "Full snapshots and whole-chain validation are deliberately unscalable; management history is not a research retention root.",
+    "Quarantine has no automatic repair/cancel path; coarse tickets block unrelated creation/reconciliation and have no expiry.",
+    "Provider adoption and cleanup executables remain asserted, not executed by the journal.",
+    "Gate must independently bind plan bytes, backend/configuration receipts and physical identity mapping.",
+    "No native DML/LMDB, power-loss, universal provider adoption, secure erasure or legal-compliance claim."
+  ],
+  "historical_delivery": ["report-v1.md", "summary-v1.json", "evidence-v1.json", "contract-v1.md", "journal-v1.py", "test_journal-v1.py"],
+  "evidence": "evidence.json",
+  "completion_marker": "followup-done.json",
+  "next_experiment": "Independent v2 rerun, then fresh-owned integration with the saved-plan gate and import-capable synthetic artifact provider using immutable receipt observations."
+}

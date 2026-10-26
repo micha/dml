@@ -1,0 +1,66 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "3ad42d841e2261b72dae6d050d36af2eeed52d29d4c2f869450a1aea42f5858a",
+  "source_id": "local-adoption",
+  "source_path": "feasibility/opentofu/evidence.json",
+  "values": [
+    {
+      "locator": "/probes/local_adoption",
+      "value": {
+        "actions": {
+          "local_file.adopted": [
+            "create"
+          ]
+        },
+        "after": "configuration-content",
+        "before": "execution-created-content",
+        "import_error": "Error: Resource Import Not Implemented\n\nThis resource does not support import. Please contact the provider developer\nfor additional information.\n\nlocal_file.adopted: Importing from ID \"/work/repos/micha/dml-design/feasibility/opentofu/runtime/run-we5kxfah/local-adoption/artifact.txt\"...",
+        "warning": "Applying configuration after unsupported adoption overwrote the artifact."
+      },
+      "value_sha256": "eb6d3cbccbd8bd04559228db5d96636348ebd8a77034d65dc5d6ebaefa9acbe4"
+    },
+    {
+      "locator": "/probes/surrogate_import/surrogate",
+      "value": true,
+      "value_sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+    },
+    {
+      "locator": "/probes/surrogate_import/cli_reconciliation_actions",
+      "value": {
+        "terraform_data.adopted": [
+          "update"
+        ]
+      },
+      "value_sha256": "becc7569c8e7657f2bfed07d659791350489c7690c227169c4211da5298966f3"
+    },
+    {
+      "locator": "/version",
+      "value": {
+        "platform": "linux_amd64",
+        "provider_selections": {},
+        "terraform_version": "1.13.2"
+      },
+      "value_sha256": "4124854611603d9d310e0dd2811c19d442561ab4cd6a5961c45d4482aae3ad89"
+    },
+    {
+      "locator": "/provider",
+      "value": "registry.opentofu.org/hashicorp/local 2.5.3",
+      "value_sha256": "b19eb2fa5027506f3688665b33a1d6ae43e5d20472771d3f1d030226621d7566"
+    },
+    {
+      "locator": "/command_count",
+      "value": 86,
+      "value_sha256": "816c83d0ac08a94e91547a30df27dbbe88c7643cfa3c99d33120fd361173759a"
+    },
+    {
+      "locator": "/runtime",
+      "value": "/work/repos/micha/dml-design/feasibility/opentofu/runtime/run-we5kxfah",
+      "value_sha256": "7cf63094484d42004b7145024a0739ac7b136d444bb64e2401b915488f2f9e9d"
+    },
+    {
+      "locator": "/status",
+      "value": "passed",
+      "value_sha256": "94a5fc07ee2e130610140f0ca8bc72b14def780332b1b3c4d3ec6c7855e432e8"
+    }
+  ]
+}

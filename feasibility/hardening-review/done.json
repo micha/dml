@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/hardening-review/report.md",
+  "summary": "Independent reruns: journal v2 35 tests, gate 28 result groups, artifact 52 CLI invocations, review 18 groups. Actual same-file provider adoption/destruction and SIGKILL recovery succeed via explicit narrow adapter; immutable journal snapshots verified. New saved-plan substitution deletes retained unticketed resource; forced replacement, incomplete capture/census and raw-state sensitivity remain blockers. Recommend v2 journal plus immutable deployment bundles and provider-side retirement authority."
+}

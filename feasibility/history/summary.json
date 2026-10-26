@@ -1,0 +1,33 @@
+{
+  "workstream": "computational-history",
+  "status": "completed",
+  "verdict": "Ordinary immutable DAGs can represent the tested distinctions, but hashes alone do not provide occurrence uniqueness, complete provenance, or recovery/conflict guarantees.",
+  "report": "/work/repos/micha/dml-design/feasibility/history/report.md",
+  "environment": "Python 3.13.15; standard library only",
+  "tests": {"command": "cd /work/repos/micha/dml-design/feasibility/history && python3 -m unittest -v", "passed": 24, "failed": 0},
+  "fixture": {"path": "scenario-results.json", "scenarios": 11, "byte_reproduction_verified": true},
+  "artifacts": ["model.py", "test_model.py", "run_scenarios.py", "scenario-results.json"],
+  "counterexamples": [
+    "Content-only execution records collapse two identical trials into one.",
+    "Repeated occurrence issuer/counter collapses distinct requests despite occurrence fields.",
+    "Incidental resolved outputs unnecessarily change naive closure identity.",
+    "Mutable URI-only names conceal artifact version changes.",
+    "One attempt can hide two actual external executions unless the executor reports both.",
+    "Last-writer status overwrites simultaneous lifecycle observations."
+  ],
+  "priority_gaps": [
+    "P0: dispatch/accounting evidence and durable publication boundaries",
+    "P0: closure binding projection and artifact integrity",
+    "P1: transactional head CAS, occurrence allocation, and lifecycle reconciliation",
+    "P1: retirement/result availability versus true tombstones and sensitive erasure",
+    "P2: policy registry, validation, adoption defaults, and merge rationale"
+  ],
+  "limitations": [
+    "HCL is opaque stored text; resource resolution is synthetic, not OpenTofu evaluation.",
+    "External execution, cleanup and deletion are simulations/assertions.",
+    "Crash recovery uses injected exceptions and object re-instantiation, not process termination or power loss.",
+    "Concurrent publication uses deterministic interleaving, not multiprocess transactions.",
+    "No production DML compatibility, physical erasure, or exactly-once guarantee established."
+  ],
+  "next_experiment": "Kill two local drivers at effect/commit boundaries with a non-idempotent durable mock executor, then repeat with idempotency and transactional head updates."
+}

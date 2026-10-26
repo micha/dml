@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/opentofu/report.md",
+  "summary": "Seven real OpenTofu 1.13.2 probes passed. Stable configuration regeneration works with retained state; experiments exposed unsupported local_file adoption/overwrite, state-loss recreation, provider-alias cleanup blocking and skipped destroy provisioners. Reports distinguish built-in import surrogates from external-artifact adoption."
+}

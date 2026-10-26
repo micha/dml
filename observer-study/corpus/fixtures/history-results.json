@@ -1,0 +1,106 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "ae2a4c1d9a3a44bc84497d27e87e5f8bb4e2830faf93a4b5a4c96ae4a1d79e97",
+  "source_id": "history-results",
+  "source_path": "feasibility/history/scenario-results.json",
+  "values": [
+    {
+      "locator": "/evidence",
+      "value": "executed model / simulated executor",
+      "value_sha256": "7e2d8f88fbab403de8b80ff955058590da5422d3aa657c6b0df02f56f62fba55"
+    },
+    {
+      "locator": "/model_version",
+      "value": 1,
+      "value_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "locator": "/scenarios/1",
+      "value": {
+        "distinct_attempts": true,
+        "distinct_requests": true,
+        "result_roots": 1,
+        "scenario": "identical_trials"
+      },
+      "value_sha256": "9fdd1352560a7822958587f2f940e0bc7a7f48d82f6431f16a30d8de8431d4b6"
+    },
+    {
+      "locator": "/scenarios/2",
+      "value": {
+        "actual_trials": 2,
+        "naive_unique_records": 1,
+        "scenario": "counterexample_content_identity"
+      },
+      "value_sha256": "d69c28c5647054dcbeddda9c2de388635418d1f51691c6b4c0210c851dd93c76"
+    },
+    {
+      "locator": "/scenarios/3",
+      "value": {
+        "default_off": null,
+        "default_on_reuses_original": true,
+        "explicit_off_override_reuses_original": true,
+        "fresh_returns_no_cached_attempt": true,
+        "scenario": "reuse"
+      },
+      "value_sha256": "2b6571f43104a8929abcf6a6be26d8067c818c0ca1d7559a7b660499d255e37b"
+    },
+    {
+      "locator": "/scenarios/5",
+      "value": {
+        "first_outcome": "unknown",
+        "retry_outcome_before_dispatch": "unknown",
+        "same_request": true,
+        "scenario": "multiple_attempts"
+      },
+      "value_sha256": "6429df8007c0e093d7efd3d2b59f3dec340983404c3b4a7857243ea07707a042"
+    },
+    {
+      "locator": "/scenarios/6",
+      "value": {
+        "cleanup": "failed",
+        "computation": "success",
+        "external_jobs": 1,
+        "outcome_after_crash": "unknown",
+        "partial_published": true,
+        "scenario": "crash_and_incremental_publication",
+        "statuses": [
+          "working",
+          "working",
+          "done"
+        ]
+      },
+      "value_sha256": "736b919281504ac9579b7d5dde66d156e8768f421bd93b5f99f6504c83e834bc"
+    },
+    {
+      "locator": "/scenarios/7",
+      "value": {
+        "attempt_unchanged": true,
+        "computation_after": "success",
+        "original_cleanup": "failed",
+        "scenario": "remediation"
+      },
+      "value_sha256": "9df8391bc1681a5e7a107e90f55a9d7b367d97b1aa4e020359343d674665f80d"
+    },
+    {
+      "locator": "/scenarios/9",
+      "value": {
+        "physical_deletion_evidence": "simulated assertion only",
+        "result_retained": true,
+        "scenario": "resource_retirement",
+        "selected_execution_survives": true,
+        "sensitive_content_erased": false
+      },
+      "value_sha256": "9e98a64c2ef37ce05a8a0540b62bfc4c81f94639a711370695fff291713e5356"
+    },
+    {
+      "locator": "/scenarios/10",
+      "value": {
+        "actual_simulated_executions": 2,
+        "difference_detectable_without_executor_reporting": false,
+        "modeled_attempts": 1,
+        "scenario": "counterexample_hidden_retries"
+      },
+      "value_sha256": "dd6ade3bf3a8d0e53c1a0d0f9f85cf47fa7b082399e821f6c9ae0e415f5aff8e"
+    }
+  ]
+}

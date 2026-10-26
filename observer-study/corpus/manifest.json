@@ -1,0 +1,128 @@
+{
+  "allowlist_sha256": "12413b7fe40563d37cbcafb9452e7352f8e621640dbbdfdc728353bbd9a177c7",
+  "checksum_scope": "original full bytes pinned at curation; selections and package hashes verified; historical manifests are untrusted reported assertions, not signatures",
+  "files": {
+    "ANSWER-SHEET.md": "e4c1855695ab3f7de2a4cd373d95393ba7e6cf79a8e15607f8fb0f1243a129c7",
+    "fixtures/artifact-results.json": "204114c706bde06f84bc04bc7cf96f35f9cc7a80a2d16f3b8a72809e4eb237b7",
+    "fixtures/artifact-summary.json": "472513809ae9394448a37311fa1e7da626692d23c0da4413debca6ea008e38f3",
+    "fixtures/audit-code.json": "86806162f63d8b5f3e2192cc9feaed30ca303ad015043ae2c7b3596fbec9a69b",
+    "fixtures/audit-results.json": "698fc02c3f083f54d2ff3061cfc827bbe2fcd57d79c70f63aa5f21ca719d77a9",
+    "fixtures/bridge-results.json": "45b506b23cbf99f8a36bb589728537f887e182924af3adb13763afa2fdf1db75",
+    "fixtures/current-gate.json": "f5c78e717268ca6cee0a5a2db98244f1e439d3c7461c202d2ca92ce86dc5afa7",
+    "fixtures/followup-code.json": "f47709e313cd9411134ec0ac02c6c7a53fb81ea8f940b92e28fc15320de7acf6",
+    "fixtures/followup-results.json": "6b47ead1d082fe97d923fd690917703925755fa72036d53c13e13c32220e1d20",
+    "fixtures/history-results.json": "176cedf4a7033dde74dbac686aa3e90225bd0f53e976fdc348aa76cb386752cb",
+    "fixtures/history-scenarios.json": "94c1be85291effecc52911880c29c30ed0af9e8443827d06140b86eabedad311",
+    "fixtures/history-summary.json": "4ffc56e53adee6cb18cdfd6c26593c2ef6c31bb75fc8525f11f7b02707f56d5f",
+    "fixtures/history-tests.json": "14c78a59530c8fce22b1f0c1698917b2ef900809e75016780fd2d66ff644f84b",
+    "fixtures/initial-code.json": "6a2f8eb95451d64d8d76d6996383c3c521d5c4c92e6abf8c29478b99c1e48cd9",
+    "fixtures/initial-manifest.json": "c2e0b2a275fc77e47c07e773bbd352e91eb923f8da0b136df61c3870d1181c9f",
+    "fixtures/initial-results.json": "e5311d6e9d54b220082104e9f8ebd39cc310e6e6e909dce0f61479542caadf2f",
+    "fixtures/journal-v1-code.json": "7714c8dddf2851bba773f7d97e630071adf559c8fc5e003a47d3081303eebf8c",
+    "fixtures/journal-v1.json": "eadd56608499b273ebfbae478418afd3c78ef3ddffb11169f01b87b238bcc0cd",
+    "fixtures/journal-v2.json": "f4c7504641e359bc31ae8cdda459e33725357dbd71513a69dec844de30e77224",
+    "fixtures/local-adoption.json": "c003b788206556a4621b18371df46991ce83ca55eb9b3d06b527ee9d00a68c8c",
+    "fixtures/s3-manifest.json": "11f5ba36341543aa866887468b4faf8dd9e1b7d0e17f2f68618927963e350a91",
+    "fixtures/s3-notes.json": "5d979041a2b469aabb0cc8b2ec0d699160c01b90c4c4f25a781b12a2441535b1",
+    "fixtures/s3-summary.json": "8263229e502e4f708589b68664def0c66f082e0071e52ec2ae17620556f48bdf",
+    "fixtures/sealing-code.json": "e03dad8aabf6946080dcd9f971750d884203052f1614fcfb4c2bca0bbdd0e05f",
+    "gaps.json": "559f55e940357bd86431837c3be13c7baf3395ee6299f902a6d3818ffc5fb5af",
+    "ground-truth.json": "4f70b8c1f87f4824889bf451b7d4500d16bc3e1726530074a865c8f3f3a1ad7a"
+  },
+  "ingestion": "retrospective",
+  "occurrence_identity": "no historical IDs created; source IDs label curated copies only",
+  "sanitization": "deterministic explicit pointer/line projection. No automatic secret-filter claim. Raw provider state, sessions, logs and external data excluded.",
+  "schema": "stage0-corpus-v1",
+  "supporting_availability": [
+    {
+      "citation": {
+        "fixture_pointer": "/values/10",
+        "original_locator": "/sandbox",
+        "original_sha256": "1ee5ff27592812145b1526b2d70cd36c9754cc74461ed83c4add6dfa2f3530e4",
+        "source_id": "audit-results",
+        "source_path": "feasibility/final-review/evidence.json",
+        "value_sha256": "98ce99660682e163e490e6659d8e911f396d863ad500e1308690680e448cb17e"
+      },
+      "contents_read": false,
+      "derivation": "explicit reported sandbox/snapshot or source-notes location; no directory sweep",
+      "observation": "present-regular",
+      "observation_kind": "Stage 0 lstat, not historical availability or checksum verification",
+      "path": "feasibility/final-review/runtime/run-80e3f208/snapshot/gate/gate.py"
+    },
+    {
+      "citation": {
+        "fixture_pointer": "/values/6",
+        "original_locator": "/source_manifest",
+        "original_sha256": "ba129dc87755f2c0f58c84b7102abf31d9792f4f815cc092d892baadadba3536",
+        "source_id": "bridge-results",
+        "source_path": "feasibility/hardening-review/evidence.json",
+        "value_sha256": "995c82871e1299345b21dd714d3aec74786677f649dedcf331c674f155aed628"
+      },
+      "contents_read": false,
+      "derivation": "explicit reported sandbox/snapshot or source-notes location; no directory sweep",
+      "observation": "present-regular",
+      "observation_kind": "Stage 0 lstat, not historical availability or checksum verification",
+      "path": "feasibility/hardening-review/runtime/3/source-manifest.json"
+    },
+    {
+      "citation": {
+        "fixture_pointer": "/values/0",
+        "original_locator": "",
+        "original_sha256": "3da0773c08cf21c4d42fccf922e09f904891b9fb82df0d8b4490045b426c660a",
+        "source_id": "artifact-results",
+        "source_path": "feasibility/artifact/test-results.json",
+        "value_sha256": "58e015256d904d11603fe764058d88786159872fde6802ca6dba622fc1c3cf19"
+      },
+      "contents_read": false,
+      "derivation": "explicit reported sandbox/snapshot or source-notes location; no directory sweep",
+      "observation": "present-directory",
+      "observation_kind": "Stage 0 lstat, not historical availability or checksum verification",
+      "path": "feasibility/artifact/runtime/r3"
+    },
+    {
+      "citation": {
+        "fixture_pointer": "/values/4",
+        "original_locator": "/latest/run",
+        "original_sha256": "723cd026cd80be8ce7c67c729a2d3c3e745c6015e07beaa127dcbc66184d28dd",
+        "source_id": "journal-v1",
+        "source_path": "feasibility/journal/evidence-v1.json",
+        "value_sha256": "43e5e81b69c4d9b443bccb201296ee2bcc6b72f2a4681b4c39fac324d65cfe53"
+      },
+      "contents_read": false,
+      "derivation": "explicit reported sandbox/snapshot or source-notes location; no directory sweep",
+      "observation": "present-directory",
+      "observation_kind": "Stage 0 lstat, not historical availability or checksum verification",
+      "path": "feasibility/journal/runtime/run-cebhzcvj"
+    },
+    {
+      "citation": {
+        "fixture_pointer": "/values/2",
+        "original_locator": "/sources/aws_s3_object.go",
+        "original_sha256": "a99832c393b2a295e587353361b4a4ac95bd5fee8b7eb9f32448e6e7a9d63058",
+        "source_id": "s3-manifest",
+        "source_path": "feasibility/adversarial/sources.json",
+        "value_sha256": "5061a5084b77ed9837970dcb296c002f6da9a9413402ac3396df9d650dc05521"
+      },
+      "contents_read": false,
+      "derivation": "explicit reported sandbox/snapshot or source-notes location; no directory sweep",
+      "observation": "present-regular",
+      "observation_kind": "Stage 0 lstat, not historical availability or checksum verification",
+      "path": "feasibility/adversarial/runtime/sources/aws_s3_object.go"
+    },
+    {
+      "citation": {
+        "fixture_pointer": "/values/3",
+        "original_locator": "/sources/aws_s3_delete.go",
+        "original_sha256": "a99832c393b2a295e587353361b4a4ac95bd5fee8b7eb9f32448e6e7a9d63058",
+        "source_id": "s3-manifest",
+        "source_path": "feasibility/adversarial/sources.json",
+        "value_sha256": "3c992dd0225f9ae4c312a025a96ebbf1f612f79e4d0ead8b6efe7386e696f282"
+      },
+      "contents_read": false,
+      "derivation": "explicit reported sandbox/snapshot or source-notes location; no directory sweep",
+      "observation": "present-regular",
+      "observation_kind": "Stage 0 lstat, not historical availability or checksum verification",
+      "path": "feasibility/adversarial/runtime/sources/aws_s3_delete.go"
+    }
+  ]
+}

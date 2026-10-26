@@ -1,0 +1,37 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "c56484e9215b2a55686546cdc0b4cf54a3233671a79dc84d83381f33a76ebf17",
+  "source_id": "history-summary",
+  "source_path": "feasibility/history/summary.json",
+  "values": [
+    {
+      "locator": "/tests",
+      "value": {
+        "command": "cd /work/repos/micha/dml-design/feasibility/history && python3 -m unittest -v",
+        "failed": 0,
+        "passed": 24
+      },
+      "value_sha256": "18438637b03d5b41855000e24da871551880617dc0976390660b35b2ddf4db21"
+    },
+    {
+      "locator": "/limitations",
+      "value": [
+        "HCL is opaque stored text; resource resolution is synthetic, not OpenTofu evaluation.",
+        "External execution, cleanup and deletion are simulations/assertions.",
+        "Crash recovery uses injected exceptions and object re-instantiation, not process termination or power loss.",
+        "Concurrent publication uses deterministic interleaving, not multiprocess transactions.",
+        "No production DML compatibility, physical erasure, or exactly-once guarantee established."
+      ],
+      "value_sha256": "d156a6e8d9ce0cfa93de79b3ebe75da534b33c60349c1c89a0dd6d5109aaa181"
+    },
+    {
+      "locator": "/fixture",
+      "value": {
+        "byte_reproduction_verified": true,
+        "path": "scenario-results.json",
+        "scenarios": 11
+      },
+      "value_sha256": "cebf33b1e819e7705e5ffb2d35a40e273fcfe9a9d6f81b32409cb78ef16df2b6"
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "8917e01bfd4229361f22de07c3d8b4788d1dc8fb3a83e3cc4f12147ce11a1fe2",
+  "source_id": "journal-v2",
+  "source_path": "feasibility/journal/evidence.json",
+  "values": [
+    {
+      "locator": "/contract_version",
+      "value": "journal-v2",
+      "value_sha256": "7726f519f8442034de8fbdc1da3e4a137fa6e940285f94e0a26b76224936cd8e"
+    },
+    {
+      "locator": "/latest/baseline_crashes",
+      "value": [
+        {
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "ack-before-commit",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": true,
+          "exitcode": 73,
+          "phase": "ack-after-commit",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "unlink",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": false,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "intent",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": false,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "reservation",
+          "recovered": true
+        },
+        {
+          "exitcode": 74,
+          "phase": "creation-before-receipt",
+          "recovered": true,
+          "unregistered_orphan_count": 0
+        },
+        {
+          "absent_count_on_reopen": 1,
+          "exitcode": 73,
+          "phase": "partial-batch-unlink",
+          "recovered": true
+        }
+      ],
+      "value_sha256": "46c2fbef1d57c2c6f067a0412824396c6696f0ad7256c2d36313eaf0f35dc523"
+    },
+    {
+      "locator": "/latest/followup_observations",
+      "value": [
+        {
+          "exitcode": 75,
+          "limitation": "cooperative capability ownership assumed",
+          "old_file_preserved": true,
+          "phase": "identical-bytes-pre-receipt-replacement",
+          "prior_inode_unknowable_from_intent": true,
+          "replacement_accepted": true
+        },
+        {
+          "exitcode": 75,
+          "invisible_orphans": 0,
+          "matching_receipt": true,
+          "phase": "creation-file-fsync",
+          "recovered": true
+        },
+        {
+          "absent_was_unknown": true,
+          "exitcode": 75,
+          "invisible_orphans": 0,
+          "phase": "creation-intent",
+          "recovered": true,
+          "replayed_explicitly": true
+        },
+        {
+          "barrier_controlled": true,
+          "kind": "delayed-creation-vs-disposal",
+          "recreated_disposed_identity": false
+        },
+        {
+          "cleanup_pinned": true,
+          "exitcode": 75,
+          "file_preserved": true,
+          "phase": "creation-mutated-after-crash",
+          "quarantined": true,
+          "recovered": false
+        },
+        {
+          "kind": "immutable-history",
+          "prior_head_preserved": true,
+          "prior_ticket_states": [
+            "reserved",
+            "intent",
+            "acknowledged"
+          ],
+          "snapshots": 20
+        },
+        {
+          "exitcode": 75,
+          "phase": "creation-receipt-before-commit",
+          "receipt_and_history_rolled_back": true,
+          "recovered": true
+        }
+      ],
+      "value_sha256": "d29a95edb22d17414da11b02eb6dbbb4815e0d4b08d99f1fba9396a5b41e48e2"
+    },
+    {
+      "locator": "/latest/tests",
+      "value": 35,
+      "value_sha256": "90d7ec0f0acef104d8b6252794295f661a0149634868d02a1ae0c358099638f5"
+    },
+    {
+      "locator": "/latest/baseline_tests",
+      "value": 20,
+      "value_sha256": "5378796307535df3ec8d8b15a2e2dc5641419c3d3060cfe32238c0fa973f7aa3"
+    },
+    {
+      "locator": "/latest/focused_tests",
+      "value": 15,
+      "value_sha256": "238903180cc104ec2c5d8b3f20c5bc61b389ec0a967df8cc208cdc7cd454174f"
+    },
+    {
+      "locator": "/latest/run",
+      "value": "/work/repos/micha/dml-design/feasibility/journal/runtime/followup-run-nyyr0_se",
+      "value_sha256": "bc41af1d732f9b4cd9d1fca3910dd2f43f9f316b9972b77d62bb7d6a8ac30e46"
+    },
+    {
+      "locator": "/latest/python",
+      "value": "3.13.15",
+      "value_sha256": "5dd7a55b7e65b2fdd8af7fe5e096ff2b836ba6acd6d195543ecc96ec85a0ac53"
+    },
+    {
+      "locator": "/latest/sqlite",
+      "value": "3.51.2",
+      "value_sha256": "8a9218a00c875ac3f422ff54ffc8f72861d21ad194a0f465543aab7fe6cdf226"
+    },
+    {
+      "locator": "/latest/platform",
+      "value": "Linux-6.18.55-x86_64-with-glibc2.42",
+      "value_sha256": "694f0cb1c8c84f0479efd85724a8d164477d2fd5ced8e991d04676d635ffa290"
+    },
+    {
+      "locator": "/sources",
+      "value": {
+        "contract.md": "928737b9828f611dbea511e719dc9760b11df032440d660578e42977472e2070",
+        "journal.py": "fc178a5fdcf0150de37b9cbd0a70d727903926e5fc2d95793cba5a39912a7912",
+        "test_followup.py": "3fcd5a24caeea82fd7cfbe9a6aa7b1150eec0654568fb1d98acd75e531c621ee",
+        "test_journal.py": "5207d945c305a1310e709137e55d9c4d395215ee4db170291f74692b8678894a"
+      },
+      "value_sha256": "a8fb4b2df60449db9f4734e85b714823eab9b6e9cd510348311302f813ae98bf"
+    },
+    {
+      "locator": "/historical_source_hashes_verified",
+      "value": true,
+      "value_sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+    }
+  ]
+}

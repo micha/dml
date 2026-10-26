@@ -1,0 +1,33 @@
+{
+  "status": "completed",
+  "workstream": "retention",
+  "verdict": "Finite model supports full-history retention, dependency-safe GC and excision, but safe asynchronous destruction needs a complete ownership census, durable disposal identities and cross-repository publication fencing.",
+  "report": "/work/repos/micha/dml-design/feasibility/retention/report.md",
+  "reproduce": "python3 -B feasibility/retention/test_model.py",
+  "python_version": "3.13.15",
+  "tests_passed": 20,
+  "bounded_graph_root_cases": 512,
+  "publication_reservation_destruction_interleavings": 6,
+  "trace_sha256": "7c37e3e70b1b467206060b5400728717d78ed6594e59bb1c602412e777bb43dd",
+  "evidence_type": "Executed deterministic Python simulations using synthetic local files; no DML or OpenTofu integration.",
+  "counterexamples": [
+    "Snapshot-only scanning deletes historically retained infrastructure.",
+    "Publication after GC approval/revalidation creates a stale-plan deletion race.",
+    "Deleting the sole cleanup identity strands pending adoption/disposal.",
+    "Key-only excision breaks retained artifacts; tombstones alone do not erase controlled copies.",
+    "Configuration regeneration does not recover lost operational state/address mapping."
+  ],
+  "global_coordination": [
+    "Repository/export membership and resource-reference publication versus destruction",
+    "Shared-consumer excision and dependency disposition",
+    "Durable cleanup identity handoff before research history disposal"
+  ],
+  "safe_eventual_reconciliation": "Configuration generation, adoption and cleanup retries only while durable identities/prerequisites remain protected; not destructive application from stale root summaries.",
+  "limitations": [
+    "Fences and journal are in-memory, not crash-safe or distributed.",
+    "Incomplete dependencies or never-registered repositories are outside invariant coverage.",
+    "Erasure covers synthetic controlled copies only; an uncontrolled copy intentionally survives.",
+    "Configuration is a mapping view, not HCL; provider state/import/replacement behavior is untested."
+  ],
+  "next_experiment": "Two local publisher processes plus a durable journal; kill deletion between reservation and unlink, then test publication rejection and cleanup restart."
+}

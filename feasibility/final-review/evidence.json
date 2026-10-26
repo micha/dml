@@ -1,0 +1,146 @@
+{
+  "sandbox": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208",
+  "sources": [
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/gate.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/gate/gate.py",
+      "sha256": "37f33708aef5ef78a8fec32d466b04aa46602d7f8c5ff1f2cebc4d464cdb5afb"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/apply_input.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/gate/apply_input.py",
+      "sha256": "651bfe485502122c461e41588b479a96ead10d50ede7b09d03a536d4f7b3fa8f"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/fixture_language.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/gate/fixture_language.py",
+      "sha256": "c768e80f5536e2443bd449497374ebdec04fa528834fe79d54a948b9448e94eb"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/run_tests.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/gate/run_tests.py",
+      "sha256": "fa6c531c33a1cc57be4073fc22abe557449306c51280b9bbd3ce51eaa4316510"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/journal/journal.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/journal/journal.py",
+      "sha256": "fc178a5fdcf0150de37b9cbd0a70d727903926e5fc2d95793cba5a39912a7912"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/artifact/ready.json",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/artifact/ready.json",
+      "sha256": "2f350ae43e86abdc675538ea235bc592ab7a057220ea045db6a859efa9292aea"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/artifact/main.go",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/artifact/main.go",
+      "sha256": "75f12ff2a24f439b160e39e29ae3fee738983693e41371e28d4761e275fcb567"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/hardening-review/checks.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/hardening-review/checks.py",
+      "sha256": "e5bdd34311356cd65f6e4a170eb30fa074c8e52f0a3b382afdc9da3441d81181"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/hardening-review/followup_checks.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/hardening-review/followup_checks.py",
+      "sha256": "58d0226709c9178ed08d0b34c7fee9bfcd917e48d4840471a5aec062303c8e43"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/hardening-review/followup_prepare.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/hardening-review/followup_prepare.py",
+      "sha256": "85749987d329e2ce0d2ccf5bd83717ca923a3e0505994f843259392648a66af2"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/hardening-review/followup_run.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/hardening-review/followup_run.py",
+      "sha256": "6322c0d0db367adf914480b98eb50d20245045c6105eaf693aa6644fb0112662"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/hardening-review/followup_collect.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/final-review/runtime/run-80e3f208/snapshot/hardening-review/followup_collect.py",
+      "sha256": "67ac06a751e5833c7edbdbe86f39bcfd364f5405c03b915b110918203e2ae5c9"
+    }
+  ],
+  "cases": {
+    "sealed_saved_plan_swap": {
+      "victim_deleted": true,
+      "retained_identity_preserved": true,
+      "kernel": {
+        "fd": 3,
+        "seals": 15,
+        "approved_digest": true,
+        "write_errno": 1,
+        "grow_errno": 1,
+        "shrink_errno": 1,
+        "seal_change_errno": 1
+      },
+      "actual_apply": {
+        "argv": [
+          "apply",
+          "-input=false",
+          "-no-color",
+          "/proc/self/fd/3"
+        ],
+        "code": 0,
+        "pass_fds": [
+          3
+        ],
+        "stdout_length": 289,
+        "stderr_length": 0,
+        "output_logging": "omitted"
+      }
+    },
+    "file_expression": {
+      "rejected": "unsupported evaluation expression/input",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "sensitive_expression": {
+      "rejected": "unsupported evaluation expression/input",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "unexported_resource": {
+      "rejected": "incomplete resource census",
+      "planning_cli_calls": 0,
+      "state_unchanged": true
+    },
+    "positive_captured_string_fixture": {
+      "update_applied": true,
+      "body_free_logs": true,
+      "log_mode": "0600"
+    },
+    "uncaptured_tofu_json": {
+      "material_unchanged": true,
+      "changed_file_accepted_after_plan": true,
+      "actual_state_input": "SYNTHETIC-UNTRACKED-TOFU",
+      "sealed_plan_not_broken": true
+    },
+    "same_file_sealed_provider_journal_bridge": {
+      "import_preserved_bytes_inode_mtime": true,
+      "full_history_rejection": "full-history retained",
+      "artifact_absent": true,
+      "status": "acknowledged",
+      "association_retained": true,
+      "apply_descriptor": "/proc/self/fd/6",
+      "path_swap_ineffective": true,
+      "adapter": "owned SealedFileGate subclass; original fixture builder and physical receipt"
+    }
+  },
+  "versions": {
+    "python": "3.13.15",
+    "sqlite": "3.51.2",
+    "linux": "6.18.55",
+    "opentofu": "1.13.2",
+    "provider": "immutable 0.1.0"
+  },
+  "tools": {
+    "provider": "3f3f69e57054ed57d760a9765679d8caf1d072a3f34af92ea2662a5da59ff7b1",
+    "tofu": "949061cbb3c3d4558928ca9a459a5052b8c5e5545d17656f33316d2e3bc335f2"
+  },
+  "cli_calls": 55,
+  "bridge_cli_calls": 18,
+  "completed": true,
+  "audit_sha256": "5fa39c336aeb2fdd9a01e17046722102e82ecf1a51ce5659ae5877d7dc4ddacd"
+}

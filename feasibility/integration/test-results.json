@@ -1,0 +1,344 @@
+{
+  "integration_scripts": {
+    "audit.py": "407a33da4516010652127b395f874a87be1d2c4472413509456ad1279f4ddc77",
+    "run-all": "88e4a152befff90ebeb981ef5db74c76923b702715d0f6cfe5ce5030e4f09af7",
+    "scenario.py": "28eed82daeaee0e42d3f5be6ce84ab1994db4abd9c1c428a15569dd87f5af2f2"
+  },
+  "limitations": [
+    "Models are simulations, not DML C integration or distributed safety.",
+    "AWS source assertions do not execute cloud behavior.",
+    "Original scripts replayed byte-for-byte with __file__ relocated by copying."
+  ],
+  "mode": "full",
+  "provider_source_verification": {
+    "aws_s3_delete.go": {
+      "bytes": 15230,
+      "retrieval": "independent public download",
+      "sha256": "e3fbea7f1ccd402ee42ec2a8f75716988aeb4b4b8cd7873df9633f08eca38339",
+      "status": "verified",
+      "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/internal/service/s3/delete.go"
+    },
+    "aws_s3_object.go": {
+      "bytes": 24450,
+      "retrieval": "independent public download",
+      "sha256": "fa0e6316e491678f220daaa67eaa12af43069a57ba878766069bee6286df2aa1",
+      "status": "verified",
+      "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/internal/service/s3/object.go"
+    },
+    "aws_s3_object.md": {
+      "bytes": 14220,
+      "retrieval": "independent public download",
+      "sha256": "0bf9e5aea3c87bf15f804597a9e8571454f571908a77b18db33951227ecc5216",
+      "status": "verified",
+      "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/website/docs/r/s3_object.html.markdown"
+    }
+  },
+  "python": "3.13.15 (main, Aug  5 2026, 12:25:43) [GCC 15.3.0]",
+  "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/5",
+  "sources": {
+    "/work/repos/micha/dml-design/feasibility/adversarial/experiments.py": "f41c3cbddd510dae8bf4fc45ef22ec1fa2fe44361377bf723947574ec694af40",
+    "/work/repos/micha/dml-design/feasibility/adversarial/sources.json": "a99832c393b2a295e587353361b4a4ac95bd5fee8b7eb9f32448e6e7a9d63058",
+    "/work/repos/micha/dml-design/feasibility/history/model.py": "1fbd53e6df7294f7bb17fe4e53c39e2e4c8d33228bc93a4d00643a7d45614ae7",
+    "/work/repos/micha/dml-design/feasibility/history/run_scenarios.py": "fedcd68a0a0845ad4a0cfa7db779828d687415a7e49fcdb62b76c9afc6679eaf",
+    "/work/repos/micha/dml-design/feasibility/history/scenario-results.json": "ae2a4c1d9a3a44bc84497d27e87e5f8bb4e2830faf93a4b5a4c96ae4a1d79e97",
+    "/work/repos/micha/dml-design/feasibility/history/test_model.py": "258eaefb6d078e45fb0731b05d310f93b5cccf70431cafb1195b232756228457",
+    "/work/repos/micha/dml-design/feasibility/opentofu/closure/main.tf": "3415c3248080283742bcf81ccb349e064b8794d758ab4869b8f56b6d92c74c63",
+    "/work/repos/micha/dml-design/feasibility/opentofu/local-provider.lock.hcl": "f0b58dccb939366a8365c9b9af88c2045897a385ce9c500c8aeda06e9f14b049",
+    "/work/repos/micha/dml-design/feasibility/opentofu/probe.py": "61569d045d490c2e7bc4e259bd4ebdb865462b7175f8b6d45670697f58bcfaab",
+    "/work/repos/micha/dml-design/feasibility/retention/model.py": "aa28f0d3f28b82e557883a91747ae216e58557eea642c4c865fc961d21291d4c",
+    "/work/repos/micha/dml-design/feasibility/retention/test_model.py": "b425d10784c8ee0865ceb450927992908c366b506fde44d79a5187e83c2393ca"
+  },
+  "status": "passed",
+  "tests": {
+    "adversarial": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "experiments.py"
+      ],
+      "cli_cases": 6,
+      "cloud_executed": false,
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/adversarial",
+      "experiment_count": 8,
+      "observed": {
+        "cleanup_removal": {
+          "provisioner_created_artifact_survives_destroy": true,
+          "state_empty": true
+        },
+        "erasure": {
+          "current_state_tombstoned": true,
+          "low_entropy_hash_recovered_in_candidates": 100,
+          "plaintext_survivors": [
+            "command-02.log",
+            "terraform.tfstate.backup",
+            "immutable-commit.copy",
+            "replica.tfstate.copy"
+          ],
+          "rewriting_hash_child_changes_parent": true,
+          "sensitive_json_exposes_value": true
+        },
+        "file_capture": {
+          "original_output": "synthetic-dataset-v1",
+          "regenerated_plan_exit": 1,
+          "same_hcl_sha256": "aa48b5b8b24501c76e712cc8fc229177b3e7fac3bf4edc703ebe6d3ebaf1e9c1"
+        },
+        "history_simulation": {
+          "attempts": [
+            {
+              "bytes": "answer-42",
+              "closure": "agent-v1",
+              "id": "A1"
+            },
+            {
+              "bytes": "answer-42",
+              "closure": "agent-v1",
+              "id": "A2"
+            }
+          ],
+          "counts": {
+            "attempts": 2,
+            "requests": 3,
+            "unique_results": 1
+          },
+          "requests": [
+            {
+              "action": "fresh",
+              "attempt": "A1",
+              "id": "Q1"
+            },
+            {
+              "action": "intentional-reuse",
+              "attempt": "A1",
+              "id": "Q2"
+            },
+            {
+              "action": "fresh",
+              "attempt": "A2",
+              "id": "Q3"
+            }
+          ],
+          "uri_stable_but_bytes_changed": true
+        },
+        "module_path": {
+          "final_bytes": "beta",
+          "first_instance_bytes_lost": true,
+          "two_output_paths": [
+            "child/shared.txt",
+            "child/shared.txt"
+          ]
+        },
+        "prevent_destroy": {
+          "removed_declaration_plan": "0 to add, 0 to change, 1 to destroy",
+          "with_declaration_destroy_exit": 1
+        },
+        "provider_source_checks": {
+          "absent_body_uploads_empty_bytes": true,
+          "cloud_executed": false,
+          "metadata_triggers_upload": true,
+          "version_id_computed_not_configurable": true,
+          "versioned_delete_calls_all_versions": true
+        },
+        "state_loss": {
+          "first_id": "05de4251-7055-cf25-496a-60cb1765bc65",
+          "historical_observation_stale_for_current_binding": true,
+          "same_hcl": true,
+          "second_id": "71c45b6f-ca3b-c5c0-f120-1dfdaef5d162"
+        }
+      },
+      "returncode": 0,
+      "simulation_cases": 1,
+      "source_assertion_cases": 1,
+      "status": "passed"
+    },
+    "cross-lifecycle": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "/work/repos/micha/dml-design/feasibility/integration/scenario.py",
+        "--sandbox",
+        "/work/repos/micha/dml-design/feasibility/integration/runtime/5/cross",
+        "--models",
+        "/work/repos/micha/dml-design/feasibility/integration/runtime/5",
+        "--tofu",
+        "/work/repos/micha/dml-design/feasibility/tools/tofu"
+      ],
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5",
+      "observed": {
+        "adoption": "simulated pending obligation -> registration -> failed cleanup -> confirmed absence",
+        "attempts": 2,
+        "boundaries": [
+          "OpenTofu provisions a real file plus state-only binding surrogate, not compute capacity.",
+          "Retention roots are explicit exports into a separate model, not inferred from DML nodes.",
+          "Adoption, repository fencing and external disposal are simulations.",
+          "Local arithmetic and controlled-file removal are real; no AWS, DML C or erasure claim."
+        ],
+        "controlled_result_copy_deleted": true,
+        "disposal_failure_count": 1,
+        "external_bucket_simulation_survives": true,
+        "history_result_still_reachable": true,
+        "installation_outputs": {
+          "filename": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/cross/installed/worker.txt",
+          "occurrence_id": "20f721a5-06bd-212b-61a4-921602add81f",
+          "sha256": "87eba76e7f3164534045ba922e7770fb58bbd14ad732bbf5ba6f11cc56989e6e",
+          "shared_id": "external-authority-surrogate"
+        },
+        "mapping": {
+          "A:a0": {
+            "history_commit": "56d22e1708d3f1af6b6725f86d2002b54c5e5c8a8e86a437f8120aa967c0d5b9"
+          },
+          "compute": {
+            "filename": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/cross/installed/worker.txt",
+            "occurrence_id": "20f721a5-06bd-212b-61a4-921602add81f",
+            "sha256": "87eba76e7f3164534045ba922e7770fb58bbd14ad732bbf5ba6f11cc56989e6e",
+            "shared_id": "external-authority-surrogate"
+          },
+          "result": {
+            "dag_result": "ccf8f2cfc2ac539eba690abe5839a2a64d7c9e14025abda45369a31b699e22bb",
+            "local_copy": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/cross/execution-result.txt"
+          }
+        },
+        "model_deleted": [
+          "compute",
+          "identity",
+          "result"
+        ],
+        "real_local_file_destroyed": true,
+        "requests": 3,
+        "result_roots": 1,
+        "retirement_plan_actions": {
+          "module.compute.local_file.artifact": [
+            "delete"
+          ],
+          "module.compute.terraform_data.binding": [
+            "delete"
+          ]
+        },
+        "reuse_after_compute_retirement": true,
+        "selected_attempt_unchanged_by_fresh": true,
+        "status": "passed",
+        "tofu_commands": 6
+      },
+      "returncode": 0,
+      "status": "passed"
+    },
+    "evidence-audit": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "/work/repos/micha/dml-design/feasibility/integration/audit.py",
+        "--sources",
+        "/work/repos/micha/dml-design/feasibility/integration/runtime/5/adversarial/runtime/sources"
+      ],
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5",
+      "observed": {
+        "citation_discrepancy": "First-wave notes cite version_id schema at 270\u2013273; pinned source has it at 246\u2013249.",
+        "cloud_executed": false,
+        "low_entropy_search": {
+          "actual_hash_guesses_until_match": 8,
+          "configured_candidate_domain": 100,
+          "first_wave_field_100_is_domain_size_not_measured_work": true
+        },
+        "object_go_line_anchors": {
+          "hasObjectContentChanges": 626,
+          "resourceObjectDelete": 418,
+          "resourceObjectUpdate": 337,
+          "resourceObjectUpload": 449,
+          "version_id_schema": 246
+        },
+        "source_claims": [
+          "metadata changes enter upload; absent body selects empty bytes",
+          "versioned deletion enumerates versions and delete markers, filtered to exact key"
+        ],
+        "status": "passed"
+      },
+      "returncode": 0,
+      "status": "passed"
+    },
+    "history": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "-v"
+      ],
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/history",
+      "returncode": 0,
+      "status": "passed",
+      "tests_run": 24
+    },
+    "history-fixture": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "run_scenarios.py"
+      ],
+      "byte_identical": true,
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/history",
+      "returncode": 0,
+      "status": "passed"
+    },
+    "opentofu": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "probe.py",
+        "--tofu",
+        "/work/repos/micha/dml-design/feasibility/tools/tofu"
+      ],
+      "command_count": 86,
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/o",
+      "evidence_path": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/o/evidence.json",
+      "observed_actions": {
+        "declarative_import": [
+          "update"
+        ],
+        "lost_state": {
+          "local_file.artifact": [
+            "create"
+          ],
+          "terraform_data.identity": [
+            "create"
+          ]
+        },
+        "post_cli_import": {
+          "id": "execution-42",
+          "value": null
+        }
+      },
+      "probes": 7,
+      "provider": "registry.opentofu.org/hashicorp/local 2.5.3",
+      "returncode": 0,
+      "status": "passed"
+    },
+    "retention": {
+      "argv": [
+        "/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3",
+        "-B",
+        "test_model.py"
+      ],
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5/retention",
+      "original_trace_match": true,
+      "returncode": 0,
+      "status": "passed",
+      "tests_run": 20,
+      "trace_sha256": "7c37e3e70b1b467206060b5400728717d78ed6594e59bb1c602412e777bb43dd"
+    },
+    "version": {
+      "argv": [
+        "/work/repos/micha/dml-design/feasibility/tools/tofu",
+        "version",
+        "-json"
+      ],
+      "cwd": "/work/repos/micha/dml-design/feasibility/integration/runtime/5",
+      "returncode": 0,
+      "status": "passed"
+    }
+  },
+  "tofu_executable_sha256": "949061cbb3c3d4558928ca9a459a5052b8c5e5545d17656f33316d2e3bc335f2",
+  "versions": {
+    "platform": "linux_amd64",
+    "provider_selections": {},
+    "terraform_version": "1.13.2"
+  }
+}

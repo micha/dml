@@ -1,0 +1,55 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/ITERATION-RESULTS.md",
+  "initial_report": "/work/repos/micha/dml-design/feasibility/RESULTS.md",
+  "final_independent_audit": "/work/repos/micha/dml-design/feasibility/final-review/report.md",
+  "verdict": "Qualified feasibility for cooperative local journal, artifact adoption, sealed admission and same-file handoff; not production-ready automatic resource management.",
+  "specialist_roles": 11,
+  "worker_launches_including_followups_and_failed_attempts": 16,
+  "initial_phase": {
+    "model_tests": 44,
+    "opentofu_probes": 7,
+    "cli_invocations_per_lab_run": 86,
+    "coordinator_full_integrated_rerun": "passed, integration/runtime/5"
+  },
+  "candidate_phase": {
+    "journal_version": "journal-v2",
+    "journal_tests": 35,
+    "journal_abrupt_process_exits": 12,
+    "artifact_provider": "actual Go OpenTofu provider 0.1.0",
+    "artifact_cli_invocations": 52,
+    "gate_regression_groups": 28,
+    "gate_new_groups": 22,
+    "gate_historical_replays": 4,
+    "gate_combined_cli_invocations": 285,
+    "final_focused_audit_cases": 7,
+    "final_focused_audit_cli_invocations": 73,
+    "counts_are_different_units_not_additive": true
+  },
+  "verified_candidate_mechanisms": [
+    "Transactional append-only hash-linked journal snapshots",
+    "Durable creation intent before file creation and crash recovery",
+    "Real bytes-preserving artifact import and guarded physical mismatch handling",
+    "Sealed exact-plan-byte apply resists pathname substitution",
+    "Pre-effect resource census and explicit fixture expression admission",
+    "Actual same-file provider/journal retirement and absence acknowledgement"
+  ],
+  "remaining_gaps": [
+    "New .tofu.json material-capture bypass remains unfixed",
+    "Provider Delete lacks durable identity-scoped retirement authority; direct forced replacement remains a bypass",
+    "Complete membership/dependency discovery and distributed publication coordination are assumed",
+    "Full HCL composition and active-versus-historical resource configuration policy remain open",
+    "Manager receipts and durable execution bundles remain sidecars",
+    "Raw state/metadata confidentiality and global erasure are not established",
+    "Coarse fences can block unrelated work indefinitely",
+    "No native DML integration, cloud-resource test or distributed safety proof"
+  ],
+  "orchestration_limitations": [
+    "Editing an active Bash launcher left two missing exit records; hardening parse failure observed. Later launches use frozen copies.",
+    "Two resumed hardening attempts failed at the model provider and are not credited as completed audit.",
+    "Alternate model was unavailable before tools; no account changes. A fresh working-model context completed the final audit."
+  ],
+  "safety": "Only new synthetic local resources affected. DML implementation clean at 638cc42; no live infrastructure, OS changes, remotes or pushes. All worker windows closed.",
+  "git_status": "Design changes remain uncommitted for morning review.",
+  "next_review": "Evaluate v2 journal plus provider-aware admission, immutable complete input bundles, versioned manager receipts and effect-side Delete authority; compare direct artifact cleanup and fencing tradeoffs."
+}

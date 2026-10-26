@@ -1,0 +1,48 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "9ee92e3561d17692538252f5138b5843bab532c9369bd27fa480ee0c8b7cefaf",
+  "source_id": "initial-results",
+  "source_path": "feasibility/gate/test-results-initial.json",
+  "values": [
+    {
+      "locator": "/cases/completed_effect_unknown_outcome",
+      "value": {
+        "automatic_acknowledgement": false,
+        "durable_status": "unknown",
+        "exitcode": 73,
+        "manager_manifest": {}
+      },
+      "value_sha256": "c7c8fc6be324974bebcc7da155ad09eb5e1a9007ab5d341c9fa569e3ed8adb42"
+    },
+    {
+      "locator": "/cases/interrupted_apply",
+      "value": {
+        "blind_retry": "missing/mismatched/live reservation",
+        "durable_status": "unknown",
+        "exitcode": 73,
+        "new_publisher": "live/unknown reservation",
+        "side_effect_started": false
+      },
+      "value_sha256": "db1f172ef11d1651104fa9c26518d708ea950e93b449cf2ffbeabe64abd9156f"
+    },
+    {
+      "locator": "/passed",
+      "value": true,
+      "value_sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+    },
+    {
+      "locator": "/tool",
+      "value": {
+        "platform": "linux_amd64",
+        "provider_selections": {},
+        "terraform_version": "1.13.2"
+      },
+      "value_sha256": "4124854611603d9d310e0dd2811c19d442561ab4cd6a5961c45d4482aae3ad89"
+    },
+    {
+      "locator": "/sandbox",
+      "value": "/work/repos/micha/dml-design/feasibility/gate/runtime/run-58fab76a",
+      "value_sha256": "3f16be90611acfc695db32817f64439c80e7d913eb8df8287aa7030dfdba9110"
+    }
+  ]
+}

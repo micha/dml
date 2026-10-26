@@ -1,0 +1,30 @@
+{
+  "gate.py": {
+    "snapshot": "gate-initial.py",
+    "sha256": "666d699e7ed4adac11585db98b2230eb564768dc21db72adc2394f6c1d3077ac"
+  },
+  "run_tests.py": {
+    "snapshot": "run_tests-initial.py",
+    "sha256": "361f74ea533f39ff7731b86627ce56458530c436b20a2413c84553ac5c959958"
+  },
+  "journal_adapter.py": {
+    "snapshot": "journal_adapter-initial.py",
+    "sha256": "b28eb66b5098f1e041fec42b5cb0f8b1f6fcc702bd7e1486fcc1b15ac549887a"
+  },
+  "report.md": {
+    "snapshot": "report-initial.md",
+    "sha256": "3448be324e9047bcd31ca346bad9620ffaa517ebdf79e3916d2758d4b6c31627"
+  },
+  "test-results.json": {
+    "snapshot": "test-results-initial.json",
+    "sha256": "9ee92e3561d17692538252f5138b5843bab532c9369bd27fa480ee0c8b7cefaf"
+  },
+  "summary.json": {
+    "snapshot": "summary-initial.json",
+    "sha256": "0c2ea0b6fc82d42fe183cdb16372e6863eb9365fa63d109040c7c1792017203d"
+  },
+  "done.json": {
+    "snapshot": "done-initial.json",
+    "sha256": "4cf6cee9e944068ad435f39559449cf927423f447fbddc89a7f10dacbdaca795"
+  }
+}

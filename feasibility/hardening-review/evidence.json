@@ -1,0 +1,213 @@
+{
+  "authoritative_run": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3",
+  "source_manifest": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/source-manifest.json",
+  "sources": [
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/journal/journal.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/journal/journal.py",
+      "sha256": "fc178a5fdcf0150de37b9cbd0a70d727903926e5fc2d95793cba5a39912a7912"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/journal/test_journal.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/journal/test_journal.py",
+      "sha256": "5207d945c305a1310e709137e55d9c4d395215ee4db170291f74692b8678894a"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/journal/test_followup.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/journal/test_followup.py",
+      "sha256": "3fcd5a24caeea82fd7cfbe9a6aa7b1150eec0654568fb1d98acd75e531c621ee"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/gate.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/gate/gate.py",
+      "sha256": "666d699e7ed4adac11585db98b2230eb564768dc21db72adc2394f6c1d3077ac"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/run_tests.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/gate/run_tests.py",
+      "sha256": "361f74ea533f39ff7731b86627ce56458530c436b20a2413c84553ac5c959958"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/gate/journal_adapter.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/gate/journal_adapter.py",
+      "sha256": "b28eb66b5098f1e041fec42b5cb0f8b1f6fcc702bd7e1486fcc1b15ac549887a"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/artifact/test_provider.py",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/artifact/test_provider.py",
+      "sha256": "e8b709b87c08b79156447620858ee7e1a7fbb4deb5b3e442c142f236ba62661d",
+      "adaptation": "TMPDIR shortened within review-owned runtime to avoid Unix socket length limit",
+      "adapted_sha256": "9621df3300a98a6ae6d60761d9b95d95d4099dfbc0d4ea4ed2ef2b16ebaadf56"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/artifact/main.go",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/artifact/main.go",
+      "sha256": "75f12ff2a24f439b160e39e29ae3fee738983693e41371e28d4761e275fcb567"
+    },
+    {
+      "source": "/work/repos/micha/dml-design/feasibility/artifact/ready.json",
+      "copy": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/artifact/ready.json",
+      "sha256": "2f350ae43e86abdc675538ea235bc592ab7a057220ea045db6a859efa9292aea"
+    }
+  ],
+  "versions": {
+    "python": "3.13.15",
+    "sqlite": "3.51.2",
+    "journal": "journal-v2",
+    "opentofu": "1.13.2",
+    "provider": "immutable 0.1.0"
+  },
+  "journal": {
+    "tests": 35,
+    "success": true,
+    "baseline": 20,
+    "focused": 15,
+    "results": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/journal/runtime/followup-run-36m2osdy/results.json"
+  },
+  "gate": {
+    "result_groups": 28,
+    "passed": true,
+    "results": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/gate/test-results.json"
+  },
+  "artifact": {
+    "cli_invocations": 52,
+    "checks": [
+      "actual CLI import + no-op plan/apply",
+      "metadata update preserves bytes/inode/mtime; manifest excludes bytes",
+      "configured path/digest/owner/id mutations rejected at plan",
+      "external content mismatch blocks refresh and unrefreshed delete",
+      "state loss fails creation safely; durable receipt permits re-import",
+      "retirement unlinks matching file; missing re-import cannot create",
+      "saved destroy plan refuses same-byte different-inode replacement",
+      "CLI import rejects escape, absolute path, target/parent symlink, hardlink, missing file",
+      "wrong import digest and symlink-configured root rejected",
+      "saved destroy plan refuses replaced sandbox root",
+      "declarative import plus metadata reconciliation preserves bytes; subsequent no-op",
+      "actual SIGKILL after unlink/before acknowledgement; old state survives, retry safely succeeds",
+      "COUNTEREXAMPLE: -replace deletes valid artifact then creation fails"
+    ],
+    "counterexamples": [
+      "forced replacement deletes before adoption-only create fails"
+    ],
+    "results": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/artifact/test-results.json"
+  },
+  "review": {
+    "passed": true,
+    "result_groups": 18,
+    "cases": {
+      "configuration_changed_after_final_check": {
+        "destroyed": true,
+        "new_prevent_destroy_ignored": true,
+        "after_effect_receipt_failure": "missing/nonpublic receipt",
+        "adapter": "existing before_effect test callback; no candidate source edits"
+      },
+      "saved_plan_swapped_after_final_check": {
+        "retained_other_destroyed": true,
+        "authorized_ticket_excluded_other": true,
+        "after_effect_failure": "missing/nonpublic receipt"
+      },
+      "uncaptured_file_expression": {
+        "check_accepted_changed_dependency": true,
+        "accepted_expression": "${file(\"input.txt\")}",
+        "not_a_universal_HCL_capture": true
+      },
+      "fake_gate_empty_census": {
+        "reservation_accepted": true,
+        "member_count": 0,
+        "real_journal_requires_nonempty_census": true
+      },
+      "unexported_creation_before_receipt_rejection": {
+        "created_unmapped_resource": true,
+        "after_effect_failure": "malformed identity mapping"
+      },
+      "sensitive_expression_receipt_vs_raw_log": {
+        "material_accepted": true,
+        "receipt_omits_value": true,
+        "raw_cli_log_contains_value": true
+      },
+      "module_composition_explicitly_unsupported": "unsupported configuration",
+      "existing_gate_provider_incompatibility": "unsupported material",
+      "actual_full_history_protects_provider_file": "full-history retained",
+      "shared_consumer_still_protects": "full-history retained",
+      "unavailable_registered_member": "unavailable repository member",
+      "ack_before_effect_rejected": "no in-flight intent",
+      "ack_with_file_present_rejected": "absence not observed",
+      "integrated_SIGKILL_after_provider_effect": {
+        "exitcode": -9,
+        "file_absent": true,
+        "journal_status": "intent",
+        "manager_still_records_resource": true,
+        "fence_survives": "global destruction fence active"
+      },
+      "integrated_recovery_and_historical_association": {
+        "ticket_status": "acknowledged",
+        "actual_absence": true,
+        "historical_B_head_retained": true,
+        "old_operational_head_reacquisition": "operational acquisition of pending/withdrawn/disposed identity"
+      },
+      "new_provenance_allowed_new_operation_rejected": "operational acquisition of pending/withdrawn/disposed identity",
+      "immutable_history_versions_management_states": {
+        "tables": [
+          "meta",
+          "resources",
+          "aliases",
+          "members",
+          "commits",
+          "heads",
+          "dependencies",
+          "obligations",
+          "tickets",
+          "creations",
+          "history"
+        ],
+        "obligation_now": {
+          "target": "file:3c77d9ef12b8476aa1157fd1b487cf87",
+          "kind": "disposal",
+          "cleanup": null,
+          "resolved": 1
+        },
+        "ticket_now": {
+          "version": "journal-v2",
+          "id": "b606edf44fc14b15947d7551e261dc3c",
+          "revision": 16,
+          "victims": [
+            "file:3c77d9ef12b8476aa1157fd1b487cf87"
+          ],
+          "plan_digest": "52908d141cf536536db05420733087b669bfbe04f5929ff416f72b0f555da5f2",
+          "status": "acknowledged"
+        },
+        "immutable_history_validated": {
+          "count": 21,
+          "tip": "61a3bba93a2d517249cefac02c369af00ad1781e24ffaebf1ec246467a1a53b0"
+        },
+        "obligation_kinds": [
+          "adoption",
+          "creation",
+          "disposal",
+          "managed"
+        ],
+        "ticket_states": [
+          "acknowledged",
+          "intent",
+          "reserved"
+        ],
+        "prior_snapshot_unchanged": true,
+        "exact_manager_receipt_remains_adapter_sidecar": true
+      },
+      "integrated_pre_effect_physical_mismatch": "physical file identity mismatch"
+    },
+    "results": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/review-results.json",
+    "log": "/work/repos/micha/dml-design/feasibility/hardening-review/runtime/3/checks-2.log"
+  },
+  "earlier_runs": [
+    "runtime/1: original v1 and initial artifact parent-directory failure preserved",
+    "runtime/2: intermediate v2 and successful full runner preserved"
+  ],
+  "documentation": {
+    "context7": "Monthly quota exceeded",
+    "official": [
+      "https://opentofu.org/docs/cli/commands/apply/",
+      "https://opentofu.org/docs/cli/commands/show/"
+    ]
+  }
+}

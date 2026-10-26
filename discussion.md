@@ -1,6 +1,6 @@
 # Agent-first DML design discussion — checkpoint
 
-Status: Ongoing exploratory discussion at a conceptual checkpoint. No implementation approval or changes to DML implementation specifications.
+Status: Ongoing exploratory discussion at a conceptual checkpoint. Feasibility research and candidate-design experiments are complete; no approval to change DML implementation or its specifications.
 
 ## Scope and separation
 
@@ -304,9 +304,106 @@ These are exploratory directions, not implementation approval.
 - Distributed copies/backups limit erasure guarantees. Externally managed resources remain outside DML's deletion authority.
 - Exact tombstone representation, excision authority/scope, dependency and shared-consumer impact, propagation, and failure recovery remain open. No existing API/schema is assumed to implement these new semantics already.
 
+## Authorized feasibility study
+
+The user authorized autonomous feasibility research with specialist Pi agents in
+new tmux windows, then explicitly allowed evolving and trying candidate designs.
+The work is complete: [initial findings](feasibility/RESULTS.md),
+[candidate iteration results](feasibility/ITERATION-RESULTS.md), and
+[the fresh final audit](feasibility/final-review/report.md) preserve evidence and
+limits. Narrow cooperative mechanisms work; production safety is not established.
+Candidate behavior is not a new user agreement or approval to modify DML
+implementation/specifications.
+
+## Observability motivation and sidecar observers
+
+### User-stated motivation and direction
+
+- Agent capability increases research production faster than humans can understand
+  and assess it. The bottleneck is visibility into whether the work researches what
+  the human thinks it researches, not merely obtaining more agent analyses.
+- Deterministic observability and visualization should expose how research is done
+  without overwhelming humans. Agent summaries are not a substitute for evidence.
+- Independent sidecar DAGs can import in-progress research and visualize node
+  inputs, outputs and data flow. Multiple observers should coexist without the
+  research producer needing to know about them.
+- Uniform DAG/commit/tree/datum structure should let general observers navigate
+  research without discovering each project's experiment/trial directory layout.
+- The user agreed that the next experiment should observe the feasibility study
+  itself, then requested a detailed handoff plan while discussion continues here.
+
+### Assistant proposals and unresolved boundaries
+
+- Use recursive step collapse/expansion, bounded value previews, comparisons and
+  evidence links; deterministic projection should remain usable without model calls.
+- Explore small shared record-role/edge conventions in ordinary DAG data. Generic
+  traversal supplies structure, not domain interpretation or scientific validity.
+- Following a head versus retaining an imported snapshot needs explicit treatment;
+  persistent observer imports may become retention roots and rendered values are
+  copies relevant to excision/privacy.
+- Preserve pinned source snapshots, distinguish reuse from fresh observations, and
+  label retrospective ingestion and incomplete capture rather than inventing history.
+- [Observer handoff](observer-study/HANDOFF.md) proposes staged corpus curation,
+  a model-backed generic reader, deterministic presentation, progress replay,
+  a second producer, human evaluation and independent audit. This is a plan,
+  not an approved production schema or a directive to start implementation now.
+
+## Researcher control and inspectable limits
+
+### Conceptual agreement
+
+- Sidecar observers are ordinary external consumers enabled by DML's core
+  functionality, not a DML subsystem or feature. Do not add observer-specific
+  registries, hooks, logging channels or mandatory producer integrations.
+- Recording a computational step naturally exposes its recorded boundary inputs
+  and result relationships. Internal visibility depends on what is represented as
+  further sub-DAGs; external execution can remain opaque to DML.
+- An agent can inspect the implementation code/configuration identified by a
+  closure and reason about behavior DML itself does not interpret. Inspecting code
+  does not establish which external values a particular execution received.
+- The researcher controls the degree of observability and reproducibility. This
+  flexibility is a feature; DML supplies mechanisms, not a research-policy engine
+  or universal completeness requirement.
+- DML should nevertheless preserve structural distinctions that make the basis
+  and boundaries of recorded evidence inspectable. Readers should be able to assess
+  what history supports without mistaking unrecorded events for events that did
+  not happen.
+- DML cannot automatically expose an undeclared dependency it was never told about,
+  prove complete capture, or certify scientific validity. Deterministic tools expose
+  recorded structure/values; agents interpret code and methodology; humans judge
+  the evidence and conclusions.
+
+### Illustrative distinctions, not a selected schema
+
+Captured values versus external references; explicit code versions versus moving
+references; recorded internals versus opaque boundaries; fresh attempts versus
+reuse; recorded failure versus unknown outcome; retained versus unavailable or
+excised data. These examples express the agreed criterion, not mandatory fields or
+new core record types. A mechanism failing its stated capture contract is distinct
+from a researcher intentionally choosing less capture.
+
+## Observer Stage 0 checkpoint
+
+The user reported completion of the observer study. Its
+[results](observer-study/RESULTS.md) and [independent recheck](observer-study/review/RECHECK.md)
+accept **corpus curation only**: five stories, explicit gaps, 39 passing corpus tests
+and 16 correctly rejected malformed-input probes after correction. No graph reader
+or UI has been implemented. Retrospective curation cannot recover facts that the
+original executions did not capture. That limitation is not itself a requirement
+for additional observer machinery in DML.
+
 ## Resume point
 
-The latest agreement adds authorized excision as a retention override, with tombstones preserving historical associations and resource retirement distinct from content erasure. A useful next thought experiment is install, execute, adopt results, excise provisioned compute resources, and retain inspectable research/results. Discussion-note maintenance and the checkpoint commit are authorized; implementation and changes to DML specifications are not.
+The latest agreement is researcher-controlled capture with inspectable evidence
+boundaries: observability is enabled by the core's uniform structure, not a core
+observer subsystem or research-certification policy. Continue discussing how the
+computational model naturally preserves those distinctions. Observer Stage 0 is
+complete; do not launch later implementation stages without further instruction.
+
+The completed study demonstrated narrow cooperative journal/provider/admission
+mechanisms and exposed remaining Delete-authority, input-directory capture,
+membership, receipt, HCL composition and erasure gaps. Those remain discussion
+subjects; no production schema or policy choice has been approved.
 
 Other open topics remain closure identity/configuration scope, cross-implementation reuse evidence, project/repository defaults, and exact execution/adoption semantics.
 

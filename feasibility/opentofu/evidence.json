@@ -1,0 +1,291 @@
+{
+  "runtime": "/work/repos/micha/dml-design/feasibility/opentofu/runtime/run-we5kxfah",
+  "probes": {
+    "composition": {
+      "initial_actions": {
+        "terraform_data.shared": [
+          "create"
+        ],
+        "module.installation[\"a\"].local_file.artifact": [
+          "create"
+        ],
+        "module.installation[\"a\"].terraform_data.binding": [
+          "create"
+        ],
+        "module.installation[\"b\"].local_file.artifact": [
+          "create"
+        ],
+        "module.installation[\"b\"].terraform_data.binding": [
+          "create"
+        ]
+      },
+      "unknown_bindings": {
+        "a": {
+          "occurrence_id": true,
+          "sha256": true,
+          "shared_id": true
+        },
+        "b": {
+          "occurrence_id": true,
+          "sha256": true,
+          "shared_id": true
+        }
+      },
+      "outputs": {
+        "a": {
+          "filename": "/work/repos/micha/dml-design/feasibility/opentofu/runtime/run-we5kxfah/composition/artifacts/a.txt",
+          "occurrence_id": "48e478b7-4ffc-65d3-8ffb-040dc0e1948a",
+          "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "shared_id": "895de1c7-16e9-b45a-f481-2ea98c936ca9"
+        },
+        "b": {
+          "filename": "/work/repos/micha/dml-design/feasibility/opentofu/runtime/run-we5kxfah/composition/artifacts/b.txt",
+          "occurrence_id": "36cea8d5-9966-f564-61d0-be43787cb007",
+          "sha256": "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+          "shared_id": "895de1c7-16e9-b45a-f481-2ea98c936ca9"
+        }
+      },
+      "regeneration_actions": {
+        "terraform_data.shared": [
+          "no-op"
+        ],
+        "module.installation[\"a\"].local_file.artifact": [
+          "no-op"
+        ],
+        "module.installation[\"a\"].terraform_data.binding": [
+          "no-op"
+        ],
+        "module.installation[\"b\"].local_file.artifact": [
+          "no-op"
+        ],
+        "module.installation[\"b\"].terraform_data.binding": [
+          "no-op"
+        ]
+      },
+      "rename_actions": {
+        "terraform_data.shared": [
+          "no-op"
+        ],
+        "module.installation[\"a\"].local_file.artifact": [
+          "delete"
+        ],
+        "module.installation[\"a\"].terraform_data.binding": [
+          "delete"
+        ],
+        "module.installation[\"b\"].local_file.artifact": [
+          "no-op"
+        ],
+        "module.installation[\"b\"].terraform_data.binding": [
+          "no-op"
+        ],
+        "module.installation[\"renamed\"].local_file.artifact": [
+          "create"
+        ],
+        "module.installation[\"renamed\"].terraform_data.binding": [
+          "create"
+        ]
+      },
+      "missing_alias_error": "Error: Missing required provider configuration\n\n  on main.tf line 8:\n   8: module \"installation\" {\n\nThe child module requires an additional configuration for provider\nhashicorp/local, with the local name \"local.bound\".\n\nRefer to the module's documentation to understand the intended purpose of\nthis additional provider configuration, and then add an entry for local.bound\nin the \"providers\" meta-argument in the module block to choose which provider\nconfiguration the module should use for that purpose.",
+      "material_sha256": "3415c3248080283742bcf81ccb349e064b8794d758ab4869b8f56b6d92c74c63"
+    },
+    "local_adoption": {
+      "import_error": "Error: Resource Import Not Implemented\n\nThis resource does not support import. Please contact the provider developer\nfor additional information.\n\nlocal_file.adopted: Importing from ID \"/work/repos/micha/dml-design/feasibility/opentofu/runtime/run-we5kxfah/local-adoption/artifact.txt\"...",
+      "actions": {
+        "local_file.adopted": [
+          "create"
+        ]
+      },
+      "before": "execution-created-content",
+      "after": "configuration-content",
+      "warning": "Applying configuration after unsupported adoption overwrote the artifact."
+    },
+    "surrogate_import": {
+      "surrogate": true,
+      "cli_outputs_immediately_after_import": {
+        "binding": {
+          "sensitive": false,
+          "type": [
+            "object",
+            {
+              "id": "string",
+              "value": "dynamic"
+            }
+          ],
+          "value": {
+            "id": "execution-42",
+            "value": null
+          }
+        }
+      },
+      "cli_import_state": {
+        "id": "execution-42",
+        "input": null,
+        "output": null,
+        "triggers_replace": null
+      },
+      "cli_reconciliation_actions": {
+        "terraform_data.adopted": [
+          "update"
+        ]
+      },
+      "cli_outputs_after_apply": {
+        "binding": {
+          "sensitive": false,
+          "type": [
+            "object",
+            {
+              "id": "string",
+              "value": "string"
+            }
+          ],
+          "value": {
+            "id": "execution-42",
+            "value": "resolved-input"
+          }
+        }
+      },
+      "declarative_change": {
+        "actions": [
+          "update"
+        ],
+        "before": {
+          "id": "execution-43",
+          "input": null,
+          "output": null,
+          "triggers_replace": null
+        },
+        "after": {
+          "id": "execution-43",
+          "input": "resolved-input",
+          "triggers_replace": null
+        },
+        "after_unknown": {
+          "output": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "importing": {
+          "id": "execution-43"
+        }
+      },
+      "declarative_outputs": {
+        "binding": {
+          "sensitive": false,
+          "type": [
+            "object",
+            {
+              "id": "string",
+              "value": "string"
+            }
+          ],
+          "value": {
+            "id": "execution-43",
+            "value": "resolved-input"
+          }
+        }
+      },
+      "repeat_actions": {
+        "terraform_data.adopted": [
+          "no-op"
+        ]
+      }
+    },
+    "loss": {
+      "missing_configuration_actions": {
+        "local_file.artifact": [
+          "delete"
+        ],
+        "terraform_data.identity": [
+          "delete"
+        ]
+      },
+      "regenerated_actions": {
+        "local_file.artifact": [
+          "no-op"
+        ],
+        "terraform_data.identity": [
+          "no-op"
+        ]
+      },
+      "lost_state_actions": {
+        "local_file.artifact": [
+          "create"
+        ],
+        "terraform_data.identity": [
+          "create"
+        ]
+      },
+      "old_surrogate_id": "ee34a5f2-a641-6a58-35eb-70f8c176d43b",
+      "new_surrogate_id": "b29b2069-f768-6da7-4746-f05705308374",
+      "overwritten_content": "execution-result-do-not-overwrite",
+      "after": "desired-by-config"
+    },
+    "removal": {
+      "remove_one_actions": {
+        "terraform_data.shared": [
+          "no-op"
+        ],
+        "module.installation[\"a\"].local_file.artifact": [
+          "delete"
+        ],
+        "module.installation[\"a\"].terraform_data.binding": [
+          "delete"
+        ],
+        "module.installation[\"b\"].local_file.artifact": [
+          "no-op"
+        ],
+        "module.installation[\"b\"].terraform_data.binding": [
+          "no-op"
+        ]
+      },
+      "destroy_all_actions": {
+        "terraform_data.shared": [
+          "delete"
+        ],
+        "module.installation[\"b\"].local_file.artifact": [
+          "delete"
+        ],
+        "module.installation[\"b\"].terraform_data.binding": [
+          "delete"
+        ]
+      },
+      "destroy_completion_order": [
+        "module.installation[\"b\"].local_file.artifact",
+        "module.installation[\"b\"].terraform_data.binding",
+        "terraform_data.shared"
+      ]
+    },
+    "provider_cleanup": {
+      "missing_provider_error": "Error: Provider configuration not present\n\nTo work with local_file.artifact (orphan) its original provider configuration\nat provider[\"registry.opentofu.org/hashicorp/local\"].cleanup is required, but\nit has been removed. This occurs when a provider configuration is removed\nwhile objects created by that provider still exist in the state. Re-add the\nprovider configuration to destroy local_file.artifact (orphan), after which\nyou can remove the provider configuration again.",
+      "restored_provider_actions": {
+        "local_file.artifact": [
+          "delete"
+        ]
+      }
+    },
+    "provisioners": {
+      "marker_absent_after_plan": true,
+      "marker_after_apply": "created",
+      "removed_block_actions": {
+        "terraform_data.hook[0]": [
+          "delete"
+        ]
+      },
+      "removed_block_skipped_cleanup": true,
+      "count_zero_actions": {
+        "terraform_data.hook[0]": [
+          "delete"
+        ]
+      },
+      "count_zero_cleanup": "cleaned"
+    }
+  },
+  "version": {
+    "terraform_version": "1.13.2",
+    "platform": "linux_amd64",
+    "provider_selections": {}
+  },
+  "status": "passed",
+  "command_count": 86,
+  "provider": "registry.opentofu.org/hashicorp/local 2.5.3"
+}

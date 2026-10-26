@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/final-review/report.md",
+  "summary": "Seven focused cases independently completed (73 actual CLI calls). Sealed saved-plan swap preserved extra retained UUID; file()/sensitive()/unexported resource rejected pre-plan; positive captured fixture and actual same-file sealed provider/journal disposal worked. New .tofu.json material-capture bypass reproduced. Qualified feasibility only; provider Delete authority, direct bypass, membership/dependencies, state confidentiality and receipt sidecars remain unresolved. Prior failed followup not credited."
+}

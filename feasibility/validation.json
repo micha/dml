@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "scope": "Final static artifact checks, not production-safety certification",
+  "python_sources_ast_parsed": 41,
+  "json_artifacts_parsed_before_this_record": 49,
+  "local_markdown_links_and_anchors_checked": 157,
+  "new_file_whitespace_diffs_checked": 134,
+  "bash_launcher_syntax": "passed",
+  "tracked_diff_whitespace": "passed",
+  "implementation_repository": "/work/repos/micha/dml",
+  "implementation_head": "638cc42",
+  "implementation_worktree": "clean",
+  "tmux": "All recorded study worker windows are closed and original @86 is retained. A newly appeared unassigned @103 in the implementation directory was left untouched.",
+  "own_study_orphan_process_audit": "No PPID-1 process found with CWD in this design repository or its feasibility directories",
+  "runtime_policy": "Raw state, tool binaries, frozen launchers and sessions are not added to Git",
+  "limitations": "External link availability, native DML behavior, cloud semantics and distributed/erasure guarantees are outside these static checks."
+}

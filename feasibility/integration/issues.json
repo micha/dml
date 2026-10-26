@@ -1,0 +1,122 @@
+{
+  "authority": "Informative ranked synthesis; fixes and gates are proposals, not approved DML decisions.",
+  "evidence_legend": {"local_cli": "Executed OpenTofu against synthetic local resources", "model": "Executed simulation", "source": "Pinned primary-source reading/assertions; cloud unexecuted", "hypothesis": "Not established experimentally"},
+  "issues": [
+    {
+      "rank": 1, "id": "I01", "priority": "P0", "topic": "adoption and provider ownership granularity",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy", "untested_cloud_hypothesis"],
+      "claim": "Import plus a matching-looking declaration universally preserves an immutable artifact and its version-scoped ownership.",
+      "evidence": ["local_cli: local_file rejects import; subsequent create overwrites existing bytes", "source: AWS v6.70.0 metadata updates upload an empty body when no content/source exists", "source: versioned s3_object destruction enumerates all versions/delete markers of the exact key"],
+      "sources": ["../opentofu/report.md", "../adversarial/source-notes.md", "test-results.json"],
+      "possible_fix": "Provider-specific adoption admission, preservation plan gate, immutable unique artifact names or narrow version-specific lifecycle adapter.",
+      "tradeoff": "Reduced provider generality and extra identity/source capture.",
+      "policy_question": "Whole-object key ownership versus separately managed versions; acceptable import/update operations?",
+      "gate": "No immutable-artifact adoption claim until an import-capable local provider preserves mismatched existing bytes; AWS behavior requires separate authorization and tests."
+    },
+    {
+      "rank": 2, "id": "I02", "priority": "P0", "topic": "multi-repository destructive races",
+      "classification": ["falsified_general_claim", "engineering_gap", "untested_distributed_hypothesis"],
+      "claim": "Approval or immediate revalidation makes an asynchronous delete safe against newly published roots.",
+      "evidence": ["model: publication between check and delete loses retained object", "model: six cooperative fenced interleavings pass, without process/crash durability"],
+      "sources": ["../retention/test_model.py", "../retention/report.md"],
+      "possible_fix": "Durable victim reservation binding root/membership revisions, enlisted publishers, deletion-in-flight state and non-reopening recovery.",
+      "tradeoff": "Global coordination; partitions can block publication or disposal.",
+      "gate": "Killed deleter and two publishers cannot re-root deletion-in-flight identities; no inference from an OpenTofu state lock."
+    },
+    {
+      "rank": 3, "id": "I03", "priority": "P0", "topic": "arbitrary HCL composition and executable side effects",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy"],
+      "claim": "Module address namespacing isolates effects and output manifests account for all resources.",
+      "evidence": ["local_cli: local modules overwrite the same path.module file", "local_cli: omitting the block skips destroy provisioner; provisioner-created artifact survives"],
+      "sources": ["../adversarial/report.md", "../opentofu/report.md"],
+      "possible_fix": "Read-only module bundles, instance workdirs, provider contracts, explicit effect/cleanup registration, isolated deployment runner.",
+      "tradeoff": "Limits HCL expressiveness and otherwise unconstrained deployment freedom.",
+      "policy_question": "Which opaque effects are admitted; one root versus isolated stacks for provider-version incompatibility?",
+      "gate": "Every admitted destructive effect has a durable cleanup obligation; unsupported executable features fail closed."
+    },
+    {
+      "rank": 4, "id": "I04", "priority": "P0", "topic": "state versus configuration regeneration",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy"],
+      "claim": "Exact HCL regeneration reconstructs operational identity/state.",
+      "evidence": ["local_cli: retained state gives no-op; lost state creates new surrogate ID and overwrites file", "model: materialized mapping cannot recover vanished state"],
+      "sources": ["../opentofu/report.md", "../retention/report.md"],
+      "possible_fix": "Preserve state/backend lineage, stable declaration IDs, provider cleanup configuration and import/disposal receipts; verify explicit recovery imports.",
+      "tradeoff": "Durable operational journal/state backup remains necessary alongside regenerable configuration.",
+      "policy_question": "Who owns backup and safe state-recovery approval?",
+      "gate": "Lost-state plan cannot create/replace a retained physical identity without explicit verified recovery."
+    },
+    {
+      "rank": 5, "id": "I05", "priority": "P0", "topic": "closure identity and adoption-state acknowledgement",
+      "classification": ["engineering_gap", "user_policy", "untested_hypothesis"],
+      "claim": "A resource ID or exported output is sufficient acknowledgement of an execution-ready bound closure.",
+      "evidence": ["local_cli: immediate CLI-import output contains ID with null value; declarative import includes update", "model: projecting incidental outputs is a deliberately supplied convention", "integration: real output exported into model, not a generalized readiness protocol"],
+      "sources": ["../history/model.py", "../opentofu/report.md", "scenario.py"],
+      "possible_fix": "Declared adapter-specific binding projection and required-field validation; readiness receipt includes configuration/state revision and successful reconciliation.",
+      "tradeoff": "Domain-specific validation and more metadata; overbroad identity causes churn.",
+      "policy_question": "Which endpoint/version/digest/configuration fields affect equality and current executability?",
+      "gate": "Null/incomplete, drifted or soon-to-be-replaced bindings cannot be published as ready."
+    },
+    {
+      "rank": 6, "id": "I06", "priority": "P0", "topic": "retention versus resource dependencies",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy"],
+      "claim": "Snapshot roots, provenance associations and runtime dependencies are interchangeable retention edges.",
+      "evidence": ["model: ancestor retains compute absent from newest snapshot", "model: removing encryption key breaks retained artifact; removing provenance-only compute need not break reuse", "model: 512 bounded graph/root cases pass"],
+      "sources": ["../retention/report.md", "../history/report.md", "scenario.py"],
+      "possible_fix": "Full-history census plus typed operational, cleanup, containment and provenance edges; retained-identity plan gate independent of IaC dependency ordering.",
+      "tradeoff": "Incomplete edges lose artifacts; excessive edges retain expensive infrastructure.",
+      "policy_question": "Shared-consumer excision authority, cascades and migration acceptance?",
+      "gate": "Compute retirement retains usable result; required key/storage retirement is blocked or explicitly cascaded."
+    },
+    {
+      "rank": 7, "id": "I07", "priority": "P0", "topic": "dispatch/publication and disposal durability",
+      "classification": ["engineering_gap", "untested_hypothesis"],
+      "claim": "Recording an attempt or obligation eliminates unknown external effects and leaks.",
+      "evidence": ["model: one attempt hides two reported-only external executions", "model: creation before durable identity publication can evade discovery", "model: dropping sole cleanup identity strands pending adoption"],
+      "sources": ["../history/report.md", "../retention/report.md"],
+      "possible_fix": "Durable occurrence allocator, idempotency when available, explicit unknown outcomes, minimal independent cleanup handoff and confirmation receipts.",
+      "tradeoff": "Unknown/quarantined actions can remain indefinitely; no generic exactly-once guarantee.",
+      "gate": "Process termination at every effect/acknowledgement/journal boundary retains investigation or cleanup capability."
+    },
+    {
+      "rank": 8, "id": "I08", "priority": "P0", "topic": "erasure",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy", "untested_hypothesis"],
+      "claim": "Sensitive labels, new tombstones or a successful destroy establish physical/global erasure.",
+      "evidence": ["local_cli: sensitive value appears in state and JSON; four plaintext artifacts survive current-state tombstoning", "simulation: controlled copies can be cleared while offline copy survives", "audit: low-entropy digest recovered in eight actual guesses from a 100-candidate domain"],
+      "sources": ["../adversarial/report.md", "../retention/report.md", "audit.py"],
+      "possible_fix": "Copy inventory, non-sensitive tombstones, redacted manifests/logs, key/revocation and exceptional same-ID resolution design.",
+      "tradeoff": "Cannot guarantee uncontrolled replica deletion; immutable-history preservation conflicts with removal of sensitive stored bytes.",
+      "policy_question": "Erasure authority, permissible residual metadata and assurance scope?",
+      "gate": "No legal/global erasure claim from these tests; separately test storage pages, backups and replicas."
+    },
+    {
+      "rank": 9, "id": "I09", "priority": "P1", "topic": "dependency capture and provider compatibility",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy"],
+      "claim": "Exact HCL text and provider lock fully capture an installable closure.",
+      "evidence": ["local_cli: same HCL fails without payload file", "documentation: provider lock does not lock remote modules; shared root requires compatible provider versions"],
+      "sources": ["../adversarial/source-notes.md", "reviewed-sources.json"],
+      "possible_fix": "Bundle modules/files, pin module revisions, record engine/provider versions and effective non-secret inputs, preserve provider aliases through cleanup.",
+      "tradeoff": "Capture/retention cost and stack partitioning; complete environmental closure remains an assertion.",
+      "gate": "Offline replay from captured non-secret bundle validates with unchanged dependency lock."
+    },
+    {
+      "rank": 10, "id": "I10", "priority": "P1", "topic": "history semantics and empirical accounting",
+      "classification": ["falsified_general_claim", "engineering_gap", "user_policy"],
+      "claim": "Content identity counts trials or distinct attempt IDs certify independent observations.",
+      "evidence": ["model: content-identical executions collapse without occurrence IDs; restarted counter can collide", "integration: three requests, two actual arithmetic attempts and one result root", "model: last-writer status loses knowledge; competing selections require resolution"],
+      "sources": ["../history/report.md", "scenario.py"],
+      "possible_fix": "Collision-safe allocation, ordinary-DAG convention validation, transactional publication and causal observation merge; explicit reuse/independence rationale.",
+      "tradeoff": "Application conventions and conflict handling beyond pure DAG hashing.",
+      "policy_question": "Initial/fresh adoption defaults, cross-implementation equivalence and methodology?",
+      "gate": "No reuse counted as another trial; unknown/conflicting results cannot silently become selected."
+    },
+    {
+      "rank": 11, "id": "I11", "priority": "P2", "topic": "reproducible runner path limits and evidence precision",
+      "classification": ["engineering_gap", "corrected_report_number"],
+      "evidence": ["local_cli: first relocated lab run fails provider Unix socket bind at 124-byte pathname", "local_cli: short byte-identical replay passes seven probes and 86 invocations", "audit: 100 is candidate-domain size, not measured guesses; version_id line citation corrected to 246–249"],
+      "sources": ["run-index.json", "runtime/run-746l_y65/plugin-diagnosis.stderr", "audit.py"],
+      "possible_fix": "Bounded short sandbox names, checksum-pinned reviewed replay inputs, retained failed runs and measured-versus-configured count fields.",
+      "tradeoff": "Path naming limits and explicit manual archival after eight retained runs.",
+      "gate": "Failures remain visible; no automatic provider skip, dependency substitution or uncapped retries."
+    }
+  ]
+}

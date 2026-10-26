@@ -1,0 +1,60 @@
+{
+  "status": "completed",
+  "workstream": "integration",
+  "report": "/work/repos/micha/dml-design/feasibility/integration/report.md",
+  "verdict": "Go for a constrained local obligation-journal prototype; no-go for unrestricted HCL, generic immutable-artifact adoption, distributed deletion safety or an erasure guarantee.",
+  "versions": {"python": "3.13.15", "opentofu": "1.13.2", "local_provider": "2.5.3", "platform": "linux_amd64", "aws_provider_source_only": "v6.70.0 / 5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f"},
+  "latest_full_run": "/work/repos/micha/dml-design/feasibility/integration/runtime/4",
+  "reruns": {
+    "history_tests_passed": 24,
+    "history_scenarios_byte_identical": 11,
+    "retention_tests_passed": 20,
+    "retention_bounded_graph_root_cases": 512,
+    "retention_interleavings": 6,
+    "retention_trace_matches_original": true,
+    "opentofu_probes_passed": 7,
+    "opentofu_cli_invocations": 86,
+    "adversarial_cli_cases": 6,
+    "adversarial_simulation_cases": 1,
+    "adversarial_provider_source_assertion_cases": 1,
+    "cross_lifecycle_cli_invocations": 6,
+    "successful_short_layout_full_runs": 4,
+    "model_only_mode_exercised": true,
+    "initial_provider_failure_retained": true
+  },
+  "cross_lifecycle": {
+    "actual_installation": "OpenTofu provisions local_file plus state-only terraform_data binding surrogate, not compute capacity",
+    "requests": 3,
+    "actual_local_arithmetic_attempts": 2,
+    "result_roots": 1,
+    "adoption_and_multi_repo_retention": "Explicit model simulation and export mapping",
+    "disposal_failure": "One simulated failed reconciliation; cleanup identity protected",
+    "actual_disposal": "OpenTofu destroys installed descriptor and binding; controlled local result copy manually unlinked",
+    "history_scalar_result_retained": true,
+    "erasure_claim": false
+  },
+  "discrepancies": [
+    "Initial byte-identical relocated lab failed: 124-byte provider Unix socket pathname. Diagnosed bind invalid argument; shorter integration-owned layout passed without dependency changes.",
+    "Adversarial 100-candidate field describes search domain; measured matching work is eight guesses, not 100.",
+    "Pinned source version_id schema is at lines 246–249, not first-wave citation 270–273. Function claims reproduce.",
+    "Lab ready.json hash is release ZIP, not extracted executable; integration verifies executable hash separately."
+  ],
+  "source_findings_not_cloud_tested": [
+    "AWS s3_object metadata changes route through upload; absent content/source body is empty.",
+    "Versioned destruction enumerates all versions and delete markers of exact key; version_id is computed."
+  ],
+  "ranked_priority_topics": [
+    "P0 provider-specific adoption/ownership scope",
+    "P0 durable cross-repository publication fencing and cleanup handoff",
+    "P0 HCL executable effects and composition isolation",
+    "P0 operational-state recovery and bound-closure readiness",
+    "P0 full-history retention versus operational/cleanup dependencies",
+    "P0 copy-aware erasure scope",
+    "P1 durable occurrence allocation, conflict validation and dependency bundles"
+  ],
+  "artifacts": ["run-all", "scenario.py", "audit.py", "reviewed-sources.json", "test-results.json", "run-index.json", "issues.json", "report.md"],
+  "context7": "Monthly quota exceeded; read primary docs/source and independently downloaded three checksum-matched pinned provider files twice; installed no documentation CLI.",
+  "limitations": ["No DML C/LMDB integration", "No AWS/cloud provider execution", "No crash-safe distributed fencing", "No secure page/backups/replica erasure", "No real external-artifact provider adoption"],
+  "next_prototype": "Durable file-backed obligation journal, two local publishers, import-capable sandbox-file adapter, retained-identity plan gate and process-kill fault injection at effect/acknowledgement/publication boundaries.",
+  "approval_boundary": "All fixes and gates are exploratory proposals, not approved schemas, policy or implementation changes."
+}

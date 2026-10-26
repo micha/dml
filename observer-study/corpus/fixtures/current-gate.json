@@ -1,0 +1,18 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "37f33708aef5ef78a8fec32d466b04aa46602d7f8c5ff1f2cebc4d464cdb5afb",
+  "source_id": "current-gate",
+  "source_path": "feasibility/gate/gate.py",
+  "values": [
+    {
+      "locator": "lines:62-76",
+      "value": "def material(root):\n    # Read each captured file once; parse/hash the same bytes. Not full HCL capture.\n    files = sorted(p for p in root.iterdir() if p.name.endswith(('.tf', '.tf.json', '.tfvars', '.tfvars.json')) or p.name == '.terraform.lock.hcl')\n    need(all(not p.is_symlink() for p in files), 'symlink material')\n    need({p.name for p in files} <= {'main.tf.json', 'inputs.auto.tfvars.json'}, 'unsupported material')\n    need((root / 'main.tf.json').is_file(), 'missing material')\n    data = {p.name:p.read_bytes() for p in files}\n    try:\n        fixture(load(data['main.tf.json']), load(data.get('inputs.auto.tfvars.json',b'{}')))\n    except InvalidFixture as e:\n        raise Rejected(str(e)) from e\n    return digest(canonical({name:digest(value) for name,value in data.items()}))\n\n@contextlib.contextmanager\ndef approved_plan(path, expected_digest=None):\n",
+      "value_sha256": "d21b91963028373c7a5bd4cd11dbcee11eda1153aacbccdf643e358a4868b563"
+    },
+    {
+      "locator": "lines:255-281",
+      "value": "    def apply(self, ticket, token, plan, before_effect=None, after_effect=None):\n        # One source read: the SAME sealed object is checked and passed to apply.\n        with approved_plan(plan,ticket['plan_digest']) as snapshot:\n            with self.journal.tx() as c:\n                row = c.execute('SELECT ticket,status FROM reservations WHERE token=?', (token,)).fetchone()\n                need(row is not None and row[1] == 'reserved' and json.loads(row[0]) == ticket, 'missing/mismatched/live reservation')\n                self.journal.validate(c, ticket)\n                self.check(ticket, snapshot)\n                c.execute(\"UPDATE reservations SET status='unknown',outcome='apply may not have started' WHERE token=?\", (token,))\n            with self.journal.tx() as c:\n                # Local writer lock ONLY excludes cooperative journal publishers.\n                self.journal.validate(c, ticket)\n                self.check(ticket, snapshot)\n                if before_effect:\n                    before_effect()\n                # Catch deterministic configuration changes at this test barrier;\n                # not an atomic defense against hostile concurrent file writers.\n                need(material(self.root) == ticket['material_digest'], 'stale configuration/input at effect boundary')\n                cli(self.root, 'apply', '-input=false', '-no-color', snapshot.path, pass_fds=snapshot.pass_fds)\n                if after_effect:\n                    after_effect()\n                after = observe(self.root)\n                need(sorted(after['manifest']) == ticket['census']['after'], 'post-effect census mismatch')\n                c.execute(\"UPDATE reservations SET status='completed',outcome=? WHERE token=?\", (json.dumps(after),token))\n        return after\n\nif __name__ == '__main__':\n",
+      "value_sha256": "0196a6f287ec2ad27f2382bdb8b9f427802564e1092f7ae09853ad7e232b6a47"
+    }
+  ]
+}

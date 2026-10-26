@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/integration/report.md",
+  "summary": "Integrated and independently reran all four workstreams in fresh owned sandboxes: 44 model tests, seven real OpenTofu probes/86 invocations, adversarial suite and executable joined lifecycle passed. Initial provider socket-path failure retained and fixed by shorter paths without dependency changes. Ranked issues and go/no-go gates delivered; AWS findings remain source-only, adoption/fencing simulated, and search-count discrepancy corrected to eight guesses from a 100-candidate domain. No implementation changes or cloud calls."
+}

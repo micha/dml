@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "verdict": "Narrow cooperative admission works locally; positive end-to-end journal/manager identity integration is not established.",
+  "report": "/work/repos/micha/dml-design/feasibility/gate/report.md",
+  "reproduce": "python3 -B feasibility/gate/run_tests.py",
+  "evidence": "test-results.json",
+  "passed_result_groups": 28,
+  "opentofu_cli_invocations": 130,
+  "versions": {"python": "3.13.15", "opentofu": "1.13.2", "provider": "built-in terraform_data", "real_journal": "journal-v2"},
+  "strongest_results": [
+    "Direct saved-plan apply destroyed the actual UUID despite newly added unapplied prevent_destroy; candidate rejected stale material.",
+    "Retained actual UUID rejected update, replacement and destruction; explicit disposition admitted actual sandbox cleanup.",
+    "One-state-snapshot receipt rejected a manifest/output and state read mixed across actual replacement.",
+    "Pipe-barrier publisher observed SQLite writer exclusion between validation and actual apply.",
+    "Real process exits before dispatch and after successful cleanup left durable unknown records and rejected blind retries.",
+    "Public real journal roots, revision admission, durable publication fence and mismatched absence acknowledgement were executed; unsupported UUID-to-file bridge rejected."
+  ],
+  "evidence_boundaries": {
+    "standalone_gate": "actual manager CLI plus durable FAKE research journal with manually supplied retention/membership",
+    "real_adapter": "negative integration executed through public Journal APIs in gate-owned runtime; positive adapter apply not executed",
+    "documentation": "Context7 quota exhausted; official site 403; official repository main source downloaded instead",
+    "conjecture": "remote fencing, general providers and safe production resource management not established"
+  },
+  "handoff": [
+    "Provide backend-specific immutable managed identity registration and identity-scoped absence acknowledgement; do not relabel unrelated terraform_data UUIDs as journal files.",
+    "Replace fake journal with authoritative roots, ownership, dependency closure and disposed-identity publication rejection.",
+    "Test mid-provider-operation interruption and recovery with import-capable artifact provider."
+  ],
+  "limitations": [
+    "Arbitrary direct CLI and noncooperating filesystem changes bypass candidate safety.",
+    "Coarse durable global fence can block unrelated work indefinitely on unknown outcomes; no automatic expiry or recovery in fake journal.",
+    "No positive end-to-end joined cleanup, native DML/LMDB integration, cloud/remote backend experiment or atomic effect claim.",
+    "Only controlled JSON fixtures and unindexed built-in terraform_data instances supported."
+  ],
+  "final_sandbox": "runtime/run-58fab76a",
+  "retained_fresh_runs": 7,
+  "bounded_run_limit": 8
+}

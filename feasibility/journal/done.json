@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/journal/report.md",
+  "summary": "journal-v1 delivered: 20 passing persistent/multiprocess tests, six recovered destruction process exits, rejected ownership/withdrawal/stale-ticket admissions, and one executed creation-orphan limitation. Contract, source, evidence and summary are published."
+}

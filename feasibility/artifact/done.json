@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/artifact/report.md",
+  "summary": "Built actual import-capable immutable-file provider; 52 real CLI invocations cover adoption, metadata preservation, mismatch checks, state recovery, and SIGKILL retry. Forced replacement deletes valid artifact before Create fails: requires destructive admission. Report, summary, scripts, pinned modules and ignored ready.json published."
+}

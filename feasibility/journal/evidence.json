@@ -1,0 +1,242 @@
+{
+  "contract_version": "journal-v2",
+  "command": "python3 -B feasibility/journal/test_followup.py",
+  "latest": {
+    "version": "journal-v2",
+    "python": "3.13.15",
+    "sqlite": "3.51.2",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.42",
+    "run": "/work/repos/micha/dml-design/feasibility/journal/runtime/followup-run-nyyr0_se",
+    "tests": 35,
+    "baseline_tests": 20,
+    "focused_tests": 15,
+    "failures": 0,
+    "errors": 0,
+    "success": true,
+    "baseline_crashes": [
+      {
+        "phase": "ack-before-commit",
+        "exitcode": 73,
+        "absent_on_reopen": true,
+        "acknowledged_on_reopen": false,
+        "recovered": true
+      },
+      {
+        "phase": "ack-after-commit",
+        "exitcode": 73,
+        "absent_on_reopen": true,
+        "acknowledged_on_reopen": true,
+        "recovered": true
+      },
+      {
+        "phase": "unlink",
+        "exitcode": 73,
+        "absent_on_reopen": true,
+        "acknowledged_on_reopen": false,
+        "recovered": true
+      },
+      {
+        "phase": "intent",
+        "exitcode": 73,
+        "absent_on_reopen": false,
+        "acknowledged_on_reopen": false,
+        "recovered": true
+      },
+      {
+        "phase": "reservation",
+        "exitcode": 73,
+        "absent_on_reopen": false,
+        "acknowledged_on_reopen": false,
+        "recovered": true
+      },
+      {
+        "phase": "creation-before-receipt",
+        "exitcode": 74,
+        "unregistered_orphan_count": 0,
+        "recovered": true
+      },
+      {
+        "phase": "partial-batch-unlink",
+        "exitcode": 73,
+        "absent_count_on_reopen": 1,
+        "recovered": true
+      }
+    ],
+    "followup_observations": [
+      {
+        "phase": "identical-bytes-pre-receipt-replacement",
+        "exitcode": 75,
+        "replacement_accepted": true,
+        "prior_inode_unknowable_from_intent": true,
+        "old_file_preserved": true,
+        "limitation": "cooperative capability ownership assumed"
+      },
+      {
+        "phase": "creation-file-fsync",
+        "exitcode": 75,
+        "matching_receipt": true,
+        "invisible_orphans": 0,
+        "recovered": true
+      },
+      {
+        "phase": "creation-intent",
+        "exitcode": 75,
+        "absent_was_unknown": true,
+        "replayed_explicitly": true,
+        "invisible_orphans": 0,
+        "recovered": true
+      },
+      {
+        "kind": "delayed-creation-vs-disposal",
+        "barrier_controlled": true,
+        "recreated_disposed_identity": false
+      },
+      {
+        "phase": "creation-mutated-after-crash",
+        "exitcode": 75,
+        "quarantined": true,
+        "file_preserved": true,
+        "cleanup_pinned": true,
+        "recovered": false
+      },
+      {
+        "kind": "immutable-history",
+        "prior_head_preserved": true,
+        "prior_ticket_states": [
+          "reserved",
+          "intent",
+          "acknowledged"
+        ],
+        "snapshots": 20
+      },
+      {
+        "phase": "creation-receipt-before-commit",
+        "exitcode": 75,
+        "receipt_and_history_rolled_back": true,
+        "recovered": true
+      }
+    ]
+  },
+  "standalone_v2_baseline_runs": [
+    {
+      "version": "journal-v2",
+      "python": "3.13.15",
+      "sqlite": "3.51.2",
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.42",
+      "run": "/work/repos/micha/dml-design/feasibility/journal/runtime/run-zmr_zwt8",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "success": true,
+      "crashes": [
+        {
+          "phase": "ack-before-commit",
+          "exitcode": 73,
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": false,
+          "recovered": true
+        },
+        {
+          "phase": "ack-after-commit",
+          "exitcode": 73,
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": true,
+          "recovered": true
+        },
+        {
+          "phase": "unlink",
+          "exitcode": 73,
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": false,
+          "recovered": true
+        },
+        {
+          "phase": "intent",
+          "exitcode": 73,
+          "absent_on_reopen": false,
+          "acknowledged_on_reopen": false,
+          "recovered": true
+        },
+        {
+          "phase": "reservation",
+          "exitcode": 73,
+          "absent_on_reopen": false,
+          "acknowledged_on_reopen": false,
+          "recovered": true
+        },
+        {
+          "phase": "creation-before-receipt",
+          "exitcode": 74,
+          "unregistered_orphan_count": 0,
+          "recovered": true
+        },
+        {
+          "phase": "partial-batch-unlink",
+          "exitcode": 73,
+          "absent_count_on_reopen": 1,
+          "recovered": true
+        }
+      ]
+    }
+  ],
+  "followup_run_history": [
+    {
+      "run": "/work/repos/micha/dml-design/feasibility/journal/runtime/followup-run-4n1acki8",
+      "tests": 34,
+      "focused_tests": 14,
+      "success": true,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "run": "/work/repos/micha/dml-design/feasibility/journal/runtime/followup-run-nyyr0_se",
+      "tests": 35,
+      "focused_tests": 15,
+      "success": true,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "sources": {
+    "journal.py": "fc178a5fdcf0150de37b9cbd0a70d727903926e5fc2d95793cba5a39912a7912",
+    "test_journal.py": "5207d945c305a1310e709137e55d9c4d395215ee4db170291f74692b8678894a",
+    "test_followup.py": "3fcd5a24caeea82fd7cfbe9a6aa7b1150eec0654568fb1d98acd75e531c621ee",
+    "contract.md": "928737b9828f611dbea511e719dc9760b11df032440d660578e42977472e2070"
+  },
+  "snapshot_volume": {
+    "database": "/work/repos/micha/dml-design/feasibility/journal/runtime/followup-run-nyyr0_se/test_followup_prior_state_and_ticket_outcomes_inspectable-jijzd5bz/journal.sqlite",
+    "snapshots": 20,
+    "total_json_bytes": 39661,
+    "final_snapshot_json_bytes": 3071,
+    "maximum_snapshot_json_bytes": 3077
+  },
+  "historical_evidence": "evidence-v1.json",
+  "historical_source_hashes_verified": true,
+  "primary_docs": [
+    {
+      "url": "https://www.sqlite.org/lang_transaction.html",
+      "local": "feasibility/journal/runtime/docs/sqlite-transaction.html",
+      "sha256": "b65dc308fd9e0ce471844c97366a4f5ad3a1f42833a3b19486ad7d6555a8e24e"
+    },
+    {
+      "url": "https://docs.python.org/3.13/library/sqlite3.html",
+      "local": "feasibility/journal/runtime/docs/python-sqlite.html",
+      "sha256": "d19a0c5202cad068a0d7a216207f03985298aa8cd3b49fe4b72d734a329b8194"
+    },
+    {
+      "url": "https://docs.python.org/3.13/library/os.html",
+      "local": "feasibility/journal/runtime/docs/python-os.html",
+      "sha256": "0fd84c38d2e757f36c26ddbc67e4b7f26be99f220389756dcaa6ee59bbf800cd"
+    },
+    {
+      "url": "https://www.sqlite.org/lang_createtrigger.html",
+      "local": "feasibility/journal/runtime/docs/sqlite-triggers.html",
+      "sha256": "e9fee81d281f5bb8dc62f665d90a63a61ac943ef7da740f2ffbba99a8f73d257"
+    },
+    {
+      "url": "https://www.sqlite.org/lang_conflict.html",
+      "local": "feasibility/journal/runtime/docs/sqlite-conflict.html",
+      "sha256": "772b9b3f407bed4cdf59a32f1dd5828c3bc8293744bc40a3f25d07e15973b75f"
+    }
+  ]
+}

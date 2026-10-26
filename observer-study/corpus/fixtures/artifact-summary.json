@@ -1,0 +1,57 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "eee4014e0d76503bd3de6fd5c6705b5b0bc11549a72319bffc55e017761af385",
+  "source_id": "artifact-summary",
+  "source_path": "feasibility/artifact/summary.json",
+  "values": [
+    {
+      "locator": "/versions",
+      "value": {
+        "go": "1.26.8",
+        "provider": "0.1.0",
+        "sdk": "2.38.2",
+        "tofu": "1.13.2"
+      },
+      "value_sha256": "6495b81ec408ababd8de757b4a79b5ce20578320ada6c304fe18440d809df5bd"
+    },
+    {
+      "locator": "/provider_sha256",
+      "value": "3f3f69e57054ed57d760a9765679d8caf1d072a3f34af92ea2662a5da59ff7b1",
+      "value_sha256": "59e3e92269578c816be05291996dd3e748367f72bcb62d13781635bf655048f6"
+    },
+    {
+      "locator": "/evidence",
+      "value": {
+        "cli_invocations": 52,
+        "counterexample": "apply -replace=immutable_artifact.result unlinks the valid file, then fails adoption-only Create",
+        "final_run": "/work/repos/micha/dml-design/feasibility/artifact/runtime/r3",
+        "kind": "Actual compiled Go provider and local OpenTofu CLI; no surrogate or simulation",
+        "passed_probes": [
+          "CLI and declarative import",
+          "no-op plan/apply",
+          "metadata update preserves bytes/inode/mtime",
+          "immutable config fields rejected",
+          "content mismatch rejected on refresh and deletion",
+          "lost-state re-import",
+          "retirement and missing-import failure",
+          "saved-plan inode/root replacement checks",
+          "escape/symlink/hardlink rejection",
+          "actual SIGKILL after unlink and safe retry"
+        ]
+      },
+      "value_sha256": "d9d8a33b019671155f887a759044a4dad7a47cbd90b4b88ff54a823f88ec6268"
+    },
+    {
+      "locator": "/limitations",
+      "value": [
+        "No apply-time retirement admission token or retention gate",
+        "Ownership labels are not exclusive or authenticated",
+        "Conditional path unlink remains racy under hostile external namespace mutation",
+        "Device/inode identity can be reused",
+        "No erasure or power-loss durability guarantee",
+        "Linux-only synthetic sandbox experiment"
+      ],
+      "value_sha256": "ad44fb41f9b244d55bca53737c239122e7233a8accce159f9b6d47db3cef3568"
+    }
+  ]
+}

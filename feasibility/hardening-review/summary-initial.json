@@ -1,0 +1,34 @@
+{
+  "status": "completed",
+  "verdict": "Qualified success for actual cooperative synthetic file/provider/journal handoff; not general retention-safe deployment.",
+  "report": "/work/repos/micha/dml-design/feasibility/hardening-review/report.md",
+  "evidence": "/work/repos/micha/dml-design/feasibility/hardening-review/evidence.json",
+  "executed": {
+    "journal_v2_tests": 35,
+    "gate_result_groups": 28,
+    "artifact_cli_invocations": 52,
+    "independent_review_result_groups": 18,
+    "joined_handoff": "Same journal-created file imported unchanged; actual full-history/shared heads block destruction; excision creates durable ticket; real provider unlink followed by SIGKILL leaves journal intent and stale manager state; checked retry and observed absence acknowledge; different-inode replacement rejected.",
+    "immutable_history": "Journal v2 independently validates prior creation/adoption/disposal observations and reserved/intent/acknowledged snapshots. Initial v1 mutable-history/orphan evidence remains preserved."
+  },
+  "strongest_counterexamples": [
+    "Swap saved plan after final validation: second retained resource outside authorized ticket is destroyed before final receipt failure.",
+    "Provider forced replacement deletes imported artifact before adoption-only Create fails.",
+    "Allowed file() expression changes an uncaptured dependency while gate check accepts.",
+    "Unexported resource created before after-state manifest validation rejects it; fake gate accepts empty census.",
+    "Sensitive expression passes material validation; projected receipt excludes value but raw CLI state log contains synthetic plaintext.",
+    "Pre-receipt identical-byte replacement accepted by journal creation recovery; original moved inode remains."
+  ],
+  "interface_limits": [
+    "Existing gate rejects artifact provider; review uses explicit single-resource FileGate, not a false terraform_data identity bridge.",
+    "FileGate uses journal private verification inside an owned transaction; exact manager receipts remain sidecars rather than immutable journal observations.",
+    "Complete membership/dependencies, trusted excision authority, cooperative namespace and deployers remain assumed; modules and arbitrary HCL are unsupported."
+  ],
+  "next": "Review v2 journal plus provider-aware admission. Test immutable execution bundles and provider-side durable retirement authority against plan substitution, forced replacement and effect/receipt crashes; version exact manager observations and restrict raw state exposure.",
+  "policy_alternatives": [
+    "Coarse fence is demonstrated but blocks unrelated work; per-resource fences require membership/dependency/head conflict coverage.",
+    "Current per-head operational reacquisition checks versus explicitly authorized historical-inspection copying.",
+    "OpenTofu provider plus Delete authority versus simpler direct journal artifact effect."
+  ],
+  "boundaries": "Synthetic local files only; no cloud/system/production operations, installs, commits, source edits to other workers, native DML changes, hostile-filesystem or distributed-protocol proof."
+}

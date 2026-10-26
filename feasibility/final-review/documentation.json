@@ -1,0 +1,19 @@
+[
+  {
+    "file": "feasibility/final-review/runtime/docs/seals.html",
+    "sha256": "d3fe3c1aa5800eabf146bb7f9f7d68e4bed91650bed4f2f1ff480d6e0b7921eb",
+    "excerpts": [
+      "2) .  Those calls fail\n              with  EPERM  if you try to shrink the file in question.\n              Increasing the file size is still possible.\n\n        F_SEAL_GROW \n              If this seal is set, the size of the file in question\n              cannot be increased.  This affects  write(2)  beyond the end\n              of the file,  truncate(2) ,  ftruncate(2) , and  fallocate(2) .\n              These calls fail with  EPERM  if you use them to increase the\n              file size.  If you keep th",
+      "al set of seals of a file includes  F_SEAL_SEAL ,\n              then this effectively causes the set of seals to be\n              constant and locked.\n\n        F_SEAL_SHRINK \n              If this seal is set, the file in question cannot be reduced\n              in size.  This affects  open(2)  with the  O_TRUNC  flag as\n              well as  truncate(2)  and  ftruncate(2) .  Those calls fail\n              with  EPERM  if you try to shrink the file in question.\n              Increasing the file size is s",
+      "File seals limit the set of allowed operations on a given file.\n       For each seal that is set on a file, a specific set of operations\n       will fail with  EPERM  on this file from now on.  The file is said\n       to be sealed.  The default set of seals depends on the type of the\n       underlying file and filesystem.  For an overview of file sealing,\n       a discussion of its purpose, and some code examples, see\n        memfd_create(2) .\n\n       Currently, file seals can be applied only to a file de"
+    ]
+  },
+  {
+    "file": "feasibility/final-review/runtime/docs/files.html",
+    "sha256": "8773c8352743e088d0ca7d95487aeee870052055f3960c0ae38bf49af01faac3",
+    "excerpts": [
+      "tored in plain text files with the  .tf \nor  .tofu  file extensions. There is also\n a JSON-based variant of the language  that is\nnamed with the  .tf.json  or  .tofu.json  file extensions. \n Files containing OpenTofu code are often called  configuration files. \n Extension Precedence \u200b \n When both  .tf  and  .tofu  files with the same base name are present in a\ndirectory, OpenTofu will prioritize the  .tofu  file and ignore the  .tf  file.\nFor example: \n \n If both  foo.tf  and  foo.tofu  exist in the same ",
+      " file extensions. \n Files containing OpenTofu code are often called  configuration files. \n Extension Precedence \u200b \n When both  .tf  and  .tofu  files with the same base name are present in a\ndirectory, OpenTofu will prioritize the  .tofu  file and ignore the  .tf  file.\nFor example: \n \n If both  foo.tf  and  foo.tofu  exist in the same directory, OpenTofu will\nonly load  foo.tofu  and ignore  foo.tf . \n \n This ensures that  .tofu  files always take precedence over  .tf  files when\nboth are available. Thi"
+    ]
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "status": "completed",
+  "verdict": "Real import-capable OpenTofu provider works for bytes-preserving adoption and guarded disposal, but forced replacement can destroy a retained artifact before creation fails.",
+  "report": "/work/repos/micha/dml-design/feasibility/artifact/report.md",
+  "ready": "/work/repos/micha/dml-design/feasibility/artifact/ready.json",
+  "source": "dml.invalid/feasibility/immutable",
+  "versions": {"provider": "0.1.0", "sdk": "2.38.2", "go": "1.26.8", "tofu": "1.13.2"},
+  "provider_sha256": "3f3f69e57054ed57d760a9765679d8caf1d072a3f34af92ea2662a5da59ff7b1",
+  "evidence": {
+    "kind": "Actual compiled Go provider and local OpenTofu CLI; no surrogate or simulation",
+    "final_run": "/work/repos/micha/dml-design/feasibility/artifact/runtime/r3",
+    "cli_invocations": 52,
+    "passed_probes": ["CLI and declarative import", "no-op plan/apply", "metadata update preserves bytes/inode/mtime", "immutable config fields rejected", "content mismatch rejected on refresh and deletion", "lost-state re-import", "retirement and missing-import failure", "saved-plan inode/root replacement checks", "escape/symlink/hardlink rejection", "actual SIGKILL after unlink and safe retry"],
+    "counterexample": "apply -replace=immutable_artifact.result unlinks the valid file, then fails adoption-only Create"
+  },
+  "limitations": ["No apply-time retirement admission token or retention gate", "Ownership labels are not exclusive or authenticated", "Conditional path unlink remains racy under hostile external namespace mutation", "Device/inode identity can be reused", "No erasure or power-loss durability guarantee", "Linux-only synthetic sandbox experiment"],
+  "next_experiment": "Integrate journal-backed destructive authorization in Delete and saved-plan admission; reject forced replacement and duplicate adoption while preserving retry after unlink/acknowledgement interruption.",
+  "docs": "Context7 monthly quota exceeded; pinned official SDK source and official OpenTofu documentation used directly.",
+  "reproduce": ["python3 -B feasibility/artifact/build.py", "python3 -B feasibility/artifact/test_provider.py"]
+}

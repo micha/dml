@@ -1,0 +1,34 @@
+{
+  "status": "completed",
+  "verdict": "Conditionally feasible as a durable obligation journal and constrained IaC view; arbitrary HCL and generic immutable-artifact adoption are not established.",
+  "report": "/work/repos/micha/dml-design/feasibility/adversarial/report.md",
+  "evidence": {
+    "opentofu": "1.13.2",
+    "python": "3.13.15",
+    "aws_provider": "v6.70.0",
+    "aws_provider_commit": "5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f",
+    "executed_opentofu_cases": 6,
+    "simulation_cases": 1,
+    "provider_source_assertion_cases": 1,
+    "cloud_executed": false,
+    "dml_integration_executed": false,
+    "context7": "Monthly quota exceeded; used official docs and pinned source directly."
+  },
+  "strongest_findings": [
+    "AWS s3_object metadata edits take an upload branch; absent source/content selects empty bytes. Source evidence, not cloud execution.",
+    "Versioned aws_s3_object destruction calls deletion of all versions of the key; version_id is computed, not configurable.",
+    "Sensitive output values survive in structured output, state backups, synthetic copies and logs after current-state tombstoning.",
+    "Removing a declaration bypassed prevent_destroy and omitted its destroy-time provisioner; the sandbox artifact survived.",
+    "Same HCL without file dependencies failed; two local module instances shared and overwrote path.module output.",
+    "Same HCL without operational state generated a different binding identity."
+  ],
+  "user_judgments": [
+    "Whole-key versus version-specific resource ownership",
+    "Constrained HCL admission versus opaque arbitrary effects",
+    "Journal capture and state-recovery responsibilities",
+    "Erasure assurance and allowable surviving metadata/copies",
+    "Retention overrides, replacement authorization and independence methodology"
+  ],
+  "next_experiment": "Separately authorized disposable S3 import/metadata/version/deletion tests; otherwise fake-provider byte-preservation and retained-identity plan gate.",
+  "limitations": "No cloud calls, remote backend, actual DML integration, concurrent deployment or secure storage-page erasure test."
+}

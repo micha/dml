@@ -1,0 +1,45 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "a99832c393b2a295e587353361b4a4ac95bd5fee8b7eb9f32448e6e7a9d63058",
+  "source_id": "s3-manifest",
+  "source_path": "feasibility/adversarial/sources.json",
+  "values": [
+    {
+      "locator": "/aws_release",
+      "value": "v6.70.0",
+      "value_sha256": "fa2b9e7f7df917d46b7be832a4921eeb07deb991292f68f35ca1ca8a2256437e"
+    },
+    {
+      "locator": "/aws_commit",
+      "value": "5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f",
+      "value_sha256": "4a7b297802f89fc2bba18752514c48fa1c478efad71316ad39650edab04fe592"
+    },
+    {
+      "locator": "/sources/aws_s3_object.go",
+      "value": {
+        "bytes": 24450,
+        "sha256": "fa0e6316e491678f220daaa67eaa12af43069a57ba878766069bee6286df2aa1",
+        "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/internal/service/s3/object.go"
+      },
+      "value_sha256": "5061a5084b77ed9837970dcb296c002f6da9a9413402ac3396df9d650dc05521"
+    },
+    {
+      "locator": "/sources/aws_s3_delete.go",
+      "value": {
+        "bytes": 15230,
+        "sha256": "e3fbea7f1ccd402ee42ec2a8f75716988aeb4b4b8cd7873df9633f08eca38339",
+        "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/internal/service/s3/delete.go"
+      },
+      "value_sha256": "3c992dd0225f9ae4c312a025a96ebbf1f612f79e4d0ead8b6efe7386e696f282"
+    },
+    {
+      "locator": "/sources/aws_s3_object.md",
+      "value": {
+        "bytes": 14220,
+        "sha256": "0bf9e5aea3c87bf15f804597a9e8571454f571908a77b18db33951227ecc5216",
+        "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/website/docs/r/s3_object.html.markdown"
+      },
+      "value_sha256": "72b2bebad1f5e276772fcaa242656c39e45cbbd5a522ff8976e3c7ee00fc7d7a"
+    }
+  ]
+}

@@ -8,6 +8,10 @@ and `discussion.md` before continuing the discussion.
 - Keep conceptual agreements, tentative directions, assistant suggestions, and
   open questions distinguishable.
 - Design discussion is not approval to implement or amend DML specifications.
+- The user authorized isolated feasibility prototypes, local sandbox experiments
+  and candidate-design evolution under `feasibility/`. Read its index,
+  `ITERATION-RESULTS.md` and final audit for completed work and limitations. This
+  does not authorize cloud experiments or production integration.
 - Keep the implementation repository `/work/repos/micha/dml` unchanged unless
   separately authorized.
 - Preserve corrections and uncertainty rather than silently turning proposals

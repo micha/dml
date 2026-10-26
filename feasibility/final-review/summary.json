@@ -1,0 +1,47 @@
+{
+  "status": "completed",
+  "verdict": "Qualified narrow feasibility pass; no production-safety approval. Sealed-plan and same-file bridge succeed; untracked .tofu.json configuration falsifies complete material capture.",
+  "report": "/work/repos/micha/dml-design/feasibility/final-review/report.md",
+  "reproduce": "python3 -B feasibility/final-review/audit.py",
+  "evidence": "evidence.json",
+  "successful_sandbox": "runtime/run-80e3f208",
+  "independently_executed": {
+    "focused_cases": 7,
+    "built_in_cli_calls": 55,
+    "provider_bridge_cli_calls": 18,
+    "saved_plan_swap": "Actual apply inherited sealed fd; approved victim deleted, extra retained UUID survived; write/grow/shrink/seal changes returned EPERM, mask 15.",
+    "pre_effect_rejections": ["file() expression", "sensitive() expression", "unexported resource"],
+    "positive_fixture": "Captured string update works; body-free logs mode 0600.",
+    "new_counterexample": "main.tofu.json overrides tracked fixture using same-census literal semantics; adding/changing it leaves material hash unchanged; gate accepts and applies saved untracked literal.",
+    "positive_bridge": "Owned sealed FileGate uses actual journal-created/provider-imported same file; full history protects it, trusted excision permits disposal, plan-path substitution is ineffective, absence acknowledgement and immutable history validate."
+  },
+  "harness_failure": {
+    "sandbox": "runtime/run-c031220f",
+    "completed_cases_before_failure": 4,
+    "cli_calls": 40,
+    "cause": "Owned assertion treated terraform_data raw input as a string rather than {value,type}; corrected assertion only, one bounded fresh rerun."
+  },
+  "inspected_not_reexecuted": [
+    "Journal 35-test suite and immutable/pre-effect creation behavior",
+    "Artifact 52-call suite and forced replacement deleting before Create fails",
+    "Prior hardening same-file SIGKILL/retry evidence",
+    "Gate 285-call combined suite",
+    "Failed hardening followup scripts; not credited as completed audit"
+  ],
+  "remaining": [
+    "Provider Delete has no durable retirement authorization; direct CLI remains a bypass.",
+    "Complete membership/dependencies and exclusive namespace authority remain assumptions.",
+    "Raw manager state and argv/metadata confidentiality are unresolved; no erasure claim.",
+    "Receipts/bundles remain sidecars; private journal verification used by narrow bridge.",
+    "Sealed memfd is volatile, not a retained immutable execution bundle.",
+    "Full HCL, arbitrary providers, native DML, cloud, distributed recovery remain unsupported/untested."
+  ],
+  "morning_review": [
+    "Preserve v2 journal intent/immutable observations and sealed-byte admission.",
+    "Reject unexpected OpenTofu extensions or capture an immutable input directory.",
+    "Review provider-aware seam, versioned manager receipts and Delete authority.",
+    "Choose coarse fencing availability tradeoffs and compare direct artifact cleanup."
+  ],
+  "documentation": "Existing Context7 quota failure inspected; no native tool available, no installation/account changes. Official OpenTofu/Linux pages downloaded once each with bounded timeout and hashes.",
+  "authority": "Experiments and recommendations only; not approved design/specification or production safety."
+}

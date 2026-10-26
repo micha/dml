@@ -1,0 +1,23 @@
+{
+  "status": "completed",
+  "run": "/work/repos/micha/dml-design/feasibility/artifact/runtime/r3",
+  "cli_invocations": 52,
+  "checks": [
+    "actual CLI import + no-op plan/apply",
+    "metadata update preserves bytes/inode/mtime; manifest excludes bytes",
+    "configured path/digest/owner/id mutations rejected at plan",
+    "external content mismatch blocks refresh and unrefreshed delete",
+    "state loss fails creation safely; durable receipt permits re-import",
+    "retirement unlinks matching file; missing re-import cannot create",
+    "saved destroy plan refuses same-byte different-inode replacement",
+    "CLI import rejects escape, absolute path, target/parent symlink, hardlink, missing file",
+    "wrong import digest and symlink-configured root rejected",
+    "saved destroy plan refuses replaced sandbox root",
+    "declarative import plus metadata reconciliation preserves bytes; subsequent no-op",
+    "actual SIGKILL after unlink/before acknowledgement; old state survives, retry safely succeeds",
+    "COUNTEREXAMPLE: -replace deletes valid artifact then creation fails"
+  ],
+  "counterexamples": [
+    "forced replacement deletes before adoption-only create fails"
+  ]
+}

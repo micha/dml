@@ -1,0 +1,26 @@
+{
+  "status": "completed",
+  "verdict": "Real CLI supports stable module-based configuration regeneration with retained state; state regeneration, universal adoption and cleanup by omission are not supported by these probes.",
+  "report": "/work/repos/micha/dml-design/feasibility/opentofu/report.md",
+  "evidence": "/work/repos/micha/dml-design/feasibility/opentofu/evidence.json",
+  "executable": "/work/repos/micha/dml-design/feasibility/tools/tofu",
+  "versions": {"opentofu": "1.13.2", "local_provider": "2.5.3", "platform": "linux_amd64"},
+  "executed": {"probes": 7, "fresh_runs": 3, "cli_commands_per_run": 86, "final_run_passed": true},
+  "counterexamples": [
+    "local_file rejects import; a subsequent create overwrites pre-existing execution-created content.",
+    "Lost state plans creates and changes a built-in binding identity; identical regenerated configuration can overwrite independently changed content.",
+    "Omitting an orphaned resource's provider alias blocks destruction until the alias is restored.",
+    "Removing a resource block skips its destroy provisioner; retained count=0 runs the benign cleanup hook.",
+    "Declarative import can include update actions, while CLI import exposes an ID output immediately but leaves imported configured values null until reconciliation.",
+    "Renaming an installation key plans delete/create despite otherwise equivalent module material."
+  ],
+  "positive_results": [
+    "Two instances share stored HCL material with isolated state addresses and explicit provider mappings.",
+    "Repeated apply and reordered-key root regeneration preserve outputs with all no-op plan actions.",
+    "Removing one instance retains the other and the shared declaration; executed final destruction follows reversed dependencies."
+  ],
+  "evidence_boundary": "terraform_data is a real CLI state-only surrogate, not an external-artifact adoption proof; fixture copying models DML materialization without implementing it.",
+  "documentation": "Context7 quota exceeded; primary OpenTofu documentation and pinned local provider source docs used.",
+  "priority_gaps": ["State durability and provider-specific preservation gates", "Stable declaration IDs and cleanup provider retention", "Incomplete binding publication and import drift", "Durable cleanup and shared retention aggregation", "Executable HCL deployment isolation"],
+  "next_experiment": "Use an import-capable sandbox-file provider to test mismatched adopted attributes and recovery across import, binding publication and cleanup."
+}

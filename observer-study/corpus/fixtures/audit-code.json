@@ -1,0 +1,18 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "5fa39c336aeb2fdd9a01e17046722102e82ecf1a51ce5659ae5877d7dc4ddacd",
+  "source_id": "audit-code",
+  "source_path": "feasibility/final-review/audit.py",
+  "values": [
+    {
+      "locator": "lines:70-81",
+      "value": "    root=create('swap'); cfg=json.loads((root/'main.tf.json').read_text())\n    cfg['resource']['terraform_data']['other']={'input':'synthetic-retained'}\n    cfg['output']['dml_manifest']['value']['terraform_data.other']='${terraform_data.other.id}'\n    save(root/'main.tf.json',cfg); G.cli(root,'apply','-auto-approve','-input=false','-no-color')\n    before=G.observe(root); survivor=before['manifest']['terraform_data.other']\n    del cfg['resource']['terraform_data']['victim']; del cfg['output']['dml_manifest']['value']['terraform_data.victim']\n    save(root/'main.tf.json',cfg)\n    j=G.FakeJournal(run/'swap.sqlite'); j.publish(ident=survivor,member='A'); g=G.Gate(root,j)\n    ticket=g.plan(); assert ticket['victims']=={'terraform_data.victim':before['manifest']['terraform_data.victim']}\n    G.cli(root,'plan','-destroy','-input=false','-no-color','-out=alternate.tfplan'); token=j.reserve(ticket)\n    evidence={}\n    def swap():\n",
+      "value_sha256": "7083a68926c284f1260c422f23f27167a751a76ce174534fb3d442411da8e776"
+    },
+    {
+      "locator": "lines:132-145",
+      "value": "    # Adversarial check: literal-only same-census OpenTofu-preferred filename.\n    root=create('tofu-precedence'); g=G.Gate(root,G.FakeJournal(run/'precedence.sqlite'))\n    material=G.material(root); cfg=json.loads((root/'main.tf.json').read_text())\n    cfg['resource']['terraform_data']['victim']['input']='SYNTHETIC-UNTRACKED-TOFU'\n    save(root/'main.tofu.json',cfg); assert G.material(root)==material\n    t=g.plan()\n    cfg['resource']['terraform_data']['victim']['input']='SYNTHETIC-CHANGED-AFTER-PLAN'\n    save(root/'main.tofu.json',cfg); assert G.material(root)==material\n    g.check(t,root/'cleanup.tfplan'); tok=g.journal.reserve(t); g.apply(t,tok,root/'cleanup.tfplan')\n    state=json.loads(G.cli(root,'state','pull'))\n    value=state['resources'][0]['instances'][0]['attributes']['input']['value']\n    assert value=='SYNTHETIC-UNTRACKED-TOFU'\n    record('uncaptured_tofu_json',{'material_unchanged':True,'changed_file_accepted_after_plan':True,\n                                 'actual_state_input':value,'sealed_plan_not_broken':True})\n",
+      "value_sha256": "ccd5e71f85d26c33842d8d335c7ae63865269585dbcf81edef3d84f5ba341383"
+    }
+  ]
+}

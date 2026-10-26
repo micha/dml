@@ -1,0 +1,15 @@
+# Feasibility study scratch data and raw agent output
+feasibility/runtime/
+feasibility/run-worker.freeze-*.sh
+feasibility/tools/
+feasibility/**/tools/
+feasibility/**/runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log

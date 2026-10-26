@@ -1,0 +1,101 @@
+[
+  {
+    "mode": "full",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/0",
+    "status": "passed",
+    "tests": {
+      "adversarial": "passed",
+      "cross-lifecycle": "passed",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "passed",
+      "retention": "passed",
+      "version": "passed"
+    }
+  },
+  {
+    "mode": "models-only",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/1",
+    "status": "partial",
+    "tests": {
+      "adversarial": "skipped",
+      "cross-lifecycle": "skipped",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "skipped",
+      "retention": "passed"
+    }
+  },
+  {
+    "mode": "full",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/2",
+    "status": "passed",
+    "tests": {
+      "adversarial": "passed",
+      "cross-lifecycle": "passed",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "passed",
+      "retention": "passed",
+      "version": "passed"
+    }
+  },
+  {
+    "mode": "full",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/3",
+    "status": "passed",
+    "tests": {
+      "adversarial": "passed",
+      "cross-lifecycle": "passed",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "passed",
+      "retention": "passed",
+      "version": "passed"
+    }
+  },
+  {
+    "mode": "full",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/4",
+    "status": "passed",
+    "tests": {
+      "adversarial": "passed",
+      "cross-lifecycle": "passed",
+      "evidence-audit": "passed",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "passed",
+      "retention": "passed",
+      "version": "passed"
+    }
+  },
+  {
+    "mode": "full",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/5",
+    "status": "passed",
+    "tests": {
+      "adversarial": "passed",
+      "cross-lifecycle": "passed",
+      "evidence-audit": "passed",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "passed",
+      "retention": "passed",
+      "version": "passed"
+    }
+  },
+  {
+    "mode": "full",
+    "run": "/work/repos/micha/dml-design/feasibility/integration/runtime/run-746l_y65",
+    "status": "failed",
+    "tests": {
+      "adversarial": "passed",
+      "cross-lifecycle": "passed",
+      "history": "passed",
+      "history-fixture": "passed",
+      "opentofu": "failed",
+      "retention": "passed",
+      "version": "passed"
+    }
+  }
+]

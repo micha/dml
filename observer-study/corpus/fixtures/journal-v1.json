@@ -1,0 +1,91 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "723cd026cd80be8ce7c67c729a2d3c3e745c6015e07beaa127dcbc66184d28dd",
+  "source_id": "journal-v1",
+  "source_path": "feasibility/journal/evidence-v1.json",
+  "values": [
+    {
+      "locator": "/contract_version",
+      "value": "journal-v1",
+      "value_sha256": "40f22b0b56f6339e65f3b5805b9df12f81716100cb7dbcb8c71ac9ace7cf2446"
+    },
+    {
+      "locator": "/sources",
+      "value": {
+        "contract.md": "d6af504d4d9e8d01eb1a08c9af3ab25f4c0f1922a09a92e4c0c1497d8aac3908",
+        "journal.py": "d70375192cd35018bfbec3bbea52cd85922f5cf3d088256d31cf817fab01c36c",
+        "test_journal.py": "38ad24b31d3b87b5222279f051997d2073130dff7fa37c8b55b3ba33a1ee2662"
+      },
+      "value_sha256": "c537524aea3adf3985bc2d174a83253408030574760768cd8fd79e85e0f66c11"
+    },
+    {
+      "locator": "/latest/crashes",
+      "value": [
+        {
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "ack-before-commit",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": true,
+          "exitcode": 73,
+          "phase": "ack-after-commit",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": true,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "unlink",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": false,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "intent",
+          "recovered": true
+        },
+        {
+          "absent_on_reopen": false,
+          "acknowledged_on_reopen": false,
+          "exitcode": 73,
+          "phase": "reservation",
+          "recovered": true
+        },
+        {
+          "exitcode": 74,
+          "limitation": "no creation WAL; orphan retained without automatic deletion",
+          "phase": "creation-before-registration",
+          "recovered": false,
+          "unregistered_orphan_count": 1
+        },
+        {
+          "absent_count_on_reopen": 1,
+          "exitcode": 73,
+          "phase": "partial-batch-unlink",
+          "recovered": true
+        }
+      ],
+      "value_sha256": "be45536a18eb1c115a3780a5b490b394f946ab2c0dc228c0890637802aced9f1"
+    },
+    {
+      "locator": "/latest/tests",
+      "value": 20,
+      "value_sha256": "5378796307535df3ec8d8b15a2e2dc5641419c3d3060cfe32238c0fa973f7aa3"
+    },
+    {
+      "locator": "/latest/run",
+      "value": "/work/repos/micha/dml-design/feasibility/journal/runtime/run-cebhzcvj",
+      "value_sha256": "43e5e81b69c4d9b443bccb201296ee2bcc6b72f2a4681b4c39fac324d65cfe53"
+    },
+    {
+      "locator": "/latest/success",
+      "value": true,
+      "value_sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+    }
+  ]
+}

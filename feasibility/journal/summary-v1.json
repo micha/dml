@@ -1,0 +1,41 @@
+{
+  "workstream": "journal",
+  "status": "completed",
+  "contract_version": "journal-v1",
+  "contract": "/work/repos/micha/dml-design/feasibility/journal/contract.md",
+  "report": "/work/repos/micha/dml-design/feasibility/journal/report.md",
+  "source": ["journal.py", "test_journal.py"],
+  "command": "python3 -B feasibility/journal/test_journal.py",
+  "versions": {"python": "3.13.15", "sqlite": "3.51.2"},
+  "executed": {
+    "tests": 20,
+    "failures": 0,
+    "errors": 0,
+    "real_process_exits": 7,
+    "recovered_destruction_crashes": 6,
+    "creation_crash_orphans": 1,
+    "race_schedules": ["reservation first", "two publications first", "simultaneous head CAS"],
+    "latest_run": "runtime/run-cebhzcvj",
+    "log": "runtime/tests-delivery-scoped.log"
+  },
+  "verdict": "Qualified local cooperative-admission success; incomplete creation/adoption journal and no unrestricted deployment guarantee.",
+  "rejected_counterexamples": [
+    "duplicate physical identity, ownership overwrite and conflicting alias rebinding",
+    "new operational dependency or queued operational publication after withdrawal",
+    "stale revision or altered/finished ticket",
+    "cleanup prerequisite disposal before successful target absence acknowledgement",
+    "mutated bytes or replacement inode at recorded sandbox path"
+  ],
+  "candidate_policy": "One durable global fence blocks all admission writes. Historical provenance survives withdrawal; newly acquired operational commit references fail. Adoption keeps eventual cleanup prerequisites pinned.",
+  "integration": "Journal(db_path, sandbox_path, runtime_root=own_workstream_runtime) permits later integration in an explicitly scoped fresh sandbox. snapshot -> reserve -> verify -> begin_effect -> effect -> ack. Gate must independently bind saved-plan bytes and backend/configuration receipts.",
+  "limitations": [
+    "Creation is not write-ahead protected: real exit leaves an unregistered orphan, retained without auto-deletion.",
+    "Adoption is a trusted caller assertion, not an actual provider import.",
+    "Complete registered membership/dependencies and cooperative publishers/deployments are assumed.",
+    "Global fencing sacrifices availability; identity mismatch leaves a blocked ticket with no cancellation API.",
+    "External mutation between check and unlink, direct database writes, distributed operation and power-loss durability are not established.",
+    "Commit association sets approximate DML graphs; no immutable chronology/evidence DAG, exactly-once or legal erasure claim."
+  ],
+  "next_experiment": "Add creation WAL intent, then integrate a cooperative saved-plan gate and import-capable synthetic-file provider with independently validated physical receipts.",
+  "evidence": "evidence.json"
+}

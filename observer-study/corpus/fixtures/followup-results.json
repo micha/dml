@@ -1,0 +1,94 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "70edb830ab82adba37620a405258a08d866f4c03cb374683d3121113e33b3f67",
+  "source_id": "followup-results",
+  "source_path": "feasibility/gate/followup-test-results.json",
+  "values": [
+    {
+      "locator": "/baseline_replay/initial_plan_swap_destroys_retained_other",
+      "value": {
+        "after_effect_error": "missing/nonpublic receipt",
+        "retained_uuid": "e52e649c-735a-61ca-2489-f1ea64dc7652"
+      },
+      "value_sha256": "d42e2e6feae126738d4b0811d22fec15da8e1850d69f0ba4e270ab8f3556041d"
+    },
+    {
+      "locator": "/adversarial/sealed_plan_survives_actual_final_barrier_swap",
+      "value": {
+        "apply_uses_passed_fd": true,
+        "barrier": {
+          "approved_digest": "4581bca3b26814b97105ce497a276c39fbbea1b19bd198deea6631a0e94d7011",
+          "denied": {
+            "change_seals": "EPERM",
+            "grow": "EPERM",
+            "shrink": "EPERM",
+            "write": "EPERM"
+          },
+          "mutable_path_changed": true,
+          "seal_mask": 15
+        },
+        "retained_uuid_survives": "10f3287f-6d71-7d8c-071f-3271305af526",
+        "victim_absent": true
+      },
+      "value_sha256": "765e2c030f5cdeb241204174dd981bc62b723958f0db28cc6f8b5f8fdab5a474"
+    },
+    {
+      "locator": "/counts",
+      "value": {
+        "abrupt_os_exits": 2,
+        "adversarial_groups": 22,
+        "baseline_replay_groups": 4,
+        "opentofu_cli_invocations": 285,
+        "regression_groups": 28,
+        "wrapper_cli_subprocesses": 3
+      },
+      "value_sha256": "5c100946ae44cbae95b63dd37c70ad7b03a48c8dee5501f840e293f978b50486"
+    },
+    {
+      "locator": "/passed",
+      "value": true,
+      "value_sha256": "a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74"
+    },
+    {
+      "locator": "/code_checksums",
+      "value": {
+        "apply_input.py": "651bfe485502122c461e41588b479a96ead10d50ede7b09d03a536d4f7b3fa8f",
+        "fixture_language.py": "c768e80f5536e2443bd449497374ebdec04fa528834fe79d54a948b9448e94eb",
+        "followup_tests.py": "cc21c85408f9d61f72e785700b230d5e9acac04fff61aded127659c7fb7954ce",
+        "gate.py": "37f33708aef5ef78a8fec32d466b04aa46602d7f8c5ff1f2cebc4d464cdb5afb",
+        "journal_adapter.py": "ad253cb9648155c28e01184de1a1d324a0ca9db465b5675301a8abe814bed2c1",
+        "run_tests.py": "fa6c531c33a1cc57be4073fc22abe557449306c51280b9bbd3ce51eaa4316510"
+      },
+      "value_sha256": "252a439748bada3f442dd66eb19b96d4db9660bad30cf0753854a4b8e146260b"
+    },
+    {
+      "locator": "/sandbox",
+      "value": "/work/repos/micha/dml-design/feasibility/gate/runtime/followup/run-b51b898c",
+      "value_sha256": "c8d5b55db669762aa9f372bf80a15912d09d1085e8edad8d19a977144edb7709"
+    },
+    {
+      "locator": "/python",
+      "value": "3.13.15 (main, Aug  5 2026, 12:25:43) [GCC 15.3.0]",
+      "value_sha256": "64002f8a15dfa7e42580ab08a7dc0f9c6e0b8708ed2bc039e02b62a0a0666a00"
+    },
+    {
+      "locator": "/kernel",
+      "value": "6.18.55",
+      "value_sha256": "2d414fb26da6d18fc3e3e07aca2449407306a304238ccab8edeaeade438849a5"
+    },
+    {
+      "locator": "/sqlite",
+      "value": "3.51.2",
+      "value_sha256": "8a9218a00c875ac3f422ff54ffc8f72861d21ad194a0f465543aab7fe6cdf226"
+    },
+    {
+      "locator": "/tool",
+      "value": {
+        "platform": "linux_amd64",
+        "provider_selections": {},
+        "terraform_version": "1.13.2"
+      },
+      "value_sha256": "4124854611603d9d310e0dd2811c19d442561ab4cd6a5961c45d4482aae3ad89"
+    }
+  ]
+}

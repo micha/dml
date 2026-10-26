@@ -1,0 +1,41 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "f3e096709be77e3b39e20e4b42f493fb9cd9f7ee0a04a9a606e16180809f4a3c",
+  "source_id": "s3-summary",
+  "source_path": "feasibility/adversarial/summary.json",
+  "values": [
+    {
+      "locator": "/evidence",
+      "value": {
+        "aws_provider": "v6.70.0",
+        "aws_provider_commit": "5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f",
+        "cloud_executed": false,
+        "context7": "Monthly quota exceeded; used official docs and pinned source directly.",
+        "dml_integration_executed": false,
+        "executed_opentofu_cases": 6,
+        "opentofu": "1.13.2",
+        "provider_source_assertion_cases": 1,
+        "python": "3.13.15",
+        "simulation_cases": 1
+      },
+      "value_sha256": "9844ed16b369214f77cae65528d69632dfd93c8a0fbe94d0c3087739ffc37d61"
+    },
+    {
+      "locator": "/strongest_findings",
+      "value": [
+        "AWS s3_object metadata edits take an upload branch; absent source/content selects empty bytes. Source evidence, not cloud execution.",
+        "Versioned aws_s3_object destruction calls deletion of all versions of the key; version_id is computed, not configurable.",
+        "Sensitive output values survive in structured output, state backups, synthetic copies and logs after current-state tombstoning.",
+        "Removing a declaration bypassed prevent_destroy and omitted its destroy-time provisioner; the sandbox artifact survived.",
+        "Same HCL without file dependencies failed; two local module instances shared and overwrote path.module output.",
+        "Same HCL without operational state generated a different binding identity."
+      ],
+      "value_sha256": "aa25a5a959c7d33245de4d911bdcfc6b7df7fe31a35a048075268fec6e5fd774"
+    },
+    {
+      "locator": "/limitations",
+      "value": "No cloud calls, remote backend, actual DML integration, concurrent deployment or secure storage-page erasure test.",
+      "value_sha256": "33e49453177bf54544616ea53740838267124bf605d1e49d561b8b3fefb9eb6f"
+    }
+  ]
+}

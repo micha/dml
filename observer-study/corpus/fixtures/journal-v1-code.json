@@ -1,0 +1,13 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "d70375192cd35018bfbec3bbea52cd85922f5cf3d088256d31cf817fab01c36c",
+  "source_id": "journal-v1-code",
+  "source_path": "feasibility/journal/journal-v1.py",
+  "values": [
+    {
+      "locator": "lines:1-20",
+      "value": "\"\"\"Durable cooperative candidate; SQLite is a test substrate, not a DML proposal.\"\"\"\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport sqlite3\nimport stat\nimport uuid\nfrom contextlib import contextmanager\n\nCONTRACT_VERSION = \"journal-v1\"\n\n\nclass Rejected(RuntimeError):\n    pass\n\n\ndef encode(value):\n    return json.dumps(value, sort_keys=True, separators=(\",\", \":\"))\n\n",
+      "value_sha256": "4ea1595a33e03cb7a1be3fd08640e904ab3e7635aea01108b63549b3935cc7fe"
+    }
+  ]
+}

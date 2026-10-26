@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/journal/report.md",
+  "summary": "journal-v2 follow-up delivered: 35 passing tests and 12 abrupt OS exits. Transactional append-only snapshot history and pre-effect creation intent preserve prior outcomes and eliminate the demonstrated invisible orphan. Mutated/unsafe creation outcomes remain quarantined; identical-byte pre-receipt replacement remains an explicit cooperative-trust limitation. Initial delivery is preserved separately."
+}

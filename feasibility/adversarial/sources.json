@@ -1,0 +1,71 @@
+{
+  "aws_release": "v6.70.0",
+  "aws_commit": "5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f",
+  "sources": {
+    "aws_s3_object.md": {
+      "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/website/docs/r/s3_object.html.markdown",
+      "sha256": "0bf9e5aea3c87bf15f804597a9e8571454f571908a77b18db33951227ecc5216",
+      "bytes": 14220
+    },
+    "aws_s3_object.go": {
+      "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/internal/service/s3/object.go",
+      "sha256": "fa0e6316e491678f220daaa67eaa12af43069a57ba878766069bee6286df2aa1",
+      "bytes": 24450
+    },
+    "aws_s3_delete.go": {
+      "url": "https://raw.githubusercontent.com/hashicorp/terraform-provider-aws/5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f/internal/service/s3/delete.go",
+      "sha256": "e3fbea7f1ccd402ee42ec2a8f75716988aeb4b4b8cd7873df9633f08eca38339",
+      "bytes": 15230
+    },
+    "tofu-file.html": {
+      "url": "https://opentofu.org/docs/language/functions/file/",
+      "sha256": "df26b036ca2a15ee80f0c756b1cba435c530c383aa88682763c41778b18e9264",
+      "bytes": 79427
+    },
+    "tofu-path.html": {
+      "url": "https://opentofu.org/docs/language/expressions/references/",
+      "sha256": "5d77fe40c6925b136f4c035d73457ba8a6ce39c338400ead72f5f5445a3aae1e",
+      "bytes": 94971
+    },
+    "tofu-lock.html": {
+      "url": "https://opentofu.org/docs/language/files/dependency-lock/",
+      "sha256": "665216e20404517abb6fc0a93e47cbca4b05225c505075d06e771f51d073e394",
+      "bytes": 131159
+    },
+    "tofu-modules.html": {
+      "url": "https://opentofu.org/docs/language/modules/sources/",
+      "sha256": "ee5674203d595070a2d34278603b68ce813e1285cff6ef5e76541d34fb0cd351",
+      "bytes": 141070
+    },
+    "tofu-provisioners.html": {
+      "url": "https://opentofu.org/docs/language/resources/provisioners/syntax/",
+      "sha256": "2e17317319d483f4371bf0c7f2d7c698eb9f448bb5e2475c17c04144d6b93036",
+      "bytes": 111943
+    },
+    "tofu-providers.html": {
+      "url": "https://opentofu.org/docs/language/modules/develop/providers/",
+      "sha256": "851679eda47dc57aa2050e9c38f93a25bca0416fb632816e7ff9163b4bdcb2b4",
+      "bytes": 102304
+    },
+    "tofu-lifecycle.html": {
+      "url": "https://opentofu.org/docs/language/meta-arguments/lifecycle/",
+      "sha256": "64c20901f88483b63a1e9678922249d4bce1457c6a8340aa4f837ed42448aa8c",
+      "bytes": 56878
+    },
+    "tofu-sensitive.html": {
+      "url": "https://opentofu.org/docs/language/values/outputs/",
+      "sha256": "214905eba35bac82931d58749a35d2df8c5199d81abd524f1f0b33a9c0f07751",
+      "bytes": 116735
+    },
+    "aws-delete.html": {
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html",
+      "sha256": "13a42f7b8a5a0d76b78843abb7d1dcdb63b6b9e2da4ab173ca3f11048b81c245",
+      "bytes": 45680
+    },
+    "aws-copy.html": {
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html",
+      "sha256": "cfd6f98516fe5f7eb6b67c118bb9672cecd1292b1241a5bcbeaae8b6686137a4",
+      "bytes": 134903
+    }
+  }
+}

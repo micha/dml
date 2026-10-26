@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/gate/report.md",
+  "summary": "28 result groups and 130 actual OpenTofu calls passed. Candidate rejects stale saved plans, retained UUID mutations and mixed receipts; cooperative fences and durable unknown outcomes demonstrated. Real journal negative integration executed, but positive UUID/file identity bridge remains unsupported."
+}

@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/gate/report.md",
+  "summary": "Immutable-input follow-up completed: 28 regression, 22 focused adversarial and 4 preserved-gate replay groups; 285 actual OpenTofu CLI calls. Sealed memfd apply survives final-barrier plan-path substitution while retained extra UUID survives. Pre-effect census and fixture expression whitelist reject unexported resources/file()/sensitive(); logs omit state bodies. General provider Delete authority and positive real-journal bridge remain unresolved."
+}

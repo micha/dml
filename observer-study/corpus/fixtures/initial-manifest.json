@@ -1,0 +1,42 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "12278629f2c8ad48d78a59a7de767a62a40c799a1192e76c7aedd8899fd3bfd3",
+  "source_id": "initial-manifest",
+  "source_path": "feasibility/gate/initial-checksums.json",
+  "values": [
+    {
+      "locator": "",
+      "value": {
+        "done.json": {
+          "sha256": "4cf6cee9e944068ad435f39559449cf927423f447fbddc89a7f10dacbdaca795",
+          "snapshot": "done-initial.json"
+        },
+        "gate.py": {
+          "sha256": "666d699e7ed4adac11585db98b2230eb564768dc21db72adc2394f6c1d3077ac",
+          "snapshot": "gate-initial.py"
+        },
+        "journal_adapter.py": {
+          "sha256": "b28eb66b5098f1e041fec42b5cb0f8b1f6fcc702bd7e1486fcc1b15ac549887a",
+          "snapshot": "journal_adapter-initial.py"
+        },
+        "report.md": {
+          "sha256": "3448be324e9047bcd31ca346bad9620ffaa517ebdf79e3916d2758d4b6c31627",
+          "snapshot": "report-initial.md"
+        },
+        "run_tests.py": {
+          "sha256": "361f74ea533f39ff7731b86627ce56458530c436b20a2413c84553ac5c959958",
+          "snapshot": "run_tests-initial.py"
+        },
+        "summary.json": {
+          "sha256": "0c2ea0b6fc82d42fe183cdb16372e6863eb9365fa63d109040c7c1792017203d",
+          "snapshot": "summary-initial.json"
+        },
+        "test-results.json": {
+          "sha256": "9ee92e3561d17692538252f5138b5843bab532c9369bd27fa480ee0c8b7cefaf",
+          "snapshot": "test-results-initial.json"
+        }
+      },
+      "value_sha256": "5e0bcb0c7fcfc22da6d6b77dcc293e64d114ec05a2f0fb01d3983705306cf943"
+    }
+  ]
+}

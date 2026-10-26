@@ -1,0 +1,244 @@
+{
+  "items": [
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/3",
+          "original_locator": "/sources",
+          "original_sha256": "1ee5ff27592812145b1526b2d70cd36c9754cc74461ed83c4add6dfa2f3530e4",
+          "source_id": "audit-results",
+          "source_path": "feasibility/final-review/evidence.json",
+          "value_sha256": "8c157ee5efc92b54d602271f383eeca8acc29ad75b1520708ba516226be39b01"
+        },
+        {
+          "fixture_pointer": "/values/0",
+          "original_locator": "",
+          "original_sha256": "3da0773c08cf21c4d42fccf922e09f904891b9fb82df0d8b4490045b426c660a",
+          "source_id": "artifact-results",
+          "source_path": "feasibility/artifact/test-results.json",
+          "value_sha256": "58e015256d904d11603fe764058d88786159872fde6802ca6dba622fc1c3cf19"
+        }
+      ],
+      "description": "Raw plans, state, receipts, logs and historical source bundle contents excluded by sensitivity boundary.",
+      "id": "raw-evidence",
+      "impact": "Cannot independently inspect raw operations, numeric victim/survivor identities in final audit or adoption digest/inode/mtime pairs."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/2",
+          "original_locator": "/sources/aws_s3_object.go",
+          "original_sha256": "a99832c393b2a295e587353361b4a4ac95bd5fee8b7eb9f32448e6e7a9d63058",
+          "source_id": "s3-manifest",
+          "source_path": "feasibility/adversarial/sources.json",
+          "value_sha256": "5061a5084b77ed9837970dcb296c002f6da9a9413402ac3396df9d650dc05521"
+        },
+        {
+          "fixture_pointer": "/values/0",
+          "original_locator": "lines:52-94",
+          "original_sha256": "4d5e0130f422ea84934da8bf5b03600e64035ec99a2e5e851103d18a83c627ab",
+          "source_id": "s3-notes",
+          "source_path": "feasibility/adversarial/source-notes.md",
+          "value_sha256": "e89e6369b7aecd9f3ef37042973786138f5591a7d973f78bb014b01b3e4bc720"
+        }
+      ],
+      "description": "Pinned AWS primary-source copies receive lstat only; external URLs are not fetched.",
+      "id": "s3-primary",
+      "impact": "Source claims remain inspectable authored trace, not independently reverified primary-source or cloud outcome."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/2",
+          "original_locator": "/scenarios/1",
+          "original_sha256": "ae2a4c1d9a3a44bc84497d27e87e5f8bb4e2830faf93a4b5a4c96ae4a1d79e97",
+          "source_id": "history-results",
+          "source_path": "feasibility/history/scenario-results.json",
+          "value_sha256": "9fdd1352560a7822958587f2f940e0bc7a7f48d82f6431f16a30d8de8431d4b6"
+        },
+        {
+          "fixture_pointer": "/values/4",
+          "original_locator": "/scenarios/3",
+          "original_sha256": "ae2a4c1d9a3a44bc84497d27e87e5f8bb4e2830faf93a4b5a4c96ae4a1d79e97",
+          "source_id": "history-results",
+          "source_path": "feasibility/history/scenario-results.json",
+          "value_sha256": "2b6571f43104a8929abcf6a6be26d8067c818c0ca1d7559a7b660499d255e37b"
+        },
+        {
+          "fixture_pointer": "/values/1",
+          "original_locator": "lines:90-109",
+          "original_sha256": "258eaefb6d078e45fb0731b05d310f93b5cccf70431cafb1195b232756228457",
+          "source_id": "history-tests",
+          "source_path": "feasibility/history/test_model.py",
+          "value_sha256": "5dfcad6ebcf645c2ae27e844ae7fa1f1cf07eb16a526279576165fcb6820d265"
+        }
+      ],
+      "description": "Model summary emits booleans/counts, not retained request/attempt objects or all IDs.",
+      "id": "occurrence-trace",
+      "impact": "Source-derived reuse counts must stay distinct from recorded model assertions; ingestion source labels are not historical IDs."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/1",
+          "original_locator": "/review/cases/integrated_SIGKILL_after_provider_effect",
+          "original_sha256": "ba129dc87755f2c0f58c84b7102abf31d9792f4f815cc092d892baadadba3536",
+          "source_id": "bridge-results",
+          "source_path": "feasibility/hardening-review/evidence.json",
+          "value_sha256": "75aa1291870e6c718e42d294bfd86bd3b4af6989fdc366e013e90e569a3070ca"
+        },
+        {
+          "fixture_pointer": "/values/6",
+          "original_locator": "/scenarios/6",
+          "original_sha256": "ae2a4c1d9a3a44bc84497d27e87e5f8bb4e2830faf93a4b5a4c96ae4a1d79e97",
+          "source_id": "history-results",
+          "source_path": "feasibility/history/scenario-results.json",
+          "value_sha256": "736b919281504ac9579b7d5dde66d156e8768f421bd93b5f99f6504c83e834bc"
+        }
+      ],
+      "description": "Real disposal recovery and simulated computation/cleanup are different evidence streams.",
+      "id": "split-lifecycle",
+      "impact": "No complete real request/binding/attempt/computation/cleanup timeline can be reconstructed without invention."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/4",
+          "original_locator": "/versions",
+          "original_sha256": "1ee5ff27592812145b1526b2d70cd36c9754cc74461ed83c4add6dfa2f3530e4",
+          "source_id": "audit-results",
+          "source_path": "feasibility/final-review/evidence.json",
+          "value_sha256": "b7c51638d27716328f808f92d9f2a4684c6fa5b32fef5a31ea9bff11a17529d2"
+        },
+        {
+          "fixture_pointer": "/values/5",
+          "original_locator": "/tools",
+          "original_sha256": "1ee5ff27592812145b1526b2d70cd36c9754cc74461ed83c4add6dfa2f3530e4",
+          "source_id": "audit-results",
+          "source_path": "feasibility/final-review/evidence.json",
+          "value_sha256": "1103c6f2e30a97c7b857bedebed31e840ee00f529a5f2947f4840641ec2ef444"
+        },
+        {
+          "fixture_pointer": "/values/1",
+          "original_locator": "/cases/uncaptured_tofu_json",
+          "original_sha256": "1ee5ff27592812145b1526b2d70cd36c9754cc74461ed83c4add6dfa2f3530e4",
+          "source_id": "audit-results",
+          "source_path": "feasibility/final-review/evidence.json",
+          "value_sha256": "b74ba23314ff3ca86b4b91e2a7a9c30ff2b8a75cb9c40e031594e0a14f52e9a1"
+        }
+      ],
+      "description": "Tool versions and hashes only where reported; no complete environment, dependencies or execution closure.",
+      "id": "environment",
+      "impact": "Current file hashes do not establish complete historical input capture or timing."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/0",
+          "original_locator": "",
+          "original_sha256": "3da0773c08cf21c4d42fccf922e09f904891b9fb82df0d8b4490045b426c660a",
+          "source_id": "artifact-results",
+          "source_path": "feasibility/artifact/test-results.json",
+          "value_sha256": "58e015256d904d11603fe764058d88786159872fde6802ca6dba622fc1c3cf19"
+        },
+        {
+          "fixture_pointer": "/values/1",
+          "original_locator": "lines:255-281",
+          "original_sha256": "37f33708aef5ef78a8fec32d466b04aa46602d7f8c5ff1f2cebc4d464cdb5afb",
+          "source_id": "current-gate",
+          "source_path": "feasibility/gate/gate.py",
+          "value_sha256": "0196a6f287ec2ad27f2382bdb8b9f427802564e1092f7ae09853ad7e232b6a47"
+        }
+      ],
+      "description": "Sealed bytes do not authorize provider Delete; forced replacement remains unsafe.",
+      "id": "authorization",
+      "impact": "Harness success must not be presented as system safety."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/8",
+          "original_locator": "/scenarios/9",
+          "original_sha256": "ae2a4c1d9a3a44bc84497d27e87e5f8bb4e2830faf93a4b5a4c96ae4a1d79e97",
+          "source_id": "history-results",
+          "source_path": "feasibility/history/scenario-results.json",
+          "value_sha256": "9e98a64c2ef37ce05a8a0540b62bfc4c81f94639a711370695fff291713e5356"
+        },
+        {
+          "fixture_pointer": "/values/2",
+          "original_locator": "/limitations",
+          "original_sha256": "f3e096709be77e3b39e20e4b42f493fb9cd9f7ee0a04a9a606e16180809f4a3c",
+          "source_id": "s3-summary",
+          "source_path": "feasibility/adversarial/summary.json",
+          "value_sha256": "33e49453177bf54544616ea53740838267124bf605d1e49d561b8b3fefb9eb6f"
+        }
+      ],
+      "description": "No actual excision, backup erasure or inaccessible external dataset was ingested.",
+      "id": "erasure",
+      "impact": "Do not invent withdrawn/excised resources, synthetic historical events or global erasure."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/0",
+          "original_locator": "",
+          "original_sha256": "12278629f2c8ad48d78a59a7de767a62a40c799a1192e76c7aedd8899fd3bfd3",
+          "source_id": "initial-manifest",
+          "source_path": "feasibility/gate/initial-checksums.json",
+          "value_sha256": "5e0bcb0c7fcfc22da6d6b77dcc293e64d114ec05a2f0fb01d3983705306cf943"
+        },
+        {
+          "fixture_pointer": "/values/1",
+          "original_locator": "/sources",
+          "original_sha256": "723cd026cd80be8ce7c67c729a2d3c3e745c6015e07beaa127dcbc66184d28dd",
+          "source_id": "journal-v1",
+          "source_path": "feasibility/journal/evidence-v1.json",
+          "value_sha256": "c537524aea3adf3985bc2d174a83253408030574760768cd8fd79e85e0f66c11"
+        },
+        {
+          "fixture_pointer": "/values/3",
+          "original_locator": "/sources",
+          "original_sha256": "1ee5ff27592812145b1526b2d70cd36c9754cc74461ed83c4add6dfa2f3530e4",
+          "source_id": "audit-results",
+          "source_path": "feasibility/final-review/evidence.json",
+          "value_sha256": "8c157ee5efc92b54d602271f383eeca8acc29ad75b1520708ba516226be39b01"
+        }
+      ],
+      "description": "Checksum manifests are retained reported data, not authenticated attestations.",
+      "id": "historical-attestation",
+      "impact": "Equal archive/full-file digest verifies bytes against reported digest only, not historical execution, independence, timestamp or provenance completeness."
+    },
+    {
+      "citations": [
+        {
+          "fixture_pointer": "/values/2",
+          "original_locator": "/counts",
+          "original_sha256": "70edb830ab82adba37620a405258a08d866f4c03cb374683d3121113e33b3f67",
+          "source_id": "followup-results",
+          "source_path": "feasibility/gate/followup-test-results.json",
+          "value_sha256": "5c100946ae44cbae95b63dd37c70ad7b03a48c8dee5501f840e293f978b50486"
+        },
+        {
+          "fixture_pointer": "/values/0",
+          "original_locator": "/tests",
+          "original_sha256": "c56484e9215b2a55686546cdc0b4cf54a3233671a79dc84d83381f33a76ebf17",
+          "source_id": "history-summary",
+          "source_path": "feasibility/history/summary.json",
+          "value_sha256": "18438637b03d5b41855000e24da871551880617dc0976390660b35b2ddf4db21"
+        },
+        {
+          "fixture_pointer": "/values/0",
+          "original_locator": "",
+          "original_sha256": "3da0773c08cf21c4d42fccf922e09f904891b9fb82df0d8b4490045b426c660a",
+          "source_id": "artifact-results",
+          "source_path": "feasibility/artifact/test-results.json",
+          "value_sha256": "58e015256d904d11603fe764058d88786159872fde6802ca6dba622fc1c3cf19"
+        }
+      ],
+      "description": "Historical metrics mix model tests, group counts, invocations and simulated attempts.",
+      "id": "units",
+      "impact": "Never sum these into a generic tests-passed count or count retrospective ingestion as fresh research."
+    }
+  ],
+  "schema": "stage0-gaps-v1"
+}

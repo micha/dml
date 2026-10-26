@@ -1,0 +1,28 @@
+{
+  "status": "completed",
+  "workstream": "review",
+  "verdict": "needs corrections",
+  "report": "/work/repos/micha/dml-design/feasibility/review/report.md",
+  "summary": "First-wave results reproduced and integration labels are honest. Path failure corrected/disclosed by integration. New saved-plan destruction, withdrawn-dependent publication, ownership-rebinding and output/state mismatch counterexamples require coverage/admission corrections before end-to-end safety claims; narrow local prototype remains justified.",
+  "independently_reproduced": {
+    "history_tests": 24,
+    "history_scenarios": 11,
+    "retention_tests": 20,
+    "retention_trace_matches": true,
+    "lab_probes": 7,
+    "lab_cli_commands": 86,
+    "adversarial_cases": {"cli": 6, "accounting_drift": 1, "source_assertion": 1},
+    "joined_scenario": {"requests": 3, "arithmetic_attempts": 2, "result_roots": 1, "cli_commands": 6},
+    "new_checks": {"model": 3, "actual_cli_interleavings": 2, "cli_commands": 12},
+    "pinned_aws_source_files_downloaded_and_verified": 3,
+    "hash_guesses_until_match": 8
+  },
+  "versions": {"python": "3.13.15", "opentofu": "1.13.2", "local_provider": "2.5.3", "aws_source": "v6.70.0 / 5e13eedee7c22ac362e6ffdfbdcfd23a5f9f797f"},
+  "open_findings": ["R2 saved-plan apply admission", "R3 withdrawal versus new dependencies", "R4 canonical identity validation", "R5 atomic observation receipt", "R6 validated retention-root export", "R7 fresh-only standalone test allocation"],
+  "corrected_findings": ["R1 provider socket path failure: integration shorter layout passes and preserves original failure", "Integration audit clarifies 100-candidate domain versus eight guesses and stale schema citation"],
+  "limits": ["No DML C/LMDB integration", "No cloud execution", "No crash-safe distributed fencing", "Retention/adoption in joined scenario are explicit simulations", "No legal/global erasure guarantee"],
+  "context7": "Monthly quota exceeded; primary pinned source used without installing a documentation tool.",
+  "next_experiment": "Two publishers plus durable local obligation journal and crash-injected deleter, validated identity/root exports, saved-plan admission and import-capable synthetic-file adapter.",
+  "artifacts": ["report.md", "findings.json", "rerun.py", "adversarial_checks.py", "verify_sources.py", "rerun_integration.py"],
+  "approval_boundary": "No user policy, specification or implementation decision approved. No commits or changes outside review-owned files."
+}

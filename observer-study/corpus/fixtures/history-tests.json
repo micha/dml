@@ -1,0 +1,18 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "258eaefb6d078e45fb0731b05d310f93b5cccf70431cafb1195b232756228457",
+  "source_id": "history-tests",
+  "source_path": "feasibility/history/test_model.py",
+  "values": [
+    {
+      "locator": "lines:62-72",
+      "value": "    def test_content_dedup_but_distinct_occurrences(self):\n        q1, a1 = self.new_attempt()\n        q2, a2 = self.new_attempt()\n        d1, d2 = self.success(a1), self.success(a2)\n        self.assertNotEqual(q1, q2)\n        self.assertNotEqual(a1, a2)\n        self.assertEqual(self.store.get(q1)[\"refs\"], self.store.get(q2)[\"refs\"])\n        self.assertEqual(self.store.get(d1)[\"refs\"][\"result\"],\n                         self.store.get(d2)[\"refs\"][\"result\"])\n        self.assertEqual(self.store.put(\"datum\", 11), self.result)\n\n",
+      "value_sha256": "de76ca7cb99dc491bf6e1a6476286ccab5a096030545fa978309d131b8bd6654"
+    },
+    {
+      "locator": "lines:90-109",
+      "value": "    def test_reuse_is_not_independent_trial_and_default_off_override(self):\n        _, original = self.new_attempt()\n        self.success(original)\n        self.select(original)\n        before = self.repo.heads[\"main\"]\n        self.assertIsNone(choose(self.repo, before, self.bound, False))\n        self.assertEqual(choose(self.repo, before, self.bound, False,\n                                explicit=original), original)\n        self.assertEqual(choose(self.repo, before, self.bound, True), original)\n        q2 = request(self.store, self.ids, self.bound)\n        hit = event(self.store, self.ids, q2, \"reuse\", refs={\"actual_attempt\": original,\n                                                           \"result\": self.result})\n        self.repo.append(\"main\", [hit])\n        reachable = self.store.walk(self.repo.heads[\"main\"])\n        self.assertEqual(sum(self.store.get(x)[\"kind\"] == \"attempt\" for x in reachable), 1)\n        _, fresh = self.new_attempt()\n        self.success(fresh)\n        self.assertNotEqual(fresh, original)\n        self.assertEqual(sum(self.store.get(x)[\"kind\"] == \"attempt\"\n                             for x in self.store.walk(self.repo.heads[\"main\"])), 2)\n",
+      "value_sha256": "5dfcad6ebcf645c2ae27e844ae7fa1f1cf07eb16a526279576165fcb6820d265"
+    }
+  ]
+}

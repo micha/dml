@@ -1,0 +1,114 @@
+{
+  "sandbox": "/work/repos/micha/dml-design/feasibility/gate/runtime/run-58fab76a",
+  "python": "3.13.15 (main, Aug  5 2026, 12:25:43) [GCC 15.3.0]",
+  "tool": {
+    "terraform_version": "1.13.2",
+    "platform": "linux_amd64",
+    "provider_selections": {}
+  },
+  "cases": {
+    "saved_plan_gate": "stale configuration/input",
+    "saved_plan_raw_hazard": {
+      "destroyed": "7eb34e5d-6de2-809d-297b-3aa0f46c90b9",
+      "despite_unapplied_prevent_destroy": true
+    },
+    "retained_update": "retained actual identity",
+    "retained_replace": "retained actual identity",
+    "retained_destroy": "retained actual identity",
+    "explicit_disposition_cleanup": {
+      "before": "ba5e948c-1b5e-9419-17bc-1cf1daeccdc8",
+      "after": {
+        "lineage": "f5e4597d-5465-6c93-b394-845fe3d64d9d",
+        "serial": 2,
+        "manifest": {},
+        "snapshot_digest": "59f159907915d23e640ecdfe0ffb6a7c064fb8d3d8ffe50328302736798a6231"
+      }
+    },
+    "input_changed": "stale configuration/input",
+    "plan_bytes_changed": "changed plan bytes",
+    "membership_changed": "stale root/membership revision",
+    "roots_changed": "stale root/membership revision",
+    "mixed_receipt": "malformed identity mapping",
+    "address_not_identity": {
+      "before": {
+        "lineage": "6bda661d-eb47-e176-af10-4a9d30b30fe7",
+        "serial": 1,
+        "manifest": {
+          "terraform_data.victim": "df8ab3bd-369e-4730-58ed-c82cb2e8a5be"
+        },
+        "snapshot_digest": "c55a3a944513c11bb44df0308b0ce5709d5e9932fd7890e8d106bd163a3a94d9"
+      },
+      "after": {
+        "lineage": "6bda661d-eb47-e176-af10-4a9d30b30fe7",
+        "serial": 2,
+        "manifest": {
+          "terraform_data.victim": "1b5058fc-12f7-5f95-898e-a43d5eb7f980"
+        },
+        "snapshot_digest": "7b2ad161faf247a82ac56e334d31df644a2a9e659fcac4194a39e46cc7107761"
+      }
+    },
+    "receipt_missing": "missing/nonpublic receipt",
+    "receipt_sensitive": "missing/nonpublic receipt",
+    "receipt_serial": "unknown state",
+    "receipt_mapping": "malformed identity mapping",
+    "old_observation": "stale manager receipt",
+    "omitted_ticket_victims": "ticket victim/plan mismatch",
+    "old_identity_does_not_retain_successor": {
+      "admitted_current_uuid": {
+        "terraform_data.victim": "1b5058fc-12f7-5f95-898e-a43d5eb7f980"
+      },
+      "retained_old_uuid": {
+        "terraform_data.victim": "df8ab3bd-369e-4730-58ed-c82cb2e8a5be"
+      }
+    },
+    "interrupted_apply": {
+      "exitcode": 73,
+      "durable_status": "unknown",
+      "side_effect_started": false,
+      "new_publisher": "live/unknown reservation",
+      "blind_retry": "missing/mismatched/live reservation"
+    },
+    "completed_effect_unknown_outcome": {
+      "exitcode": 73,
+      "durable_status": "unknown",
+      "manager_manifest": {},
+      "automatic_acknowledgement": false
+    },
+    "publisher_between_check_and_effect": {
+      "excluded_while_apply_transaction": true,
+      "after_apply": "published",
+      "note": "manual fake member publication after completed cleanup; real root acquisition must also reject disposed identities"
+    },
+    "durable_reservation_fence": "live/unknown reservation",
+    "missing_reservation": "missing/mismatched/live reservation",
+    "unavailable_member": "unavailable member",
+    "deployment_neutral_cli_driver": {
+      "actions": [
+        "plan",
+        "reserve",
+        "apply"
+      ],
+      "after": {
+        "lineage": "41ffadf1-f765-1e2e-372b-b7e1afac3831",
+        "serial": 2,
+        "manifest": {},
+        "snapshot_digest": "02adbb99ffee967cbf95b7c67330940e442d7f41ebfff5c81a82a1992c30b858"
+      }
+    },
+    "unsupported_material": "unsupported material",
+    "real_journal_adapter_attempt": {
+      "contract": "journal-v2",
+      "journal_source_digest": "fc178a5fdcf0150de37b9cbd0a70d727903926e5fc2d95793cba5a39912a7912",
+      "adapter_status": "identity/backend integration blocked",
+      "actual_full_history_retention": "full-history retained",
+      "actual_stale_membership": "stale revision / empty plan",
+      "physical_bridge_rejection": "unsupported physical identity bridge",
+      "actual_durable_publication_fence": "global destruction fence active",
+      "mismatched_effect_ack_rejection": "absence not observed",
+      "durable_status_after_mismatch": "intent",
+      "file_backend_recovery": "acknowledged",
+      "limitations": "No managed terraform_data registration or equivalent file backend mapping; generic gate rejects rather than inventing one."
+    }
+  },
+  "passed": true
+}

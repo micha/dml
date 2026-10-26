@@ -1,0 +1,13 @@
+{
+  "acquisition": "retrospective-selected-copy",
+  "original_sha256": "666d699e7ed4adac11585db98b2230eb564768dc21db72adc2394f6c1d3077ac",
+  "source_id": "initial-code",
+  "source_path": "feasibility/gate/gate-initial.py",
+  "values": [
+    {
+      "locator": "lines:191-216",
+      "value": "    def apply(self, ticket, token, plan, before_effect=None, after_effect=None):\n        with self.journal.tx() as c:\n            row = c.execute('SELECT ticket,status FROM reservations WHERE token=?', (token,)).fetchone()\n            need(row is not None and row[1] == 'reserved' and json.loads(row[0]) == ticket, 'missing/mismatched/live reservation')\n            self.journal.validate(c, ticket)\n            self.check(ticket, plan)\n            # Commit unknown before invoking any side effect. A kill leaves durable uncertainty.\n            c.execute(\"UPDATE reservations SET status='unknown',outcome='apply may not have started' WHERE token=?\", (token,))\n        with self.journal.tx() as c:\n            # Holding a local writer transaction across subprocess works ONLY cooperatively.\n            self.journal.validate(c, ticket)\n            self.check(ticket, plan)\n            if before_effect:\n                before_effect()\n            try:\n                cli(self.root, 'apply', '-input=false', '-no-color', str(plan))\n                if after_effect:\n                    after_effect()\n                after = observe(self.root)\n            except BaseException:\n                # Rollback keeps the already committed unknown. No automatic release.\n                raise\n            c.execute(\"UPDATE reservations SET status='completed',outcome=? WHERE token=?\", (json.dumps(after),token))\n        return after\n\nif __name__ == '__main__':\n",
+      "value_sha256": "6f138406f43a68cb7ec66478c4dbc2c55ff581eba870bbd4c387d1da4d269b8a"
+    }
+  ]
+}

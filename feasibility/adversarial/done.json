@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/adversarial/report.md",
+  "summary": "Ten ranked findings and two worked lifecycles delivered. Six offline OpenTofu cases passed; AWS v6.70.0 source exposes empty-body metadata updates and all-version key deletion risks. Cloud behavior remains unexecuted."
+}

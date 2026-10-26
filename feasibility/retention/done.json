@@ -1,0 +1,5 @@
+{
+  "status": "completed",
+  "report": "/work/repos/micha/dml-design/feasibility/retention/report.md",
+  "summary": "20 deterministic tests passed, including 512 graph/root cases and six publication/deletion interleavings. Naive GC loses historical resources, races new references, and can strand cleanup. Safe destruction needs complete ownership knowledge, durable disposal identities and cross-repository fencing; erasure and state regeneration have explicit limits."
+}
