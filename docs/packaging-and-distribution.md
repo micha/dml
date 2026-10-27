@@ -24,7 +24,8 @@ from that subdirectory. Maintained Python/native binding sources still live ther
 
 The `python-runtime` Meson install tag selects only:
 
-- `daggerml/__init__.py`, `local.py`, `transfer.py`, `exchange.py`, `_core.pyi`, `py.typed`;
+- `daggerml/__init__.py`, `local.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
+  `_core.pyi`, `py.typed`;
 - the linked `_core` extension;
 - the native `daggerml/_bin/dml` (`dml.exe` on Windows).
 
@@ -74,6 +75,10 @@ those layers through explicit prepare/execute/receive stages, using fresh instal
 worker/receiver processes and the same unchanged local child contract. Its
 [exchange contract](spec-next/repository-execution.md) owns retained files, pinned
 selection and validated explicit-ref return without adoption.
+The [asynchronous story](../examples/asynchronous_execution.py) retains/reaps the fixed
+installed worker while short-lived clients observe immutable P/U/F packets. The
+[asynchronous contract](spec-next/asynchronous-execution.md) owns its process/packet
+boundary; the example child is captured source, not an installed runtime/fault hook.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory
 workloads to the C tests; [coverage/memory accounting](../tests/coverage-exclusions.md)

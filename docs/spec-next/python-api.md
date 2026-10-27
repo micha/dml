@@ -14,6 +14,8 @@ The explicit [transfer layer](transfer.md) owns bounded pinned-commit bundles,
 complete typed closure checks and optional atomic ref creation. The explicit
 [repository-execution layer](repository-execution.md) composes those public APIs
 for one pinned step in independent local B and a validated explicit-ref return to A.
+Its additive [asynchronous contract](asynchronous-execution.md) owns saved handles,
+live application-owned worker launch and bounded immutable progress observation/reception.
 
 ## Values and descriptions
 

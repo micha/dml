@@ -233,11 +233,14 @@ def test_meaningful_file_failures_retain_workspaces(job, stage, monkeypatch):
 
             monkeypatch.setattr(builtins, "open", fail)
         else:
-            monkeypatch.setattr(
-                ex.os,
-                "replace",
-                lambda *args: (_ for _ in ()).throw(PermissionError("receipt denied")),
-            )
+            replacing = ex.os.replace
+
+            def denied_receipt(source, target):
+                if Path(target).name == "completion.json":
+                    raise PermissionError("receipt denied")
+                return replacing(source, target)
+
+            monkeypatch.setattr(ex.os, "replace", denied_receipt)
         with pytest.raises(PermissionError):
             ex.execute_exchange(workspace)
         assert not (workspace / "completion.json").exists()

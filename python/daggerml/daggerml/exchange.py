@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -28,11 +29,23 @@ __all__ = [
     "prepare_exchange",
     "execute_exchange",
     "receive_exchange",
+    "ExchangeHandle",
+    "WorkerLaunch",
+    "ExchangeObservation",
+    "ReceivedObservation",
+    "save_exchange_handle",
+    "load_exchange_handle",
+    "start_exchange",
+    "observe_exchange",
+    "receive_observation",
 ]
 
 MAX_DESCRIPTOR_BYTES = 8192
 JOB_FORMAT = "daggerml-local-exchange-job-v1"
 COMPLETION_FORMAT = "daggerml-local-exchange-completion-v1"
+HANDLE_FORMAT = "daggerml-local-exchange-handle-v1"
+READY_FORMAT = "daggerml-local-exchange-ready-v1"
+OBSERVATION_FORMAT = "daggerml-local-exchange-observation-v1"
 
 
 class ExchangeError(ValueError):
@@ -100,7 +113,7 @@ class ExchangeSpec:
 @dataclass(frozen=True)
 class ReceivedRun:
     commit: ObjectId
-    ref: str
+    ref: Optional[str]
     object_count: int
     pre_dispatch: ObjectId
     request_id: str
@@ -184,10 +197,32 @@ def _job(workspace):
         ),
         JOB_FORMAT,
     )
+    return _spec_values(document)
+
+
+def _spec_values(document):
+    if type(document) is not dict or set(document) != set(_spec_document_keys()):
+        raise ExchangeError("unexpected job fields")
+    if document["format"] != JOB_FORMAT:
+        raise ExchangeError("unsupported job format")
     values = {key: value for key, value in document.items() if key != "format"}
     for name in ("commit", "binding", "inputs"):
         values[name] = ObjectId.from_hex(_hex(values[name]))
     return ExchangeSpec(**values)
+
+
+def _spec_document_keys():
+    return (
+        "format",
+        "token",
+        "commit",
+        "binding_name",
+        "inputs_name",
+        "binding",
+        "inputs",
+        "intent_uri",
+        "worker_ref",
+    )
 
 
 def _write_document(path, document):
@@ -334,7 +369,12 @@ def execute_exchange(workspace, *, map_size: int = 0) -> local.LocalRun:
     worker = workspace / "worker.dml"
     if any(
         path.exists()
-        for path in (worker, workspace / "output.bundle", workspace / "completion.json")
+        for path in (
+            worker,
+            workspace / "output.bundle",
+            workspace / "completion.json",
+            workspace / "worker-ready.json",
+        )
     ):
         raise ExchangeError("worker or output already exists")
     try:
@@ -354,6 +394,14 @@ def execute_exchange(workspace, *, map_size: int = 0) -> local.LocalRun:
         _selection(tx, spec)
         if tx.get_ref(spec.worker_ref) != spec.commit:
             raise ExchangeError("worker ref mismatch")
+    _write_document(
+        workspace / "worker-ready.json",
+        {
+            "format": READY_FORMAT,
+            "token": spec.token,
+            "commit": str(spec.commit),
+        },
+    )
     run = local.run_step(
         worker,
         head_ref=spec.worker_ref,
@@ -468,10 +516,8 @@ def _outcome(tx, oid, publication_result):
     )
 
 
-def _completion(tx, spec, receipt, ref, count):
+def _initial(tx, spec, pre, qid, aid):
     base = _selection(tx, spec)
-    pre, final = receipt["pre_dispatch"], receipt["final_commit"]
-    qid, aid = receipt["request_id"], receipt["attempt_id"]
     qname, aname, pname = "request-" + qid, "attempt-" + aid, "publication-" + aid
     initial_tree = _tree(tx, pre)
     if (
@@ -507,6 +553,30 @@ def _completion(tx, spec, receipt, ref, count):
         or _scalar(tx, a.bindings["publication-ref"], ("string",)) != aname
     ):
         raise ExchangeError("initial attempt association mismatch")
+    return initial_tree, request, initial, a, scratch
+
+
+def _publication(tx, pre, aid, selected, initial_tree):
+    publication_tree = _tree(tx, selected)
+    publication = publication_tree.pop("publication-" + aid, None)
+    if (
+        publication is None
+        or publication_tree != initial_tree
+        or tx.get_commit(selected).parents != (pre,)
+    ):
+        raise ExchangeError("publication history mismatch")
+    p = _role(
+        tx, publication, "local-publication-v1", ("role", "result"), occurrence=aid
+    )
+    return publication, _subdag(tx, p.bindings["result"])
+
+
+def _completion(tx, spec, receipt, ref, count):
+    pre, final = receipt["pre_dispatch"], receipt["final_commit"]
+    qid, aid = receipt["request_id"], receipt["attempt_id"]
+    initial_tree, request, initial, a, scratch = _initial(tx, spec, pre, qid, aid)
+    aname, pname = "attempt-" + aid, "publication-" + aid
+    required = ("role", "request", "publication-ref", "scratch")
     final_tree = _tree(tx, final)
     final_attempt = final_tree.get(aname)
     if final_attempt is None:
@@ -528,19 +598,9 @@ def _completion(tx, spec, receipt, ref, count):
     expected_tree = dict(initial_tree)
     expected_tree[aname] = final_attempt
     if len(parents) == 2 and parents[0] == pre:
-        publication_commit = parents[1]
-        publication_tree = _tree(tx, publication_commit)
-        publication = publication_tree.pop(pname, None)
-        if (
-            publication is None
-            or publication_tree != initial_tree
-            or tx.get_commit(publication_commit).parents != (pre,)
-        ):
-            raise ExchangeError("publication history mismatch")
-        p = _role(
-            tx, publication, "local-publication-v1", ("role", "result"), occurrence=aid
+        publication, publication_result = _publication(
+            tx, pre, aid, parents[1], initial_tree
         )
-        publication_result = _subdag(tx, p.bindings["result"])
         expected_tree[pname] = publication
     elif parents != (pre,):
         raise ExchangeError("completion parent order mismatch")
@@ -631,5 +691,313 @@ def receive_exchange(
     finally:
         # Only allocated validation scratch. Cleanup failure prevents any A write.
         shutil.rmtree(scratch)
+    transfer.import_commit(repository_path, bundle, ref=ref, map_size=map_size)
+    return received
+
+
+@dataclass(frozen=True)
+class ExchangeHandle:
+    """Saved observation identity, never live process or recovery authority."""
+
+    workspace: Path
+    expected: ExchangeSpec
+
+    def __post_init__(self):
+        if not isinstance(self.expected, ExchangeSpec):
+            raise TypeError("expected requires ExchangeSpec")
+        object.__setattr__(self, "workspace", _path(self.workspace))
+
+
+class WorkerLaunch:
+    """Application-owned direct process. Retain it and explicitly wait/reap it.
+
+    No finalizer, context-manager wait, hidden registry or detached lifetime promise.
+    A timed-out wait retains ownership and streams. Process status is not progress.
+    """
+
+    def __init__(self, handle, stdout, stderr):
+        self.handle = handle
+        self.process = None
+        self._stdout = stdout
+        self._stderr = stderr
+
+    def wait(self, timeout=None):
+        code = self.process.wait(timeout=timeout)
+        self._stdout.close()
+        self._stderr.close()
+        return code
+
+
+def _handle(value):
+    if not isinstance(value, ExchangeHandle):
+        raise TypeError("handle requires ExchangeHandle")
+    if _job(value.workspace) != value.expected:
+        raise ExchangeError("job differs from caller expected selection")
+    return value.workspace, value.expected
+
+
+def save_exchange_handle(file, handle: ExchangeHandle) -> None:
+    """Write a new caller-owned bounded handle file; never dispatch."""
+    if not isinstance(handle, ExchangeHandle):
+        raise TypeError("handle requires ExchangeHandle")
+    document = {
+        "format": HANDLE_FORMAT,
+        "workspace": str(handle.workspace),
+        "expected": _spec_document(handle.expected),
+    }
+    data = json.dumps(
+        document, ensure_ascii=True, allow_nan=False, separators=(",", ":")
+    ).encode("utf-8")
+    if len(data) > MAX_DESCRIPTOR_BYTES:
+        raise ExchangeError("handle exceeds profile limit")
+    with open(_path(file), "xb") as stream:
+        stream.write(data)
+
+
+def load_exchange_handle(file) -> ExchangeHandle:
+    """Load identity only. Does not read the workspace, signal a PID or start work."""
+    document = _document(_path(file), ("workspace", "expected"), HANDLE_FORMAT)
+    if type(document["workspace"]) is not str:
+        raise ExchangeError("handle workspace requires str")
+    return ExchangeHandle(document["workspace"], _spec_values(document["expected"]))
+
+
+def start_exchange(handle: ExchangeHandle) -> WorkerLaunch:
+    """Spawn the fixed installed worker once, without waiting for computation."""
+    workspace, _ = _handle(handle)
+    artifacts = (
+        "started",
+        "worker.dml",
+        "output.bundle",
+        "completion.json",
+        "worker-ready.json",
+        "worker.stdout",
+        "worker.stderr",
+    )
+    if any((workspace / name).exists() for name in artifacts):
+        raise ExchangeError("worker artifacts already exist")
+    try:
+        with open(workspace / "launched", "xb"):
+            pass
+    except FileExistsError:
+        raise ExchangeError(
+            "exchange already launched; no automatic relaunch"
+        ) from None
+    # Allocate command, streams and owner before spawn; no postspawn receipt IO.
+    command = [sys.executable, "-m", "daggerml.exchange_worker", str(workspace)]
+    stdout = open(workspace / "worker.stdout", "xb")
+    try:
+        stderr = open(workspace / "worker.stderr", "xb")
+        try:
+            launch = WorkerLaunch(handle, stdout, stderr)
+            launch.process = subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                shell=False,
+            )
+        except BaseException:
+            stderr.close()
+            raise
+    except BaseException:
+        stdout.close()
+        raise
+    return launch
+
+
+@dataclass(frozen=True)
+class ReceivedObservation:
+    lifecycle: str
+    phase: str
+    commit: ObjectId
+    ref: Optional[str]
+    object_count: int
+    pre_dispatch: ObjectId
+    request_id: str
+    attempt_id: str
+    request: ObjectId
+    initial_attempt: ObjectId
+    publication: Optional[ObjectId]
+    result: Optional[ObjectId]
+    completion: Optional[ReceivedRun]
+
+
+@dataclass(frozen=True)
+class ExchangeObservation:
+    lifecycle: str
+    phase: str
+    packet: Optional[Path]
+    snapshot: Optional[ReceivedObservation]
+
+
+def _discover(tx, spec):
+    """Read head and its fresh attempt publication ref in this ONE read snapshot."""
+    base = _selection(tx, spec)
+    head = tx.get_ref(spec.worker_ref)
+    if head == spec.commit:
+        return None
+    selected = _tree(tx, head)
+    new_names = set(selected) - set(base)
+    requests = [name for name in new_names if name.startswith("request-q-")]
+    attempts = [name for name in new_names if name.startswith("attempt-a-")]
+    if len(requests) != 1 or len(attempts) != 1:
+        raise ExchangeError("worker head lacks exactly one fresh request/attempt")
+    qid, aid = requests[0][8:], attempts[0][8:]
+    _hex(qid, "q-")
+    _hex(aid, "a-")
+    attempt = tx.get_dag(selected[attempts[0]])
+    if "status" in attempt.bindings:
+        parents = tx.get_commit(head).parents
+        if not parents:
+            raise ExchangeError("final head has no pre-dispatch parent")
+        pre, phase, root = parents[0], "completion", head
+    else:
+        pre = head
+        initial_tree, _, _, _, _ = _initial(tx, spec, pre, qid, aid)
+        target = tx.get_ref("attempt-" + aid)
+        if target == pre:
+            phase, root = "initial", pre
+        else:
+            _publication(tx, pre, aid, target, initial_tree)
+            phase, root = "publication", target
+    receipt = {
+        "phase": phase,
+        "selected_commit": root,
+        "pre_dispatch": pre,
+        "request_id": qid,
+        "attempt_id": aid,
+    }
+    _progress(tx, spec, receipt, None, 0)
+    return receipt
+
+
+def _progress(tx, spec, receipt, ref, count):
+    pre, selected = receipt["pre_dispatch"], receipt["selected_commit"]
+    qid, aid, phase = receipt["request_id"], receipt["attempt_id"], receipt["phase"]
+    initial_tree, request, initial, _, _ = _initial(tx, spec, pre, qid, aid)
+    publication = result = completion = None
+    if phase == "initial":
+        if selected != pre:
+            raise ExchangeError("initial root differs from pre-dispatch")
+    elif phase == "publication":
+        publication, result = _publication(tx, pre, aid, selected, initial_tree)
+    else:
+        completion = _completion(
+            tx, spec, dict(receipt, final_commit=selected), ref, count
+        )
+        result = completion.result
+        publication = _tree(tx, selected).get("publication-" + aid)
+    return ReceivedObservation(
+        "done" if completion is not None else "working",
+        phase,
+        selected,
+        ref,
+        count,
+        pre,
+        qid,
+        aid,
+        request,
+        initial,
+        publication,
+        result,
+        completion,
+    )
+
+
+def _validate_observation(bundle, spec, receipt, ref):
+    scratch = tempfile.mkdtemp(prefix="dml-observation-validation-")
+    try:
+        validation = Path(scratch) / "validation.dml"
+        with Repository(validation, create=True):
+            pass
+        imported = transfer.import_commit(validation, bundle)
+        if imported.commit != receipt["selected_commit"]:
+            raise ExchangeError("observation root mismatch")
+        with Repository(validation) as repo, repo.read() as tx:
+            return _progress(tx, spec, receipt, ref, imported.object_count)
+    finally:
+        shutil.rmtree(scratch)
+
+
+def observe_exchange(handle: ExchangeHandle, *, packet) -> ExchangeObservation:
+    """One coherent discovery and pinned retrieval; no internal polling or execution."""
+    workspace, spec = _handle(handle)
+    packet = _path(packet)
+    ready = workspace / "worker-ready.json"
+    if not ready.exists():
+        return ExchangeObservation("working", "bootstrap", None, None)
+    readiness = _document(ready, ("token", "commit"), READY_FORMAT)
+    if _hex(readiness["token"]) != spec.token or _hex(readiness["commit"]) != str(
+        spec.commit
+    ):
+        raise ExchangeError("readiness token/base mismatch")
+    worker = workspace / "worker.dml"
+    with Repository(worker) as repo, repo.read() as tx:
+        receipt = _discover(tx, spec)
+    if receipt is None:
+        return ExchangeObservation("working", "bootstrap", None, None)
+    bundle = transfer.export_commit(worker, commit=receipt["selected_commit"])
+    snapshot = _validate_observation(bundle, spec, receipt, None)
+    observation = ExchangeObservation(
+        snapshot.lifecycle, snapshot.phase, packet, snapshot
+    )
+    document = {
+        "format": OBSERVATION_FORMAT,
+        "token": spec.token,
+        "commit": str(spec.commit),
+    }
+    document.update(
+        (key, str(value) if isinstance(value, ObjectId) else value)
+        for key, value in receipt.items()
+    )
+    packet.mkdir()
+    with open(packet / "snapshot.bundle", "xb") as stream:
+        stream.write(bundle)
+    _write_document(packet / "job.json", _spec_document(spec))
+    _write_document(packet / "observation.json", document)
+    return observation
+
+
+def receive_observation(
+    repository_path, *, packet, expected: ExchangeSpec, ref: str, map_size: int = 0
+) -> ReceivedObservation:
+    """Independently validate immutable P/U/F before atomic explicit-ref A import."""
+    if not isinstance(expected, ExchangeSpec):
+        raise TypeError("expected requires ExchangeSpec")
+    _name(ref)
+    _map_size(map_size)
+    packet = _path(packet)
+    if _job(packet) != expected:
+        raise ExchangeError("job differs from caller expected selection")
+    receipt = _document(
+        packet / "observation.json",
+        (
+            "token",
+            "commit",
+            "phase",
+            "selected_commit",
+            "pre_dispatch",
+            "request_id",
+            "attempt_id",
+        ),
+        OBSERVATION_FORMAT,
+    )
+    if _hex(receipt["token"]) != expected.token or _hex(receipt["commit"]) != str(
+        expected.commit
+    ):
+        raise ExchangeError("observation token/base mismatch")
+    if type(receipt["phase"]) is not str or receipt["phase"] not in (
+        "initial",
+        "publication",
+        "completion",
+    ):
+        raise ExchangeError("invalid observation phase")
+    for name in ("selected_commit", "pre_dispatch"):
+        receipt[name] = ObjectId.from_hex(_hex(receipt[name]))
+    _hex(receipt["request_id"], "q-")
+    _hex(receipt["attempt_id"], "a-")
+    bundle = _read(packet / "snapshot.bundle", transfer.MAX_BUNDLE_BYTES)
+    received = _validate_observation(bundle, expected, receipt, ref)
     transfer.import_commit(repository_path, bundle, ref=ref, map_size=map_size)
     return received

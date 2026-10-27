@@ -43,6 +43,9 @@ The separately imported `daggerml.exchange` composes those public layers for one
 pinned step in independent local B. Its [contract](spec-next/repository-execution.md)
 owns retained one-shot workspaces, selected-history inspection in private validation
 storage and atomic explicit-ref return to A without moving existing heads.
+Its additive [asynchronous contract](spec-next/asynchronous-execution.md) separates saved
+observation identity/live worker ownership and pins validated P/U/F packets through
+coherent public storage reads, without another executor or detached supervision service.
 
 ## Technical navigation
 

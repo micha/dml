@@ -25,6 +25,10 @@ The separately imported [exchange layer](../../docs/spec-next/repository-executi
 connects pinned transfer and the unchanged local runner for one fresh step in local B,
 then validates/returns its exact history under an explicit A ref without adoption.
 See the [repository execution story](../../examples/repository_execution.py).
+The additive [asynchronous contract](../../docs/spec-next/asynchronous-execution.md)
+and [finite application story](../../examples/asynchronous_execution.py) retain explicit
+live worker ownership while saved handles support fresh-client progress observation
+and independently validated immutable P/U/F reception.
 
 ## Local build
 

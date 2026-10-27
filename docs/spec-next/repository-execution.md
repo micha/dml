@@ -9,7 +9,10 @@ selected-completion validation and explicit return publication. [Local execution
 owns the unchanged runner and ordinary role/history conventions; [transfer](transfer.md)
 owns bundle framing, profile and atomic import. [Python API](python-api.md) owns native
 handles/values, [repository](repository.md) storage and [CLI](cli.md) inspection.
-Vocabulary follows the [glossary](glossary.md). Normative sections describe implemented
+Vocabulary follows the [glossary](glossary.md). The additive
+[asynchronous contract](asynchronous-execution.md) owns saved handles/live worker launch,
+bootstrap readiness and immutable initial/publication/completion observation packets.
+Normative sections describe implemented
 behavior; example orchestration is informative.
 
 ## Public stages and owned descriptions
@@ -94,6 +97,8 @@ An existing directory is not replaced/reused. The fixed workspace files are:
 | `job.json` | Exact selected job; no A path, commands, environment or arbitrary filenames |
 | `started` | Exclusive worker one-shot marker, not a DML occurrence |
 | `worker.dml` | Fresh initialized B, retained on success/failure |
+| `launched`, `worker.stdout`, `worker.stderr` | Optional asynchronous launch marker/logs; [owning contract](asynchronous-execution.md#retained-launch-and-readiness) |
+| `worker-ready.json` | Bootstrap readiness before local dispatch; [owning contract](asynchronous-execution.md#retained-launch-and-readiness) |
 | `output.bundle` | Exact completed F and full history |
 | `completion.json` | Last-published correlation/history receipt, not an outcome assertion |
 
@@ -120,7 +125,7 @@ trusted single-owner prototype; no filesystem sandbox/locking claim is made.
 
 ## Fresh B and one-shot execution
 
-Execute checks the descriptor and rejects preexisting B/output. Before initializing,
+Execute checks the descriptor and rejects preexisting B/output/readiness. Before initializing,
 importing or dispatching, it acquires `started` with exclusive creation. A prior
 marker prevents re-execution even if no DML attempt was ever created. Markers are
 never automatically cleared. A fresh workspace is fresh execution, not an implicit
@@ -128,8 +133,9 @@ retry of a prior request. This cooperative one-shot boundary is not distributed
 exactly-once execution.
 
 Execute imports C into fresh B under the explicit `worker_ref`, checks input root,
-selected binding/input DAGs and ref target, closes handles, then calls unchanged
-`local.run_step`. The local runner creates the request/attempt in B and owns its
+selected binding/input DAGs and ref target, closes handles, publishes bounded bootstrap
+readiness, then calls unchanged `local.run_step`. The local runner creates the request/attempt
+in B and owns its
 newly allocated execution scratch. Source refs are not copied from A.
 
 After the runner returns (including recorded failure), execute exports the exact

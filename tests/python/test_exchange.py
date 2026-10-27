@@ -24,7 +24,13 @@ ADD = (ROOT / "examples/local_add.py").read_bytes()
 def exchange_runtime(tmp_path, monkeypatch):
     package = tmp_path / "runtime" / "daggerml"
     package.mkdir(parents=True)
-    for name in ("__init__.py", "local.py", "transfer.py", "exchange.py"):
+    for name in (
+        "__init__.py",
+        "local.py",
+        "transfer.py",
+        "exchange.py",
+        "exchange_worker.py",
+    ):
         shutil.copyfile(ROOT / "python/daggerml/daggerml" / name, package / name)
     extension = Path(d._core.__file__)
     assert any(

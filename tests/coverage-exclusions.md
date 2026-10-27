@@ -203,6 +203,32 @@ not new installed-process memory checks. Actual counts, installed/runtime proven
 negative-oracle probes and limitations belong to
 [Iteration 6 results](../../dml-design/iterations/06-local-repository-execution/RESULTS.md).
 
+## Iteration 7 asynchronous exchange population
+
+The additive exchange helpers, fixed installed worker module and maintained asynchronous
+application/slow child remain measured in the unchanged source gate. No new exclusions,
+source omissions, reduced inputs, weaker thresholds or memory suppressions. Host-helper
+statement coverage is not every Python branch or installed worker/child invocation.
+
+Private cooperative child barriers expose real P/U before exit; application owners retain/
+reap workers. Worker-loss barriers are before computational spawn or after proven actual
+child reaping. Coherent-read tests move both refs from a separate process mid-read, then
+export the pinned immutable selection. Independent typed-byte oracles, prior history in C,
+strict framing and typed-valid wrong histories protect progress association/unknown state.
+Genuinely new actual-A successful puts/readback precede real map-full, different/malformed
+refs and private substituted consuming-commit failures. Fresh readers compare all baseline/
+new immutable records; whole-file equality preserves raw ref corruption. Actual pre/post-A
+commit process barriers distinguish no batch from complete import despite response loss.
+
+A scaled packed-total rejection is not production-limit stress. Separate actual >4 MiB
+result recording lets the unchanged runner reap/record F, then execute/observe export fails
+at the unchanged real per-record limit; no false done packet or retry occurs. Maintained
+example gates are caller-owned normal captured-source inputs, not installed fault hooks.
+Failed watchdog/barrier cleanup is not general process-tree/power-loss assurance. Existing
+binding/141 native CLI memory workloads remain separate from installed process-memory and
+Python mutation evidence. Commands, provenance, faults and remaining qualifications belong
+to [Iteration 7 results](../../dml-design/iterations/07-asynchronous-local-execution/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through
