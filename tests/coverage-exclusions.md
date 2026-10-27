@@ -156,6 +156,30 @@ not new process-level Valgrind or sandbox assurance. Actual checks and bounded
 negative-oracle probes belong to
 [Iteration 4 results](../../dml-design/iterations/04-local-recorded-execution/RESULTS.md).
 
+## Iteration 5 Python transfer population
+
+The public packed insertion wrapper, explicit `daggerml.transfer` module and
+transfer example remain in the unchanged Python source gate. No new exclusion,
+source omission, suppression or threshold change. Host-side tests measure transfer
+framing, traversal, full-bundle checks and owning transaction boundaries, including
+real stored missing/corrupt keys, real small-map abort and private native write/
+consuming-commit faults. Test-only `raw-delete` extends the existing driver fixture;
+it is not shipped or an immutable deletion API.
+
+Private process barriers surround the actual storage commit: termination after
+three puts but before commit versus after successful commit before acknowledgement.
+Fresh readers distinguish no batch from complete publication. These staged and
+installed processes are not host-coverage-instrumented; direct helper/example
+coverage is separate from real process-loss/installed functional evidence.
+
+The existing binding Valgrind workload additionally reinserts exact records for
+all datum kinds, literal/sub-DAG nodes, rooted/named DAGs, trees and commits, and
+sweeps packed insertion allocation failures. Native production code is unchanged;
+existing exact exclusions still apply. These bounded workloads do not supply a
+new process-memory, hostile-input or Python mutation-framework guarantee. Actual
+retained populations, memory results, negative-oracle probes and platform/runtime
+limits belong to [Iteration 5 results](../../dml-design/iterations/05-pinned-snapshot-transfer/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

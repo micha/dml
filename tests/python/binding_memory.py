@@ -46,6 +46,11 @@ with tempfile.TemporaryDirectory() as scratch:
                       dml.Datum.list([]), dml.Datum.set([]), dml.Datum.map([]),
                       dml.Datum.list([child, second_child]), dml.Datum.set([child, second_child]),
                       dml.Datum.map([(child, child), (second_child, second_child)])]]
+            packed = tx.get_record("datum", child)
+            for object_kind, oid in [("datum", value) for value in values] + [
+                    ("node", node), ("node", subdag), ("dag", dag), ("dag", nested),
+                    ("tree", tree), ("commit", first), ("commit", commit)]:
+                assert tx.put_record(object_kind, tx.get_record(object_kind, oid)) == oid
         for kind in [1, 2, 3]:
             for nth in range(1, 30):
                 tx = repo.write()
@@ -54,6 +59,7 @@ with tempfile.TemporaryDirectory() as scratch:
                 else:
                     core.set_fault(kind, nth)
                 try:
+                    tx.put_record("datum", packed)
                     value = tx.put_datum(dml.Datum.map([(child, child), (second_child, second_child)]))
                     tx.put_dag(root=node, bindings={"a": node, "b": node})
                     tx.put_subdag(dag)

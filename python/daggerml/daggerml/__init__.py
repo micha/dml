@@ -430,6 +430,17 @@ class Transaction:
         return ObjectId(_call(_core.ref_op, self._handle, 0, name, None))
 
     @_mutation
+    def put_record(self, kind: str, record: bytes) -> ObjectId:
+        """Validate and insert exact packed bytes through the native codec/store."""
+        if type(kind) is not str:
+            raise TypeError("record kind requires str")
+        if kind not in _TYPES:
+            raise ValueError("expected datum/node/dag/tree/commit")
+        if type(record) is not bytes:
+            raise TypeError("packed record requires exact bytes")
+        return ObjectId(_call(_core.put_record, self._handle, _TYPES[kind], record))
+
+    @_mutation
     def put_datum(self, value: Union[Datum, None, bool, int, float, bytes, str]) -> ObjectId:
         datum = _datum(value)
         value = datum.value

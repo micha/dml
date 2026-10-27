@@ -299,19 +299,20 @@ static int command_object_put(const char *path, dml_record_type type) {
 }
 
 /* Test-only corruption injection; never part of the public repository API. */
-static int command_raw_write(const char *path, const char *key_text) {
+static int command_raw_write(const char *path, const char *key_text, int delete_key) {
   dml_buffer bytes = {0};
   MDB_env *env = NULL;
   MDB_txn *txn = NULL;
   MDB_dbi dbi;
-  if (!read_all(&bytes)) return 1;
+  if (!delete_key && !read_all(&bytes)) return 1;
   MDB_val key = {strlen(key_text), (void *)key_text};
   MDB_val value = {bytes.len, bytes.data};
   int code = mdb_env_create(&env);
   if (code == MDB_SUCCESS) code = mdb_env_open(env, path, 0, 0664);
   if (code == MDB_SUCCESS) code = mdb_txn_begin(env, NULL, 0, &txn);
   if (code == MDB_SUCCESS) code = mdb_dbi_open(txn, NULL, 0, &dbi);
-  if (code == MDB_SUCCESS) code = mdb_put(txn, dbi, &key, &value, 0);
+  if (code == MDB_SUCCESS) code = delete_key ? mdb_del(txn, dbi, &key, NULL)
+                                           : mdb_put(txn, dbi, &key, &value, 0);
   if (txn != NULL) {
     if (code == MDB_SUCCESS) code = mdb_txn_commit(txn);
     else mdb_txn_abort(txn);
@@ -329,7 +330,8 @@ int main(int argc, char **argv) {
   if (argc == 3 && strcmp(argv[1], "encode-object") == 0) return command_object_encode(argv[2]);
   if (argc == 4 && strcmp(argv[1], "object-put") == 0)
     return command_object_put(argv[2], (dml_record_type)strtol(argv[3], NULL, 10));
-  if (argc == 4 && strcmp(argv[1], "raw-write") == 0) return command_raw_write(argv[2], argv[3]);
+  if (argc == 4 && strcmp(argv[1], "raw-write") == 0) return command_raw_write(argv[2], argv[3], 0);
+  if (argc == 4 && strcmp(argv[1], "raw-delete") == 0) return command_raw_write(argv[2], argv[3], 1);
   if (argc == 3 && strcmp(argv[1], "encode") == 0) return command_encode(argv[2]);
   if (argc == 2 && (strcmp(argv[1], "validate") == 0 || strcmp(argv[1], "decode") == 0 ||
                     strcmp(argv[1], "id") == 0 || strcmp(argv[1], "object-id") == 0))
@@ -346,6 +348,6 @@ int main(int argc, char **argv) {
   fprintf(stderr,
           "usage: test_core_driver "
           "<encode|encode-object|validate|decode|id|object-id|normalize-uri|repo-init|"
-          "repo-put-batch|repo-get|object-get|object-put|raw-write> ...\n");
+          "repo-put-batch|repo-get|object-get|object-put|raw-write|raw-delete> ...\n");
   return 2;
 }

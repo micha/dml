@@ -34,6 +34,11 @@ as ordinary DAGs/commits/refs. It neither changes native node semantics nor prov
 a sandbox. Its owning [contract](spec-next/local-execution.md) explains capture and
 interruption limits.
 
+The separately imported `daggerml.transfer` layer also uses only public operations:
+validated exact record reads, owned typed descriptions and mutation-guarded packed
+insertion. Its [contract](spec-next/transfer.md) owns complete all-parent bundles and
+atomic optional-ref import. It neither duplicates codecs nor executes copied source.
+
 ## Technical navigation
 
 Start with [spec-next/README.md](spec-next/README.md) for the implemented contract:
@@ -45,6 +50,8 @@ Start with [spec-next/README.md](spec-next/README.md) for the implemented contra
 - [Python API](spec-next/python-api.md): conversions, exceptions and native lifetime/context policy.
 - [Local recorded Python execution](spec-next/local-execution.md): ordinary execution records,
   cooperative publication, process mechanics and trust/capture limits.
+- [Pinned commit transfer](spec-next/transfer.md): bounded exact-record bundles,
+  complete typed object closure and atomic import/ref behavior.
 - [Inspection CLI](spec-next/cli.md): grammar, traversal and presentation.
 - [Packaging](packaging-and-distribution.md): shared native builds and installed entry paths.
 - [Glossary](spec-next/glossary.md): shared vocabulary.

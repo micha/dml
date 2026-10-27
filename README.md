@@ -74,6 +74,9 @@ the low-level Python API, inspection CLI and explicit
 The [runnable local story](examples/local_execution.py) executes a trusted child,
 records distinct attempts and durable result DAGs; capture and interruption limits
 are explicit in that layer's contract.
+The [pinned transfer layer](docs/spec-next/transfer.md) and
+[runnable transfer story](examples/pinned_transfer.py) copy full recorded parent
+history between local repositories without executing imported source or copying refs.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

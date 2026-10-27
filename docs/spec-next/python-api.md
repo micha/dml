@@ -10,6 +10,8 @@ lifetime/context restrictions. [Records](records.md), [objects](objects.md) and
 inspection presentation; [packaging](../packaging-and-distribution.md) owns builds.
 The separate [local-execution layer](local-execution.md) owns trusted Python-step
 execution and ordinary request/attempt/publication conventions over this API.
+The explicit [transfer layer](transfer.md) owns bounded pinned-commit bundles,
+complete typed closure checks and optional atomic ref creation.
 
 ## Values and descriptions
 
@@ -84,6 +86,7 @@ Both transaction modes provide:
 Write transactions also provide:
 
 ```python
+put_record(kind, record) -> ObjectId
 put_datum(value) -> ObjectId
 put_literal(datum_id) -> ObjectId
 put_subdag(dag_id) -> ObjectId
@@ -94,6 +97,16 @@ create_ref(name, commit_id) -> None
 update_ref(name, commit_id) -> None
 commit() -> None
 ```
+
+`put_record(kind, record)` accepts an exact string kind (`datum`, `node`, `dag`,
+`tree`, `commit`) and exact immutable `bytes`. It calls existing native packed
+insertion, returning the computed content ID. It does not accept metadata, refs,
+arbitrary keys, mutable buffers or implicit kind inference. Native encoding/type,
+direct dependency and no-overwrite checks apply; existing identical bytes succeed,
+corruption is never skipped/repaired. Conversion/native/allocation failure poisons
+like other mutations, including a failed ID-return allocation after native insertion.
+Read transactions reject it without being ended or poisoned. It does not bypass
+ownership/lifetime rules or introduce a Python packed codec.
 
 Tree and DAG-binding input accepts mappings or pair sequences, preserving duplicate
 names until C rejects them. Parent order is preserved;
@@ -169,7 +182,9 @@ root fixture. It demonstrates containment/values, not captured computational cau
 
 The [local execution example](../../examples/local_execution.py) uses that separate
 layer to execute captured trusted entry bytes, publish results and record outcomes;
-it does not add execution semantics to low-level nodes or lookup.
+it does not add execution semantics to low-level nodes or lookup. The
+[pinned transfer example](../../examples/pinned_transfer.py) copies exact recorded
+history through the separately imported transfer layer without executing it.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

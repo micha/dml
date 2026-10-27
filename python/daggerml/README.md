@@ -16,6 +16,11 @@ records ordinary request/attempt/result history. See the
 [local driver](../../examples/local_execution.py) and
 [cooperative child](../../examples/local_add.py); this is not a sandbox or complete
 environment capture.
+The separately imported [transfer layer](../../docs/spec-next/transfer.md) carries
+one pinned commit's complete all-parent typed object closure through bounded bundles,
+using the low-level public packed insertion seam. The
+[transfer story](../../examples/pinned_transfer.py) preserves recorded attempts and
+bytes/IDs without running copied source or installing source refs.
 
 ## Local build
 
