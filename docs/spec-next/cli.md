@@ -17,6 +17,8 @@ dml --version                     # also -V
 dml --help
 dml [--json] --repo PATH ref get NAME
 dml [--json] --repo PATH show datum|node|dag|tree|commit ID
+dml [--json] --repo PATH lookup DAG_ID NAME
+dml [--json] --repo PATH walk DAG_ID [--limit N]
 dml [--json] --repo PATH snapshot (--ref NAME | --commit ID) [--limit N]
 dml [--json] --repo PATH log (--ref NAME | --commit ID) [--limit N]
 ```
@@ -40,27 +42,41 @@ read-only-mount guarantee.
 - `ref get`: resolve the ref's validated commit target.
 - `show`: inspect the expected object type, full immediate fields and references.
   Datum collections are ID edges, never recursively loaded values.
+- `lookup`: return the node ID bound to the name in the exact supplied DAG. Invalid
+  names are usage errors; absent names are runtime `not_found`. No implicit descent,
+  global fallback or value conversion.
+- `walk`: iterative depth-first preorder of DAG/node structure: emit the starting
+  DAG, visit its root then binding targets in canonical order; sub-DAG nodes visit
+  their DAG target. Literal nodes include datum IDs/bounded previews without
+  expanding composite datum children. Tracking uses object type and ID; shared
+  objects emit once while root/binding/target edges remain in the fields. Active
+  state is checked before visited suppression, rejecting traversed cycles.
 - `snapshot`: inspect the selected commit, parents and tree, with entries in
-  canonical name order. For displayed entries, read the DAG, root literal node
-  and root datum and include every corresponding ID plus a bounded datum preview.
+  canonical name order. For displayed entries, read the DAG and root node. Literal
+  roots include a datum ID and bounded preview; sub-DAG roots show their target DAG
+  without descending or pretending that it is a scalar.
 - `log`: iterative depth-first preorder of **all** parents in stored parent order,
   showing shared ancestors once. It is not timestamp order or first-parent history.
   Active-stack cycle detection fails on a traversed cycle. A bounded prefix is not
   a validity proof for unvisited history.
 
-Snapshot limits displayed entries; log limits distinct displayed commits. Snapshot
-truncation compares displayed and total entry counts. Log truncation is true only
+Snapshot limits displayed entries; log limits distinct displayed commits; walk
+limits distinct emitted DAG/node records (not datums, edges or scope paths).
+Snapshot truncation compares displayed and total entry counts. Log/walk truncation
+is true only
 when an unvisited work item remains after the limit, not merely because the limit
 was exactly reached. Multiple parents are inspected without implementing merge.
 Missing/corrupt visited objects fail the command, not produce invented history.
 
-These bounds limit presentation/traversal, not C record allocation/read size or
-native direct-reference validation. Existing indexed tree scans and visited-ID
+These bounds limit presentation/traversal, not C record allocation/read size,
+binding arrays, buffered output bytes or native direct-reference validation.
+Indexed binding/tree scans and visited-ID
 comparisons remain simple linear scans; large histories are not benchmarked.
 
 ## Human presentation and previews
 
-Human output is a command-specific title (`Ref`, `Object`, `Snapshot`, `History`)
+Human output is a command-specific title (`Ref`, `Object`, `Snapshot`, `History`,
+`Lookup` or `DAG structure`)
 followed by indented structured fields/entries, one per line. Field names match
 JSON so human inspections and machine inspections have the same evidence basis.
 Human datum `show` and snapshot previews bound values:
@@ -93,8 +109,8 @@ values are `"nan"`, `"inf"`, `"-inf"`. No JSON NaN/Infinity tokens are emitted.
 | Type | Fields |
 | --- | --- |
 | Datum | `datum: {kind, value}`; bytes add `encoding: "hex"` |
-| Node | `kind: "literal"`, `datum: <id>` |
-| DAG | `root: <id>` |
+| Node | `kind: "literal"`, `datum: <id>` or `kind: "subdag"`, `dag: <id>` |
+| DAG | `root: <id>`, `bindings: [{name, node}, ...]` in canonical order |
 | Tree | `entries: [{name, dag}, ...]` in canonical order |
 | Commit | `tree: <id>`, `parents: [<id>, ...]` in stored order |
 
@@ -103,13 +119,21 @@ are JSON null/bool, I64/F64 strings, bytes hex strings, string/URI strings,
 LIST/SET ID arrays, or MAP arrays of `{key, value}` ID pairs.
 
 Snapshot fields: `command: "snapshot"`, `commit`, `tree`, `parents`, `entry_count`,
-`entries`, `truncated`. Each entry is `{name, dag, root, datum, preview}`; the middle
-three values are IDs. Preview fields: `kind`, `value`, `truncated`, optional
+`entries`, `truncated`. Each entry has `name`, `dag`, `root`, and `root_node`:
+`{kind: "literal", datum: <id>}` or `{kind: "subdag", dag: <id>}`. Literal entries
+also have `datum` and `preview`; sub-DAG entries omit those fields.
+Preview fields: `kind`, `value`, `truncated`, optional
 `total_count` and `encoding`, following the same datum value rules with bounds.
 
 Log fields: `command: "log"`, `start`, `commits` and `truncated`. Each commit is
 `{id, tree, parents}`. Key/order formatting is deterministic; clients should parse
 fields, not depend on exact spacing.
+
+Lookup fields: `command: "lookup"`, `dag`, `name`, `node`. Walk fields:
+`command: "walk"`, `start`, `records`, `truncated`. Each record has `type: "dag"`
+or `"node"`, `id` and the immediate fields from the show table above. Literal
+nodes additionally have `preview`. Deterministic structure order is not execution
+or chronological order. A truncated prefix is not a validity proof for unseen content.
 
 ## Exit status and diagnostics
 
@@ -132,4 +156,5 @@ report a write failure. Diagnostic allocation failure uses a fixed JSON fallback
 [fresh-process public acceptance](../../tests/python/test_public_acceptance.py) and
 [CLI memory workload](../../tests/python/cli_memory.py) exercise the implementation.
 Actual local/platform validation is recorded in
-[Iteration 2 results](../../../dml-design/iterations/02-repository-usability/RESULTS.md).
+[Iteration 2 results](../../../dml-design/iterations/02-repository-usability/RESULTS.md)
+and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).

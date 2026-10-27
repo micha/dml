@@ -59,6 +59,9 @@ dml --help
 [The runnable example](../examples/repository_history.py) creates repository state
 using the public API. Run it against a new path whose parent already exists, then
 inspect `main` with `dml --json --repo PATH snapshot --ref main`.
+Use the [composable DAG example](../examples/composable_dags.py) to produce named,
+nested snapshots and inspect them with `lookup`/`walk`; it uses the same packaged
+API/executable seam, without DML execution.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory
 workloads to the C tests; [coverage/memory accounting](../tests/coverage-exclusions.md)

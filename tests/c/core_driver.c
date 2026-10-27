@@ -217,23 +217,24 @@ static int command_object_encode(const char *type_text) {
   dml_buffer record = {0};
   dml_object_input input = {.type = (dml_record_type)strtol(type_text, NULL, 10)};
   dml_tree_entry *entries = NULL;
+  dml_dag_binding *bindings = NULL;
   dml_error error;
   int result = 2;
   if (!read_all(&payload)) goto done;
   if (input.type == DML_REC_NODE && payload.len == 20) {
     input.value.node.kind = read_u32(payload.data);
-    memcpy(input.value.node.datum.bytes, payload.data + 4, 16);
-  } else if (input.type == DML_REC_DAG && payload.len == 16) {
-    memcpy(input.value.root.bytes, payload.data, 16);
+    memcpy(input.value.node.target.bytes, payload.data + 4, 16);
   } else if (input.type == DML_REC_COMMIT && payload.len >= 20 && (payload.len - 20) % 16 == 0) {
     memcpy(input.value.commit.tree.bytes, payload.data, 16);
     input.value.commit.parents.count = (payload.len - 20) / 16;
     if (read_u32(payload.data + 16) != input.value.commit.parents.count) goto done;
     input.value.commit.parents.items = (const dml_object_id *)(payload.data + 20);
-  } else if (input.type == DML_REC_TREE && payload.len >= 4) {
-    size_t count = read_u32(payload.data);
-    size_t offset = 4;
-    if (count > (payload.len - 4) / 20) goto done;
+  } else if ((input.type == DML_REC_TREE && payload.len >= 4) ||
+             (input.type == DML_REC_DAG && payload.len >= 20)) {
+    size_t base = input.type == DML_REC_DAG ? 20 : 4;
+    size_t count = read_u32(payload.data + base - 4);
+    size_t offset = base;
+    if (count > (payload.len - base) / 20) goto done;
     entries = calloc(count == 0 ? 1 : count, sizeof(*entries));
     if (entries == NULL) goto done;
     for (size_t i = 0; i < count; i++) {
@@ -246,13 +247,26 @@ static int command_object_encode(const char *type_text) {
       offset += len + 16;
     }
     if (offset != payload.len) goto done;
-    input.value.tree.items = entries;
-    input.value.tree.count = count;
+    if (input.type == DML_REC_DAG) {
+      bindings = calloc(count == 0 ? 1 : count, sizeof(*bindings));
+      if (bindings == NULL) goto done;
+      for (size_t i = 0; i < count; i++) {
+        bindings[i].name = entries[i].name;
+        bindings[i].node = entries[i].dag;
+      }
+      memcpy(input.value.dag.root.bytes, payload.data, 16);
+      input.value.dag.items = bindings;
+      input.value.dag.count = count;
+    } else {
+      input.value.tree.items = entries;
+      input.value.tree.count = count;
+    }
   } else goto done;
   dml_status status = dml_object_encode(&input, &record, &error);
   result = status == DML_OK ? write_buffer(&record) : fail(status, &error);
 done:
   free(entries);
+  free(bindings);
   dml_buffer_free(&payload);
   dml_buffer_free(&record);
   return result;

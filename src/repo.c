@@ -381,7 +381,8 @@ static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
   if (status != DML_OK) return status; /* LCOV_EXCL_BR_LINE: caller already checked type, encoding and ID. */
   MDB_val ignored;
   if (type != DML_REC_TREE) {
-    dml_record_type referenced_type = type == DML_REC_NODE ? DML_REC_DATUM
+    dml_record_type referenced_type = type == DML_REC_NODE
+                                    ? (view.node_kind == DML_NODE_LITERAL ? DML_REC_DATUM : DML_REC_DAG)
                                   : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_TREE;
     status = lookup_object(txn, referenced_type, &view.reference, &ignored, error);
     if (status != DML_OK) return status;
@@ -392,11 +393,16 @@ static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
       dml_tree_entry entry;
       (void)dml_object_view_entry(&view, i, &entry, NULL);
       id = entry.dag;
+    } else if (type == DML_REC_DAG) {
+      dml_dag_binding binding;
+      (void)dml_object_view_binding(&view, i, &binding, NULL);
+      id = binding.node;
     } else {
       (void)dml_object_view_parent(&view, i, &id, NULL);
     }
-    status = lookup_object(txn, type == DML_REC_TREE ? DML_REC_DAG : DML_REC_COMMIT,
-                            &id, &ignored, error);
+    dml_record_type target_type = type == DML_REC_TREE ? DML_REC_DAG
+                               : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_COMMIT;
+    status = lookup_object(txn, target_type, &id, &ignored, error);
     if (status != DML_OK) return status;
   }
   return DML_OK;
@@ -495,6 +501,33 @@ dml_status dml_txn_get_object(dml_txn *txn, dml_record_type type,
     return dml_set_error(error, DML_INVALID_KIND, 0, "unsupported object storage type");
   }
   return get_object(txn, type, id, out, error);
+}
+
+dml_status dml_txn_lookup_node(dml_txn *txn, const dml_object_id *dag,
+                               dml_bytes name, dml_object_id *out, dml_error *error) {
+  if (txn == NULL || dag == NULL || out == NULL) {
+    return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid node lookup arguments");
+  }
+  dml_status status = dml_name_validate(name, error);
+  if (status != DML_OK) return status;
+  dml_buffer buffer = {0};
+  status = dml_txn_get_object(txn, DML_REC_DAG, dag, &buffer, error);
+  if (status != DML_OK) return status;
+  dml_object_view view;
+  (void)dml_object_decode(buffer.data, buffer.len, &view, NULL);
+  status = DML_NOT_FOUND;
+  for (size_t i = 0; i < view.count; i++) {
+    dml_dag_binding binding;
+    (void)dml_object_view_binding(&view, i, &binding, NULL);
+    if (binding.name.len == name.len && memcmp(binding.name.data, name.data, name.len) == 0) {
+      *out = binding.node;
+      status = DML_OK;
+      break;
+    }
+  }
+  dml_buffer_free(&buffer);
+  if (status != DML_OK) return dml_set_error(error, status, 0, "node name was not found in this DAG");
+  return DML_OK;
 }
 
 static dml_status ref_key(dml_bytes name, char bytes[139], MDB_val *key, dml_error *error) {

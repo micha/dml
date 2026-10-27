@@ -73,7 +73,8 @@ key/content IDs. Direct relationships are:
 | --- | --- |
 | Composite datum | Datum elements, keys and values |
 | Literal node | Datum |
-| DAG | Root node |
+| Sub-DAG-reference node | DAG |
+| DAG | Root node and each binding node |
 | Tree | Entry DAGs |
 | Commit | Tree and each parent commit |
 
@@ -111,9 +112,20 @@ accepted tombstone shape is rejected as `invalid_payload` with detail
 `record_type=tombstone;detail=excised`. This does not implement an excision request,
 tombstone writer, deletion authority, GC, external cleanup or physical erasure.
 
+## Scoped node lookup
+
+`dml_txn_lookup_node(txn, dag_id, name, out, error)` obtains a copied node ID from
+one explicitly supplied DAG. It uses the validated DAG read, including all direct
+root/binding checks. Names follow the [name profile](objects.md#names-and-canonical-ordering).
+An invalid name returns `invalid_argument`; an absent local name returns `not_found`.
+The operation does not descend into nested DAGs, resolve a ref, execute a node or
+load its value. Errors are read failures and MUST NOT poison a write transaction.
+Explicit descent reads a sub-DAG node and supplies its DAG ID to another lookup.
+The current lookup scans indexed bindings and is quadratic in the binding count.
+
 ## Refs
 
-Ref names MUST satisfy the [ASCII name profile](objects.md#names-and-tree-ordering).
+Ref names MUST satisfy the [ASCII name profile](objects.md#names-and-canonical-ordering).
 The caller supplies a short name such as `main`; storage adds `refs/heads/`.
 Names are case-sensitive repository data, not filesystem paths.
 
@@ -188,4 +200,5 @@ construction and inspection through this API.
   and atomic object/ref rollback even after attempted poisoned commit.
 
 Actual validation runs and outstanding gates are recorded in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md).
+[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
+and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).

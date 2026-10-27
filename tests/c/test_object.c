@@ -113,7 +113,7 @@ static int test_trees(void) {
 }
 
 static int test_invalid_arguments_and_shapes(void) {
-  dml_object_input input = {.type = DML_REC_NODE, .value.node.kind = 2};
+  dml_object_input input = {.type = DML_REC_NODE, .value.node.kind = 3};
   dml_buffer record = {0};
   dml_object_view view;
   dml_object_id id;
@@ -153,7 +153,7 @@ static int test_invalid_arguments_and_shapes(void) {
       dml_write_u16_le(raw + 6, (uint16_t)type);
       dml_write_u32_le(raw + 8, (uint32_t)len);
       dml_status status = dml_record_validate(raw, len, &error);
-      if ((type == DML_REC_DAG && len == 36) ||
+      if ((type == DML_REC_DAG && len == 40) ||
           (type == DML_REC_TREE && len == 24) || (type == DML_REC_COMMIT && len == 40)) {
         CHECK(status == DML_OK);
       } else CHECK(status != DML_OK);
@@ -173,7 +173,40 @@ static int test_invalid_arguments_and_shapes(void) {
   return 0;
 }
 
+static int test_dag_bindings(void) {
+  dml_dag_binding bindings[] = {
+    {{(const uint8_t *)"ab", 2}, {{2}}},
+    {{(const uint8_t *)"a", 1}, {{1}}},
+    {{(const uint8_t *)"z", 1}, {{3}}}
+  };
+  dml_object_input input = {.type = DML_REC_DAG, .value.dag = {{{9}}, bindings, 3}};
+  dml_buffer record = {0}; dml_object_view view; dml_dag_binding binding;
+  CHECK(dml_object_encode(&input, &record, NULL) == DML_OK);
+  CHECK(dml_object_decode(record.data, record.len, &view, NULL) == DML_OK);
+  CHECK(view.count == 3 && view.reference.bytes[0] == 9 && view.node_kind == 0);
+  CHECK(dml_object_view_binding(&view, 0, &binding, NULL) == DML_OK);
+  CHECK(binding.name.len == 1 && binding.name.data[0] == 'a' && binding.node.bytes[0] == 1);
+  CHECK(dml_object_view_binding(&view, 2, &binding, NULL) == DML_OK && binding.node.bytes[0] == 3);
+  CHECK(dml_object_view_binding(NULL, 0, &binding, NULL) == DML_INVALID_ARGUMENT);
+  CHECK(dml_object_view_binding(&view, 0, NULL, NULL) == DML_INVALID_ARGUMENT);
+  CHECK(dml_object_view_binding(&view, 3, &binding, NULL) == DML_INVALID_ARGUMENT);
+  view.type = DML_REC_TREE;
+  CHECK(dml_object_view_binding(&view, 0, &binding, NULL) == DML_INVALID_ARGUMENT);
+  dml_buffer_free(&record);
+  input.value.dag.items = NULL;
+  CHECK(dml_object_encode(&input, &record, NULL) == DML_INVALID_ARGUMENT);
+  input.value.dag.items = bindings; input.value.dag.count = SIZE_MAX;
+  CHECK(dml_object_encode(&input, &record, NULL) == DML_INVALID_BOUNDS);
+  input = (dml_object_input){.type = DML_REC_NODE, .value.node = {DML_NODE_SUBDAG, {{7}}}};
+  CHECK(dml_object_encode(&input, &record, NULL) == DML_OK);
+  CHECK(dml_object_decode(record.data, record.len, &view, NULL) == DML_OK);
+  CHECK(view.node_kind == DML_NODE_SUBDAG && view.reference.bytes[0] == 7);
+  dml_buffer_free(&record);
+  return 0;
+}
+
 int main(void) {
+  CHECK(test_dag_bindings() == 0);
   CHECK(test_roundtrips() == 0);
   CHECK(test_trees() == 0);
   CHECK(test_invalid_arguments_and_shapes() == 0);

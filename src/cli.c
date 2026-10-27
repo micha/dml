@@ -11,8 +11,8 @@
 #include "dml/dml.h"
 
 typedef struct { char *data; size_t len, capacity; int failed; } Text;
-typedef struct { dml_object_id id; int leave; } Work;
-typedef struct { dml_object_id id; int active; } Seen;
+typedef struct { dml_object_id id; int leave; dml_record_type type; } Work;
+typedef struct { dml_object_id id; int active; dml_record_type type; } Seen;
 
 static int grow(Text *text, size_t extra) {
   if (text->failed) return 0;
@@ -145,6 +145,33 @@ static dml_status load(dml_txn *txn, dml_record_type type, const dml_object_id *
   return status;
 }
 
+static void node_fields(Text *text, const dml_object_view *view) {
+  add(text, view->node_kind == DML_NODE_LITERAL
+      ? "\"kind\":\"literal\",\"datum\":" : "\"kind\":\"subdag\",\"dag\":");
+  id(text, &view->reference);
+}
+
+static void dag_fields(Text *text, const dml_object_view *view) {
+  add(text, "\"root\":"); id(text, &view->reference); add(text, ",\"bindings\":[");
+  for (size_t i = 0; i < view->count; i++) {
+    dml_dag_binding binding; dml_object_view_binding(view, i, &binding, NULL);
+    if (i) add(text, ",");
+    add(text, "{\"name\":"); quote(text, binding.name.data, binding.name.len);
+    add(text, ",\"node\":"); id(text, &binding.node); add(text, "}");
+  }
+  add(text, "]");
+}
+
+static dml_status literal_preview(Text *text, dml_txn *txn, const dml_object_id *value,
+                                  dml_error *error) {
+  dml_buffer buffer = {0}; dml_datum_view view;
+  dml_status status = dml_txn_get_datum(txn, value, &buffer, error);
+  if (status == DML_OK) status = dml_datum_decode(buffer.data, buffer.len, &view, error);
+  if (status == DML_OK) { add(text, ",\"preview\":"); datum(text, &view, 1); }
+  dml_buffer_free(&buffer);
+  return status;
+}
+
 static dml_status show(Text *text, dml_txn *txn, dml_record_type type,
                        const dml_object_id *value, const char *type_name, int json, dml_error *error) {
   dml_buffer buffer = {0}; dml_status status;
@@ -158,8 +185,8 @@ static dml_status show(Text *text, dml_txn *txn, dml_record_type type,
   } else {
     dml_object_view view; status = load(txn, type, value, &buffer, &view, error);
     if (status == DML_OK) {
-      if (type == DML_REC_NODE) { add(text, ",\"kind\":\"literal\",\"datum\":"); id(text, &view.reference); }
-      else if (type == DML_REC_DAG) { add(text, ",\"root\":"); id(text, &view.reference); }
+      if (type == DML_REC_NODE) { add(text, ","); node_fields(text, &view); }
+      else if (type == DML_REC_DAG) { add(text, ","); dag_fields(text, &view); }
       else if (type == DML_REC_COMMIT) { add(text, ",\"tree\":"); id(text, &view.reference); add(text, ",\"parents\":"); parents(text, &view); }
       else {
         add(text, ",\"entries\":[");
@@ -176,20 +203,21 @@ static dml_status show(Text *text, dml_txn *txn, dml_record_type type,
 }
 
 static dml_status snapshot_entry(Text *text, dml_txn *txn, const dml_tree_entry *entry, dml_error *error) {
-  dml_buffer dag = {0}, node = {0}, value = {0}; dml_object_view dag_view, node_view;
+  dml_buffer dag = {0}, node = {0}; dml_object_view dag_view, node_view;
   dml_status status = load(txn, DML_REC_DAG, &entry->dag, &dag, &dag_view, error);
   if (status != DML_OK) goto done;
   status = load(txn, DML_REC_NODE, &dag_view.reference, &node, &node_view, error);
   if (status != DML_OK) goto done;
-  status = dml_txn_get_datum(txn, &node_view.reference, &value, error);
-  if (status != DML_OK) goto done;
-  dml_datum_view datum_view; status = dml_datum_decode(value.data, value.len, &datum_view, error);
-  if (status != DML_OK) goto done;
   add(text, "{\"name\":"); quote(text, entry->name.data, entry->name.len);
   add(text, ",\"dag\":"); id(text, &entry->dag); add(text, ",\"root\":"); id(text, &dag_view.reference);
-  add(text, ",\"datum\":"); id(text, &node_view.reference); add(text, ",\"preview\":"); datum(text, &datum_view, 1); add(text, "}");
+  add(text, ",\"root_node\":{"); node_fields(text, &node_view); add(text, "}");
+  if (node_view.node_kind == DML_NODE_LITERAL) {
+    add(text, ",\"datum\":"); id(text, &node_view.reference);
+    status = literal_preview(text, txn, &node_view.reference, error);
+  }
+  add(text, "}");
 done:
-  dml_buffer_free(&dag); dml_buffer_free(&node); dml_buffer_free(&value); return status;
+  dml_buffer_free(&dag); dml_buffer_free(&node); return status;
 }
 
 static dml_status snapshot(Text *text, dml_txn *txn, const dml_object_id *start, size_t limit, dml_error *error) {
@@ -212,44 +240,74 @@ done:
   dml_buffer_free(&commit); dml_buffer_free(&tree); return status;
 }
 
-static dml_status history(Text *text, dml_txn *txn, const dml_object_id *start, size_t limit, dml_error *error) {
+static dml_status traverse(Text *text, dml_txn *txn, const dml_object_id *start,
+                            size_t limit, int graph, dml_error *error) {
   Work *work = malloc(sizeof(*work)); Seen *seen = NULL;
   size_t work_count = 1, seen_count = 0; int truncated = 0;
   dml_buffer buffer = {0}; dml_status status = DML_OK;
   if (!work) return DML_OUT_OF_MEMORY;
-  work[0] = (Work){*start, 0};
-  add(text, "{\"command\":\"log\",\"start\":"); id(text, start); add(text, ",\"commits\":[");
+  work[0] = (Work){*start, 0, graph ? DML_REC_DAG : DML_REC_COMMIT};
+  add(text, "{\"command\":"); string(text, graph ? "walk" : "log");
+  add(text, ",\"start\":"); id(text, start); add(text, graph ? ",\"records\":[" : ",\"commits\":[");
   while (work_count) {
     Work item = work[--work_count]; size_t index;
-    for (index = 0; index < seen_count; index++) if (memcmp(seen[index].id.bytes, item.id.bytes, 16) == 0) break;
+    for (index = 0; index < seen_count; index++) {
+      if (seen[index].type == item.type && memcmp(seen[index].id.bytes, item.id.bytes, 16) == 0) break;
+    }
     if (item.leave) { seen[index].active = 0; continue; }
     if (index < seen_count) {
-      if (seen[index].active) { status = DML_INTEGRITY_ERROR; strcpy(error->detail, "cycle in traversed commit history"); goto done; }
+      if (seen[index].active) {
+        status = DML_INTEGRITY_ERROR;
+        strcpy(error->detail, graph ? "cycle in traversed DAG structure" : "cycle in traversed commit history");
+        goto done;
+      }
       continue;
     }
     if (seen_count == limit) { truncated = 1; break; }
     dml_object_view view;
-    status = load(txn, DML_REC_COMMIT, &item.id, &buffer, &view, error);
+    status = load(txn, item.type, &item.id, &buffer, &view, error);
     if (status != DML_OK) goto done;
-    /* Reaching these size bounds needs exabytes of already-allocated traversal
-     * state on the supported 64-bit matrix, not a distinct ownership case. */
-    if (view.count > (SIZE_MAX / sizeof(*work)) - work_count - 1 || seen_count == SIZE_MAX / sizeof(*seen)) { /* LCOV_EXCL_BR_LINE */
+    size_t children = view.count;
+    if (item.type == DML_REC_DAG) children++;
+    if (item.type == DML_REC_NODE) children = view.node_kind == DML_NODE_SUBDAG ? 1 : 0;
+    /* Requires exabytes of already-allocated traversal state on the supported
+     * 64-bit matrix; checked growth and actual allocation failures remain tested. */
+    if (children > (SIZE_MAX / sizeof(*work)) - work_count - 1 || seen_count == SIZE_MAX / sizeof(*seen)) { /* LCOV_EXCL_BR_LINE */
       status = DML_OUT_OF_MEMORY; goto done; /* LCOV_EXCL_LINE */
     }
-    Work *new_work = realloc(work, (work_count + view.count + 1) * sizeof(*work));
+    Work *new_work = realloc(work, (work_count + children + 1) * sizeof(*work));
     if (!new_work) { status = DML_OUT_OF_MEMORY; goto done; }
     work = new_work;
     Seen *new_seen = realloc(seen, (seen_count + 1) * sizeof(*seen));
     if (!new_seen) { status = DML_OUT_OF_MEMORY; goto done; }
-    seen = new_seen; seen[seen_count] = (Seen){item.id, 1};
+    seen = new_seen; seen[seen_count] = (Seen){item.id, 1, item.type};
     if (seen_count++) add(text, ",");
-    add(text, "{\"id\":"); id(text, &item.id); add(text, ",\"tree\":"); id(text, &view.reference);
-    add(text, ",\"parents\":"); parents(text, &view); add(text, "}");
-    work[work_count++] = (Work){item.id, 1};
-    for (size_t i = view.count; i > 0; i--) {
-      dml_object_id parent; dml_object_view_parent(&view, i - 1, &parent, NULL);
-      work[work_count++] = (Work){parent, 0};
+    add(text, "{");
+    if (graph) { add(text, "\"type\":"); string(text, item.type == DML_REC_DAG ? "dag" : "node"); add(text, ","); }
+    add(text, "\"id\":"); id(text, &item.id); add(text, ",");
+    work[work_count++] = (Work){item.id, 1, item.type};
+    if (item.type == DML_REC_DAG) {
+      dag_fields(text, &view);
+      for (size_t i = view.count; i > 0; i--) {
+        dml_dag_binding binding; dml_object_view_binding(&view, i - 1, &binding, NULL);
+        work[work_count++] = (Work){binding.node, 0, DML_REC_NODE};
+      }
+      work[work_count++] = (Work){view.reference, 0, DML_REC_NODE};
+    } else if (item.type == DML_REC_NODE) {
+      node_fields(text, &view);
+      if (view.node_kind == DML_NODE_SUBDAG) work[work_count++] = (Work){view.reference, 0, DML_REC_DAG};
+      else {
+        status = literal_preview(text, txn, &view.reference, error);
+        if (status != DML_OK) goto done;
+      }
+    } else {
+      add(text, "\"tree\":"); id(text, &view.reference); add(text, ",\"parents\":"); parents(text, &view);
+      for (size_t i = view.count; i > 0; i--) {
+        dml_object_id parent; dml_object_view_parent(&view, i - 1, &parent, NULL);
+        work[work_count++] = (Work){parent, 0, DML_REC_COMMIT};
+      }
     }
+    add(text, "}");
     dml_buffer_free(&buffer);
   }
   add(text, "],\"truncated\":"); add(text, truncated ? "true" : "false"); add(text, "}\n");
@@ -301,6 +359,8 @@ static const char *usage =
   "  ref get NAME\n"
   "  show datum|node|dag|tree|commit ID\n"
   "  snapshot (--ref NAME | --commit ID) [--limit N]\n"
+  "  lookup DAG_ID NAME\n"
+  "  walk DAG_ID [--limit N]\n"
   "  log (--ref NAME | --commit ID) [--limit N]\n";
 
 static int diagnostic(int json, dml_status status, const dml_error *error, int parser) {
@@ -355,9 +415,23 @@ int main(int argc, char **argv) {
     status = dml_object_id_parse(argv[index + 2], strlen(argv[index + 2]), &value, &error);
     if (status != DML_OK) return diagnostic(json, status, &error, 1);
     command = 2;
-  } else if (!strcmp(argv[index], "snapshot") || !strcmp(argv[index], "log")) {
-    command = !strcmp(argv[index], "snapshot") ? 3 : 4;
+  } else if (!strcmp(argv[index], "lookup")) {
+    if (argc - index != 3) goto syntax;
+    status = dml_object_id_parse(argv[index + 1], strlen(argv[index + 1]), &value, &error);
+    if (status != DML_OK) return diagnostic(json, status, &error, 1);
+    name = argv[index + 2];
+    status = dml_name_validate((dml_bytes){(const uint8_t *)name, strlen(name)}, &error);
+    if (status != DML_OK) return diagnostic(json, status, &error, 1);
+    command = 5;
+  } else if (!strcmp(argv[index], "snapshot") || !strcmp(argv[index], "log") || !strcmp(argv[index], "walk")) {
+    command = !strcmp(argv[index], "snapshot") ? 3 : !strcmp(argv[index], "log") ? 4 : 6;
     int selector = 0, have_limit = 0; index++;
+    if (command == 6) {
+      if (index >= argc) goto syntax;
+      status = dml_object_id_parse(argv[index], strlen(argv[index]), &value, &error);
+      if (status != DML_OK) return diagnostic(json, status, &error, 1);
+      selector = 2; index++;
+    }
     while (index < argc) {
       if (index + 1 >= argc) goto syntax;
       if (!strcmp(argv[index], "--ref") && !selector) { name = argv[index + 1]; selector = 1; }
@@ -386,7 +460,7 @@ int main(int argc, char **argv) {
   if (status != DML_OK) goto done;
   status = dml_txn_begin(repo, DML_TXN_READ, &txn, &error);
   if (status != DML_OK) goto done;
-  if (name) {
+  if (name && command != 5) {
     dml_bytes bytes = {(const uint8_t *)name, strlen(name)};
     status = dml_txn_ref_get(txn, bytes, &value, &error);
     if (status != DML_OK) goto done;
@@ -396,7 +470,14 @@ int main(int argc, char **argv) {
     add(&text, ",\"target\":"); id(&text, &value); add(&text, "}\n");
   } else if (command == 2) status = show(&text, txn, type, &value, type_name, json, &error);
   else if (command == 3) status = snapshot(&text, txn, &value, limit, &error);
-  else status = history(&text, txn, &value, limit, &error);
+  else if (command == 5) {
+    dml_object_id node;
+    status = dml_txn_lookup_node(txn, &value, (dml_bytes){(const uint8_t *)name, strlen(name)}, &node, &error);
+    if (status == DML_OK) {
+      add(&text, "{\"command\":\"lookup\",\"dag\":"); id(&text, &value);
+      add(&text, ",\"name\":"); string(&text, name); add(&text, ",\"node\":"); id(&text, &node); add(&text, "}\n");
+    }
+  } else status = traverse(&text, txn, &value, limit, command == 6, &error);
   if (status == DML_OK && text.failed) { status = DML_OUT_OF_MEMORY; strcpy(error.detail, "inspection output allocation failed"); }
 done:
   dml_txn_abort(&txn);
@@ -404,7 +485,8 @@ done:
   /* Abort consumed the only transaction; close of a null/live idle handle succeeds. */
   if (status == DML_OK && close_status != DML_OK) { status = close_status; error = close_error; } /* LCOV_EXCL_BR_LINE */
   if (status == DML_OK) {
-    const char *title = command == 1 ? "Ref" : command == 2 ? "Object" : command == 3 ? "Snapshot" : "History";
+    const char *title = command == 1 ? "Ref" : command == 2 ? "Object" : command == 3 ? "Snapshot"
+                       : command == 5 ? "Lookup" : command == 6 ? "DAG structure" : "History";
     int written = json ? fwrite(text.data, 1, text.len, stdout) == text.len : human_output(&text, title);
     if (!written || fflush(stdout) != 0) status = DML_STORAGE_ERROR;
     if (status != DML_OK) { error.native_code = errno; strcpy(error.detail, "cannot write inspection output"); }

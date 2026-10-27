@@ -267,6 +267,18 @@ static PyObject *ref_op(PyObject *self, PyObject *args) {
   Py_RETURN_NONE;
 }
 
+static PyObject *lookup_node(PyObject *self, PyObject *args) {
+  (void)self;
+  PyObject *obj, *dag_obj; const char *name; Py_ssize_t len;
+  if (!PyArg_ParseTuple(args, "OOs#", &obj, &dag_obj, &name, &len)) return NULL;
+  Txn *txn = txn_handle(obj); dml_object_id dag, node; dml_error error;
+  if (!txn || !as_id(dag_obj, &dag)) return NULL;
+  dml_status s = dml_txn_lookup_node(txn->ptr, &dag,
+    (dml_bytes){(const uint8_t *)name, (size_t)len}, &node, &error);
+  if (s != DML_OK) return fail(s, &error);
+  return id_bytes(&node);
+}
+
 /* Python passes owned tuples/bytes. All canonicalization is performed by C. */
 static PyObject *encode_datum(PyObject *self, PyObject *args) {
   (void)self;
@@ -317,22 +329,34 @@ static PyObject *encode_object(PyObject *self, PyObject *args) {
   int type; PyObject *value, *parents;
   if (!PyArg_ParseTuple(args, "iOO", &type, &value, &parents)) return NULL;
   dml_object_input input = {.type = (dml_record_type)type};
-  dml_tree_entry *entries = NULL; dml_object_id *ids = NULL;
+  dml_tree_entry *entries = NULL; dml_dag_binding *bindings = NULL; dml_object_id *ids = NULL;
   if (type == DML_REC_NODE) {
-    input.value.node.kind = DML_NODE_LITERAL;
-    if (!as_id(value, &input.value.node.datum)) return NULL;
-  } else if (type == DML_REC_DAG) {
-    if (!as_id(value, &input.value.root)) return NULL;
-  } else if (type == DML_REC_TREE) {
-    Py_ssize_t count = tuple_count(value); if (count < 0) return NULL;
-    entries = calloc((size_t)count + 1, sizeof(*entries)); if (!entries) return PyErr_NoMemory();
-    input.value.tree.items = entries; input.value.tree.count = (size_t)count;
+    unsigned long kind = parents == Py_None ? DML_NODE_LITERAL : PyLong_AsUnsignedLong(parents);
+    if (PyErr_Occurred() || !as_id(value, &input.value.node.target)) return NULL;
+    input.value.node.kind = kind > UINT32_MAX ? 0 : (uint32_t)kind;
+  } else if (type == DML_REC_DAG || type == DML_REC_TREE) {
+    PyObject *pairs = value;
+    if (type == DML_REC_DAG) {
+      if (!as_id(value, &input.value.dag.root)) return NULL;
+      pairs = parents;
+    }
+    Py_ssize_t count = tuple_count(pairs); if (count < 0) return NULL;
+    if (type == DML_REC_DAG) {
+      bindings = calloc((size_t)count + 1, sizeof(*bindings)); if (!bindings) return PyErr_NoMemory();
+      input.value.dag.items = bindings; input.value.dag.count = (size_t)count;
+    } else {
+      entries = calloc((size_t)count + 1, sizeof(*entries)); if (!entries) return PyErr_NoMemory();
+      input.value.tree.items = entries; input.value.tree.count = (size_t)count;
+    }
     for (Py_ssize_t i = 0; i < count; i++) {
-      PyObject *pair = PyTuple_GetItem(value, i); char *name; Py_ssize_t len;
-      if (!PyTuple_Check(pair) || PyTuple_Size(pair) != 2) { PyErr_SetString(PyExc_TypeError, "tree pair required"); goto conversion_error; }
+      PyObject *pair = PyTuple_GetItem(pairs, i); char *name; Py_ssize_t len;
+      if (!PyTuple_Check(pair) || PyTuple_Size(pair) != 2) { PyErr_SetString(PyExc_TypeError, "named pair required"); goto conversion_error; }
+      dml_object_id *target = type == DML_REC_DAG ? &bindings[i].node : &entries[i].dag;
       if (PyBytes_AsStringAndSize(PyTuple_GetItem(pair, 0), &name, &len) < 0 ||
-          !as_id(PyTuple_GetItem(pair, 1), &entries[i].dag)) goto conversion_error;
-      entries[i].name = (dml_bytes){(const uint8_t *)name, (size_t)len};
+          !as_id(PyTuple_GetItem(pair, 1), target)) goto conversion_error;
+      dml_bytes bytes = {(const uint8_t *)name, (size_t)len};
+      if (type == DML_REC_DAG) bindings[i].name = bytes;
+      else entries[i].name = bytes;
     }
   } else if (type == DML_REC_COMMIT) {
     if (!as_id(value, &input.value.commit.tree)) return NULL;
@@ -343,11 +367,11 @@ static PyObject *encode_object(PyObject *self, PyObject *args) {
   }
   dml_buffer buffer = {0}; dml_error error;
   dml_status s = dml_object_encode(&input, &buffer, &error);
-  free(entries); free(ids);
+  free(entries); free(bindings); free(ids);
   if (s != DML_OK) return fail(s, &error);
   return buffer_bytes(&buffer);
 conversion_error:
-  free(entries); free(ids);
+  free(entries); free(bindings); free(ids);
   return NULL;
 }
 
@@ -409,11 +433,19 @@ static PyObject *decode_object(PyObject *self, PyObject *args) {
     if (view.type == DML_REC_TREE) {
       dml_tree_entry entry; dml_object_view_entry(&view, i, &entry, &error);
       item = Py_BuildValue("NN", PyUnicode_DecodeUTF8((const char *)entry.name.data, (Py_ssize_t)entry.name.len, "strict"), id_bytes(&entry.dag));
+    } else if (view.type == DML_REC_DAG) {
+      dml_dag_binding binding; dml_object_view_binding(&view, i, &binding, &error);
+      item = Py_BuildValue("NN", PyUnicode_DecodeUTF8((const char *)binding.name.data,
+        (Py_ssize_t)binding.name.len, "strict"), id_bytes(&binding.node));
     } else {
       dml_object_id id; dml_object_view_parent(&view, i, &id, &error); item = id_bytes(&id);
     }
     if (!item) { Py_DECREF(items); return NULL; }
     PyTuple_SetItem(items, (Py_ssize_t)i, item);
+  }
+  if (view.type == DML_REC_NODE) {
+    Py_DECREF(items);
+    return Py_BuildValue("Ni", id_bytes(&view.reference), (int)view.node_kind);
   }
   return Py_BuildValue("NN", id_bytes(&view.reference), items);
 }
@@ -433,6 +465,7 @@ static PyMethodDef methods[] = {
   {"txn_end", txn_end, METH_VARARGS, NULL},
   {"get_record", get_record, METH_VARARGS, NULL},
   {"put_record", put_record, METH_VARARGS, NULL},
+  {"lookup_node", lookup_node, METH_VARARGS, NULL},
   {"ref_op", ref_op, METH_VARARGS, NULL},
   {"encode_datum", encode_datum, METH_VARARGS, NULL},
   {"encode_object", encode_object, METH_VARARGS, NULL},

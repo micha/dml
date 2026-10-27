@@ -1,6 +1,6 @@
 # Snapshot and history objects
 
-Status: implemented literal nodes, rooted DAGs, trees and commits; record format 1.
+Status: implemented literal and sub-DAG-reference nodes, named DAGs, trees and commits; record format 1.
 
 ## Authority boundary
 
@@ -14,13 +14,19 @@ Normative sections describe the current implementation.
 
 ## Typed object structure
 
-A literal node MUST reference a datum. A DAG MUST designate a node as its root.
-A tree entry MUST associate a name with a DAG. A commit MUST reference a tree and
+A literal node MUST reference a datum. A sub-DAG-reference node MUST reference a
+DAG by immutable content ID; it records nested structure without executing it.
+A DAG MUST designate a node as its root and MAY bind names to nodes. A tree entry
+MUST associate a name with a DAG. A commit MUST reference a tree and
 an ordered list of parent commits. References are 16-byte full-record content IDs.
 The codecs validate structural encoding; storage checks direct referenced objects
 as described in [repository reference validation](repository.md#writes-and-reference-validation).
 
-A tree-entry name is not a named binding within a DAG. Parent lists record history;
+A tree-entry name is not a named binding within a DAG. DAG-to-root, DAG-to-binding
+and sub-DAG-node-to-DAG edges define structural reachability; there is no separate
+node-membership array. Literal references and composite datum children are value
+structure, not computational input edges. Bindings/nesting do not establish
+causal dependencies or prove how a value was calculated. Parent lists record history;
 constructing a commit with multiple parents is not a merge operation.
 
 ## Packed bodies
@@ -31,23 +37,26 @@ truncation, trailing bytes and unsupported node kinds MUST be rejected.
 
 | Type / envelope tag | Body after byte 20 | Total size |
 | --- | --- | --- |
-| Node / 3 | u32 kind = 1 (`DML_NODE_LITERAL`), datum ID | 40 bytes |
-| DAG / 4 | Root node ID | 36 bytes |
+| Node / 3 | u32 kind = 1 (`DML_NODE_LITERAL`) or 2 (`DML_NODE_SUBDAG`), target ID | 40 bytes |
+| DAG / 4 | Root node ID, u32 binding count; bindings below | 40 bytes + bindings |
 | Tree / 5 | u32 entry count; entries below | 24 bytes + entries |
 | Commit / 6 | Tree ID, u32 parent count, parent IDs in order | 40 bytes + 16 × parent count |
 
-Each tree entry is a u32 name byte length, name bytes without a terminator, then
-its DAG ID. There are no offsets, gaps, native structure padding or persisted
-pointers. An empty tree is valid. A DAG always has one root reference.
+Each tree entry or DAG binding is a u32 name byte length, name bytes without a
+terminator, then its DAG ID (tree) or node ID (binding). There are no offsets, gaps,
+native structure padding or persisted pointers. Empty trees and binding sets are
+valid; a DAG always has one root reference. The previous 36-byte root-only DAG
+encoding MUST be rejected; the current decoder has no compatibility interpretation.
+Node kind determines the target type and contributes to identity.
 
 An initial commit has zero parents. Supplied parent order MUST be preserved;
 duplicate parent IDs MUST be rejected. Changing parent order changes content
 identity. Duplicate checking currently uses pairwise comparison.
 
-## Names and tree ordering
+## Names and canonical ordering
 
 `dml_name_validate()` implements this intentionally narrow name profile, shared
-with [ref names](repository.md#refs):
+with DAG bindings and [ref names](repository.md#refs):
 
 - 1–128 ASCII bytes, case-sensitive.
 - First byte: `A`–`Z`, `a`–`z` or `0`–`9`.
@@ -56,11 +65,16 @@ with [ref names](repository.md#refs):
 Names outside this profile MUST be rejected, not normalized or interpreted as
 filesystem paths. This profile does not accept Unicode or slash-separated names.
 
-The tree encoder sorts entries by lexicographic name bytes; a prefix sorts before
-its extension. Duplicate names MUST be rejected even if their DAG targets match.
+The tree/DAG encoder sorts entries/bindings by lexicographic name bytes; a prefix
+sorts before its extension. Duplicate names MUST be rejected even if their targets
+match. Different names MAY target the same node, including the root. There is no
+reserved `root` name, parent scope, global scope or implicit nested lookup.
+Names bind existing node IDs, not future selections from refs.
+
 Packed validation requires strictly increasing names and never silently sorts a
-stored record. Input entry order does not contribute to tree identity after
-canonicalization; entry names and targets do.
+stored record. Input order does not contribute to identity after canonicalization;
+root, names and targets do. Changing a root, renaming/retargeting, or adding/removing
+a binding changes the DAG's full-record content identity.
 
 ## C codec and views
 
@@ -68,13 +82,18 @@ Public declarations are in [object.h](../../include/dml/object.h).
 
 - `dml_object_input` discriminates node/DAG/tree/commit input using `type`.
   `dml_object_encode()` accepts only those four types and returns an owned buffer.
+  Node input uses `value.node.kind/target`; DAG input uses `value.dag.root/items/count`
+  with separately typed `dml_dag_binding` entries (`name/node`), distinct from
+  `dml_tree_entry` (`name/dag`).
 - `dml_object_decode()` validates packed bytes and returns a borrowed
-  `dml_object_view`. Its `reference` is the node's datum, DAG's root or commit's
-  tree; it is zero for a tree. `count` denotes tree entries or commit parents.
-- `dml_object_view_entry()` returns a DAG ID and borrowed name bytes;
+  `dml_object_view`. `node_kind` identifies a node's kind (zero on other objects).
+  `reference` is the node's datum/DAG target, DAG's root or commit's tree; it is zero
+  for a tree. `count` denotes DAG bindings, tree entries or commit parents.
+- `dml_object_view_binding()` returns a node ID and borrowed binding name;
+  `dml_object_view_entry()` returns a DAG ID and borrowed tree name;
   `dml_object_view_parent()` copies a parent ID. Accessors require a valid,
   unchanged decoded view and reject wrong view types/out-of-range indices.
-  Tree entry access scans preceding entries; it is linear in the requested index.
+  Binding/tree entry access scans preceding entries; it is linear in the index.
 - Callers MUST retain the original bytes unchanged while using a view or borrowed
   name. Encoded and repository-read buffers follow
   [records buffer ownership](records.md#c-api-ownership).
@@ -107,4 +126,5 @@ snapshot. Retrieve parent commits to inspect history.
   branching and ordered multiple-parent persistence.
 
 Actual validation runs and outstanding gates are recorded in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md).
+[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
+and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).

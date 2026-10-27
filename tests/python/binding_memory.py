@@ -36,7 +36,9 @@ with tempfile.TemporaryDirectory() as scratch:
         with repo.write() as tx:
             child = tx.put_datum(42)
             second_child = tx.put_datum(43)
-            node = tx.put_literal(child); dag = tx.put_dag(root=node)
+            node = tx.put_literal(child); dag = tx.put_dag(root=node, bindings={"a": node, "b": node})
+            subdag = tx.put_subdag(dag)
+            nested = tx.put_dag(root=subdag, bindings={"trial": subdag, "value": node})
             tree = tx.put_tree({"example": dag}); first = tx.put_commit(tree)
             commit = tx.put_commit(tree, parents=[first]); tx.create_ref("main", commit)
             values = [tx.put_datum(value) for value in [None, True, False, -(2**63), -42, 4.5, -3.25,
@@ -53,6 +55,8 @@ with tempfile.TemporaryDirectory() as scratch:
                     core.set_fault(kind, nth)
                 try:
                     value = tx.put_datum(dml.Datum.map([(child, child), (second_child, second_child)]))
+                    tx.put_dag(root=node, bindings={"a": node, "b": node})
+                    tx.put_subdag(dag)
                     tx.put_tree({"example": dag})
                     tx.put_commit(tree, parents=[first])
                 except (MemoryError, dml.DmlError):
@@ -66,6 +70,7 @@ with tempfile.TemporaryDirectory() as scratch:
                 try:
                     descriptions = [tx.get_datum(value) for value in values]
                     tx.get_commit(commit); tx.get_tree(tree); tx.get_ref("main")
+                    tx.get_node(subdag); tx.get_dag(nested); tx.lookup_node(nested, "trial")
                 except MemoryError:
                     pass
                 finally:

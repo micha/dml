@@ -52,8 +52,7 @@ static dml_status snapshot(dml_txn *txn, int64_t value, const dml_object_id *par
   dml_object_input input = {.type = DML_REC_NODE, .value.node = {DML_NODE_LITERAL, ids[0]}};
   status = store(txn, &input, &ids[1], error);
   if (status != DML_OK) return status;
-  input.type = DML_REC_DAG;
-  input.value.root = ids[1];
+  input = (dml_object_input){.type = DML_REC_DAG, .value.dag.root = ids[1]};
   status = store(txn, &input, &ids[2], error);
   if (status != DML_OK) return status;
   dml_tree_entry entry = {name("example"), ids[2]};
@@ -199,8 +198,8 @@ static int negative(const char *path) {
     if (scenario < 2) {
       input.type = DML_REC_NODE;
       input.value.node.kind = DML_NODE_LITERAL;
-      input.value.node.datum = scenario % 2 == 0 ? missing : ids[4];
-    } else if (scenario < 4) { input.type = DML_REC_DAG; input.value.root = bad; }
+      input.value.node.target = scenario % 2 == 0 ? missing : ids[4];
+    } else if (scenario < 4) { input.type = DML_REC_DAG; input.value.dag.root = bad; }
     else if (scenario < 6) {
       input.type = DML_REC_TREE;
       input.value.tree.items = &entry; input.value.tree.count = 1;
@@ -227,7 +226,7 @@ static int negative(const char *path) {
     if (scenario == 7) CHECK(dml_txn_put_object(txn, DML_REC_NODE, NULL, 0, NULL, &error) == DML_INVALID_ARGUMENT);
     CHECK(dml_txn_commit(&txn, &error) == DML_INVALID_STATE && txn == NULL);
   }
-  dml_object_input input = {.type = DML_REC_DAG, .value.root = ids[1]};
+  dml_object_input input = {.type = DML_REC_DAG, .value.dag.root = ids[1]};
   REQUIRE(dml_object_encode(&input, &packed, &error));
   REQUIRE(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error));
   CHECK(dml_txn_put_object(txn, DML_REC_NODE, packed.data, packed.len, &ignored, &error) == DML_INVALID_KIND);

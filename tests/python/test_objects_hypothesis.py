@@ -32,14 +32,14 @@ def tree_payload(entries: list[tuple[str, bytes]]) -> bytes:
 @given(ids)
 def test_node_dag_oracles_and_type_domain(reference: bytes) -> None:
   node = encode(3, struct.pack("<I", 1) + reference)
-  dag = encode(4, reference)
+  dag = encode(4, reference + struct.pack("<I", 0))
   assert node == envelope(3, struct.pack("<I", 1) + reference)
-  assert dag == envelope(4, reference)
+  assert dag == envelope(4, reference + struct.pack("<I", 0))
   assert object_id(node) != object_id(dag)
   assert object_id(node) == object_id(node)
   changed = bytes([reference[0] ^ 1]) + reference[1:]
   assert object_id(node) != object_id(encode(3, struct.pack("<I", 1) + changed))
-  assert object_id(dag) != object_id(encode(4, changed))
+  assert object_id(dag) != object_id(encode(4, changed + struct.pack("<I", 0)))
   assert run_driver("id", data=node, check=False).returncode != 0
 
 
@@ -89,7 +89,7 @@ def test_malformed_enveloped_payloads_fail_without_crashing(kind: int, payload: 
 
 
 @pytest.mark.parametrize("kind,payload", [
-  (3, struct.pack("<I", 2) + b"\0" * 16),
+  (3, struct.pack("<I", 3) + b"\0" * 16),
   (4, b"\0" * 17),
   (5, struct.pack("<I", 0) + b"extra"),
   (5, struct.pack("<II", 1, 0xFFFFFFFF) + b"a" + b"\0" * 16),
@@ -102,7 +102,7 @@ def test_invalid_kind_counts_lengths_and_trailing_bytes(kind: int, payload: byte
 
 
 @pytest.mark.parametrize("kind,payload", [
-  (3, struct.pack("<I", 1) + b"\0" * 16), (4, b"\0" * 16),
+  (3, struct.pack("<I", 1) + b"\0" * 16), (4, b"\0" * 16 + struct.pack("<I", 0)),
   (5, tree_payload([("example", b"\0" * 16)])),
   (6, b"\0" * 16 + struct.pack("<I", 1) + b"\x01" * 16),
 ])

@@ -2,7 +2,7 @@
 
 Status: implemented subset, growing through the design spiral. The datum foundation
 was initially inspected at `638cc42`; the minimum viable repository extends it with
-literal nodes, DAGs, trees, commits and transactional refs.
+literal/sub-DAG-reference nodes, named DAGs, trees, commits and transactional refs.
 
 ## Authority boundary
 
@@ -39,7 +39,7 @@ flowchart TD
     GUIDE["../documentation-guidelines.md<br/>Shared writing rules"]
     GLOSSARY["glossary.md<br/>Shared terminology"]
     RECORDS["records.md<br/>Datums, encoding, record identity and errors"]
-    OBJECTS["objects.md<br/>Snapshot/history fields, names and views"]
+    OBJECTS["objects.md<br/>Named/nested DAG and history fields, names and views"]
     REPO["repository.md<br/>Local storage, refs, transactions and ownership"]
     PY["python-api.md<br/>Python values, errors and contexts"]
     CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
@@ -86,7 +86,7 @@ flowchart TD
 | Shared documentation style and authority conventions | [Documentation Writing Guidelines](../documentation-guidelines.md) |
 | Shared vocabulary, not implementation contracts | [Glossary](glossary.md) |
 | Datum kinds, canonical records, record IDs, URI/text behavior and error representation | [records.md](records.md) |
-| Literal-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
+| Literal/sub-DAG-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
 | Repository initialization, storage keys, transactions, direct reference checks, refs and handle ownership | [repository.md](repository.md) |
 | Python conversions, owned descriptions, exceptions, thread/finalizer policy and contexts | [python-api.md](python-api.md) |
 | Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
@@ -96,7 +96,8 @@ flowchart TD
 
 - A C codec for all ten datum kinds, deterministic record encoding and IDs.
 - UTF-8/NFC and URI validation/canonicalization helpers.
-- Literal nodes, rooted DAGs, named trees and ordered-parent commits with full-record IDs.
+- Literal and non-executing sub-DAG-reference nodes, rooted DAGs with scoped named
+  bindings/lookup, named trees and ordered-parent commits with full-record IDs.
 - An LMDB-backed local repository storing immutable objects and mutable refs in
   storage transactions.
 - C tests and Python tests driving native test helpers, including fresh-process
@@ -104,7 +105,8 @@ flowchart TD
 - A linked low-level Python API constructing and reading that state through real
   native handles, with explicit references and atomic transaction contexts.
 - A native inspection CLI and Python console forwarding to the bundled executable,
-  with human/JSON presentation, snapshots and all-parent history traversal.
+  with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
+  all-parent history traversal.
 
 ## Development policy
 
@@ -128,6 +130,7 @@ Technical documents describe the current implemented contract. MUST, SHOULD and
 MAY are normative when used there; examples are explicitly informative. Source and
 test links provide evidence; actual validation runs and outstanding gates are in the
 [Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
-and [Iteration 2 delivery notes](../../../dml-design/iterations/02-repository-usability/RESULTS.md).
+and [Iteration 2 delivery notes](../../../dml-design/iterations/02-repository-usability/RESULTS.md)
+and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).
 If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

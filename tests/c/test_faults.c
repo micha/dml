@@ -82,12 +82,14 @@ static int test_codec_allocations(void) {
   }
   dml_test_reset();
   dml_tree_entry entry = {{text, sizeof(text) - 1}, ids[0]};
+  dml_dag_binding binding = {{text, sizeof(text) - 1}, ids[0]};
   for (int type = DML_REC_NODE; type <= DML_REC_COMMIT; type++) {
     dml_object_input input = {.type = (dml_record_type)type};
     if (type == DML_REC_NODE) input.value.node.kind = DML_NODE_LITERAL;
+    if (type == DML_REC_DAG) { input.value.dag.items = &binding; input.value.dag.count = 1; }
     if (type == DML_REC_TREE) { input.value.tree.items = &entry; input.value.tree.count = 1; }
     if (type == DML_REC_COMMIT) input.value.commit.parents = (dml_id_array){ids, 2};
-    size_t allocations = type == DML_REC_TREE ? 2 : 1;
+    size_t allocations = type == DML_REC_TREE || type == DML_REC_DAG ? 2 : 1;
     for (size_t nth = 1; nth <= allocations; nth++) {
       dml_buffer out = {0};
       dml_test_fail(DML_TEST_ALLOCATE, nth, 0);

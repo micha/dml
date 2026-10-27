@@ -101,6 +101,11 @@ int main(void) {
   CHECK(dml_repo_open(repo_path, &create, &repo, &error) == DML_OK);
   CHECK(dml_repo_schema(repo, &schema, &error) == DML_OK && schema == 1);
   CHECK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error) == DML_OK);
+  dml_bytes lookup_name = {(const uint8_t *)"a", 1};
+  CHECK(dml_txn_lookup_node(NULL, &missing, lookup_name, &list_id, NULL) == DML_INVALID_ARGUMENT);
+  CHECK(dml_txn_lookup_node(txn, NULL, lookup_name, &list_id, NULL) == DML_INVALID_ARGUMENT);
+  CHECK(dml_txn_lookup_node(txn, &missing, lookup_name, NULL, NULL) == DML_INVALID_ARGUMENT);
+  CHECK(dml_txn_lookup_node(txn, &missing, (dml_bytes){NULL, 0}, &list_id, NULL) == DML_INVALID_ARGUMENT);
   CHECK(dml_repo_close(&repo, &error) == DML_INVALID_STATE);
   CHECK(dml_datum_encode(&input, &scalar, &error) == DML_OK);
   CHECK(dml_txn_put_datum(txn, scalar.data, scalar.len, &scalar_id, &error) == DML_OK);

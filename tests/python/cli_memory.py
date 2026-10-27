@@ -1,4 +1,4 @@
-"""Valgrind the native CLI and every injected allocation boundary in four commands."""
+"""Valgrind native inspection commands and their injected allocation boundaries."""
 
 import json
 import os
@@ -19,13 +19,20 @@ with tempfile.TemporaryDirectory() as scratch:
     with dml.Repository(path, create=True) as repo:
         with repo.write() as tx:
             value = tx.put_datum('a"\\\n\u0085' + "é"*90)
-            dag = tx.put_dag(root=tx.put_literal(value))
+            node = tx.put_literal(value)
+            dag = tx.put_dag(root=node, bindings={"a": node, "b": node})
+            subdag = tx.put_subdag(dag)
+            nested = tx.put_dag(root=subdag, bindings={"trial": subdag, "value": node})
+            nested_commit = tx.put_commit(tx.put_tree({"nested": nested}))
             tree = tx.put_tree({"example": dag}); first = tx.put_commit(tree)
             second = tx.put_commit(tree, parents=[first]); tx.create_ref("main", second)
             large_values = ["payloadé\n" * 400, bytes(range(256)) * 16]
             large_ids = [tx.put_datum(item) for item in large_values]
     for args in [["ref", "get", "main"], ["show", "datum", str(value)],
-                 ["snapshot", "--ref", "main"], ["log", "--ref", "main"]]:
+                 ["snapshot", "--ref", "main"], ["log", "--ref", "main"],
+                 ["walk", str(nested)], ["lookup", str(nested), "trial"],
+                 ["show", "dag", str(nested)], ["show", "node", str(subdag)],
+                 ["snapshot", "--commit", str(nested_commit)]]:
         for nth in range(1, 500):
             result = subprocess.run([
                 "valgrind", "--error-exitcode=101", "--leak-check=full", "--show-leak-kinds=all", "--track-origins=yes",

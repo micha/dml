@@ -38,14 +38,18 @@ Other frozen descriptions:
 
 | Read | Result |
 | --- | --- |
-| `get_node(id)` | `LiteralNode(datum: ObjectId)` |
-| `get_dag(id)` | `DAG(root: ObjectId)` |
+| `get_node(id)` | `LiteralNode(datum: ObjectId)` or `SubDAGNode(dag: ObjectId)` |
+| `get_dag(id)` | `DAG(root: ObjectId, bindings: read_only_mapping)` |
 | `get_tree(id)` | `Tree`, read-only Mapping with tuple `entries` in stored name order |
 | `get_commit(id)` | `Commit(tree: ObjectId, parents: tuple[ObjectId, ...])` |
 
 Descriptions and record bytes are copied while C views are valid. They remain
 usable after transaction/repository closure and never retain native pointers.
-They do not execute nodes, lazily load references or establish DAG named bindings.
+They do not execute nodes or lazily load references. `DAG` copies a mapping or
+sequence of name/ID pairs into a read-only mapping; duplicate description names
+are rejected. Retrieved bindings preserve canonical stored order. Root-only
+`DAG(root)` descriptions have empty bindings. `SubDAGNode` stores an explicit DAG
+ID, not a moving ref or an execution request.
 
 ## Repository and transactions
 
@@ -69,6 +73,10 @@ Both transaction modes provide:
 - Typed `get_datum`, `get_node`, `get_dag`, `get_tree`, `get_commit` and `get_ref(name)`.
 - `get_record(kind, id) -> bytes`, for datum/node/dag/tree/commit only, through C's
   validated typed read. This is exact immutable record inspection, not raw LMDB IO.
+- `lookup_node(dag_id, name) -> ObjectId`: exact single-scope lookup, not a value.
+  Explicit nested descent reads a `SubDAGNode` then looks up in its `.dag`.
+  Invalid/missing names are read failures and do not poison writes. See the
+  [native lookup contract](repository.md#scoped-node-lookup).
 - `abort()` to consume the transaction without publishing its writes.
 
 Write transactions also provide:
@@ -76,7 +84,8 @@ Write transactions also provide:
 ```python
 put_datum(value) -> ObjectId
 put_literal(datum_id) -> ObjectId
-put_dag(*, root=node_id) -> ObjectId
+put_subdag(dag_id) -> ObjectId
+put_dag(*, root=node_id, bindings=()) -> ObjectId
 put_tree(mapping_or_pairs) -> ObjectId
 put_commit(tree_id, *, parents=()) -> ObjectId
 create_ref(name, commit_id) -> None
@@ -84,7 +93,8 @@ update_ref(name, commit_id) -> None
 commit() -> None
 ```
 
-Tree pairs preserve duplicates until C rejects them. Parent order is preserved;
+Tree and DAG-binding input accepts mappings or pair sequences, preserving duplicate
+names until C rejects them. Parent order is preserved;
 C validates names, duplicates and direct references. No recursive Python value
 insertion, automatic map growth or partial retry is performed. Map-full recovery
 closes/reopens with a larger map and retries the whole batch.
@@ -150,7 +160,10 @@ missing composite children (`invalid_kind`) and missing object references
 [The runnable history example](../../examples/repository_history.py) records 42,
 then 43 in a child commit, moves `main`, and creates a fork. It prints IDs and saved
 record bytes for [CLI inspection](cli.md). Higher-level helpers can compose this
-API; this example is not a library workflow framework.
+API; this example is not a library workflow framework. The
+[composable DAG example](../../examples/composable_dags.py) records two Python
+calculations, shares one trial across child snapshots, and includes a nonliteral
+root fixture. It demonstrates containment/values, not captured computational causality.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),
@@ -159,4 +172,5 @@ Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [failure tests](../../tests/python/test_binding_failures.py) and
 [lifetime edges](../../tests/python/test_lifetime_edges.py).
 Actual validation and platform limits belong to
-[Iteration 2 results](../../../dml-design/iterations/02-repository-usability/RESULTS.md).
+[Iteration 2 results](../../../dml-design/iterations/02-repository-usability/RESULTS.md)
+and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).

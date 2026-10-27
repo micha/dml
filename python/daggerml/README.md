@@ -7,7 +7,9 @@ collection references; `get_datum(id).value` accesses the immediate value.
 
 See the owning [Python API contract](../../docs/spec-next/python-api.md),
 [build/package instructions](../../docs/packaging-and-distribution.md) and
-[runnable history example](../../examples/repository_history.py).
+[runnable history example](../../examples/repository_history.py) and
+[composable DAG example](../../examples/composable_dags.py). Named bindings and
+non-executing sub-DAG nodes record structure; Python computes any example values.
 
 ## Local build
 

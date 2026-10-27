@@ -51,8 +51,8 @@ pin the precise lines in the current source.
 | Source and marked statement/region | Why further execution provides no useful assurance | Retained assurance |
 | --- | --- | --- |
 | `src/object.c`, `dml_object_decode()` type-range condition | Successful record validation admits only META through COMMIT. The upper-range rejection edge cannot occur. | Datum rejection, accepted object views and malformed records are tested. |
-| `src/object.c`, tree per-entry total-size guard and its error return | On 64-bit hosts, each prior iteration bounds `len` to u32 and the next increment to at most 148, so `size_t` addition cannot overflow. Reaching the u32 total-size rejection requires a multi-GiB tree and tens of millions of repeated entries; that repeats independently tested checked addition and the common u32 record-size contract, rather than exercising different ownership or storage behavior. | Public oversized-count rejection, checked arithmetic, name bounds, codec counts, canonical ordering and both tree allocation failures are tested. No large-tree performance claim is made. |
-| `src/object.c`, tree sorted-array multiplication guard and its error return | A u32-bounded entry count times the entry structure size cannot overflow 64-bit `size_t`. Synthetic helper lies would only violate this invariant. | Multiplication overflow is tested directly; allocation failure and cleanup are tested at both tree allocations. |
+| `src/object.c`, shared DAG/tree per-entry total-size guard and its error return | On 64-bit hosts, each prior iteration bounds `len` to u32 and the next increment to at most 148, so `size_t` addition cannot overflow. Reaching the u32 total-size rejection requires a multi-GiB named object and tens of millions of repeated entries; that repeats independently tested checked addition and the common u32 record-size contract, rather than exercising different ownership or storage behavior. | Public oversized-count rejection, checked arithmetic, name bounds, codec counts, canonical ordering and both DAG/tree allocation failures are tested. No large-tree performance claim is made. |
+| `src/object.c`, shared DAG/tree sorted-array multiplication guard and its error return | A u32-bounded entry count times the entry structure size cannot overflow 64-bit `size_t`. Synthetic helper lies would only violate this invariant. | Multiplication overflow is tested directly; allocation failure and cleanup are tested at both named-object allocations. |
 | `src/object.c`, encoder's second type switch and its default | The first switch has accepted exactly NODE/DAG/TREE/COMMIT; this second switch covers all four. Its fallback is unreachable with unchanged caller-owned input. | All four encoding bodies, identity, malformed types and both switch-entry argument guards are tested. |
 | `src/object_id.c`, immutable type-range condition | Successful record validation permits only META..COMMIT. A type above COMMIT cannot reach this condition. | META rejection, datum-only identity restrictions, all immutable types, bad encoding and hash allocation failure are tested. |
 | `src/record.c`, both encoder kind switches | The earlier range guard admits exactly the ten cases covered by both switches; the compiler's implicit defaults cannot occur. | All ten kinds, independent encoding oracles, malformed kinds and failed encoding allocations remain tested. |
@@ -79,7 +79,7 @@ The old exclusions above are unchanged. Added precise locations:
 | --- | --- | --- |
 | `python/daggerml/src/_core_module.c`, `repo_schema()` status guard | The live-handle helper and non-null local output already establish this allocation-free native query's complete preconditions. It cannot newly fail. | Closed/wrong-thread/invalid native handles and successful schema reads are tested. |
 | Same source, `txn_begin()`'s `Py_INCREF(owner)` and `decode_datum()`'s `Py_INCREF(Py_None)`/NULL case label | CPython generates immortal/refcount branches, not alternate DML ownership paths. A live capsule owner is mortal and None is immortal on this Python build. The NULL case label marker accounts for GCC attributing the inline branch to that label. | Owner retention, successful/failing capsule construction, explicit cleanup, queued foreign-thread cleanup and isolated unsupported abandonment tests remain measured. |
-| `src/cli.c`, `history()` traversal-array size guard and error-return line | Overflow requires exabytes of already-allocated traversal state on the supported 64-bit matrix. Repeating giant graphs adds no distinct cleanup/storage assurance. | Real initial/reallocation failures, both traversal arrays, late failures, shared ancestors, limits and a simulated-hash cycle fixture are tested. |
+| `src/cli.c`, `traverse()` traversal-array size guard and error-return line | Overflow requires exabytes of already-allocated traversal state on the supported 64-bit matrix. Repeating giant graphs adds no distinct cleanup/storage assurance. | Real initial/reallocation failures, both traversal arrays, late failures, shared ancestors/DAGs, deep iterative nesting, exact limits and simulated-hash commit/DAG cycle fixtures are tested. |
 | `src/cli.c`, positive limit parser's `*end` guard | Every input byte was already checked as a decimal digit, so successful `strtoumax` consumes the whole string. A fabricated partial parse would violate the dependency's contract. | Empty/non-digit/negative/zero/overflow limits and valid limits are tested. |
 | `src/cli.c`, parser's `parsed > SIZE_MAX` guard | uintmax_t and size_t are both 64-bit on the supported matrix. This guard currently contributes no measured branch; retain it and re-evaluate on another width. | Decimal overflow is exercised through errno/ERANGE; no smaller target-width support is inferred. |
 | `src/cli.c`, final `close_status` guard | The sole read transaction was just consumed by abort. The handle is live and idle, or null after open failure; repository close cannot newly fail. | All open/traversal/read failures clean up, and native close-with-active rejection remains tested independently. |
@@ -111,6 +111,27 @@ cataloged. New per-source removals are:
 These are denominator removals, not claimed passing tests. Full commands,
 intermediate failures and source state are in
 [Iteration 2 results](../../dml-design/iterations/02-repository-usability/RESULTS.md).
+
+## Iteration 3 exclusion reassessment
+
+The shared DAG/tree size exclusions retain the same 64-bit invariant: validated
+names add at most 148 bytes to a u32-bounded length; both base sizes (24/40) and
+minimum-entry count guards bound the sorted array. DAG inputs use separately typed
+public bindings; a private sorted tree-entry buffer copies each name/target rather
+than alias-casting input arrays. Both allocation failures and cleanup are exercised
+for DAGs as well as trees. The marked guards are not excluded entire functions.
+
+The renamed typed `traverse()` retains the same astronomical-size growth guards
+for both commit history and DAG/node traversal. Encoded counts are u32-bounded;
+adding the DAG root cannot overflow size_t on the supported 64-bit matrix.
+Actual allocation failures, shared/active cases, cycles and output failures remain
+retained tests. The direct-reference decoder exclusion still applies: DAG-binding
+and node-kind decoding are allocation-free after the same unchanged bytes were
+validated. No new exclusion is needed merely for lookup/conversion/traversal.
+
+Historical Iteration 2 population counts below remain that iteration's evidence,
+not current counts. Iteration 3 measurements are in its
+[results](../../dml-design/iterations/03-composable-dags/RESULTS.md).
 
 ## Memory-check accounting
 

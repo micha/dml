@@ -43,6 +43,9 @@ dml_status dml_txn_put_object(dml_txn *txn, dml_record_type type,
                                dml_error *error);
 dml_status dml_txn_get_object(dml_txn *txn, dml_record_type type,
                                const dml_object_id *id, dml_buffer *out, dml_error *error);
+/* Exact DAG scope only. Failed lookup is a read failure and does not poison writes. */
+dml_status dml_txn_lookup_node(dml_txn *txn, const dml_object_id *dag,
+                               dml_bytes name, dml_object_id *out, dml_error *error);
 /* Ref names use dml_name_validate(). Create never overwrites; update requires
  * an existing ref. Targets must resolve to commits in this transaction. */
 dml_status dml_txn_ref_create(dml_txn *txn, dml_bytes name, const dml_object_id *target,

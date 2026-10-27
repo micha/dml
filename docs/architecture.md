@@ -7,7 +7,8 @@ Authority boundary:
 - For normative implemented behavior, see the
   [as-built specification](spec-next/README.md).
 
-The native C core implements datums, literal nodes, rooted DAGs, trees and commits,
+The native C core implements datums, literal/sub-DAG-reference nodes, named rooted
+DAGs, trees and commits,
 with full-record content IDs. LMDB-backed storage transactions persist immutable
 objects and atomically create or update repository-scoped refs to commits.
 Installed headers separate these module boundaries:
@@ -17,7 +18,7 @@ Installed headers separate these module boundaries:
 - [object.h](../include/dml/object.h): snapshot/history codecs, borrowed views,
   the ASCII name profile and immutable-object identity.
 - [repo.h](../include/dml/repo.h): opaque repository/storage-transaction handles,
-  typed object storage and ref operations.
+  typed object storage, scoped node lookup and ref operations.
 
 xxHash, LMDB, utf8proc and uriparser remain private static dependencies. The root
 Meson project links this core into both the inspection CLI and Python extension.

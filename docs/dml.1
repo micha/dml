@@ -11,8 +11,9 @@ dml \- inspect local DaggerML repository state
 .I COMMAND
 .RB [ ARGS ... ]
 .SH DESCRIPTION
-The native inspection CLI resolves refs, shows typed objects, displays snapshots,
-and traverses all-parent commit history. It does not initialize or mutate repositories.
+The native inspection CLI resolves refs, shows typed objects, looks up DAG bindings,
+walks nested DAG structure, displays snapshots and traverses all-parent commit history.
+It does not initialize or mutate repositories.
 .SH DOCUMENTATION
 Global grammar is available through:
 .IP \[bu] 2

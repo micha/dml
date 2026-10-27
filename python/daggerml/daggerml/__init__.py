@@ -8,12 +8,13 @@ import threading
 import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Iterable, Iterator, Mapping as MappingType, Tuple, Union
 
 from . import _core
 
 __all__ = [
-    "version", "ObjectId", "Datum", "LiteralNode", "DAG", "Tree", "Commit",
+    "version", "ObjectId", "Datum", "LiteralNode", "SubDAGNode", "DAG", "Tree", "Commit",
     "Repository", "Transaction", "canonicalize_uri", "DmlError", "NotFoundError",
     "InvalidStateError", "IntegrityError", "MapFullError",
 ]
@@ -186,11 +187,30 @@ class LiteralNode:
 
 
 @dataclass(frozen=True)
+class SubDAGNode:
+    dag: ObjectId
+
+    def __post_init__(self) -> None:
+        _id(self.dag)
+
+
+@dataclass(frozen=True)
 class DAG:
     root: ObjectId
+    bindings: MappingType[str, ObjectId] = ()
 
     def __post_init__(self) -> None:
         _id(self.root)
+        pairs = self.bindings.items() if isinstance(self.bindings, Mapping) else self.bindings
+        copied = {}
+        for name, node in pairs:
+            if not isinstance(name, str):
+                raise TypeError("binding name requires str")
+            _id(node)
+            if name in copied:
+                raise ValueError("duplicate binding name")
+            copied[name] = node
+        object.__setattr__(self, "bindings", MappingProxyType(copied))
 
 
 @dataclass(frozen=True)
@@ -381,13 +401,19 @@ class Transaction:
     def _get_object(self, kind: str, object_id: ObjectId):
         return _call(_core.decode_object, self.get_record(kind, object_id))
 
-    def get_node(self, object_id: ObjectId) -> LiteralNode:
-        reference, _ = self._get_object("node", object_id)
-        return LiteralNode(ObjectId(reference))
+    def get_node(self, object_id: ObjectId) -> Union[LiteralNode, SubDAGNode]:
+        reference, kind = self._get_object("node", object_id)
+        return (LiteralNode if kind == 1 else SubDAGNode)(ObjectId(reference))
 
     def get_dag(self, object_id: ObjectId) -> DAG:
-        reference, _ = self._get_object("dag", object_id)
-        return DAG(ObjectId(reference))
+        reference, entries = self._get_object("dag", object_id)
+        return DAG(ObjectId(reference), tuple((name, ObjectId(node)) for name, node in entries))
+
+    def lookup_node(self, dag: ObjectId, name: str) -> ObjectId:
+        self._check()
+        if not isinstance(name, str):
+            raise TypeError("node name requires str")
+        return ObjectId(_call(_core.lookup_node, self._handle, _id(dag), name))
 
     def get_tree(self, object_id: ObjectId) -> Tree:
         _, entries = self._get_object("tree", object_id)
@@ -421,11 +447,21 @@ class Transaction:
 
     @_mutation
     def put_literal(self, datum: ObjectId) -> ObjectId:
-        return self._put_object("node", _id(datum))
+        return self._put_object("node", _id(datum), 1)
 
     @_mutation
-    def put_dag(self, *, root: ObjectId) -> ObjectId:
-        return self._put_object("dag", _id(root))
+    def put_subdag(self, dag: ObjectId) -> ObjectId:
+        return self._put_object("node", _id(dag), 2)
+
+    @_mutation
+    def put_dag(self, *, root: ObjectId, bindings=()) -> ObjectId:
+        pairs = bindings.items() if isinstance(bindings, Mapping) else bindings
+        converted = []
+        for name, node in pairs:
+            if not isinstance(name, str):
+                raise TypeError("binding name requires str")
+            converted.append((name.encode("utf-8"), _id(node)))
+        return self._put_object("dag", _id(root), tuple(converted))
 
     @_mutation
     def put_tree(self, entries: Union[MappingType[str, ObjectId], Iterable[Tuple[str, ObjectId]]]) -> ObjectId:

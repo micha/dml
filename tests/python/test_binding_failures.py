@@ -47,7 +47,7 @@ def test_handle_allocation_cleanup(tmp_path, core):
     gc.collect()
 
 
-@pytest.mark.parametrize("operation", ["bytes", "string", "uri", "list", "set", "map", "tree", "commit"])
+@pytest.mark.parametrize("operation", ["bytes", "string", "uri", "list", "set", "map", "tree", "commit", "dag", "subdag"])
 def test_encode_binding_allocation_failures_rollback(tmp_path, core, operation):
     # Sweep every binding allocation until the operation succeeds. Includes
     # copied UTF-8/record bytes, ID-return objects and tuple/reference arrays.
@@ -66,6 +66,10 @@ def test_encode_binding_allocation_failures_rollback(tmp_path, core, operation):
                 try:
                     if operation == "tree":
                         result = tx.put_tree({"b": dag})
+                    elif operation == "dag":
+                        result = tx.put_dag(root=node, bindings={"a": node, "b": node})
+                    elif operation == "subdag":
+                        result = tx.put_subdag(dag)
                     elif operation == "commit":
                         result = tx.put_commit(tree, parents=[parent])
                     else:
@@ -137,10 +141,11 @@ def test_collection_and_object_decode_allocation_cleanup(tmp_path, core):
         with repo.write() as tx:
             child = tx.put_datum(42)
             ids = [tx.put_datum(dml.Datum.list([child, child])), tx.put_datum(dml.Datum.map([(child, child)]))]
-            node = tx.put_literal(child); dag = tx.put_dag(root=node)
+            node = tx.put_literal(child); dag = tx.put_dag(root=node, bindings={"a": node, "b": node})
+            subdag = tx.put_subdag(dag)
             tree = tx.put_tree({"a": dag}); first = tx.put_commit(tree); commit = tx.put_commit(tree, parents=[first])
         with repo.read() as tx:
-            operations = [lambda: tx.get_datum(ids[0]), lambda: tx.get_datum(ids[1]), lambda: tx.get_tree(tree), lambda: tx.get_commit(commit), lambda: tx.get_node(node)]
+            operations = [lambda: tx.get_datum(ids[0]), lambda: tx.get_datum(ids[1]), lambda: tx.get_tree(tree), lambda: tx.get_commit(commit), lambda: tx.get_node(node), lambda: tx.get_node(subdag), lambda: tx.get_dag(dag), lambda: tx.lookup_node(dag, "a")]
             for operation in operations:
                 for nth in range(1, 14):
                     core.set_fault(2, nth)
@@ -193,6 +198,7 @@ def test_native_begin_commit_and_read_error_lifetime(tmp_path, core):
     ("parse_id", (1,)), ("canonicalize_uri", (1,)), ("repo_open", (1,)),
     ("txn_begin", (1,)), ("txn_end", (1,)), ("get_record", (1,)),
     ("put_record", (1,)), ("ref_op", (1,)), ("encode_datum", (1,)),
+    ("lookup_node", (1,)),
     ("encode_object", (1,)), ("decode_datum", (1,)), ("decode_object", (1,)),
 ])
 def test_private_native_argument_errors(name, args):
@@ -224,6 +230,12 @@ def test_private_native_state_thread_and_conversion_guards(tmp_path):
             with pytest.raises((TypeError, ValueError)):
                 core.get_record(tx._handle, 2, value)
         tx.abort()
+        for handle, identity in [(tx._handle, b"\0" * 16), (repo._handle, b"\0" * 16)]:
+            with pytest.raises((RuntimeError, ValueError)):
+                core.lookup_node(handle, identity, "a")
+        with repo.read() as reader:
+            with pytest.raises(ValueError):
+                core.lookup_node(reader._handle, b"short", "a")
         with pytest.raises(RuntimeError):
             core.get_record(tx._handle, 2, b"\0"*16)
         core.txn_end(tx._handle, False)
@@ -242,10 +254,12 @@ def test_private_datum_codec_conversion_errors(kind, value):
 
 
 @pytest.mark.parametrize("type_code,value,parents", [(3, 1, None), (4, 1, None), (5, [], None), (5, ((),), None),
+    (4, b"\0"*16, []), (4, b"\0"*16, ((),)), (4, b"\0"*16, ((1, b"\0"*16),)),
+    (4, b"\0"*16, ((b"a", 1),)), (3, b"\0"*16, "bad"), (3, b"\0"*16, 2**32 + 1),
     (5, ((1, b"\0"*16),), None), (5, ((b"a", 1),), None), (6, 1, ()),
     (6, b"\0"*16, []), (6, b"\0"*16, (1,)), (99, None, None)])
 def test_private_object_codec_conversion_errors(type_code, value, parents):
-    with pytest.raises((TypeError, ValueError, RuntimeError)):
+    with pytest.raises((TypeError, ValueError, OverflowError, RuntimeError)):
         dml._core.encode_object(type_code, value, parents)
 
 

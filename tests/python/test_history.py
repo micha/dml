@@ -215,7 +215,7 @@ def test_missing_direct_references_reject_on_put_and_read(tmp_path: pathlib.Path
   if position == "datum":
     kind, payload = 3, struct.pack("<I", 1) + missing
   elif position == "root":
-    kind, payload = 4, missing
+    kind, payload = 4, missing + struct.pack("<I", 0)
   elif position == "entry":
     kind, payload = 5, tree_payload([("example", missing)])
   elif position == "tree":
