@@ -1,8 +1,8 @@
 # DML: the evolving as-built specification
 
-Status: implemented subset, growing through the design spiral. The initial source
-inspection is at commit `638cc42`; the implementation has not changed to create
-this specification.
+Status: implemented subset, growing through the design spiral. The datum foundation
+was initially inspected at `638cc42`; the minimum viable repository extends it with
+literal nodes, DAGs, trees, commits and transactional refs.
 
 ## Authority boundary
 
@@ -39,15 +39,22 @@ flowchart TD
     GUIDE["../documentation-guidelines.md<br/>Shared writing rules"]
     GLOSSARY["glossary.md<br/>Shared terminology"]
     RECORDS["records.md<br/>Datums, encoding, record identity and errors"]
-    REPO["repository.md<br/>Local storage, transactions and ownership"]
+    OBJECTS["objects.md<br/>Snapshot/history fields, names and views"]
+    REPO["repository.md<br/>Local storage, refs, transactions and ownership"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
     TESTS["../../tests/<br/>Behavior checks"]
     README --> AGENTS
     README --> RECORDS
+    README --> OBJECTS
     README --> REPO
     AGENTS --> GUIDE
     AGENTS --> GLOSSARY
     RECORDS --> GLOSSARY
+    OBJECTS --> GLOSSARY
+    OBJECTS --> RECORDS
+    OBJECTS --> REPO
+    OBJECTS --> CODE
+    OBJECTS --> TESTS
     REPO --> GLOSSARY
     REPO --> RECORDS
     RECORDS --> CODE
@@ -65,14 +72,18 @@ flowchart TD
 | Shared documentation style and authority conventions | [Documentation Writing Guidelines](../documentation-guidelines.md) |
 | Shared vocabulary, not implementation contracts | [Glossary](glossary.md) |
 | Datum kinds, canonical records, record IDs, URI/text behavior and error representation | [records.md](records.md) |
-| Repository initialization, storage keys, transactions, reference checks and handle ownership | [repository.md](repository.md) |
+| Literal-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
+| Repository initialization, storage keys, transactions, direct reference checks, refs and handle ownership | [repository.md](repository.md) |
 
 ## What exists today
 
 - A C codec for all ten datum kinds, deterministic record encoding and IDs.
 - UTF-8/NFC and URI validation/canonicalization helpers.
-- An LMDB-backed local repository storing immutable datums in transactions.
-- C tests and Python tests driving native test helpers.
+- Literal nodes, rooted DAGs, named trees and ordered-parent commits with full-record IDs.
+- An LMDB-backed local repository storing immutable objects and mutable refs in
+  storage transactions.
+- C tests and Python tests driving native test helpers, including fresh-process
+  snapshot/history inspection and atomic object/ref rollback.
 - Version-only/scaffold CLI, Python package and example adapter entry points.
 
 ## Development policy
@@ -95,6 +106,7 @@ behavior as implemented before the corresponding code exists.
 
 Technical documents describe the current implemented contract. MUST, SHOULD and
 MAY are normative when used there; examples are explicitly informative. Source and
-test links provide evidence, not a claim that a fresh test run occurred during this
-initial documentation pass. If code, tests and this spec disagree, report the
+test links provide evidence; actual validation runs and outstanding gates are in the
+[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md).
+If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

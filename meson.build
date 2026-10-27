@@ -29,6 +29,7 @@ libdml = static_library(
     'src/dml.c',
     'src/encoding.c',
     'src/error.c',
+    'src/object.c',
     'src/object_id.c',
     'src/record.c',
     'src/repo.c',
@@ -43,6 +44,7 @@ libdml = static_library(
 install_headers(
   'include/dml/dml.h',
   'include/dml/error.h',
+  'include/dml/object.h',
   'include/dml/record.h',
   'include/dml/repo.h',
   subdir: 'dml',
@@ -103,6 +105,17 @@ test_core_driver = executable(
   'tests/c/core_driver.c',
   include_directories: dml_inc,
   dependencies: dml_dep,
+)
+
+test_object = executable(
+  'test_object', 'tests/c/test_object.c',
+  include_directories: dml_inc, dependencies: dml_dep,
+)
+test('test_object', test_object)
+
+executable(
+  'test_history_driver', 'tests/c/history_driver.c',
+  include_directories: dml_inc, dependencies: dml_dep,
 )
 
 meson.override_dependency('dml', dml_dep)

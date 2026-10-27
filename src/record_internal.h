@@ -12,6 +12,9 @@
 
 dml_status dml_validate_envelope(const uint8_t *data, size_t len,
                                  uint16_t *type, dml_error *error);
+void dml_encode_header(uint8_t *data, uint16_t type, uint32_t len);
+dml_status dml_validate_object(const uint8_t *data, size_t len, uint16_t type,
+                                 dml_error *error);
 void dml_encode_meta(uint8_t out[DML_META_SIZE]);
 
 #endif

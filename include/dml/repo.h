@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "dml/error.h"
-#include "dml/record.h"
+#include "dml/object.h"
 
 typedef struct dml_repo dml_repo;
 typedef struct dml_txn dml_txn;
@@ -37,6 +37,20 @@ dml_status dml_txn_put_datum(dml_txn *txn, const uint8_t *data, size_t len,
                              dml_object_id *out, dml_error *error);
 dml_status dml_txn_get_datum(dml_txn *txn, const dml_object_id *id,
                              dml_buffer *out, dml_error *error);
+/* Expected type must be NODE, DAG, TREE or COMMIT; packed type must match. */
+dml_status dml_txn_put_object(dml_txn *txn, dml_record_type type,
+                               const uint8_t *data, size_t len, dml_object_id *out,
+                               dml_error *error);
+dml_status dml_txn_get_object(dml_txn *txn, dml_record_type type,
+                               const dml_object_id *id, dml_buffer *out, dml_error *error);
+/* Ref names use dml_name_validate(). Create never overwrites; update requires
+ * an existing ref. Targets must resolve to commits in this transaction. */
+dml_status dml_txn_ref_create(dml_txn *txn, dml_bytes name, const dml_object_id *target,
+                               dml_error *error);
+dml_status dml_txn_ref_update(dml_txn *txn, dml_bytes name, const dml_object_id *target,
+                               dml_error *error);
+dml_status dml_txn_ref_get(dml_txn *txn, dml_bytes name, dml_object_id *out,
+                            dml_error *error);
 /* Commit consumes the handle on success or failure; abort is null-safe. */
 dml_status dml_txn_commit(dml_txn **txn, dml_error *error);
 void dml_txn_abort(dml_txn **txn);

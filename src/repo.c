@@ -273,28 +273,33 @@ dml_status dml_txn_begin(dml_repo *repo, dml_txn_mode mode, dml_txn **out,
   return DML_OK;
 }
 
-static void datum_key(const dml_object_id *id, char key[47]) {
+static size_t object_key(dml_record_type type, const dml_object_id *id, char key[48]) {
+  static const char *const prefixes[] = {
+    "objects/datums/", "objects/nodes/", "objects/dags/", "objects/trees/", "objects/commits/"
+  };
+  const char *prefix = prefixes[type - DML_REC_DATUM];
+  size_t prefix_len = strlen(prefix);
   char hex[DML_OBJECT_ID_HEX_SIZE + 1];
   (void)dml_object_id_format(id, hex, NULL);
-  memcpy(key, "objects/datums/", 15);
-  memcpy(key + 15, hex, 32);
+  memcpy(key, prefix, prefix_len);
+  memcpy(key + prefix_len, hex, 32);
+  return prefix_len + 32;
 }
 
-static dml_status lookup_datum(dml_txn *txn, const dml_object_id *id,
-                               MDB_val *value, dml_error *error) {
-  char key_bytes[47];
-  MDB_val key = {sizeof(key_bytes), key_bytes};
+static dml_status lookup_object(dml_txn *txn, dml_record_type expected, const dml_object_id *id,
+                                 MDB_val *value, dml_error *error) {
+  char key_bytes[48];
+  MDB_val key = {object_key(expected, id, key_bytes), key_bytes};
   uint16_t type;
   dml_object_id actual;
   int code;
   dml_status status;
-  datum_key(id, key_bytes);
   code = mdb_get(txn->native, txn->repo->dbi, &key, value);
   if (code == MDB_NOTFOUND) {
-    return dml_set_error(error, DML_NOT_FOUND, code, "datum object was not found");
+    return dml_set_error(error, DML_NOT_FOUND, code, "immutable object was not found");
   }
   if (code != MDB_SUCCESS) {
-    return storage_error(error, code, "reading datum object");
+    return storage_error(error, code, "reading immutable object");
   }
   status = dml_validate_envelope(value->mv_data, value->mv_size, &type, error);
   if (status != DML_OK) {
@@ -310,19 +315,26 @@ static dml_status lookup_datum(dml_txn *txn, const dml_object_id *id,
     return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
                          "record_type=tombstone;detail=excised");
   }
-  if (type != DML_REC_DATUM) {
+  if (type != expected) {
     return dml_set_error(error, DML_INVALID_KIND, 0,
-                         "record_type=datum;detail=composite_ref_not_datum");
+                         expected == DML_REC_DATUM
+                           ? "record_type=datum;detail=composite_ref_not_datum"
+                           : "stored object does not have the expected type");
   }
-  status = dml_datum_id(value->mv_data, value->mv_size, &actual, error);
+  status = dml_object_id_compute(value->mv_data, value->mv_size, &actual, error);
   if (status != DML_OK) {
     return status;
   }
   if (memcmp(actual.bytes, id->bytes, DML_OBJECT_ID_SIZE) != 0) {
     return dml_set_error(error, DML_INTEGRITY_ERROR, 0,
-                         "stored datum id does not match its key");
+                         "stored object id does not match its key");
   }
   return DML_OK;
+}
+
+static dml_status lookup_datum(dml_txn *txn, const dml_object_id *id,
+                               MDB_val *value, dml_error *error) {
+  return lookup_object(txn, DML_REC_DATUM, id, value, error);
 }
 
 static dml_status validate_references(dml_txn *txn, const uint8_t *data, size_t len,
@@ -358,10 +370,41 @@ static dml_status validate_references(dml_txn *txn, const uint8_t *data, size_t 
   return DML_OK;
 }
 
-dml_status dml_txn_put_datum(dml_txn *txn, const uint8_t *data, size_t len,
-                             dml_object_id *out, dml_error *error) {
-  char key_bytes[47];
-  MDB_val key = {sizeof(key_bytes), key_bytes};
+static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
+                                             const uint8_t *data, size_t len,
+                                             dml_error *error) {
+  if (type == DML_REC_DATUM) return validate_references(txn, data, len, error);
+  dml_object_view view;
+  dml_status status = dml_object_decode(data, len, &view, error);
+  if (status != DML_OK) return status;
+  MDB_val ignored;
+  if (type != DML_REC_TREE) {
+    dml_record_type referenced_type = type == DML_REC_NODE ? DML_REC_DATUM
+                                  : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_TREE;
+    status = lookup_object(txn, referenced_type, &view.reference, &ignored, error);
+    if (status != DML_OK) return status;
+  }
+  for (size_t i = 0; i < view.count; i++) {
+    dml_object_id id;
+    if (type == DML_REC_TREE) {
+      dml_tree_entry entry;
+      (void)dml_object_view_entry(&view, i, &entry, NULL);
+      id = entry.dag;
+    } else {
+      (void)dml_object_view_parent(&view, i, &id, NULL);
+    }
+    status = lookup_object(txn, type == DML_REC_TREE ? DML_REC_DAG : DML_REC_COMMIT,
+                            &id, &ignored, error);
+    if (status != DML_OK) return status;
+  }
+  return DML_OK;
+}
+
+static dml_status put_object(dml_txn *txn, dml_record_type type,
+                              const uint8_t *data, size_t len,
+                              dml_object_id *out, dml_error *error) {
+  char key_bytes[48];
+  MDB_val key = {0, key_bytes};
   MDB_val value = {len, (void *)data};
   MDB_val existing;
   dml_status status;
@@ -373,50 +416,162 @@ dml_status dml_txn_put_datum(dml_txn *txn, const uint8_t *data, size_t len,
     txn->poisoned = 1;
     return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "object id output is null");
   }
-  status = dml_datum_id(data, len, out, error);
-  if (status == DML_OK) status = validate_references(txn, data, len, error);
+  status = dml_object_id_compute(data, len, out, error);
+  if (status == DML_OK && dml_read_u16_le(data + 6) != type) {
+    status = dml_set_error(error, DML_INVALID_KIND, 0, "object does not have the expected type");
+  }
+  if (status == DML_OK) status = validate_object_references(txn, type, data, len, error);
   if (status != DML_OK) {
     txn->poisoned = 1;
     return status;
   }
-  datum_key(out, key_bytes);
+  key.mv_size = object_key(type, out, key_bytes);
   code = mdb_put(txn->native, txn->repo->dbi, &key, &value, MDB_NOOVERWRITE);
   if (code == MDB_KEYEXIST) {
-    status = lookup_datum(txn, out, &existing, error);
+    status = lookup_object(txn, type, out, &existing, error);
     if (status == DML_OK &&
         (existing.mv_size != len || memcmp(existing.mv_data, data, len) != 0)) {
       status = dml_set_error(error, DML_INTEGRITY_ERROR, 0,
-                             "datum id collision or stored corruption");
+                             "object id collision or stored corruption");
     }
     if (status != DML_OK) txn->poisoned = 1;
     return status;
   }
   if (code != MDB_SUCCESS) {
     txn->poisoned = 1;
-    return storage_error(error, code, "storing datum object");
+    return storage_error(error, code, "storing immutable object");
   }
   return DML_OK;
 }
 
-dml_status dml_txn_get_datum(dml_txn *txn, const dml_object_id *id,
-                             dml_buffer *out, dml_error *error) {
+static dml_status get_object(dml_txn *txn, dml_record_type type, const dml_object_id *id,
+                              dml_buffer *out, dml_error *error) {
   MDB_val value;
   dml_status status;
   if (txn == NULL || id == NULL || out == NULL || out->data != NULL || out->len != 0) {
-    return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid datum get arguments");
+    return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid object get arguments");
   }
   out->data = NULL;
   out->len = 0;
-  status = lookup_datum(txn, id, &value, error);
-  if (status == DML_OK) status = validate_references(txn, value.mv_data, value.mv_size, error);
+  status = lookup_object(txn, type, id, &value, error);
+  if (status == DML_OK) {
+    status = validate_object_references(txn, type, value.mv_data, value.mv_size, error);
+  }
   if (status != DML_OK) return status;
   out->data = malloc(value.mv_size);
   if (out->data == NULL) {
-    return dml_set_error(error, DML_OUT_OF_MEMORY, 0, "copying stored datum");
+    return dml_set_error(error, DML_OUT_OF_MEMORY, 0, "copying stored object");
   }
   memcpy(out->data, value.mv_data, value.mv_size);
   out->len = value.mv_size;
   return DML_OK;
+}
+
+dml_status dml_txn_put_datum(dml_txn *txn, const uint8_t *data, size_t len,
+                             dml_object_id *out, dml_error *error) {
+  return put_object(txn, DML_REC_DATUM, data, len, out, error);
+}
+
+dml_status dml_txn_get_datum(dml_txn *txn, const dml_object_id *id,
+                             dml_buffer *out, dml_error *error) {
+  return get_object(txn, DML_REC_DATUM, id, out, error);
+}
+
+dml_status dml_txn_put_object(dml_txn *txn, dml_record_type type,
+                               const uint8_t *data, size_t len, dml_object_id *out,
+                               dml_error *error) {
+  if (type < DML_REC_NODE || type > DML_REC_COMMIT) {
+    if (txn != NULL && txn->mode == DML_TXN_WRITE) txn->poisoned = 1;
+    return dml_set_error(error, DML_INVALID_KIND, 0, "unsupported object storage type");
+  }
+  return put_object(txn, type, data, len, out, error);
+}
+
+dml_status dml_txn_get_object(dml_txn *txn, dml_record_type type,
+                               const dml_object_id *id, dml_buffer *out, dml_error *error) {
+  if (type < DML_REC_NODE || type > DML_REC_COMMIT) {
+    return dml_set_error(error, DML_INVALID_KIND, 0, "unsupported object storage type");
+  }
+  return get_object(txn, type, id, out, error);
+}
+
+static dml_status ref_key(dml_bytes name, char bytes[139], MDB_val *key, dml_error *error) {
+  dml_status status = dml_name_validate(name, error);
+  if (status != DML_OK) return status;
+  memcpy(bytes, "refs/heads/", 11);
+  memcpy(bytes + 11, name.data, name.len);
+  key->mv_data = bytes;
+  key->mv_size = 11 + name.len;
+  return DML_OK;
+}
+
+static dml_status validate_ref_target(dml_txn *txn, const dml_object_id *id, dml_error *error) {
+  MDB_val value;
+  dml_status status = lookup_object(txn, DML_REC_COMMIT, id, &value, error);
+  if (status == DML_OK) {
+    status = validate_object_references(txn, DML_REC_COMMIT, value.mv_data, value.mv_size, error);
+  }
+  return status;
+}
+
+dml_status dml_txn_ref_get(dml_txn *txn, dml_bytes name, dml_object_id *out,
+                            dml_error *error) {
+  char bytes[139];
+  MDB_val key;
+  MDB_val value;
+  if (txn == NULL || out == NULL) {
+    return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid ref get arguments");
+  }
+  dml_status status = ref_key(name, bytes, &key, error);
+  if (status != DML_OK) return status;
+  int code = mdb_get(txn->native, txn->repo->dbi, &key, &value);
+  if (code == MDB_NOTFOUND) return dml_set_error(error, DML_NOT_FOUND, code, "ref was not found");
+  if (code != MDB_SUCCESS) return storage_error(error, code, "reading ref");
+  if (value.mv_size != 16) return dml_set_error(error, DML_INTEGRITY_ERROR, 0, "invalid ref target size");
+  dml_object_id target;
+  memcpy(target.bytes, value.mv_data, 16);
+  status = validate_ref_target(txn, &target, error);
+  if (status == DML_OK) *out = target;
+  return status;
+}
+
+static dml_status write_ref(dml_txn *txn, dml_bytes name, const dml_object_id *target,
+                             int create, dml_error *error) {
+  if (txn == NULL || txn->mode != DML_TXN_WRITE || txn->poisoned) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "transaction is not writable");
+  }
+  char bytes[139];
+  MDB_val key;
+  MDB_val existing;
+  dml_status status = ref_key(name, bytes, &key, error);
+  if (status == DML_OK && target == NULL) {
+    status = dml_set_error(error, DML_INVALID_ARGUMENT, 0, "ref target is null");
+  }
+  if (status == DML_OK) status = validate_ref_target(txn, target, error);
+  if (status == DML_OK && !create) {
+    int code = mdb_get(txn->native, txn->repo->dbi, &key, &existing);
+    if (code == MDB_NOTFOUND) status = dml_set_error(error, DML_NOT_FOUND, code, "ref was not found");
+    else if (code != MDB_SUCCESS) status = storage_error(error, code, "reading ref before update");
+    else if (existing.mv_size != 16) status = dml_set_error(error, DML_INTEGRITY_ERROR, 0, "invalid ref target size");
+  }
+  if (status == DML_OK) {
+    MDB_val value = {16, (void *)target->bytes};
+    int code = mdb_put(txn->native, txn->repo->dbi, &key, &value, create ? MDB_NOOVERWRITE : 0);
+    if (code == MDB_KEYEXIST) status = dml_set_error(error, DML_INVALID_STATE, code, "ref already exists");
+    else if (code != MDB_SUCCESS) status = storage_error(error, code, "storing ref");
+  }
+  if (status != DML_OK) txn->poisoned = 1;
+  return status;
+}
+
+dml_status dml_txn_ref_create(dml_txn *txn, dml_bytes name, const dml_object_id *target,
+                               dml_error *error) {
+  return write_ref(txn, name, target, 1, error);
+}
+
+dml_status dml_txn_ref_update(dml_txn *txn, dml_bytes name, const dml_object_id *target,
+                               dml_error *error) {
+  return write_ref(txn, name, target, 0, error);
 }
 
 dml_status dml_txn_commit(dml_txn **txn_ptr, dml_error *error) {

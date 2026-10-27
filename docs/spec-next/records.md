@@ -1,17 +1,18 @@
 # Records and datums
 
-Status: implemented datum codec and record identity, record format 1.
+Status: implemented datum codec and immutable-object identity, record format 1.
 
 ## Authority boundary
 
 This document owns the implemented datum kinds, packed encoding, canonicalization,
 record hashing, value-buffer ownership and error representation in this as-built
 specification. For persistence, reference validation and transaction ownership, see
-[repository.md](repository.md). For implementation status, see [README.md](README.md).
+[repository.md](repository.md). For node/DAG/tree/commit bodies and views, see
+[objects.md](objects.md). For implementation status, see [README.md](README.md).
 Terms follow the shared [glossary](glossary.md).
 
-Normative sections describe current code. No computational identity mask or general
-node identity API is implied by the datum ID API.
+Full-record content identity is implemented. The hashing API does not supply
+computational reuse identities or researcher-controlled identity masks.
 
 ## Datum model
 
@@ -48,7 +49,7 @@ The record envelope is 20 bytes:
 | --- | --- | --- |
 | 0 | Magic `0x314c4d44` | u32 |
 | 4 | Record format version, currently 1 | u16 |
-| 6 | Record type; datum is 2, metadata is 1 | u16 |
+| 6 | Record type: metadata 1, datum 2, node 3, DAG 4, tree 5, commit 6 | u16 |
 | 8 | Total record length | u32 |
 | 12 | Reserved flags, zero | u32 |
 | 16 | Checksum, zero | u32 |
@@ -69,9 +70,10 @@ Collections begin with a u32 count followed by 16-byte IDs (LIST/SET) or 32-byte
 key/value ID pairs (MAP). SET ordering and MAP-key ordering use lexicographic ID
 bytes. IDs in stored SETs and MAP keys MUST be strictly increasing.
 
-`dml_record_validate()` currently supports metadata and datums only. Recognized
-record-type constants do not confer validation support for other object classes.
-Repository metadata uses the envelope plus a u32 schema version, currently 1.
+`dml_record_validate()` supports metadata, datums and the four
+[snapshot/history object types](objects.md#packed-bodies). Other record-type
+constants do not confer validation support. Repository metadata uses the envelope
+plus a u32 schema version, currently 1.
 
 ## Text, numbers and URIs
 
@@ -93,9 +95,11 @@ of external availability.
 
 ## Record identity
 
-`dml_datum_id()` validates a datum record and hashes a copy with the envelope's
-magic, total-length and checksum fields zeroed. Record type, format version, datum
-kind and payload still contribute. The algorithm is unseeded XXH3-128; the result
+`dml_object_id_compute()` validates an immutable datum/node/DAG/tree/commit record
+and hashes a copy with the envelope's magic, total-length and checksum fields zeroed.
+Record type, format version and the complete body still contribute. Metadata and
+refs MUST NOT be accepted as immutable objects. `dml_datum_id()` uses the same
+hashing rule but MUST accept only datums. The algorithm is unseeded XXH3-128; the result
 is 16 canonical bytes, high 64 bits followed by low 64 bits, each big-endian.
 
 Text formatting uses 32 lowercase hex characters. Parsing MUST reject other lengths
@@ -109,13 +113,14 @@ writers, establish scientific validity or prove complete environment capture.
 
 Public declarations are in [record.h](../../include/dml/record.h).
 
-- `dml_datum_encode()`, `dml_uri_canonicalize()` and repository datum reads return
-  owned `dml_buffer` allocations. The caller MUST release them with
+- Encoders, `dml_uri_canonicalize()` and repository object reads return owned
+  `dml_buffer` allocations. The caller MUST release them with
   `dml_buffer_free()`.
 - Output buffers MUST initially be empty. `dml_buffer_free()` is null-safe and
   clears the buffer.
 - `dml_datum_decode()` produces a borrowed view. The caller MUST keep the original
   packed bytes alive and unchanged while using it or its element accessors.
+  Snapshot/history views follow [the same lifetime rule](objects.md#c-codec-and-views).
 
 ## Errors
 
@@ -137,4 +142,5 @@ not use that form. Unknown general record types report an unsupported-type error
   [failure tests](../../tests/c/test_record_failure.c).
 - [Native-driver property tests and golden vectors](../../tests/python/test_records_hypothesis.py).
 
-These links identify evidence; this documentation pass did not rerun the suite.
+Actual validation runs and outstanding gates are recorded in the
+[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md).

@@ -3,11 +3,12 @@
 
 #include <xxhash.h>
 
-#include "dml/record.h"
+#include "dml/object.h"
+#include "encoding.h"
 #include "error_internal.h"
 
-dml_status dml_datum_id(const uint8_t *data, size_t len, dml_object_id *out,
-                        dml_error *error) {
+static dml_status compute_id(const uint8_t *data, size_t len, dml_object_id *out,
+                              bool datum_only, dml_error *error) {
   uint8_t *masked;
   XXH128_canonical_t canonical;
   dml_status status;
@@ -18,9 +19,13 @@ dml_status dml_datum_id(const uint8_t *data, size_t len, dml_object_id *out,
   if (status != DML_OK) {
     return status;
   }
-  if (len < 8 || data[6] != DML_REC_DATUM || data[7] != 0) {
+  uint16_t type = dml_read_u16_le(data + 6);
+  if (datum_only && type != DML_REC_DATUM) {
     return dml_set_error(error, DML_INVALID_KIND, 0,
                          "record_type=datum;detail=record_type");
+  }
+  if (type < DML_REC_DATUM || type > DML_REC_COMMIT) {
+    return dml_set_error(error, DML_INVALID_KIND, 0, "record is not an immutable object");
   }
   masked = malloc(len);
   if (masked == NULL) {
@@ -34,6 +39,16 @@ dml_status dml_datum_id(const uint8_t *data, size_t len, dml_object_id *out,
   free(masked);
   memcpy(out->bytes, canonical.digest, DML_OBJECT_ID_SIZE);
   return DML_OK;
+}
+
+dml_status dml_object_id_compute(const uint8_t *data, size_t len, dml_object_id *out,
+                                  dml_error *error) {
+  return compute_id(data, len, out, false, error);
+}
+
+dml_status dml_datum_id(const uint8_t *data, size_t len, dml_object_id *out,
+                        dml_error *error) {
+  return compute_id(data, len, out, true, error);
 }
 
 dml_status dml_object_id_format(const dml_object_id *id,

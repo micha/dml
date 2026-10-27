@@ -16,7 +16,7 @@ _Static_assert(FLT_RADIX == 2 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 dml_status dml_text_normalize(const uint8_t *data, size_t len, dml_buffer *out,
                               dml_error *error);
 
-static void encode_header(uint8_t *data, uint16_t type, uint32_t len) {
+void dml_encode_header(uint8_t *data, uint16_t type, uint32_t len) {
   dml_write_u32_le(data, 0x314c4d44u);
   dml_write_u16_le(data + 4, DML_RECORD_VERSION);
   dml_write_u16_le(data + 6, type);
@@ -55,7 +55,7 @@ dml_status dml_validate_envelope(const uint8_t *data, size_t len,
 }
 
 void dml_encode_meta(uint8_t out[DML_META_SIZE]) {
-  encode_header(out, DML_REC_META, DML_META_SIZE);
+  dml_encode_header(out, DML_REC_META, DML_META_SIZE);
   dml_write_u32_le(out + DML_HEADER_SIZE, DML_SCHEMA_VERSION);
 }
 
@@ -217,6 +217,9 @@ dml_status dml_record_validate(const uint8_t *data, size_t len, dml_error *error
   if (type == DML_REC_DATUM) {
     return validate_datum(data, len, NULL, error);
   }
+  if (type >= DML_REC_NODE && type <= DML_REC_COMMIT) {
+    return dml_validate_object(data, len, type, error);
+  }
   return dml_set_error(error, DML_INVALID_KIND, 0,
                        "record_type=unknown;detail=unsupported_type");
 }
@@ -334,7 +337,7 @@ dml_status dml_datum_encode(const dml_datum_input *input, dml_buffer *out,
     dml_buffer_free(&normalized);
     return dml_set_error(error, DML_OUT_OF_MEMORY, 0, "allocating datum record");
   }
-  encode_header(record, DML_REC_DATUM, (uint32_t)total_len);
+  dml_encode_header(record, DML_REC_DATUM, (uint32_t)total_len);
   dml_write_u32_le(record + 20, input->kind);
   dml_write_u64_le(record + 24, payload_len);
   dml_write_u64_le(record + 32, DML_DATUM_PREFIX_SIZE);

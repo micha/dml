@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <lmdb.h>
+
 #include "dml/dml.h"
 
 #ifdef _WIN32
@@ -104,7 +106,9 @@ static int command_record(const char *command) {
   }
   dml_object_id id;
   char hex[33];
-  status = dml_datum_id(record.data, record.len, &id, &error);
+  status = strcmp(command, "object-id") == 0
+             ? dml_object_id_compute(record.data, record.len, &id, &error)
+             : dml_datum_id(record.data, record.len, &id, &error);
   free(record.data);
   if (status != DML_OK) return fail(status, &error);
   (void)dml_object_id_format(&id, hex, NULL);
@@ -135,7 +139,7 @@ static int command_repo_init(const char *path) {
   return dml_repo_close(&repo, &error) == DML_OK ? 0 : 1;
 }
 
-static int command_repo_get(const char *path, const char *hex) {
+static int command_repo_get(const char *path, const char *hex, dml_record_type type) {
   dml_repo_options options = {false, 0};
   dml_object_id id;
   dml_repo *repo = NULL;
@@ -145,7 +149,10 @@ static int command_repo_get(const char *path, const char *hex) {
   dml_status status = dml_object_id_parse(hex, strlen(hex), &id, &error);
   if (status == DML_OK) status = dml_repo_open(path, &options, &repo, &error);
   if (status == DML_OK) status = dml_txn_begin(repo, DML_TXN_READ, &txn, &error);
-  if (status == DML_OK) status = dml_txn_get_datum(txn, &id, &record, &error);
+  if (status == DML_OK) {
+    status = type == DML_REC_DATUM ? dml_txn_get_datum(txn, &id, &record, &error)
+                                 : dml_txn_get_object(txn, type, &id, &record, &error);
+  }
   if (status != DML_OK) {
     dml_txn_abort(&txn);
     if (repo != NULL) (void)dml_repo_close(&repo, NULL);
@@ -205,23 +212,126 @@ static int command_repo_put_batch(const char *path, int commit) {
   return status == DML_OK ? 0 : fail(status, &error);
 }
 
+static int command_object_encode(const char *type_text) {
+  dml_buffer payload = {0};
+  dml_buffer record = {0};
+  dml_object_input input = {.type = (dml_record_type)strtol(type_text, NULL, 10)};
+  dml_tree_entry *entries = NULL;
+  dml_error error;
+  int result = 2;
+  if (!read_all(&payload)) goto done;
+  if (input.type == DML_REC_NODE && payload.len == 20) {
+    input.value.node.kind = read_u32(payload.data);
+    memcpy(input.value.node.datum.bytes, payload.data + 4, 16);
+  } else if (input.type == DML_REC_DAG && payload.len == 16) {
+    memcpy(input.value.root.bytes, payload.data, 16);
+  } else if (input.type == DML_REC_COMMIT && payload.len >= 20 && (payload.len - 20) % 16 == 0) {
+    memcpy(input.value.commit.tree.bytes, payload.data, 16);
+    input.value.commit.parents.count = (payload.len - 20) / 16;
+    if (read_u32(payload.data + 16) != input.value.commit.parents.count) goto done;
+    input.value.commit.parents.items = (const dml_object_id *)(payload.data + 20);
+  } else if (input.type == DML_REC_TREE && payload.len >= 4) {
+    size_t count = read_u32(payload.data);
+    size_t offset = 4;
+    if (count > (payload.len - 4) / 20) goto done;
+    entries = calloc(count == 0 ? 1 : count, sizeof(*entries));
+    if (entries == NULL) goto done;
+    for (size_t i = 0; i < count; i++) {
+      if (payload.len - offset < 4) goto done;
+      size_t len = read_u32(payload.data + offset);
+      offset += 4;
+      if (payload.len - offset < 16 || len > payload.len - offset - 16) goto done;
+      entries[i].name = (dml_bytes){payload.data + offset, len};
+      memcpy(entries[i].dag.bytes, payload.data + offset + len, 16);
+      offset += len + 16;
+    }
+    if (offset != payload.len) goto done;
+    input.value.tree.items = entries;
+    input.value.tree.count = count;
+  } else goto done;
+  dml_status status = dml_object_encode(&input, &record, &error);
+  result = status == DML_OK ? write_buffer(&record) : fail(status, &error);
+done:
+  free(entries);
+  dml_buffer_free(&payload);
+  dml_buffer_free(&record);
+  return result;
+}
+
+static int command_object_put(const char *path, dml_record_type type) {
+  dml_repo *repo = NULL;
+  dml_txn *txn = NULL;
+  dml_buffer record = {0};
+  dml_object_id id;
+  dml_error error = {0};
+  if (!read_all(&record)) return 1;
+  dml_status status = dml_repo_open(path, NULL, &repo, &error);
+  if (status == DML_OK) status = dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error);
+  if (status == DML_OK) status = dml_txn_put_object(txn, type, record.data, record.len, &id, &error);
+  if (txn != NULL) {
+    /* Deliberately try commit even after failure: poisoned transactions must abort. */
+    dml_status commit = dml_txn_commit(&txn, status == DML_OK ? &error : NULL);
+    if (status == DML_OK) status = commit;
+    else if (commit != DML_INVALID_STATE) status = DML_INTEGRITY_ERROR;
+  }
+  if (status == DML_OK) {
+    char hex[33];
+    (void)dml_object_id_format(&id, hex, NULL);
+    puts(hex);
+  }
+  dml_buffer_free(&record);
+  if (repo != NULL) (void)dml_repo_close(&repo, NULL);
+  return status == DML_OK ? 0 : fail(status, &error);
+}
+
+/* Test-only corruption injection; never part of the public repository API. */
+static int command_raw_write(const char *path, const char *key_text) {
+  dml_buffer bytes = {0};
+  MDB_env *env = NULL;
+  MDB_txn *txn = NULL;
+  MDB_dbi dbi;
+  if (!read_all(&bytes)) return 1;
+  MDB_val key = {strlen(key_text), (void *)key_text};
+  MDB_val value = {bytes.len, bytes.data};
+  int code = mdb_env_create(&env);
+  if (code == MDB_SUCCESS) code = mdb_env_open(env, path, 0, 0664);
+  if (code == MDB_SUCCESS) code = mdb_txn_begin(env, NULL, 0, &txn);
+  if (code == MDB_SUCCESS) code = mdb_dbi_open(txn, NULL, 0, &dbi);
+  if (code == MDB_SUCCESS) code = mdb_put(txn, dbi, &key, &value, 0);
+  if (txn != NULL) {
+    if (code == MDB_SUCCESS) code = mdb_txn_commit(txn);
+    else mdb_txn_abort(txn);
+  }
+  if (env != NULL) mdb_env_close(env);
+  dml_buffer_free(&bytes);
+  return code == MDB_SUCCESS ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
 #ifdef _WIN32
   (void)_setmode(_fileno(stdin), _O_BINARY);
   (void)_setmode(_fileno(stdout), _O_BINARY);
 #endif
+  if (argc == 3 && strcmp(argv[1], "encode-object") == 0) return command_object_encode(argv[2]);
+  if (argc == 4 && strcmp(argv[1], "object-put") == 0)
+    return command_object_put(argv[2], (dml_record_type)strtol(argv[3], NULL, 10));
+  if (argc == 4 && strcmp(argv[1], "raw-write") == 0) return command_raw_write(argv[2], argv[3]);
   if (argc == 3 && strcmp(argv[1], "encode") == 0) return command_encode(argv[2]);
   if (argc == 2 && (strcmp(argv[1], "validate") == 0 || strcmp(argv[1], "decode") == 0 ||
-                    strcmp(argv[1], "id") == 0))
+                    strcmp(argv[1], "id") == 0 || strcmp(argv[1], "object-id") == 0))
     return command_record(argv[1]);
   if (argc == 2 && strcmp(argv[1], "normalize-uri") == 0) return command_uri();
   if (argc == 3 && strcmp(argv[1], "repo-init") == 0) return command_repo_init(argv[2]);
-  if (argc == 4 && strcmp(argv[1], "repo-get") == 0) return command_repo_get(argv[2], argv[3]);
+  if (argc == 4 && strcmp(argv[1], "repo-get") == 0)
+    return command_repo_get(argv[2], argv[3], DML_REC_DATUM);
+  if (argc == 5 && strcmp(argv[1], "object-get") == 0)
+    return command_repo_get(argv[2], argv[4], (dml_record_type)strtol(argv[3], NULL, 10));
   if (argc == 4 && strcmp(argv[1], "repo-put-batch") == 0 &&
       (strcmp(argv[3], "commit") == 0 || strcmp(argv[3], "abort") == 0))
     return command_repo_put_batch(argv[2], strcmp(argv[3], "commit") == 0);
   fprintf(stderr,
           "usage: test_core_driver "
-          "<encode|validate|decode|id|normalize-uri|repo-init|repo-put-batch|repo-get> ...\n");
+          "<encode|encode-object|validate|decode|id|object-id|normalize-uri|repo-init|"
+          "repo-put-batch|repo-get|object-get|object-put|raw-write> ...\n");
   return 2;
 }
