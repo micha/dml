@@ -42,6 +42,22 @@ test, and report-generation failures still fail the job.
 Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
 targets `build/check/test_version` by default when present.
 
+## C Editor Setup
+
+Run `scripts/setup-lsp.sh` in your build environment (Meson, Ninja, a C compiler,
+Python, and Python development headers are required). It configures separate
+editor builds for the core and Python extension, then writes an ignored
+`compile_commands.json` at the repository root. No compilation is required.
+
+The database includes compiler-discovered system-header paths for environments
+such as Nix, where an unwrapped clangd cannot infer them. It does not change
+Neovim's global configuration or the coverage/mutation builds.
+
+Rerun the script after changing build definitions, compilers, or Python
+installations. Restart the clangd client in Neovim after the initial setup.
+See [clangd project setup](https://clangd.llvm.org/installation.html#project-setup)
+and [system-header discovery](https://clangd.llvm.org/guides/system-headers).
+
 ## CLI Help
 
 - Primary documentation surface: `dml --help` and `dml <command> --help`

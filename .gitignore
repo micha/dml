@@ -65,9 +65,12 @@ dkms.conf
 .td-root
 
 # Meson build artifacts
+compile_commands.json
+compile_commands.json.tmp
 build/
 builddir/
 subprojects/packagecache/
+/subprojects/.wraplock
 .cache/
 
 # Test and local tool artifacts
