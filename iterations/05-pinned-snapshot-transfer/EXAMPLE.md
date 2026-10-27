@@ -1,9 +1,11 @@
 # Iteration 5 worked example: carry recorded history to another repository
 
-Status: informative acceptance story for the user-approved bounded plan, not executed
-during preparation. Implementation remains unauthorized. [DESIGN.md](DESIGN.md)
+Status: informative acceptance story for the approved bounded plan. Subsequently
+implemented and independently accepted; publication is `0ec769b`, all six final
+exact-SHA CI jobs pass. Turn complete and stopped. See [RESULTS.md](RESULTS.md), [REVIEW.md](REVIEW.md) and
+[the runnable story](../../../dml/examples/pinned_transfer.py). [DESIGN.md](DESIGN.md)
 owns planned semantics; [HANDOFF.md](HANDOFF.md) owns implementation/evidence work.
-Illustrative APIs and provisional engineering details are not as-built contracts.
+Illustrative APIs below preserve planning provenance, not the as-built API contract.
 
 ## 1. Produce two attempts in A
 

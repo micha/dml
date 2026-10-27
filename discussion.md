@@ -1,8 +1,10 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: the user approved Iteration 5's pinned-snapshot-transfer plan
-and requested a local design checkpoint. Implementation, delegation and publication
-remain unauthorized; illustrative APIs/provisional details are not as-built contracts.
+Latest checkpoint: Iteration 5 implementation, independent coordinator review,
+worker commit/push and final exact-SHA CI verification are complete through
+`0ec769b`; all six CI jobs pass on the first run. Bounded turn accepted and stopped.
+No release/package publication or later feature. Delivery/assurance limits remain
+explicit in RESULTS/REVIEW and the as-built transfer contract.
 Iteration 4 implementation, independent review and authorized publication/CI are
 complete through `d498a6c`; all six final exact-SHA jobs pass.
 The bounded local-recorded-execution turn is accepted and stopped. Iteration 3
@@ -1090,15 +1092,84 @@ scope/orientation/resume notes. Earlier uncommitted/pending-review statements re
 their preparation provenance. The design repository has no remote; no push is
 requested or performed. Implementation remains clean at already published `d498a6c`.
 
+### Iteration 5 implementation and publication authorization
+
+The user declared Iteration 5 GO and authorized the existing window-2 agent in a
+new Pi session to implement the approved bounded plan. Coordinator monitors,
+independently reviews and sends feedback until satisfactory; then worker commits,
+pushes and fixes exact-SHA CI issues until successful. This supersedes the earlier
+planning-only permission statements for this turn, not its scope or stop line.
+No extra workers, release/package publication, cloud experiments or later feature.
+
+[COORDINATION](iterations/05-pinned-snapshot-transfer/COORDINATION.md) records the
+assignment and build ownership. Coordinator sent `/new` to pane `%215`, verified
+an empty new session and submitted the assignment. Both checkouts were clean;
+implementation baseline is `d498a6c`. Worker owns implementation/tests/as-built docs
+and RESULTS; coordinator owns review and design status notes. Commit/push awaits
+explicit coordinator acceptance. The user's Context7 credential-location clarification
+was relayed without exposing the value.
+
+### Iteration 5 delivery and final publication checkpoint
+
+The fresh-session window-2 worker implemented the bounded public packed insertion
+seam and explicit `daggerml.transfer` layer: deterministic pinned all-parent typed
+object closure, strict bounded JSON/base64 framing and one atomic import with optional
+create-or-same-target ref. Native encoding/identity/no-overwrite remains authoritative;
+complete-bundle checks do not accept preexisting B objects as omitted dependencies.
+IDs/bytes/occurrences and ordered history transfer unchanged; source refs, external
+resources and historical-path/execution authority do not transfer.
+
+Coordinator early feedback corrected mislabeled missing-source evidence and added
+genuine parent/node/composite-only-child deletion fixtures. Worker strengthened
+composite-only property oracles. No functional production defect was found. Worker
+and independent coordinator default checks pass: seven C executables, 467 Python
+tests, Python 1,163/1,163 statements, retained C 1681/1681 lines, 132/132 functions,
+1562/1562 outcomes. Expanded binding memory and 141 CLI Valgrind processes pass.
+Coordinator's separate installed workflow passes 50 checks, with independent typed
+population/bytes/parents, source-offline fresh import/reader and late-abort probes.
+Meaningful real map-full, pre/postcommit interruption and native fault evidence,
+host versus installed coverage, mutation-tool gaps, precise exclusions/suppressions,
+profile/trust and local installed-runtime limitations remain in
+[RESULTS](iterations/05-pinned-snapshot-transfer/RESULTS.md) and
+[REVIEW](iterations/05-pinned-snapshot-transfer/REVIEW.md).
+
+After explicit acceptance worker committed/pushed the reviewed 19-file slice as
+`0ec769b5e85fde6b6581b628fffdf3465c78a098`. Coordinator independently verified the
+commit surface, clean checkout/index, matching remote master and only automatic
+exact-SHA [CI run 40556958937](https://github.com/micha/dml/actions/runs/40556958937).
+All six jobs pass on the first run: seven C tests everywhere; Linux/strict 467 Python,
+macOS 463 with four existing skips, Windows 462 with five existing skips. CI's
+informational `-c` remains distinct from local default/memory `-v` evidence. No CI
+fix/rerun or release workflow needed. Worker instructed to finalize RESULTS and stop.
+
+Implementation, review and authorized publication/CI are complete and stopped.
+No extra workers, force push, release/tag/package publication, cloud experiments or
+later feature. Design notes remain local/uncommitted; no local design checkpoint
+was requested for this turn.
+
+### Iteration 5 user acceptance and design checkpoint
+
+The user accepted the delivery and requested a local design commit before discussing
+Iteration 6. This checkpoint includes the Iteration 5 coordination, results, independent
+review/publication/CI evidence and reconciled scope/orientation/resume notes. Earlier
+uncommitted-design statements preserve their pre-checkpoint provenance. This design
+repository has no remote; no push is requested or performed. Implementation remains
+clean at published `0ec769b`. Iteration 6 discussion is invited, but no next direction,
+plan, worker assignment or implementation is yet approved.
+
 ## Resume point
 
-Iteration 5's bounded [design](iterations/05-pinned-snapshot-transfer/DESIGN.md),
-[worked example](iterations/05-pinned-snapshot-transfer/EXAMPLE.md) and
-[conditional handoff](iterations/05-pinned-snapshot-transfer/HANDOFF.md) are approved
-and included in the requested local design checkpoint. Next is separate user
-authorization before implementation/delegation/publication. Illustrative APIs and
-provisional engineering details are not as-built contracts. Do not restart the
-completed window-2 worker or inherit Iteration 4's publication request.
+Iteration 5 is implemented, independently accepted and published as `0ec769b`;
+all six final exact-SHA CI jobs pass. Read
+[RESULTS](iterations/05-pinned-snapshot-transfer/RESULTS.md),
+[REVIEW](iterations/05-pinned-snapshot-transfer/REVIEW.md) and
+[as-built transfer contract](../dml/docs/spec-next/transfer.md). Implementation
+checkout/index are clean and remote master matches. The worker is stopped;
+no later feature, release or package publication is authorized. The user accepted
+the delivery and requested checkpointing these design notes locally before discussing
+Iteration 6; no next-turn direction or implementation is approved. The approved
+planning documents preserve their candidate provenance, not additional implementation
+permission.
 
 Iteration 4 is implemented, independently accepted and published through `d498a6c`;
 all six final exact-SHA CI jobs pass. Read
@@ -1107,9 +1178,9 @@ all six final exact-SHA CI jobs pass. Read
 [as-built local-execution contract](../dml/docs/spec-next/local-execution.md).
 Implementation checkout is clean at pushed `d498a6c`. The user accepted the delivery;
 Iteration 4 is complete and stopped. Its design notes were checkpointed locally as
-`ee708c4`. Iteration 5 is selected for planning only above; historical coordination
-is not permission to restart a worker. Capture/unknown/cleanup and assurance limits
-remain explicit;
+`ee708c4`. Iteration 5's separate completion is recorded above; historical
+coordination is not permission to restart a worker. Capture/unknown/cleanup and
+assurance limits remain explicit;
 CI success does not supply exactly-once execution or a complete environment model.
 
 The following Iteration 3 and Iteration 2 resume evidence is historical; Iteration 4

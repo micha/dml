@@ -1,9 +1,17 @@
 # Iteration 5 handoff: pinned snapshot transfer
 
-Status: the user approved this bounded plan and requested a local design checkpoint.
-**No implementation, worker assignment, commit/push of implementation, CI launch or
-package publication is authorized.** Do not restart the completed window-2 agent
-or inherit Iteration 4's publication authorization.
+Status: the user approved this bounded plan, checkpointed it locally, then declared
+Iteration 5 GO: implementation by the existing window-2 agent in a new session,
+coordinator monitoring/review and fixes, followed after acceptance by worker
+commit/push and exact-SHA CI verification/fixes. This supersedes the preparation-only
+permission statements below for this turn. No extra workers, release/package
+publication, cloud experiments or later feature turn. See [COORDINATION.md](COORDINATION.md).
+
+Delivery is now complete and stopped at published `0ec769b`, with all six final
+exact-SHA CI jobs passing. [RESULTS.md](RESULTS.md) and [REVIEW.md](REVIEW.md) own
+actual delivery/assurance; [the as-built contract](../../../dml/docs/spec-next/transfer.md)
+owns implemented behavior. The handoff below preserves the authorized work plan,
+not permission to restart or add another feature turn.
 
 ## 1. Authority, learning goal and stop line
 

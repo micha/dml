@@ -1,10 +1,13 @@
 # Iteration 5 candidate design: pinned snapshot transfer
 
-Status: the user approved this bounded plan and requested a local design checkpoint.
-**Implementation, delegation, commit/push of implementation and CI launch are not
-authorized.** Concrete choices below originated as assistant proposals and now guide
-the approved plan; illustrative APIs/provisional engineering details are not as-built
-contracts and may be refined within separately authorized scope.
+Status: approved bounded plan, subsequently authorized and implemented. Coordinator
+review accepts the slice; worker published `0ec769b`, with all six final exact-SHA
+CI jobs passing. Turn complete and stopped.
+[RESULTS.md](RESULTS.md) and [REVIEW.md](REVIEW.md) own delivery/assurance;
+[the as-built contract](../../../dml/docs/spec-next/transfer.md) owns actual behavior.
+This plan preserves proposal provenance and illustrative APIs; its preparation-only
+permission statements below are historical, superseded by the separate GO request.
+No extra workers, release/package publication or later feature turn.
 
 ## 1. Authority and goal
 
