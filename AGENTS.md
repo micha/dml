@@ -31,6 +31,10 @@ and `discussion.md` before continuing the discussion. Read the shared
   a new session, coordinator monitoring/review and fixes, then focused commit/push
   after acceptance and exact-SHA CI verification/fixes. No extra workers, release,
   package publication, cloud experiments or later feature turn are authorized.
+- Iteration 5 [plan and handoff](iterations/05-pinned-snapshot-transfer/HANDOFF.md)
+  are approved for pinned snapshot transfer between local repositories.
+  Implementation, worker assignment, implementation commit/push and CI launch remain unauthorized;
+  do not inherit the completed Iteration 4 authorization.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise

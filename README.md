@@ -6,6 +6,13 @@ its existing draft specifications.
 
 ## Start here
 
+- Iteration 5 [design](iterations/05-pinned-snapshot-transfer/DESIGN.md),
+  [worked example](iterations/05-pinned-snapshot-transfer/EXAMPLE.md) and
+  [conditional handoff](iterations/05-pinned-snapshot-transfer/HANDOFF.md): approved
+  bounded plan for pinned commit/full-history transfer between initialized local
+  repositories. Implementation/delegation/publication remain unauthorized;
+  illustrative APIs and provisional engineering details are not as-built contracts.
+
 - Iteration 4 [delivery](iterations/04-local-recorded-execution/RESULTS.md) and
   [coordinator review](iterations/04-local-recorded-execution/REVIEW.md): one locally
   executed, recorded Python step, published through `d498a6c`; all six final
@@ -55,6 +62,22 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
+Iteration 5's bounded plan is approved: transfer one pinned DML commit and its complete
+all-parent typed object closure between local repositories, preserving IDs/bytes and
+computational occurrences, with optional atomic destination-ref creation and ordinary
+Python/CLI inspection. The [design](iterations/05-pinned-snapshot-transfer/DESIGN.md)
+and [handoff](iterations/05-pinned-snapshot-transfer/HANDOFF.md) guide the approved plan.
+Choices include a narrow public packed-record insertion wrapper over existing native
+operations, a separate transfer module, bounded JSON/base64 bundles and create-or-same-
+target destination refs. Source refs and external resources are not transferred.
+
+This is not remote execution or automatic synchronization, and it adds no recovery,
+merge, thin/shallow/resumable exchange, network/cloud, reuse/facets or resource/observer
+work. No implementation, worker assignment, implementation commit/push or CI launch
+is authorized. Preparation inspected clean `d498a6c`; no tests/prototypes ran or
+implementation files changed. The user requested a local checkpoint of the approved
+Iteration 5 plan in this no-remote design repository; no push is authorized.
+
 Iteration 4 is implemented, independently reviewed and published through `d498a6c`.
 It adds a separate explicitly imported `daggerml.local` layer: captured trusted Python
 entry bytes, pinned named inputs, ordinary request/attempt/outcome DAGs, cooperative
@@ -76,8 +99,9 @@ mutation-tooling gaps and platform/install limits remain qualified in
 
 Implementation master is clean at pushed `d498a6c`; this bounded turn is complete
 and stopped. No release/package publication or later feature turn. The user accepted
-the delivery; these design notes are included in the requested local checkpoint in
-this no-remote repository. Reuse/facets, intent lifecycle,
+the delivery; its design notes were checkpointed locally as `ee708c4` in this
+no-remote repository. Iteration 4's stop line remains; Iteration 5 is planning only.
+Reuse/facets, intent lifecycle,
 scheduling, remotes/cloud, resources and observer/UI remain outside this turn.
 
 Iteration 3 is implemented, independently reviewed and published as `9b8fb71`.

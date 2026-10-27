@@ -1,7 +1,10 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: Iteration 4 implementation, independent review and authorized
-publication/CI are complete through `d498a6c`; all six final exact-SHA jobs pass.
+Latest checkpoint: the user approved Iteration 5's pinned-snapshot-transfer plan
+and requested a local design checkpoint. Implementation, delegation and publication
+remain unauthorized; illustrative APIs/provisional details are not as-built contracts.
+Iteration 4 implementation, independent review and authorized publication/CI are
+complete through `d498a6c`; all six final exact-SHA jobs pass.
 The bounded local-recorded-execution turn is accepted and stopped. Iteration 3
 remains published as `9b8fb71`, with all six exact-SHA
 CI jobs passing. See the [resume point](#resume-point). The status narrative below
@@ -1018,7 +1021,84 @@ The design repository has no remote; no push is requested or performed. The
 implementation remains clean at already published `d498a6c`. No next turn is
 selected or authorized.
 
+## Iteration 5 agreed direction: pinned snapshot transfer
+
+The assistant proposed a bounded local exchange slice toward later remote execution,
+rather than immediately hardening the local runner's recovery. The user agreed and
+requested detailed plan/handoff documents. This selects direction for planning, not
+implementation or exact schema/API approval.
+
+- Select one DML commit by immutable ID in repository A and transfer its complete
+  reachable objects, including every parent commit/history, into repository B.
+- Preserve exact object IDs/bytes and recorded request/attempt occurrences; importing
+  does not create another computation or empirical observation.
+- Optionally create an explicitly named destination ref atomically with import.
+- Inspect imported structure/history through ordinary Python and the existing CLI.
+- Acceptance uses two distinct local attempts with identical result content, pinned
+  export, fresh-process import/inspection, unchanged source bytes after head movement,
+  idempotent reimport and meaningful malformed/dependency/ref/atomicity failures.
+- Start with a small Python layer over public repository capabilities. A genuinely
+  missing C primitive needs a separate scope decision.
+- No network/cloud, automatic synchronization, remote execution, merge/shallow-history
+  policy, resumable transfer, reuse/facets, resources/GC/excision or observer/UI.
+  Copying recorded history does not copy external resources or a complete environment.
+
+### Iteration 5 candidate preparation
+
+The assistant prepared [DESIGN](iterations/05-pinned-snapshot-transfer/DESIGN.md),
+[EXAMPLE](iterations/05-pinned-snapshot-transfer/EXAMPLE.md) and conditional
+[HANDOFF](iterations/05-pinned-snapshot-transfer/HANDOFF.md). Assistant-origin choices
+include a narrow public `Transaction.put_record` wrapper over an already implemented
+native packed-record insertion operation, a separate `daggerml.transfer` module,
+strict bounded JSON/base64 transport, typed dependency-first/all-parent traversal,
+complete-bundle checks independent of destination contents and one atomic import.
+An optional ref is created if absent, accepted if already the same target, and never
+moved if different. These are candidate details for review, not user-agreed contracts.
+
+The existing public Python API reads exact packed bytes but does not expose their
+insertion; the C repository and private native binding already implement it. The
+candidate promotes that operation through the existing mutation guard, rather than
+adding a C primitive, private transfer-layer access or a second Python packed codec.
+No new standalone raw decoder/hash API is proposed. Actual native validation is
+retained, followed by ID/byte and complete-bundle checks before storage commit.
+
+The plan distinguishes transferred publication **history** from source mutable refs:
+source request-reservation/attempt-publication refs are not copied. Stored local paths
+and ref-name strings remain data; import does not make historical execution records
+runnable/recoverable or act on those paths. Precommit interruption leaves no batch;
+postcommit acknowledgement loss can leave a complete import. Full reachable parent
+history may contain sensitive data, so copying is caller policy, not filtering/erasure.
+
+Preparation inspected clean implementation `d498a6c` and design checkpoint `ee708c4`,
+public Python/native insertion seams and current as-built contracts. No implementation
+or as-built files changed, tests/builds/prototypes ran, workers launched or publication
+occurred. New design notes are local/uncommitted. Next is review of the candidate and
+separate authorization before any implementation/delegation/publication.
+
+### Iteration 5 plan approval and design checkpoint
+
+The user accepted the detailed plan and requested a local commit. This approves the
+bounded design/example/handoff, including the proposed public packed-record seam,
+complete all-parent bundle boundary and atomic optional-ref semantics, as the plan
+for a future authorized turn. Illustrative signatures and provisional engineering
+details remain refinable; approval does not make the plan implemented behavior.
+Implementation, worker assignment, implementation commit/push and CI launch require
+separate authorization. No worker was restarted or code/build work begun.
+
+This local checkpoint includes the three Iteration 5 planning documents and updated
+scope/orientation/resume notes. Earlier uncommitted/pending-review statements retain
+their preparation provenance. The design repository has no remote; no push is
+requested or performed. Implementation remains clean at already published `d498a6c`.
+
 ## Resume point
+
+Iteration 5's bounded [design](iterations/05-pinned-snapshot-transfer/DESIGN.md),
+[worked example](iterations/05-pinned-snapshot-transfer/EXAMPLE.md) and
+[conditional handoff](iterations/05-pinned-snapshot-transfer/HANDOFF.md) are approved
+and included in the requested local design checkpoint. Next is separate user
+authorization before implementation/delegation/publication. Illustrative APIs and
+provisional engineering details are not as-built contracts. Do not restart the
+completed window-2 worker or inherit Iteration 4's publication request.
 
 Iteration 4 is implemented, independently accepted and published through `d498a6c`;
 all six final exact-SHA CI jobs pass. Read
@@ -1026,10 +1106,10 @@ all six final exact-SHA CI jobs pass. Read
 [REVIEW](iterations/04-local-recorded-execution/REVIEW.md) and the
 [as-built local-execution contract](../dml/docs/spec-next/local-execution.md).
 Implementation checkout is clean at pushed `d498a6c`. The user accepted the delivery;
-work is complete and stopped. No later turn is selected or authorized. Do not restart
-the window-2 worker from historical planning/coordination instructions. Design notes
-are included in the requested local checkpoint. Capture/unknown/cleanup and assurance
-limits remain explicit;
+Iteration 4 is complete and stopped. Its design notes were checkpointed locally as
+`ee708c4`. Iteration 5 is selected for planning only above; historical coordination
+is not permission to restart a worker. Capture/unknown/cleanup and assurance limits
+remain explicit;
 CI success does not supply exactly-once execution or a complete environment model.
 
 The following Iteration 3 and Iteration 2 resume evidence is historical; Iteration 4
