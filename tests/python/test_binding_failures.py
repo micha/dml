@@ -9,9 +9,11 @@ import threading
 import daggerml as dml
 import pytest
 
+from native_extension import native_extension_path
+
 ROOT = Path(__file__).resolve().parents[2]
 BUILD = Path(os.environ.get("DML_BIN", ROOT / "build/check/dml")).resolve().parent
-spec = importlib.util.spec_from_file_location("_core_fault", next(path for path in BUILD.glob("_core_fault.*") if path.is_file()))
+spec = importlib.util.spec_from_file_location("_core_fault", native_extension_path(BUILD, "_core_fault"))
 FAULT = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(FAULT)
 

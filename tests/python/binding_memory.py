@@ -10,6 +10,8 @@ import runpy
 import tempfile
 import threading
 
+from native_extension import native_extension_path
+
 ROOT = Path(__file__).resolve().parents[2]
 runpy.run_path(str(ROOT / "tests/conftest.py"))
 
@@ -17,7 +19,7 @@ import daggerml as dml
 import importlib.util
 
 BUILD = Path(dml._core.__file__).parent
-spec = importlib.util.spec_from_file_location("_core_fault", next(p for p in BUILD.glob("_core_fault.*") if p.is_file()))
+spec = importlib.util.spec_from_file_location("_core_fault", native_extension_path(BUILD, "_core_fault"))
 core = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(core)
 dml._core = core
