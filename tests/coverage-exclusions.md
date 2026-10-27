@@ -133,6 +133,29 @@ Historical Iteration 2 population counts below remain that iteration's evidence,
 not current counts. Iteration 3 measurements are in its
 [results](../../dml-design/iterations/03-composable-dags/RESULTS.md).
 
+## Iteration 4 Python execution population
+
+`daggerml.local` and both local examples remain in the unchanged root-source Python
+coverage gate. No new exclusion, source omission, threshold change or suppression
+is introduced. Host-side calls exercise every local-layer statement, including
+child context/publication helpers and meaningful malformed-role, spawn, shutdown,
+IO, cleanup, collision and storage/conflict failures. The maintained child example
+also runs directly under host coverage, including its type-rejection branches.
+
+Real subprocess acceptance stages the maintained sources with the current linked
+extension; it is not a second codec or production bootstrap. Staged and installed
+subprocesses are **not coverage-instrumented** by the host coverage invocation.
+Direct helper coverage must not be described as coverage of every actual installed
+child invocation or every Python branch. Deterministic parent-loss barriers and
+fault substitutions are private fixtures, not installed runtime controls.
+
+Existing C tests and binding/CLI Valgrind workloads remain enabled. No native source
+changes occur in this slice, and Mull does not supply mutation assurance for the
+new Python layer. Real subprocess tests are functional/process-disposition evidence,
+not new process-level Valgrind or sandbox assurance. Actual checks and bounded
+negative-oracle probes belong to
+[Iteration 4 results](../../dml-design/iterations/04-local-recorded-execution/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

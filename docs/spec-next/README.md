@@ -42,6 +42,7 @@ flowchart TD
     OBJECTS["objects.md<br/>Named/nested DAG and history fields, names and views"]
     REPO["repository.md<br/>Local storage, refs, transactions and ownership"]
     PY["python-api.md<br/>Python values, errors and contexts"]
+    LOCAL["local-execution.md<br/>Trusted local Python steps and ordinary execution records"]
     CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
     PACK["../packaging-and-distribution.md<br/>Native artifacts and local builds"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
@@ -51,11 +52,15 @@ flowchart TD
     README --> OBJECTS
     README --> REPO
     README --> PY
+    README --> LOCAL
     README --> CLI
     README --> PACK
     PY --> REPO
     PY --> RECORDS
     PY --> OBJECTS
+    LOCAL --> PY
+    LOCAL --> REPO
+    LOCAL --> OBJECTS
     CLI --> REPO
     CLI --> OBJECTS
     CLI --> RECORDS
@@ -89,6 +94,7 @@ flowchart TD
 | Literal/sub-DAG-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
 | Repository initialization, storage keys, transactions, direct reference checks, refs and handle ownership | [repository.md](repository.md) |
 | Python conversions, owned descriptions, exceptions, thread/finalizer policy and contexts | [python-api.md](python-api.md) |
+| Trusted local Python execution, record conventions, publication and capture limits | [local-execution.md](local-execution.md) |
 | Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
 | Native linking, packaged executable, build/install and distribution paths | [Packaging and distribution](../packaging-and-distribution.md) |
 
@@ -104,6 +110,9 @@ flowchart TD
   snapshot/history inspection and atomic object/ref rollback.
 - A linked low-level Python API constructing and reading that state through real
   native handles, with explicit references and atomic transaction contexts.
+- A separate explicit Python local-execution layer recording pinned requests,
+  distinct attempts, cooperative child result publication and separate computation/
+  cleanup outcomes through ordinary DAGs, commits and refs.
 - A native inspection CLI and Python console forwarding to the bundled executable,
   with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
   all-parent history traversal.
@@ -131,6 +140,7 @@ MAY are normative when used there; examples are explicitly informative. Source a
 test links provide evidence; actual validation runs and outstanding gates are in the
 [Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
 and [Iteration 2 delivery notes](../../../dml-design/iterations/02-repository-usability/RESULTS.md)
-and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).
+and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md)
+and [Iteration 4 results](../../../dml-design/iterations/04-local-recorded-execution/RESULTS.md).
 If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

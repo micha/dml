@@ -69,7 +69,11 @@ and [system-header discovery](https://clangd.llvm.org/guides/system-headers).
 
 Start with the [as-built specification](docs/spec-next/README.md) for implemented
 DML behavior: datums, snapshot/history objects, transactional repository refs,
-the low-level Python API and inspection CLI.
+the low-level Python API, inspection CLI and explicit
+[local recorded Python execution](docs/spec-next/local-execution.md) layer.
+The [runnable local story](examples/local_execution.py) executes a trusted child,
+records distinct attempts and durable result DAGs; capture and interruption limits
+are explicit in that layer's contract.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

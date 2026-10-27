@@ -10,6 +10,12 @@ See the owning [Python API contract](../../docs/spec-next/python-api.md),
 [runnable history example](../../examples/repository_history.py) and
 [composable DAG example](../../examples/composable_dags.py). Named bindings and
 non-executing sub-DAG nodes record structure; Python computes any example values.
+The separately imported [local layer](../../docs/spec-next/local-execution.md)
+executes explicitly bound trusted Python entry bytes with pinned named inputs and
+records ordinary request/attempt/result history. See the
+[local driver](../../examples/local_execution.py) and
+[cooperative child](../../examples/local_add.py); this is not a sandbox or complete
+environment capture.
 
 ## Local build
 

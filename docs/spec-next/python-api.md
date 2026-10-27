@@ -8,6 +8,8 @@ This document owns Python conversions, owned descriptions, exceptions and handle
 lifetime/context restrictions. [Records](records.md), [objects](objects.md) and
 [repository](repository.md) own C encoding/storage semantics. [CLI](cli.md) owns
 inspection presentation; [packaging](../packaging-and-distribution.md) owns builds.
+The separate [local-execution layer](local-execution.md) owns trusted Python-step
+execution and ordinary request/attempt/publication conventions over this API.
 
 ## Values and descriptions
 
@@ -164,6 +166,10 @@ API; this example is not a library workflow framework. The
 [composable DAG example](../../examples/composable_dags.py) records two Python
 calculations, shares one trial across child snapshots, and includes a nonliteral
 root fixture. It demonstrates containment/values, not captured computational causality.
+
+The [local execution example](../../examples/local_execution.py) uses that separate
+layer to execute captured trusted entry bytes, publish results and record outcomes;
+it does not add execution semantics to low-level nodes or lookup.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

@@ -27,6 +27,13 @@ transaction contexts around opaque native handles; it does not duplicate codecs
 or use subprocess test drivers. The Python console entry forwards to the same
 native CLI executable bundled in `daggerml`, never PATH's `dml`.
 
+The separately imported `daggerml.local` layer composes only public repository
+operations. It closes parent handles before launching a trusted Python child,
+pins inputs/binding, and records requests, attempts, publication and final outcomes
+as ordinary DAGs/commits/refs. It neither changes native node semantics nor provides
+a sandbox. Its owning [contract](spec-next/local-execution.md) explains capture and
+interruption limits.
+
 ## Technical navigation
 
 Start with [spec-next/README.md](spec-next/README.md) for the implemented contract:
@@ -36,6 +43,8 @@ Start with [spec-next/README.md](spec-next/README.md) for the implemented contra
 - [Local repository and transactions](spec-next/repository.md): storage, direct
   reference checks, refs and handle lifecycle.
 - [Python API](spec-next/python-api.md): conversions, exceptions and native lifetime/context policy.
+- [Local recorded Python execution](spec-next/local-execution.md): ordinary execution records,
+  cooperative publication, process mechanics and trust/capture limits.
 - [Inspection CLI](spec-next/cli.md): grammar, traversal and presentation.
 - [Packaging](packaging-and-distribution.md): shared native builds and installed entry paths.
 - [Glossary](spec-next/glossary.md): shared vocabulary.

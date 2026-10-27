@@ -175,6 +175,7 @@ py.extension_module(
 
 py.install_sources(
   'python/daggerml/daggerml/__init__.py',
+  'python/daggerml/daggerml/local.py',
   'python/daggerml/daggerml/_core.pyi',
   'python/daggerml/daggerml/py.typed',
   subdir: 'daggerml', install_tag: 'python-runtime',
