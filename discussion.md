@@ -1,10 +1,38 @@
 # Agent-first DML design discussion — checkpoint
 
-Status: Ongoing exploratory discussion at a conceptual checkpoint. Feasibility research and candidate-design experiments are complete; no approval to change DML implementation or its specifications.
+Latest checkpoint: Iteration 3 is implemented, reviewed and published as `9b8fb71`;
+all six exact-SHA CI jobs pass. See the [resume point](#resume-point) and
+[coordinator review](iterations/03-composable-dags/REVIEW.md). The status narrative
+below and earlier sections preserve chronological provenance.
+
+Status: Ongoing design-spiral discussion. Feasibility studies are complete. The new
+as-built specification and glossary exist. Iteration 1's minimum viable repository
+and its bounded review follow-up are implemented. The local default coverage gate
+passes with meaningful failure tests and documented no-value exclusions. The
+reviewed follow-up and URI correction are published as `6ee9329`; all six jobs in
+its exact-SHA GitHub CI run pass. Publication is complete. Iteration 2's usability
+direction is agreed, and its detailed candidate design/handoff have been reviewed.
+The user authorized bounded Iteration 2 implementation in a fresh Pi session in
+window 2, with coordinator monitoring and review fixes. That agent implementation
+is now finished: the linked low-level Python repository API and inspection-only
+native CLI are implemented. Worker and coordinator independent default checks and
+local installed workflows pass. Mutation survivors/platform/finalizer limits remain
+qualified. Implementation and independent coordinator review are complete. The user
+subsequently authorized publication; Iteration 2 is pushed through `e253249` and
+its exact-SHA Actions run passes all six jobs after bounded Windows fixture fixes.
+Work is stopped for review. See the
+[coordinator review](iterations/02-repository-usability/REVIEW.md) and
+[publication checkpoint](iterations/02-repository-usability/RESULTS.md#publication-checkpoint).
 
 ## Scope and separation
 
-This is user-led exploratory design work, not an amendment to the existing DML specification. DML implementation code, specs, and documentation have not been changed. The user authorized moving these notes from `/tmp/dml-tasks/agent-design/` into the separate Git repository `/work/repos/micha/dml-design` and making a local checkpoint commit. Future design notes belong here unless the user directs otherwise.
+This is user-led exploratory design work, not an amendment to the existing DML
+specification. The old `docs/spec/` suite remains unchanged. Later in this discussion,
+the user authorized `../dml/docs/spec-next/` and then code changes in `../dml` for
+Iteration 1; see the resume point for current scope. The user previously authorized
+moving these notes from `/tmp/dml-tasks/agent-design/` into the separate Git repository
+`/work/repos/micha/dml-design` and making a local checkpoint commit. Future design
+notes belong here unless the user directs otherwise.
 
 The discussion is chronological: later clarifications supersede earlier framing where explicitly noted. Existing DML specs can supply context, but are not authoritative for the new design explored here. See the [resume point](#resume-point) for the latest direction. Original task instructions and acknowledgement are preserved under `archive/` as historical context, not active instructions.
 
@@ -518,20 +546,422 @@ is subsequent conceptual discussion, not an approved schema or implementation.
   preserve historical wording in archives, quotations and frozen evidence. The
   as-built spec links to the glossary rather than duplicating it.
 
+## Iteration 1 handoff and implementation authorization
+
+- The user requested a detailed handoff, then explicitly authorized code changes
+  to `../dml` for the minimum-viable-repository iteration. This supersedes the earlier
+  documentation-only authorization and pending-location discussion for this turn.
+- [Iteration 1 handoff](iterations/01-minimum-viable-repository/HANDOFF.md) records the
+  scope, suggested implementation approach, validation, as-built documentation work,
+  acceptance workflow and stop line. Its representation/API recommendations are
+  not a finalized schema; the implementation should stay minimal.
+- This handoff preparation did not start implementation. No execution, intent/closure,
+  reuse, remote, merge/rebase, GC/excision, resource-management or later observer
+  work is authorized by this iteration's scope.
+
+## Iteration 1 implementation delivery
+
+- The user instructed implementation to begin. The bounded turn now supplies
+  literal nodes, rooted DAGs, canonical named trees, ordered-parent commits and
+  transactional refs in the native C/LMDB foundation. Datum encodings and golden
+  IDs remain unchanged. No later execution/resource/observer work was started.
+- [Delivery notes](iterations/01-minimum-viable-repository/RESULTS.md) record actual
+  representation/API choices, checks, source state and limitations. The narrow
+  ASCII name profile and type-discriminated object APIs are assistant implementation
+  choices, not broader user-agreed schema decisions.
+- The acceptance workflow works across fresh processes, including branching,
+  immutable bytes/IDs after ref movement and atomic object/ref rollback. Five C
+  executables and 81 Python tests pass. Valgrind reports no errors/leaks in the
+  exercised C tests and nine history-driver invocations.
+- Required `scripts/check.sh -v` exits 1 at the unchanged coverage gate: 88.2%
+  lines, 100% functions, 74.5% branches. The baseline also failed this gate; new
+  paths are not exhaustively covered either. This is not a fully green delivery
+  or a waiver of coverage requirements.
+- The user subsequently requested a commit, GitHub push and Actions monitoring.
+  Implementation commit `0bcfe92` is pushed to `micha/dml` branch `master`.
+  [CI run 40444854493](https://github.com/micha/dml/actions/runs/40444854493)
+  passed all six jobs, including Linux/macOS on both architectures and Windows.
+  Each job reports 5 C executables and 81 Python tests passing. The Linux
+  validation job uses `scripts/check.sh -c`, so it does not enforce percentage
+  gates. Design notes remain uncommitted in this no-remote checkout.
+
+## Iteration 1 bounded review follow-up
+
+- The user authorized focused hardening/documentation, not new functionality or
+  another feature iteration. The read-only review found no functional correctness
+  defect in the new object/ref implementation. Direct rather than transitive checks,
+  ASCII names, ordered parents and
+  the small quadratic operations remain accepted first-turn choices.
+- The user clarified that coverage is a means, not an end: narrowly justified
+  no-value exclusions are permitted without case-by-case approval. Difficulty
+  alone is insufficient; keep the remaining threshold, identify exact regions and
+  reasons, and distinguish tested from excluded code. This supersedes the earlier
+  blanket prohibition. Implementation/design guides and the handoff now record it.
+- Added meaningful codec/identity/repository allocation and dependency-failure
+  tests, boundary cases and rollback checks. Updated architecture and README
+  orientation to the as-built spec. The retained GCC-header claim is corrected
+  visibly: LF=10, LH=8 means 2 uncovered lines. Historical totals are preserved.
+- Final local `scripts/check.sh -v` exits 0: 7 C executables pass under Valgrind,
+  reporting no errors/leaks. The combined current tree has 86 Python tests passing:
+  83 in this follow-up's suite plus 3 unrelated concurrent LSP tests.
+- Retained coverage is 990/990 lines, 78/78 functions and 835/835 branches (100%).
+  Marker-free diagnostic coverage is 999/1006 lines and 881/902 branches. Exclusions
+  remove 16 measured lines and 67 outcomes, not entire functions; their precise
+  locations and rationales are in the
+  [coverage catalog](../dml/tests/coverage-exclusions.md). No claim of testing all
+  excluded behavior follows from the gated percentage.
+- [Follow-up delivery notes](iterations/01-minimum-viable-repository/RESULTS.md#review-follow-up)
+  record commands, interrupted/failed diagnostics, measured populations and limits.
+  No new commits, pushes, delegates or feature work were performed. Unrelated LSP
+  changes were preserved; a concurrent Meson wipe interrupted one run, and the
+  final validation was rerun after it finished.
+
+## Final URI diagnostic correction
+
+- The user accepted the preceding review and authorized only the remaining URI
+  size-error diagnostic correction. The pre-existing implementation discarded
+  `uriToStringCharsRequiredA()`'s failing code; the new fault fixture had expected
+  the preceding `URI_SUCCESS`, incorrectly codifying that behavior.
+- The size routine's status is now retained and reported. Its fixture injects the
+  representative `URI_ERROR_OUTPUT_TOO_LARGE` and requires that exact native code.
+  Cleanup and empty outputs remain intact; no exclusions or thresholds changed.
+- The corrected fixture fails before the production fix (exit 1), demonstrating
+  the regression. Fresh default `scripts/check.sh -v` passes afterward (exit 0):
+  7 C executables under Valgrind, 86 Python tests in the combined tree, and retained
+  coverage of 990/990 lines, 78/78 functions and 835/835 branches. All seven C
+  processes report no memory errors/leaks. No new platform/remote checks were run.
+- [Correction notes](iterations/01-minimum-viable-repository/RESULTS.md#final-uri-diagnostic-correction)
+  preserve commands, historical measurements and source state. The fix is
+  uncommitted; unrelated LSP and existing design changes remain preserved.
+
+## Follow-up publication checkpoint
+
+- The user explicitly authorized the focused implementation commit, push and
+  exact-SHA Actions monitoring. The complete staged diff was inspected. Only the
+  17 reviewed hardening/documentation/URI-fix files were committed; README's editor
+  section and the unrelated LSP files/ignore entries remained outside the index.
+- `6ee93293ea10d7950c1cdc894b18dda695c55baf` is committed and normally pushed to
+  existing `micha/dml` branch `master`; push exited 0 and the remote SHA was verified.
+  [CI run 40452494677](https://github.com/micha/dml/actions/runs/40452494677)
+  completed successfully. Each of its six jobs reports 7 C executables and
+  83 Python tests passing, including Windows and both Linux/macOS architectures.
+- The Linux CI job is informational `-c`, even though its reported retained
+  counts are also 990/990 lines, 78/78 functions and 835/835 branches. It does not
+  replace local default `-v` evidence: 7 C executables under Valgrind and 86 Python
+  tests in the combined local tree, which included 3 uncommitted LSP tests.
+- [Publication notes](iterations/01-minimum-viable-repository/RESULTS.md#follow-up-publication-checkpoint)
+  record actual job URLs, source/test population and remaining unstaged work.
+  The design checkout remains local and uncommitted, preserving existing edits.
+  No tags, releases, force pushes, account/environment changes, delegates or
+  subsequent feature turn were made.
+
+## Iteration 2 agreed direction: repository usability
+
+The user selected a usability iteration following completion of Iteration 1.
+This is agreed direction for planning, not authorization to begin implementation.
+Exact Python APIs, CLI syntax, output contracts and binding mechanism remain open.
+
+- Establish a low-level Python API over the existing C repository foundation:
+  construct and read datums, literal nodes, DAGs, trees and commits; read/create/update
+  refs; and use explicit storage transactions with atomic writes and abort behavior.
+- Preserve the distinction between creating a DML commit and committing a storage
+  transaction. Python-appropriate types, exceptions and handle management need not
+  hide the repository model or duplicate its semantics.
+- Higher-level conveniences can be separate layers composed over this API without
+  privileged access. A higher-level experiment-authoring framework is outside this
+  iteration.
+- The CLI may be inspection-only for this turn: inspect objects, resolve refs,
+  display snapshots and traverse commit history, with human-readable and JSON output.
+  CLI mutation commands are deferred. This qualifies the earlier peer-interface
+  agreement: shared concepts and semantics remain the goal, but capability parity
+  is not required in this iteration. The user considers this appropriate for the
+  agent-first workflow.
+- The acceptance workflow uses Python to record 42, then 43 in a child commit and
+  move a ref. The CLI inspects both snapshots and their history; earlier immutable
+  objects remain unchanged. The script demonstrates composition rather than
+  establishing a new high-level framework.
+- Limit the turn to existing repository capabilities. New DAG semantics, execution,
+  intents, closures, reuse, remotes and resource/observer work remain outside scope.
+  Test-only corruption and fault-injection operations are not public API requirements.
+
+The assistant's preceding Python and CLI sketches were illustrative, not selected
+API contracts. In particular, CLI initialization and ref mutation from that sketch
+are superseded by the agreed inspection-only scope.
+
+### Iteration 2 detailed design and handoff preparation
+
+At the user's request, the assistant wrote the
+[candidate design](iterations/02-repository-usability/DESIGN.md) and
+[implementation handoff](iterations/02-repository-usability/HANDOFF.md). Agreed scope
+is distinguished from proposed exact APIs, wrapper restrictions, JSON and build
+choices. Proposed refinements include typed `Datum` read results, fail-closed write
+contexts, a typed `show` command and one native CLI implementation forwarded by the
+Python console entry. Those refinements are not separately user-approved decisions.
+
+Preparation inspected the implementation checkout at clean `06bf66e`, which follows
+Iteration 1's `6ee9329` and commits the separate language-server setup. Earlier notes
+about unstaged LSP work remain historical. No implementation files were changed and
+no test/build suite was run. Implementation authorization was pending at preparation.
+
+### Iteration 2 implementation authorization
+
+After reviewing the summary, the user authorized the existing agent in window 2 to
+implement this iteration in a new Pi session (not a new tmux session). The coordinator
+is to monitor, independently review, give feedback, and have issues fixed until the
+work is satisfactory, then report. This authorizes the bounded implementation,
+local validation and review fixes described in the handoff. It does not authorize
+commits, pushes, package publication, additional workers or later feature turns.
+
+## Iteration 2 delivery and review checkpoint
+
+- [Delivery notes](iterations/02-repository-usability/RESULTS.md) record actual
+  selected APIs, capsule ownership/deferred thread-safe cleanup, root native build,
+  package-relative forwarding, all changed files and bounded validation.
+- Worker and coordinator fresh default `scripts/check.sh -v` both exit 0: 7 C
+  executables, 249 Python tests, Python 399/399 statements, retained C 1555/1555
+  lines, 125/125 functions and 1409/1409 outcomes. Excluded dependency/invariant
+  populations remain distinct from tested code, with unchanged thresholds.
+- Binding supported-lifetime memory workload reports zero unsuppressed errors;
+  runtime-only and full-workload retained heaps match with narrow CPython runtime
+  suppressions. Sixty native CLI Valgrind processes pass, including large full-JSON
+  buffer growth. Unsupported foreign-thread last-owner destruction intentionally
+  abandons native resources with a warning; it is not leak-free finalization.
+- Public Python constructs 42/C1, 43/C2/ref movement and a fork; fresh processes
+  inspect snapshots/history and unchanged record bytes. Installed source-wheel and
+  console work outside checkout. Coordinator independent probes and a separate
+  venv install also pass.
+- Regular dirty-tree VCS sdist omits new source, explicitly rejected as current
+  evidence. A staged current native-source/dependency archive builds offline to the
+  same wheel hash. Local `cp313-abi3` install is not earlier-Python or other-platform
+  proof; declarations and the existing release interpreter matrix are preserved.
+- Bounded Mull diagnostics have survivors and exit 1, not green mutation gates.
+  Meaningful boundary gaps prompted small tests and memory checks. The overshift/
+  logical-span mutant remains an honest oracle limitation, not called equivalent.
+- Implementation HEAD remains `06bf66e` with all turn changes uncommitted. No old
+  spec, schema/encoding/version, execution/resource/observer feature, additional
+  worker, publication or system/global tooling change was made. The implementation
+  agent is finished; coordinator review, final validation and documentation
+  reconciliation are complete. Work is stopped for user review.
+
+## Iteration 2 publication checkpoint
+
+The user accepted the delivery and authorized commit, push and Actions verification.
+The reviewed 39-file slice was committed/pushed as `ee0327f`, also publishing the
+existing local LSP commit `06bf66e`. Five Unix jobs passed; Windows collection caught
+a test-loader glob selecting a linker library. Test-only fix `d9a554c` added exact
+interpreter extension-suffix selection. The next run exposed locale-based UTF-8
+fixture decoding and POSIX fake-compiler resolution on Windows. Test-only fix
+`e253249` made decoding explicit and supplied a native CMD compiler fixture, with
+regressions and no disabled tests or changed thresholds.
+
+[Final exact-SHA CI run 40467554833](https://github.com/micha/dml/actions/runs/40467554833)
+passes all six jobs. A fresh local default `-v` check passes with 7 C executables,
+255 Python tests, Python 399/399 statements and retained C 1555/1555 lines,
+125/125 functions and 1409/1409 outcomes; the binding and 60 CLI memory processes
+also pass. CI's informational `-c`, platform-specific device/pipe skips and installed
+package/runtime limits remain distinct. Both failed runs and fix evidence are in
+[publication notes](iterations/02-repository-usability/RESULTS.md#publication-checkpoint).
+
+Implementation master is clean at pushed `e253249eca70ad588d918d321a54a1413447b8a0`.
+No force push, tag, release, package publication, additional worker, account/system
+change or later feature turn occurred. Design notes remain local/uncommitted in the
+no-remote design checkout. Earlier uncommitted/no-CI statements above describe the
+pre-publication review, not current implementation status.
+
+## Iteration 3 agreed direction: composable DAGs and named-node lookup
+
+The user agreed to the assistant's proposed next spiral turn. This selects the
+bounded direction below for planning, not authorization to begin implementation.
+Exact representation, encoding, APIs and CLI presentation remain open.
+
+- Add named bindings inside a DAG, distinct from tree names organizing a repository
+  snapshot.
+- Provide explicitly scoped named-node lookup against a supplied DAG. Lookup neither
+  executes a node nor converts it to a Python value.
+- Support sub-DAG composition so a larger DAG can reference smaller DAGs without
+  copying or flattening them. A node referencing a sub-DAG is an assistant-proposed
+  candidate representation, not a selected schema.
+- Extend the C foundation, low-level Python API and inspection CLI only as needed
+  to construct and inspect this structure.
+- Work through a concrete example before selecting the representation: two trial
+  DAGs exposing named input/result nodes, a comparison DAG referencing those trials
+  and a recorded summary, then a child snapshot replacing one trial while retaining
+  the other. Python and CLI inspection should expose nested structure and scoped
+  names; shared sub-DAG identities and earlier immutable records remain unchanged.
+- Python performs any arithmetic itself. Recorded structure does not claim DML
+  executed the calculation or verified the summary, and nesting alone does not
+  establish computational dependency or causality.
+- Use the example to learn composition and lookup semantics, inspectability, and
+  which small authoring helpers are useful above the low-level API. No general
+  workflow framework is selected.
+- No intents, closures, requests/attempts, execution adapters, reuse facets, remotes,
+  resource management, observer subsystem or visualization UI in this turn. No
+  pre-1.0 migration machinery is required.
+
+The next planning task is a worked example and bounded candidate design/handoff.
+Scope agreement does not approve an exact schema or authorize implementation.
+
+### Iteration 3 candidate preparation
+
+At the user's instruction to proceed with planning, the assistant prepared the
+[worked example](iterations/03-composable-dags/EXAMPLE.md),
+[candidate design](iterations/03-composable-dags/DESIGN.md) and conditional
+[handoff](iterations/03-composable-dags/HANDOFF.md). The example records two Python
+calculations and a comparison, then replaces one trial in a child snapshot while
+retaining the other. It deliberately records containment/values rather than
+claiming captured computation or causal dependencies.
+
+Assistant-proposed choices include a non-executing sub-DAG-reference node,
+root-plus-named-bindings DAG structure, exact single-scope lookup, canonical ASCII
+binding names, a changed DAG encoding without migrations, and bounded native CLI
+nested inspection. These are reviewable candidate choices, not newly user-approved
+schema/API decisions. A separate sub-DAG-root fixture addresses the current CLI's
+literal-root assumption.
+
+Preparation inspected clean implementation `e253249`; no implementation files were
+changed and no build/test suite was rerun. Planning is complete for review;
+implementation, delegation and publication remain unauthorized.
+
+### Iteration 3 design approval
+
+The user reviewed and approved the worked example, design and conditional handoff.
+This accepts the assistant-origin candidate choices as the bounded plan, not
+implemented behavior. Exact engineering details still marked provisional can be
+selected and recorded during an authorized turn. Approval of the plan is recorded
+separately from permission to start implementation, which remains pending. No code,
+workers, commits, pushes or publication were started by this approval checkpoint.
+
+### Iteration 3 implementation and publication authorization
+
+The user explicitly authorized the existing Pi agent in window 2 to implement
+Iteration 3, with this coordinator monitoring, independently reviewing and providing
+feedback until satisfactory. Once accepted, have that agent commit and push, monitor
+CI workflows for the pushed SHA and fix any issues until successful. This supersedes
+the preceding implementation-pending status for this bounded turn, not its stop line.
+No extra workers, release/package publication, cloud experiments or later feature
+turn are authorized.
+
+[Coordination](iterations/03-composable-dags/COORDINATION.md) records the active
+assignment: implementation worker `dml-design:2` pane `%215`, initially empty Pi
+conversation; worker owns runtime/tests/as-built docs and RESULTS, coordinator owns
+REVIEW and design status notes. Worker has exclusive `build/check` until a review
+pause is agreed. Implementation was initially clean at `e253249`. The handoff prompt
+was submitted to the existing worker; no new agent or session was launched.
+
+### Iteration 3 delivery and publication checkpoint
+
+The existing window-2 worker implemented the approved bounded slice: named DAG
+bindings, non-executing sub-DAG-reference nodes, explicit scoped lookup, owned
+Python descriptions and native CLI nested inspection/nonliteral-root handling.
+The runnable comparison records Python-produced values/containment, not captured
+computational causality. The changed DAG encoding deliberately rejects the former
+root-only shape without pre-1.0 migration machinery.
+
+Coordinator feedback corrected DAG errors mislabeled as trees and a generated-name
+property-test flake; worker confirmed and removed only its mutation scratch artifacts
+before staging. Worker and independent coordinator fresh default checks pass:
+7 C executables, 316 Python tests, Python 469/469 statements, retained C 1681/1681
+lines, 132/132 functions and 1562/1562 outcomes. Expanded binding memory workload
+has zero unsuppressed errors and 141 native CLI Valgrind processes pass. Coordinator
+49 independent API/CLI probes and a separate isolated installed workflow pass.
+Precise exclusions/suppressions, mutation survivors, direct-not-transitive validation,
+read/allocation/presentation bounds, finalizer misuse and platform/install limits
+remain qualified in [RESULTS](iterations/03-composable-dags/RESULTS.md) and
+[REVIEW](iterations/03-composable-dags/REVIEW.md).
+
+After explicit review acceptance the worker inspected/staged the reviewed 31-file
+slice and committed/pushed `9b8fb7176e31186621dd5a4c26adadec4d76bc1e`. Coordinator
+verified the commit surface, remote master SHA, clean implementation checkout and
+[exact-SHA CI run 40474598485](https://github.com/micha/dml/actions/runs/40474598485).
+All six jobs succeed on the first published run; no CI follow-up fix was needed.
+All jobs pass 7 C executables; Linux passes 316 Python tests, macOS 312 with 4 existing
+skips, Windows 311 with 5 existing skips. CI's informational strict-Linux `-c`
+remains distinct from local default/memory evidence. Release Python was not triggered.
+No extra agent, force push, tag/release, package publication, system change or later
+feature work occurred. Design notes remain local/uncommitted. Work is complete and
+stopped for user review.
+
+### User acceptance and design checkpoint
+
+The user accepted the Iteration 3 delivery and requested a local commit of these
+design notes. This checkpoint includes the accumulated Iteration 1–3 plans, delivery
+and review evidence, scope/coverage guidance and current resume point. Earlier
+statements that design notes were uncommitted describe those historical deliveries;
+this checkpoint records them locally in the no-remote design repository. The user
+also asked for an Iteration 4 proposal; no fourth-turn direction or implementation
+is yet approved.
+
 ## Resume point
 
-Review the working [glossary](../dml/docs/spec-next/glossary.md) as needed, then
-continue by agreeing the
-implementation scope/location for the first minimum-viable
-repository iteration: simplified entities, commit graphs and refs, without executions,
-intents, merge or rebase. The assistant's larger execution-oriented first slice was
-rejected as too ambitious. The new as-built specification has been created under
-`../dml/docs/spec-next/`; only that documentation change is authorized in `../dml` so far.
+Iteration 3 implementation, independent review, authorized worker commit/push and
+final exact-SHA CI verification are complete. Read
+[RESULTS](iterations/03-composable-dags/RESULTS.md) and
+[REVIEW](iterations/03-composable-dags/REVIEW.md), plus the as-built
+[objects](../dml/docs/spec-next/objects.md),
+[repository](../dml/docs/spec-next/repository.md),
+[Python API](../dml/docs/spec-next/python-api.md) and
+[CLI](../dml/docs/spec-next/cli.md) contracts. Implementation master is clean at
+pushed `9b8fb71`; all six exact-SHA CI jobs pass. The user accepted the delivery;
+work is stopped. Discuss the next bounded spiral turn in response to the Iteration 4
+proposal request. No fourth-turn selection or authorization, release/package
+publication or later feature was performed. Design notes are checkpointed locally.
+
+The following Iteration 2 resume evidence is historical; Iteration 3 above is the
+current implementation state.
+
+Iteration 2 implementation, coordinator review and authorized publication are
+complete. Read the
+[delivery notes](iterations/02-repository-usability/RESULTS.md) and implemented
+[Python API](../dml/docs/spec-next/python-api.md),
+[inspection CLI](../dml/docs/spec-next/cli.md) and
+[packaging](../dml/docs/packaging-and-distribution.md) contracts. The
+[coordinator review](iterations/02-repository-usability/REVIEW.md) and
+[publication checkpoint](iterations/02-repository-usability/RESULTS.md#publication-checkpoint)
+record final acceptance: independent probes/install, fresh local default/memory
+validation, final links/status and all six exact-SHA CI jobs pass. The implementation
+checkout is clean at pushed `e253249`; design notes remain local/uncommitted.
+Work on Iteration 2 is complete. Its clean-source statement above is the initial
+Iteration 3 baseline, not a claim that the active worker's checkout remains clean.
+No release or package publication was performed.
+
+Prior resume framing (historical, superseded; not active instructions): see the
+[scope above](#iteration-2-agreed-direction-repository-usability). The user reviewed
+the [candidate design](iterations/02-repository-usability/DESIGN.md) and
+[handoff](iterations/02-repository-usability/HANDOFF.md), then authorized bounded
+implementation in a fresh Pi session in window 2. Monitor and independently review
+that work, send findings for fixes, validate the final state, and report. Record
+selected API/build choices and distinguish actual evidence from planned checks.
+Higher-level conveniences belong above the low-level API, not inside its contract.
+
+### Completed Iteration 1 checkpoint
+
+Historical publication state, before the later LSP commit `06bf66e` and Iteration
+2. The source/unstaged/planning statements below are retained as that earlier
+checkpoint, not current status; the Iteration 2 checkpoint above supersedes them.
+
+Publication and Actions monitoring of Iteration 1's reviewed follow-up are
+complete. The implementation is now at published `6ee9329`; its exact-SHA CI run
+passed all six jobs. Read the
+[publication checkpoint](iterations/01-minimum-viable-repository/RESULTS.md#follow-up-publication-checkpoint),
+[URI correction notes](iterations/01-minimum-viable-repository/RESULTS.md#final-uri-diagnostic-correction),
+[follow-up notes](iterations/01-minimum-viable-repository/RESULTS.md#review-follow-up)
+and [coverage catalog](../dml/tests/coverage-exclusions.md). The passing local
+default gate and informational CI remain distinct evidence; historical initial
+failures and excluded populations remain visible.
+
+Only unrelated LSP work remains unstaged in the implementation checkout:
+`.gitignore`, README's C Editor Setup section, `scripts/setup-lsp.sh`, and
+`tests/python/test_setup_lsp.py`, plus generated `.wraplock`. Design notes remain
+uncommitted with no remote. Earlier `0bcfe92` CI evidence is historical, not the
+new commit's run. Iteration 1 stopped after this publication checkpoint. Iteration
+2 is now selected for planning only, as recorded above. The as-built [object contracts](../dml/docs/spec-next/objects.md) and
+[repository contracts](../dml/docs/spec-next/repository.md) remain the implemented
+repository scope. Use the shared [glossary](../dml/docs/spec-next/glossary.md).
 
 Favor minimal prototypes and frequent iterations, broad or deep as appropriate.
 DML repositories/state are ephemeral until `v1.0.0`, without per-iteration version
-increments or required migrations. No implementation sequence or code changes have
-been approved.
+increments or required migrations. Stop after this turn for review; the handoff
+is not authorization to continue through subsequent iterations.
 
 Purpose-specific node identity facets remain agreed, initially full-record and reuse
 identity. A [draft entity and identity map](design-map.md) provides a visual reference;
@@ -550,4 +980,6 @@ subjects; no production schema or policy choice has been approved.
 
 Other open topics remain closure identity/configuration scope, cross-implementation reuse evidence, project/repository defaults, and exact execution/adoption semantics.
 
-Maintain this work separately from existing repository specs/docs. This checkpoint does not end the discussion or authorize implementation.
+Maintain design work here and implemented technical contracts in the new as-built
+spec. The bounded Iteration 1 authorization does not finalize the broader design or
+authorize implementation of later subsystems.

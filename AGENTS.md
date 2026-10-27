@@ -13,10 +13,26 @@ and `discussion.md` before continuing the discussion. Read the shared
   and candidate-design evolution under `feasibility/`. Read its index,
   `ITERATION-RESULTS.md` and final audit for completed work and limitations. This
   does not authorize cloud experiments or production integration.
-- Keep the implementation repository `/work/repos/micha/dml` unchanged unless
-  separately authorized.
+- Keep the implementation repository `/work/repos/micha/dml` unchanged outside
+  separately authorized scope. The user has authorized code changes there for
+  [Iteration 1](iterations/01-minimum-viable-repository/HANDOFF.md): the minimum viable
+  repository, plus the already authorized `docs/spec-next/` documentation. This
+  does not authorize later execution/resource/observer work. The user also
+  authorized [Iteration 2](iterations/02-repository-usability/HANDOFF.md): the
+  low-level Python repository API and inspection-only CLI, including bounded local
+  build/install validation and review fixes. No later feature turn is authorized.
+  The user also authorized [Iteration 3](iterations/03-composable-dags/HANDOFF.md):
+  composable named DAGs and scoped lookup, implementation by the existing Pi agent
+  in window 2, coordinator monitoring/review and fixes, then focused commit/push
+  after acceptance and exact-SHA CI verification/fixes. This does not authorize
+  a release, package publication, additional workers or a later feature turn.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
+- The user permits narrow coverage exclusions when exercising the precise
+  lines/branches/regions adds no useful assurance. Preserve thresholds for the
+  remaining code, document each rationale and distinguish tested from excluded
+  code. Difficult but meaningful failure paths still need tests. See the
+  implementation [testing guidance](../dml/AGENTS.md#testing).
 - Files under `archive/` are historical context, not active instructions. Do not
   execute their old coordinator or completion-marker protocols.
 

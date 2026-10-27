@@ -6,6 +6,27 @@ its existing draft specifications.
 
 ## Start here
 
+- [Iteration 3 delivery](iterations/03-composable-dags/RESULTS.md) and
+  [coordinator review](iterations/03-composable-dags/REVIEW.md): named/composable DAGs,
+  scoped lookup and nested CLI inspection, published as `9b8fb71`; all six exact-SHA
+  CI jobs successful. Implementation and review are complete; work is stopped.
+- Iteration 3 [worked example](iterations/03-composable-dags/EXAMPLE.md),
+  [design](iterations/03-composable-dags/DESIGN.md) and
+  [handoff](iterations/03-composable-dags/HANDOFF.md) preserve the approved plan and
+  bounded authorization, not permission to restart or add later features.
+- [Iteration 2 delivery](iterations/02-repository-usability/RESULTS.md): low-level
+  linked Python repository API and inspection-only native CLI, worker/coordinator
+  default checks and local install validation pass; published through `e253249`
+  with all six exact-SHA CI jobs successful. See the
+  [coordinator review](iterations/02-repository-usability/REVIEW.md).
+- [Iteration 2 design](iterations/02-repository-usability/DESIGN.md) and
+  [handoff](iterations/02-repository-usability/HANDOFF.md): agreed scope and candidate
+  choices for that authorized bounded turn, not additional feature approval.
+- [Iteration 1 delivery notes](iterations/01-minimum-viable-repository/RESULTS.md):
+  implemented minimum viable repository and bounded review follow-up; default
+  validation passes with documented no-value exclusions; stopped for review.
+- [Iteration 1 handoff](iterations/01-minimum-viable-repository/HANDOFF.md): detailed
+  plan and scope for that authorized turn.
 - [Glossary](../dml/docs/spec-next/glossary.md): shared vocabulary for maintained documentation and
   best-effort use in design discussion; provisional terms are marked.
 - [New as-built specification](../dml/docs/spec-next/README.md): implemented behavior
@@ -25,6 +46,43 @@ The checkpoint is chronological. Later clarifications can supersede earlier
 proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
+
+Iteration 3 is implemented, independently reviewed and published as `9b8fb71`.
+It adds scoped named DAG bindings, non-executing sub-DAG-reference nodes, explicit
+lookup and bounded nested CLI inspection over the existing C/Python foundation.
+The runnable comparison example records Python-produced values and containment,
+not captured computational causality or DML execution.
+
+Worker and coordinator fresh default checks pass: 7 C executables, 316 Python tests,
+Python 469/469 statements and retained C 1681/1681 lines, 132/132 functions,
+1562/1562 outcomes; expanded binding and 141 native CLI memory processes pass.
+Coordinator's 49 independent probes and isolated installed workflow also pass.
+The first published exact-SHA CI run succeeds in all six jobs. Precise exclusions,
+mutation survivors, unsupported finalizer abandonment, presentation/read limits,
+platform skips and local installed-package limits remain explicit in the
+[delivery](iterations/03-composable-dags/RESULTS.md) and
+[review](iterations/03-composable-dags/REVIEW.md).
+
+The implementation checkout is clean at pushed `9b8fb71`; work is stopped after
+this bounded turn. No release/tag, package publication or later feature was started.
+Design notes are checkpointed locally in this no-remote repository.
+
+Iteration 2 delivers a low-level Python API over the existing C foundation and an
+inspection-only native CLI with packaged console forwarding. Worker and independent
+coordinator default checks pass; after bounded Windows fixture fixes the fresh
+local default run has 7 C executables and 255 Python tests, with retained 100%
+C/Python populations and precise exclusions/runtime-memory suppressions. Published
+`e253249` passes all six CI jobs, with platform skips and informational CI coverage
+kept distinct from the local default/memory evidence. Local staged-source/wheel
+install workflows pass; mutation survivors, unsupported foreign-last-owner
+abandonment and untested installed-package/runtime coverage remain explicit in the
+[delivery notes](iterations/02-repository-usability/RESULTS.md).
+
+Implementation, review, authorized publication and Actions monitoring are complete;
+Iteration 2 work is stopped. No tags, releases, package publication or later feature
+implementation were performed. Design notes remain local/uncommitted. Higher-level
+helpers belong above this low-level API; the runnable
+example is composition, not a workflow framework.
 
 The central goal is human visibility into high-throughput agent-led research:
 deterministic inspection and progressive visualization of recorded computation,
