@@ -1,6 +1,14 @@
 # Iteration 6 candidate design: execution across local repositories
 
-Status: the user approved this bounded design/example/handoff and requested a local
+Current status: the separately authorized bounded turn is complete and stopped at
+published `a0aa05d`, all six final exact-SHA CI jobs successful. See
+[RESULTS.md](RESULTS.md), [REVIEW.md](REVIEW.md) and [COORDINATION.md](COORDINATION.md).
+Completed GO superseded planning-only permission statements below, not the scope/stop
+line. This remains the approved plan/provenance, not an as-built contract or permission
+to restart. [Actual behavior](../../../dml/docs/spec-next/repository-execution.md) is
+owned by the implementation specification.
+
+Planning checkpoint status (historical): the user approved this bounded design/example/handoff and requested a local
 checkpoint ready for handoff. **Implementation, worker assignment/restart,
 implementation commit/push, CI launch and package publication remain unauthorized.**
 Concrete choices originated as assistant proposals and now guide the approved plan;

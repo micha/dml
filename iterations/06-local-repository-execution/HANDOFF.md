@@ -1,6 +1,15 @@
-# Iteration 6 conditional handoff: execution across local repositories
+# Iteration 6 handoff: execution across local repositories
 
-Status: the user approved the bounded design/example/handoff and requested a local
+Current status: the authorized bounded turn is implemented, independently accepted
+and published as `a0aa05d`; all six final exact-SHA CI jobs pass. Work is complete
+and stopped. [RESULTS.md](RESULTS.md) and [REVIEW.md](REVIEW.md) own delivery evidence;
+[COORDINATION.md](COORDINATION.md) records the fresh-session window-2 assignment.
+The user authorized implementation/review/fixes then focused worker commit/push/CI;
+that completed authorization superseded planning-only permission statements below,
+not the scope/stop line. This plan is not permission to restart or begin another turn.
+No extra workers, release/package publication, cloud experiments or later feature.
+
+Planning checkpoint status (historical): the user approved the bounded design/example/handoff and requested a local
 checkpoint ready for handoff. **No implementation, worker assignment/restart,
 implementation commit/push, CI launch or package publication is authorized.**
 Do not inherit Iteration 5's completed delegation/publication request. Illustrative

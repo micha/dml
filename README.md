@@ -6,13 +6,26 @@ its existing draft specifications.
 
 ## Start here
 
-- Iteration 6 [design](iterations/06-local-repository-execution/DESIGN.md),
-  [worked example](iterations/06-local-repository-execution/EXAMPLE.md) and
-  [conditional handoff](iterations/06-local-repository-execution/HANDOFF.md): approved
-  bounded plan for A → B → A execution on the same machine, with unchanged caller
-  heads and an explicit return ref. Ready for handoff after separate implementation
-  authorization; implementation/delegation/publication remain pending. Illustrative
-  APIs/provisional details are not as-built contracts.
+- Iteration 7 [candidate design](iterations/07-asynchronous-local-execution/DESIGN.md),
+  [worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
+  [conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md): agreed
+  direction for asynchronous same-machine execution and inspectable progress; detailed
+  plan prepared for review, not yet approved or implemented. Proposed separate live
+  process ownership/saved handle, coherent snapshot discovery and validated P/U/F
+  packets keep publication distinct from completion. Implementation/delegation/
+  publication are not authorized.
+
+- Iteration 6 [delivery](iterations/06-local-repository-execution/RESULTS.md) and
+  [coordinator review](iterations/06-local-repository-execution/REVIEW.md): pinned
+  A → B → A execution is implemented and independently accepted, published as
+  `a0aa05d`; all six final exact-SHA CI jobs pass on the first run. The bounded turn
+  is complete and stopped. Existing A heads stay unchanged; returned selected
+  history is validated before atomic publication under an explicit ref.
+  The [design](iterations/06-local-repository-execution/DESIGN.md),
+  [example](iterations/06-local-repository-execution/EXAMPLE.md) and
+  [handoff](iterations/06-local-repository-execution/HANDOFF.md) preserve the approved
+  plan, not permission for another feature. The
+  [as-built contract](../dml/docs/spec-next/repository-execution.md) owns actual behavior.
 - Iteration 5 [delivery](iterations/05-pinned-snapshot-transfer/RESULTS.md) and
   [coordinator review](iterations/05-pinned-snapshot-transfer/REVIEW.md): pinned
   commit/full-history transfer between initialized local repositories is implemented
@@ -72,26 +85,58 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
-Iteration 6's direction is agreed: execute one step in a separate local repository
-using a pinned input snapshot, then return recorded history to the caller. Requests
-and attempts are created in the worker repository after import; same-machine,
-synchronous file-mediated exchange connects the existing local runner and transfer
-layer. A's existing head remains unchanged; returned history is imported under a
-caller-chosen ref, without adoption or merge. The
-[design](iterations/06-local-repository-execution/DESIGN.md),
-[worked example](iterations/06-local-repository-execution/EXAMPLE.md) and
-[conditional handoff](iterations/06-local-repository-execution/HANDOFF.md) are approved
-as the bounded plan and prepared for handoff after separate implementation
-authorization. Assistant-origin choices now guide the plan: explicit prepare/execute/
-receive stages, retained one-shot workspaces, bounded descriptors and isolated
-selected-run validation before atomic return import. Illustrative APIs/provisional
-engineering details remain refinable, not as-built contracts. See the
-[discussion](discussion.md#iteration-6-agreed-direction-execution-across-local-repositories).
-No worker restart, code/spec changes, tests/prototypes, network/cloud, reuse,
-automatic recovery or general merge work occurred during preparation. Implementation
-remains clean at `0ec769b`; the user requested a local checkpoint of the approved
-Iteration 6 plan. No implementation/delegation/implementation commit/push/CI launch
-is authorized; this design repository has no remote and no push is requested.
+The user accepted Iteration 6, agreed to Iteration 7's asynchronous same-machine
+execution/inspectable-progress direction and instructed preparation of the
+[candidate design](iterations/07-asynchronous-local-execution/DESIGN.md),
+[worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
+[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md).
+These are ready for review, not yet approved or implemented. Recommended mechanics:
+separate saved observation handle from application-owned live worker launch; a finite
+example supervisor reaps the worker while short-lived clients observe from saved state;
+coherent live B reads followed by pinned export and isolated validation; immutable
+initial/publication/completion packets received under explicit refs without A head
+movement. Publication is provisional evidence, and `done` requires retrieved validated
+final computation/cleanup—not outer-worker exit or prior A import. Transparent exit
+of the sole process owner with an unowned detached worker is deliberately not promised;
+review that ownership refinement before plan approval. See the
+[discussion](discussion.md#iteration-7-candidate-preparation).
+Planning inspected clean implementation `a0aa05d`; no code/spec edits, tests/prototypes,
+worker restart, delegation or publication occurred. The user requested a local checkpoint
+of these plans and the Iteration 6 delivery notes; that request does not approve the
+candidate plan. Implementation/delegation/publication require separate authorization;
+do not inherit Iteration 6's completed GO. This design repository has no remote and
+no push is requested.
+
+Iteration 6 implements one pinned step in independent local B and exact recorded
+history return to A. The separate explicit `daggerml.exchange` layer composes public
+prepare/execute/receive stages over unchanged local execution and transfer. Requests
+and attempts originate in B; fresh retained one-shot workspaces prevent implicit
+reexecution. Receive compares caller-owned selection/token and validates the selected
+completion in disposable storage before atomic explicit-ref import. A's existing heads
+stay unchanged; no adoption or merge. The
+[as-built contract](../dml/docs/spec-next/repository-execution.md) owns actual behavior;
+[RESULTS](iterations/06-local-repository-execution/RESULTS.md) and
+[REVIEW](iterations/06-local-repository-execution/REVIEW.md) qualify evidence/limits.
+
+Worker and independent coordinator fresh default checks pass: seven C executables,
+609 Python tests, 1,639/1,639 Python statements and unchanged retained C coverage/memory
+gates; 141 native CLI Valgrind processes pass. Coordinator's separate installed
+workflow passes 73 independent checks. Typed wrong-history rejection, real map-full,
+late rollback with successful new puts, safe process-loss barriers, recorded failure/
+evidence/cleanup, pin/head preservation and offline packet receive are exercised.
+Host-helper coverage is not installed-child coverage; narrow existing exclusions/runtime
+suppressions, unavailable Python mutation tools, finite local process/platform and
+trust/full-environment/profile limits remain qualified.
+
+Reviewed 16-file implementation is committed/pushed as `a0aa05d`; all six jobs in
+[exact-SHA CI](https://github.com/micha/dml/actions/runs/40593738345) pass on the first
+run. Implementation tree/index are clean and remote master matches. Implementation,
+review and publication/CI are complete and stopped. No extra workers, release/package
+publication, cloud experiments, automatic recovery/retry, merge/adoption, reuse/facets,
+resources/observer work or later feature turn. Delivery notes are included in the
+user-requested local design checkpoint alongside Iteration 7's unapproved candidate
+plan. Earlier uncommitted/preparation/authorization statements preserve chronological
+provenance, not current permission to restart.
 
 Iteration 5 implements pinned DML commit transfer with complete all-parent typed
 object closure between local repositories, preserving IDs/bytes and computational

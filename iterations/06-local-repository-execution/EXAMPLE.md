@@ -1,6 +1,12 @@
 # Iteration 6 worked example: A → B → A
 
-Status: informative acceptance story for the user-approved bounded plan, **not
+Current status: the authorized bounded turn is complete and stopped at `a0aa05d`,
+all six final exact-SHA CI jobs successful. [RESULTS.md](RESULTS.md) and
+[REVIEW.md](REVIEW.md) own actual delivery evidence; [COORDINATION.md](COORDINATION.md)
+owns assignment. This remains the approved acceptance plan/provenance, not a new
+implementation authorization or an as-built contract.
+
+Planning checkpoint status (historical): informative acceptance story for the user-approved bounded plan, **not
 executed during preparation**. Approval does not authorize implementation/delegation;
 illustrative APIs and provisional details are not as-built contracts.
 [DESIGN.md](DESIGN.md) owns candidate semantics; [HANDOFF.md](HANDOFF.md) owns work

@@ -1,11 +1,26 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: the user agreed to Iteration 6's direction: synchronous execution
-in a separate local repository, with pinned input transfer and recorded history
-returned to the caller. The user approved the detailed design/example/handoff and
-requested a local checkpoint ready for handoff. Implementation/delegation and
-implementation publication/CI remain unauthorized; illustrative APIs/provisional
-details are not as-built contracts. Iteration 5 implementation, independent coordinator
+Latest checkpoint: the user requested a local checkpoint of Iteration 6's accepted
+delivery and Iteration 7's candidate planning notes. The user accepted Iteration 6,
+agreed to Iteration 7's proposed direction and authorized planning, but has not yet
+approved its detailed candidate plan. The candidate
+[design](iterations/07-asynchronous-local-execution/DESIGN.md),
+[worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
+[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) are prepared
+for review. They recommend separate saved observation identity/live process ownership,
+coherent B snapshot discovery and validated immutable P/U/F packets. Detailed plan
+approval and implementation/delegation/publication remain pending; no tests/prototypes
+or worker restart occurred during preparation.
+Iteration 6 implementation, independent coordinator review,
+focused worker commit/push and final exact-SHA CI verification are complete through
+`a0aa05d`; all six jobs pass on the first run. The bounded turn is accepted and stopped.
+The explicit public-API exchange layer connects pinned transfer and local execution
+in independent B, validating selected history before atomic explicit-ref return while
+preserving existing A heads. Read
+[RESULTS](iterations/06-local-repository-execution/RESULTS.md) and
+[REVIEW](iterations/06-local-repository-execution/REVIEW.md) for evidence/limits.
+No release/package publication or later feature. These design notes are included
+in the requested local checkpoint; no design push is requested. Iteration 5 implementation, independent coordinator
 review, worker commit/push and final exact-SHA CI verification are complete through
 `0ec769b`; all six CI jobs pass on the first run. Bounded turn accepted and stopped.
 No release/package publication or later feature. Delivery/assurance limits remain
@@ -1252,17 +1267,177 @@ scope/orientation/resume notes. Earlier uncommitted/pending-review statements pr
 preparation provenance. Design has no remote; no push is requested or performed.
 Implementation remains clean at published `0ec769b`.
 
+### Iteration 6 implementation and publication authorization
+
+The user declared Iteration 6 GO and authorized the existing window-2 Pi agent in
+a new session to implement the approved bounded plan. Coordinator monitors,
+independently reviews and sends feedback/fixes until satisfactory; then the worker
+commits/pushes and fixes exact-SHA CI issues. This supersedes the preceding
+planning-only permission statements, not the scope/stop line. No extra workers,
+release/tag/package publication, cloud experiments or later feature turn.
+
+[COORDINATION](iterations/06-local-repository-execution/COORDINATION.md) records the
+assignment and shared-build gates. Coordinator sent `/new` to pane `%215`, verified
+an empty new session and submitted the handoff. Both checkouts were initially clean:
+implementation `0ec769b`, design checkpoint `0bc75c1`. Worker owns implementation,
+tests, as-built documentation and RESULTS; coordinator owns review and design status.
+Worker has exclusive `build/check` until explicit freeze/release, and must complete
+a clean baseline before measured source edits. Commit/push awaits coordinator
+acceptance; final delivery requires final exact-SHA CI success.
+
+### Iteration 6 delivery and final publication checkpoint
+
+The fresh-session existing window-2 worker implemented the bounded public-API-only
+exchange layer: explicit prepare/execute/receive, pinned named selection and
+transport-only token, retained fresh one-shot workspace/B, unchanged local runner
+and exact history export, isolated selected-completion validation before atomic
+A import under a caller-chosen ref. Requests/attempts originate in B; recorded
+failure is a returnable completion, cleanup is separate, missing outcome stays
+unknown. No existing A head movement, adoption/merge, copied B refs, source execution
+or historical-path action during receive.
+
+Coordinator feedback strengthened successful-new-put late rollback/raw-ref evidence,
+separate-worker caller loss, actual false-success rejection and generated history/
+repeat-receive tests. Worker and independent coordinator fresh default `-v` checks
+pass: seven C executables, 609 Python tests, Python 1,639/1,639 statements and retained
+C 1681/1681 lines, 132/132 functions, 1562/1562 outcomes; binding memory and 141 native
+CLI Valgrind processes pass. Separate coordinator offline-installed workflow passes
+73 checks. Native production/local/transfer/CLI/runtime/workflows remain unchanged.
+Host-helper versus installed coverage, existing exclusions/runtime suppressions,
+Python mutation-tool gap/five selected negative oracles, local platform/process,
+trust/environment capture/profile and response-loss limits remain in
+[RESULTS](iterations/06-local-repository-execution/RESULTS.md),
+[REVIEW](iterations/06-local-repository-execution/REVIEW.md) and the
+[as-built contract](../dml/docs/spec-next/repository-execution.md).
+
+After explicit independent acceptance, worker committed/pushed the reviewed 16-file
+slice as `a0aa05d56b9e70277a98bb03e26514ab6b6f1415`. Coordinator independently verified
+committed surface, clean implementation tree/index and matching remote master.
+[Exact-SHA CI run 40593738345](https://github.com/micha/dml/actions/runs/40593738345)
+passes all six jobs on the first run: seven C executables everywhere; Linux/strict
+609 Python tests, macOS 605 with four existing skips, Windows 604 with five existing
+skips. Full logs/job JSON, sole automatic push workflow list and finite watch exit 0
+are verified. No CI fix/rerun, manual workflow or package publication. CI informational
+`-c` remains distinct from local default/memory `-v` evidence.
+
+Implementation, review and publication/CI are complete and stopped. Worker instructed
+to finalize only RESULTS and stop all implementation/build/commit/push. No extra
+workers, force push, release/tag/package publication, cloud/global tooling or later
+feature turn. Design notes remain local/uncommitted; no checkpoint commit/push was
+requested. Earlier planning-only authorization statements preserve chronological
+provenance, not current permission to restart.
+
+## Iteration 7 agreed direction: asynchronous execution and inspectable progress
+
+The user accepted Iteration 6 and agreed to the assistant's proposed next direction.
+This selects the bounded discussion/planning direction below, not exact APIs, record/
+handle/ref semantics or implementation/delegation/publication authorization.
+
+- Keep same-machine separate caller/worker repositories and the existing local runner.
+- Start one fresh worker without waiting for computational completion, then permit
+  bounded observations through an owned exchange handle.
+- Expose recorded initial request/attempt, accepted child publication and final outcome
+  as inspectable history. Receive a selected progress or completion snapshot under an
+  explicit caller-chosen ref; preserve A's existing heads and prior snapshots.
+- Report shared adapter lifecycle `working` or `done`, separately from computational
+  and cleanup outcomes. `working` is absence of a recorded final adapter disposition,
+  not proof of process liveness. Interrupted attempts remain unknown.
+- Observations/imports concern the same request/attempt; polling never creates another
+  computational trial. A fresh caller process can continue observation from the saved
+  handle without relaunching execution.
+- Retain explicit selected snapshots/refs rather than silently adding mutable latest-
+  progress synchronization. No merge/adoption policy is selected.
+- Exercise a slow addition: initial unknown state before computation, accepted result
+  publication while the child remains active, final recorded computation/cleanup,
+  and exact return preserving earlier history/occurrences. Also cover recorded failure,
+  worker loss and B completion not yet received at A.
+- Defer automatic retry/recovery/finalization, scheduler/daemon, distributed locking,
+  process-tree guarantees, network/cloud, reuse facets and resource management.
+
+Learning goal: make recorded execution history useful while work is happening and
+expose lifecycle/ownership boundaries before introducing remote/cloud machinery.
+The proposed start/observe/receive split and slow-addition story guide exploration;
+exact handle persistence, process ownership after caller exit, publication discovery,
+selected-progress validation, ref policy and the location/evidence required for a
+`done` observation remain to be worked through. B completion and A reception must
+remain distinguishable; this agreement does not resolve their adapter-status mapping.
+No worker restart, implementation/spec edits, experiment, commit/push or CI launch
+is authorized by this direction agreement. Next is a worked example and candidate
+planning, not another implementation turn.
+
+### Iteration 7 candidate preparation
+
+At the user's instruction to proceed, the assistant prepared
+[DESIGN](iterations/07-asynchronous-local-execution/DESIGN.md),
+[EXAMPLE](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
+[HANDOFF](iterations/07-asynchronous-local-execution/HANDOFF.md). This is planning
+authorization, not implementation or approval of the detailed candidate choices.
+
+Recommended ownership separates a serializable caller-owned exchange handle from
+a nonserializable live worker launch retained/reaped by an application owner. The
+acceptance story uses a finite application supervisor while initiating/observing
+clients can exit and fresh clients observe the same saved handle. This is not a daemon
+or portable detached lifetime guarantee: normal exit of the sole launching owner
+without another owner is deliberately not promised. This refinement requires review;
+a requirement for that stronger lifetime behavior would need another design decision.
+
+Other assistant-origin recommendations: exclusive launch marker distinct from execute's
+one-shot marker; additive bootstrap readiness receipt before public local dispatch;
+coherent B working/publication ref reads followed by pinned public export; isolated
+selected initial/publication/completion validation and immutable observer-owned packets;
+explicit create-or-same-target A refs. Publication remains provisional evidence, not
+success. A `done` observation requires validated recorded final computation/cleanup
+and successful history retrieval; A reception and outer-worker reaping stay separate.
+Reading/exporting F without the original completion receipt is retrieval, not finalizing
+an unknown attempt or restarting work. Repeated polls/imports create no new attempts.
+
+Planning reinspected clean implementation
+`a0aa05d56b9e70277a98bb03e26514ab6b6f1415` and its current public exchange/local/transfer
+seams. Context7 `/python/cpython` documentation informed process ownership; no process
+experiment, implementation/as-built edit, worker restart/delegation, build/test, commit/
+push or CI launch occurred. Existing uncommitted Iteration 6 delivery/status notes are
+preserved; this no-remote design checkout now also contains candidate Iteration 7 plans.
+No design checkpoint commit/push is requested. Next is review/approval of this bounded
+plan and separate implementation/delegation/publication authorization if desired.
+
+### Local checkpoint of Iteration 6 delivery and Iteration 7 candidate planning
+
+After asking whether the repositories were clean, the user requested a local checkpoint.
+It includes Iteration 6 authorization/coordination, accepted delivery and independent
+review/publication/CI evidence; Iteration 7's agreed direction, candidate design/example/
+handoff; and updated guidance/orientation/resume notes. This authorizes the local design
+commit only, not approval of the Iteration 7 candidate plan or implementation/delegation/
+publication. Earlier uncommitted/no-design-commit-request statements preserve their
+pre-checkpoint provenance. This design repository has no remote; no push is requested
+or performed. Implementation remains clean at already published `a0aa05d`; no worker
+restart, source/spec edit, build/test/prototype or new CI launch occurs for this checkpoint.
+
 ## Resume point
 
-Iteration 6's [design](iterations/06-local-repository-execution/DESIGN.md),
-[worked example](iterations/06-local-repository-execution/EXAMPLE.md) and
-[conditional handoff](iterations/06-local-repository-execution/HANDOFF.md) are approved
-and prepared for handoff, included in the requested local design checkpoint.
-Next is separate authorization before implementation/delegation/publication; do not
-restart the completed window-2 worker or inherit Iteration 5's request. Illustrative
-APIs/provisional details are not as-built contracts. Iteration 5 delivery notes were
-checkpointed locally as `26c9afa`; this checkpoint records subsequent Iteration 6
-agreements and planning.
+Iteration 7's direction is agreed and the candidate
+[design](iterations/07-asynchronous-local-execution/DESIGN.md),
+[worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
+[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) are prepared
+for review. Review the separate process-owner/saved-handle boundary, bootstrap readiness,
+pinned progress discovery and `done` evidence mapping before accepting the plan.
+Exact APIs/protocol remain proposed; no implementation, experiment, delegation, worker
+restart or publication is authorized. Iteration 6's completed GO is not inherited.
+
+Iteration 6 is implemented, independently accepted and published as `a0aa05d`; all
+six final exact-SHA CI jobs pass on the first run. Read
+[RESULTS](iterations/06-local-repository-execution/RESULTS.md),
+[REVIEW](iterations/06-local-repository-execution/REVIEW.md) and the
+[as-built repository-execution contract](../dml/docs/spec-next/repository-execution.md).
+Implementation tree/index are clean and remote master matches. The bounded turn is
+complete and stopped; no later feature/release/package publication is authorized.
+The [design](iterations/06-local-repository-execution/DESIGN.md),
+[example](iterations/06-local-repository-execution/EXAMPLE.md) and
+[handoff](iterations/06-local-repository-execution/HANDOFF.md) preserve the approved
+plan/provenance, not permission to restart. These delivery and candidate-planning notes
+are included in the requested local checkpoint; no design push is requested. Prior
+planning checkpoint is `0bc75c1`;
+Iteration 5 delivery checkpoint is `26c9afa`. Iteration 7's separately agreed direction
+is above, not implementation approval.
 
 Iteration 5 is implemented, independently accepted and published as `0ec769b`;
 all six final exact-SHA CI jobs pass. Read
