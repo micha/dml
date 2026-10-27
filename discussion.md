@@ -1,9 +1,11 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: Iteration 3 is implemented, reviewed and published as `9b8fb71`;
-all six exact-SHA CI jobs pass. See the [resume point](#resume-point) and
-[coordinator review](iterations/03-composable-dags/REVIEW.md). The status narrative
-below and earlier sections preserve chronological provenance.
+Latest checkpoint: Iteration 4 implementation, independent review and authorized
+publication/CI are complete through `d498a6c`; all six final exact-SHA jobs pass.
+The bounded local-recorded-execution turn is accepted and stopped. Iteration 3
+remains published as `9b8fb71`, with all six exact-SHA
+CI jobs passing. See the [resume point](#resume-point). The status narrative below
+and earlier sections preserve chronological provenance.
 
 Status: Ongoing design-spiral discussion. Feasibility studies are complete. The new
 as-built specification and glossary exist. Iteration 1's minimum viable repository
@@ -891,7 +893,147 @@ this checkpoint records them locally in the no-remote design repository. The use
 also asked for an Iteration 4 proposal; no fourth-turn direction or implementation
 is yet approved.
 
+## Iteration 4 agreed direction: one locally executed, recorded step
+
+The user agreed to the proposed next turn and requested plan/handoff documentation.
+This selects the bounded direction below for planning, not implementation or exact
+record/API approval.
+
+- Execute one explicitly bound local Python implementation using named input nodes.
+  Record an explicit intent URI, concrete implementation/adapter binding and inputs
+  before dispatch, without a registry or automatic implementation selection.
+- Record distinct request and attempt occurrences as ordinary DAG data, not new
+  core record types. The subprocess constructs a result sub-DAG through the existing
+  API; record result or failure in a later DML commit.
+- Preserve missing final outcomes after interruption as unknown, not automatically
+  failed. A retry creates a new attempt; two matching fresh calculations may have
+  identical result content while their occurrences remain distinct.
+- Start with a small Python layer over public repository operations. A demonstrated
+  missing C primitive needs a separate scope decision, not automatic core expansion.
+- Acceptance includes two matching additions, a failing implementation and a parent
+  interruption after the attempt is recorded; ordinary Python/CLI inspection exposes
+  bindings, inputs and outcomes.
+- No reuse/cache/facets, intent lifecycle/defaults, asynchronous scheduler, remotes,
+  cloud execution, resource management, observer/UI or general workflow framework.
+  Recorded source/inputs do not prove complete environmental capture or scientific
+  validity; no exactly-once external execution is promised.
+
+### Iteration 4 candidate preparation
+
+The assistant prepared [DESIGN](iterations/04-local-recorded-execution/DESIGN.md),
+[EXAMPLE](iterations/04-local-recorded-execution/EXAMPLE.md) and conditional
+[HANDOFF](iterations/04-local-recorded-execution/HANDOFF.md). Assistant-proposed choices
+include a separate `daggerml.local` layer, captured entry-script bytes with explicit
+runtime/capture limits, document-local ordinary-DAG role conventions, UUID occurrence
+reservation/publication refs, atomic pre-dispatch/final commits, cooperative child
+result publication, explicit retry and computational/cleanup-outcome separation.
+A two-parent final commit can retain accepted child publication history without
+introducing a general merge algorithm. These remain candidate choices for review,
+not additional user agreements or implemented behavior.
+
+The plan explicitly addresses closing parent handles before child work, no launch
+before committed attempt state, failure of final persistence without false `done`,
+unknown outcomes despite possible child publication, bounded stored diagnostic
+snippets versus unbounded child/disk/resource effects, trusted code rather than a
+sandbox, and private deterministic interruption tests. It defers automatic recovery,
+process-tree guarantees and production concurrency/resource management.
+
+Preparation inspected clean implementation `9b8fb71` and clean design checkpoint
+`cbfcd92`. No implementation/as-built files were changed, tests/builds rerun, workers
+launched or publication performed. New design notes are local/uncommitted. Next is
+user review of the candidate and separate implementation authorization.
+
+### Iteration 4 implementation and publication authorization
+
+The user declared Iteration 4 GO and authorized the existing window-2 agent in a
+new Pi session to implement the bounded plan, with coordinator monitoring,
+independent review and feedback/fixes. Once satisfactory, have the worker commit
+and push, then monitor exact-SHA CI and fix issues as needed. This supersedes the
+preceding planning-only status, not the scope/stop line. No extra workers,
+release/package publication, cloud experiments or later feature turn.
+
+[COORDINATION](iterations/04-local-recorded-execution/COORDINATION.md) records the
+assignment and shared-build ownership. Coordinator sent `/new` to pane `%215` and
+verified an empty new session; implementation baseline is clean `9b8fb71`.
+Worker owns implementation/tests/as-built docs and RESULTS; coordinator owns review
+and design status notes. Commit/push waits for explicit coordinator acceptance.
+
+### Iteration 4 delivery and final publication checkpoint
+
+The fresh-session window-2 worker implemented the bounded Python local layer,
+ordinary request/attempt/outcome DAGs, pinned context, cooperative child publication,
+explicit retry, captured trusted entry bytes, file-backed bounded stored diagnostics
+and separate computational/cleanup outcomes. There is no native evaluator, execution
+CLI command, registry/reuse/scheduler/remote/resource/observer addition. Initial
+attempts have no final status/outcome; interruption preserves unknown rather than
+inventing failure. Trust, capture, direct-validation and direct-child-only cleanup
+limits remain explicit in the [owning contract](../dml/docs/spec-next/local-execution.md).
+
+Worker and independent coordinator fresh default checks exit 0: seven C executables,
+368 Python tests, Python 878/878 statements (local layer 361/361), retained C
+1681/1681 lines, 132/132 functions, 1562/1562 outcomes. Existing binding/141 native
+CLI Valgrind workloads pass, with no new exclusion/suppression/weaker threshold.
+Coordinator's separate offline-installed parent/child/reader/console workflow passes
+43 checks, including timeout after publication retaining evidence and final-head
+conflict preserving unknown. Measured host-side helpers are distinct from
+uninstrumented staged/installed children; unavailable Python mutation tooling,
+negative-oracle scope, runtime/finalizer and local installed-platform limits remain
+qualified in [RESULTS](iterations/04-local-recorded-execution/RESULTS.md) and
+[REVIEW](iterations/04-local-recorded-execution/REVIEW.md).
+
+After explicit coordinator acceptance, worker committed/pushed the reviewed 16-file
+slice as `efac107`. Its five Unix CI jobs passed, but Windows stalled. Coordinator
+requested investigation/cancellation and accepted narrow CI diagnostic/finiteness
+commit `b0e3107` (ten-minute matrix-job bound, unbuffered verbose Windows IDs and
+faulthandler). Both runs ultimately completed cancelled; earlier Windows logs were
+unavailable, so no original Windows stack-trace diagnosis is claimed.
+
+Worker found a confirmed portable test defect: an oversized source parameter became
+a 1,048,725-character pytest ID/PYTEST_CURRENT_TEST value. A bounded Windows-length
+model fails before the fix (9 pass/2 errors) and passes afterward (10 pass). Accepted
+test-only `d498a6c` gives short semantic IDs and a length regression, retaining the
+1 MiB + 1 byte source/rejection assertion. Worker fresh default checks and coordinator
+independent 52-test postfix run pass. No production code changed after initial review.
+
+[Final CI run 40536650838](https://github.com/micha/dml/actions/runs/40536650838) passes
+all six jobs for exact SHA `d498a6cd4eea170c2054690880526c2fbb6ebaa6`: seven C
+executables everywhere; Linux/strict 368 Python tests, macOS 364 with four existing
+skips, Windows 363 with five existing skips. Windows Python finishes in 45.99 seconds.
+Coordinator independently verifies full logs, completed JSON, exact-SHA workflow list,
+watch exit 0, clean checkout/index and matching remote master. CI informational `-c`
+remains distinct from the local default/memory gate. No release workflow was triggered.
+
+Implementation, review, authorized publication and final CI are complete. Worker
+was instructed to finalize RESULTS and stop. No extra agent, force push, release/tag,
+package publication, cloud experiment or later feature turn. Design notes remain
+local/uncommitted; no design checkpoint commit was requested for this turn.
+
+### Iteration 4 user acceptance and design checkpoint
+
+The user accepted the delivery and then requested committing the changes. This
+local checkpoint includes the Iteration 4 plan/example/handoff, coordination,
+delivery/review/CI evidence, bounded authorization and updated resume point.
+Earlier uncommitted-design statements preserve their pre-checkpoint provenance.
+The design repository has no remote; no push is requested or performed. The
+implementation remains clean at already published `d498a6c`. No next turn is
+selected or authorized.
+
 ## Resume point
+
+Iteration 4 is implemented, independently accepted and published through `d498a6c`;
+all six final exact-SHA CI jobs pass. Read
+[RESULTS](iterations/04-local-recorded-execution/RESULTS.md),
+[REVIEW](iterations/04-local-recorded-execution/REVIEW.md) and the
+[as-built local-execution contract](../dml/docs/spec-next/local-execution.md).
+Implementation checkout is clean at pushed `d498a6c`. The user accepted the delivery;
+work is complete and stopped. No later turn is selected or authorized. Do not restart
+the window-2 worker from historical planning/coordination instructions. Design notes
+are included in the requested local checkpoint. Capture/unknown/cleanup and assurance
+limits remain explicit;
+CI success does not supply exactly-once execution or a complete environment model.
+
+The following Iteration 3 and Iteration 2 resume evidence is historical; Iteration 4
+above is the current implementation state.
 
 Iteration 3 implementation, independent review, authorized worker commit/push and
 final exact-SHA CI verification are complete. Read
@@ -902,12 +1044,11 @@ final exact-SHA CI verification are complete. Read
 [Python API](../dml/docs/spec-next/python-api.md) and
 [CLI](../dml/docs/spec-next/cli.md) contracts. Implementation master is clean at
 pushed `9b8fb71`; all six exact-SHA CI jobs pass. The user accepted the delivery;
-work is stopped. Discuss the next bounded spiral turn in response to the Iteration 4
-proposal request. No fourth-turn selection or authorization, release/package
-publication or later feature was performed. Design notes are checkpointed locally.
+Iteration 3 is stopped. Its accumulated design notes were checkpointed locally as
+`cbfcd92`; new Iteration 4 planning is uncommitted. No release/package publication
+or fourth-turn implementation was performed.
 
-The following Iteration 2 resume evidence is historical; Iteration 3 above is the
-current implementation state.
+The following Iteration 2 resume evidence is historical.
 
 Iteration 2 implementation, coordinator review and authorized publication are
 complete. Read the

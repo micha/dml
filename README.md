@@ -6,6 +6,14 @@ its existing draft specifications.
 
 ## Start here
 
+- Iteration 4 [delivery](iterations/04-local-recorded-execution/RESULTS.md) and
+  [coordinator review](iterations/04-local-recorded-execution/REVIEW.md): one locally
+  executed, recorded Python step, published through `d498a6c`; all six final
+  exact-SHA CI jobs pass. Implementation/review/publication are complete and stopped.
+- Iteration 4 [design](iterations/04-local-recorded-execution/DESIGN.md),
+  [worked example](iterations/04-local-recorded-execution/EXAMPLE.md) and
+  [handoff](iterations/04-local-recorded-execution/HANDOFF.md) preserve the bounded
+  plan and its provenance, not permission to restart or add later features.
 - [Iteration 3 delivery](iterations/03-composable-dags/RESULTS.md) and
   [coordinator review](iterations/03-composable-dags/REVIEW.md): named/composable DAGs,
   scoped lookup and nested CLI inspection, published as `9b8fb71`; all six exact-SHA
@@ -46,6 +54,31 @@ The checkpoint is chronological. Later clarifications can supersede earlier
 proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
+
+Iteration 4 is implemented, independently reviewed and published through `d498a6c`.
+It adds a separate explicitly imported `daggerml.local` layer: captured trusted Python
+entry bytes, pinned named inputs, ordinary request/attempt/outcome DAGs, cooperative
+child result publication, explicit retry and separate computational/cleanup outcomes.
+No native evaluator or execution CLI command was added. Unknown outcomes after
+interruption remain unknown; capture/trust/cleanup limits remain explicit in the
+[as-built contract](../dml/docs/spec-next/local-execution.md).
+
+Worker and coordinator fresh default checks pass: seven C executables, 368 Python
+tests, 878/878 Python statements and unchanged retained C coverage/memory gates.
+Coordinator's separate installed parent/child/reader/console probes pass 43 checks.
+Two Windows-stalled runs were cancelled; a confirmed oversized pytest-ID defect was
+fixed without reducing the 1 MiB + 1 byte input or weakening tests. Final exact-SHA
+[CI run](https://github.com/micha/dml/actions/runs/40536650838) passes all six jobs.
+Cancelled-run log unavailability, direct-helper versus uninstrumented child coverage,
+mutation-tooling gaps and platform/install limits remain qualified in
+[RESULTS](iterations/04-local-recorded-execution/RESULTS.md) and
+[REVIEW](iterations/04-local-recorded-execution/REVIEW.md).
+
+Implementation master is clean at pushed `d498a6c`; this bounded turn is complete
+and stopped. No release/package publication or later feature turn. The user accepted
+the delivery; these design notes are included in the requested local checkpoint in
+this no-remote repository. Reuse/facets, intent lifecycle,
+scheduling, remotes/cloud, resources and observer/UI remain outside this turn.
 
 Iteration 3 is implemented, independently reviewed and published as `9b8fb71`.
 It adds scoped named DAG bindings, non-executing sub-DAG-reference nodes, explicit

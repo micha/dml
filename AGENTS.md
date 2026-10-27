@@ -26,6 +26,11 @@ and `discussion.md` before continuing the discussion. Read the shared
   in window 2, coordinator monitoring/review and fixes, then focused commit/push
   after acceptance and exact-SHA CI verification/fixes. This does not authorize
   a release, package publication, additional workers or a later feature turn.
+  The user also authorized [Iteration 4](iterations/04-local-recorded-execution/HANDOFF.md):
+  one locally executed, recorded Python step by the existing window-2 Pi agent in
+  a new session, coordinator monitoring/review and fixes, then focused commit/push
+  after acceptance and exact-SHA CI verification/fixes. No extra workers, release,
+  package publication, cloud experiments or later feature turn are authorized.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise
