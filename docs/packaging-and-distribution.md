@@ -24,7 +24,7 @@ from that subdirectory. Maintained Python/native binding sources still live ther
 
 The `python-runtime` Meson install tag selects only:
 
-- `daggerml/__init__.py`, `local.py`, `transfer.py`, `_core.pyi`, `py.typed`;
+- `daggerml/__init__.py`, `local.py`, `transfer.py`, `exchange.py`, `_core.pyi`, `py.typed`;
 - the linked `_core` extension;
 - the native `daggerml/_bin/dml` (`dml.exe` on Windows).
 
@@ -69,6 +69,11 @@ public API and does not install dependencies or bootstrap child imports.
 The [pinned transfer example](../examples/pinned_transfer.py) uses the installed
 [transfer layer](spec-next/transfer.md) to carry recorded history to a second
 repository with fresh-process import/inspection, without executing copied source.
+The [repository execution story](../examples/repository_execution.py) connects
+those layers through explicit prepare/execute/receive stages, using fresh installed
+worker/receiver processes and the same unchanged local child contract. Its
+[exchange contract](spec-next/repository-execution.md) owns retained files, pinned
+selection and validated explicit-ref return without adoption.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory
 workloads to the C tests; [coverage/memory accounting](../tests/coverage-exclusions.md)

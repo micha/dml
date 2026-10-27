@@ -44,6 +44,7 @@ flowchart TD
     PY["python-api.md<br/>Python values, errors and contexts"]
     LOCAL["local-execution.md<br/>Trusted local Python steps and ordinary execution records"]
     TRANSFER["transfer.md<br/>Pinned commit bundles, full typed closure and atomic import"]
+    EXCHANGE["repository-execution.md<br/>Pinned local A-B-A steps and explicit validated return"]
     CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
     PACK["../packaging-and-distribution.md<br/>Native artifacts and local builds"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
@@ -55,6 +56,10 @@ flowchart TD
     README --> PY
     README --> LOCAL
     README --> TRANSFER
+    README --> EXCHANGE
+    EXCHANGE --> LOCAL
+    EXCHANGE --> TRANSFER
+    EXCHANGE --> PY
     README --> CLI
     README --> PACK
     PY --> REPO
@@ -101,6 +106,7 @@ flowchart TD
 | Python conversions, owned descriptions, exceptions, thread/finalizer policy and contexts | [python-api.md](python-api.md) |
 | Trusted local Python execution, record conventions, publication and capture limits | [local-execution.md](local-execution.md) |
 | Pinned commit bundles, supported profile, complete typed reachability and atomic optional-ref import | [transfer.md](transfer.md) |
+| One pinned step across local repositories, retained workspaces and selected-completion return validation | [repository-execution.md](repository-execution.md) |
 | Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
 | Native linking, packaged executable, build/install and distribution paths | [Packaging and distribution](../packaging-and-distribution.md) |
 
@@ -122,6 +128,9 @@ flowchart TD
 - A separate explicit Python transfer layer exporting complete all-parent typed
   immutable object closures and importing bounded bundles atomically with optional
   create-or-same-target refs, preserving bytes/IDs/occurrences without execution.
+- An explicit Python exchange layer composing pinned transfer, one fresh step in
+  independent local B and selected-history validation before return import under a
+  caller-chosen A ref, leaving existing A heads unchanged.
 - A native inspection CLI and Python console forwarding to the bundled executable,
   with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
   all-parent history traversal.
@@ -151,6 +160,7 @@ test links provide evidence; actual validation runs and outstanding gates are in
 and [Iteration 2 delivery notes](../../../dml-design/iterations/02-repository-usability/RESULTS.md)
 and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md)
 and [Iteration 4 results](../../../dml-design/iterations/04-local-recorded-execution/RESULTS.md)
-and [Iteration 5 results](../../../dml-design/iterations/05-pinned-snapshot-transfer/RESULTS.md).
+and [Iteration 5 results](../../../dml-design/iterations/05-pinned-snapshot-transfer/RESULTS.md)
+and [Iteration 6 results](../../../dml-design/iterations/06-local-repository-execution/RESULTS.md).
 If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

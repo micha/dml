@@ -77,6 +77,10 @@ are explicit in that layer's contract.
 The [pinned transfer layer](docs/spec-next/transfer.md) and
 [runnable transfer story](examples/pinned_transfer.py) copy full recorded parent
 history between local repositories without executing imported source or copying refs.
+The [repository execution layer](docs/spec-next/repository-execution.md) and
+[A → B → A story](examples/repository_execution.py) connect pinned transfer and the
+unchanged local runner, validating returned selected history before atomic import
+under a caller-chosen ref while leaving A's existing heads alone.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

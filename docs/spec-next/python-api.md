@@ -11,7 +11,9 @@ inspection presentation; [packaging](../packaging-and-distribution.md) owns buil
 The separate [local-execution layer](local-execution.md) owns trusted Python-step
 execution and ordinary request/attempt/publication conventions over this API.
 The explicit [transfer layer](transfer.md) owns bounded pinned-commit bundles,
-complete typed closure checks and optional atomic ref creation.
+complete typed closure checks and optional atomic ref creation. The explicit
+[repository-execution layer](repository-execution.md) composes those public APIs
+for one pinned step in independent local B and a validated explicit-ref return to A.
 
 ## Values and descriptions
 
@@ -184,7 +186,10 @@ The [local execution example](../../examples/local_execution.py) uses that separ
 layer to execute captured trusted entry bytes, publish results and record outcomes;
 it does not add execution semantics to low-level nodes or lookup. The
 [pinned transfer example](../../examples/pinned_transfer.py) copies exact recorded
-history through the separately imported transfer layer without executing it.
+history through the separately imported transfer layer without executing it. The
+[repository execution story](../../examples/repository_execution.py) runs trusted
+captured source in independent local B, then returns selected history under explicit
+A refs without moving A's existing heads.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

@@ -39,6 +39,11 @@ validated exact record reads, owned typed descriptions and mutation-guarded pack
 insertion. Its [contract](spec-next/transfer.md) owns complete all-parent bundles and
 atomic optional-ref import. It neither duplicates codecs nor executes copied source.
 
+The separately imported `daggerml.exchange` composes those public layers for one
+pinned step in independent local B. Its [contract](spec-next/repository-execution.md)
+owns retained one-shot workspaces, selected-history inspection in private validation
+storage and atomic explicit-ref return to A without moving existing heads.
+
 ## Technical navigation
 
 Start with [spec-next/README.md](spec-next/README.md) for the implemented contract:
@@ -52,6 +57,8 @@ Start with [spec-next/README.md](spec-next/README.md) for the implemented contra
   cooperative publication, process mechanics and trust/capture limits.
 - [Pinned commit transfer](spec-next/transfer.md): bounded exact-record bundles,
   complete typed object closure and atomic import/ref behavior.
+- [Execution across local repositories](spec-next/repository-execution.md): explicit
+  prepare/execute/receive, selected-history validation and return publication.
 - [Inspection CLI](spec-next/cli.md): grammar, traversal and presentation.
 - [Packaging](packaging-and-distribution.md): shared native builds and installed entry paths.
 - [Glossary](spec-next/glossary.md): shared vocabulary.

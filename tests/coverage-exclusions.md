@@ -180,6 +180,29 @@ new process-memory, hostile-input or Python mutation-framework guarantee. Actual
 retained populations, memory results, negative-oracle probes and platform/runtime
 limits belong to [Iteration 5 results](../../dml-design/iterations/05-pinned-snapshot-transfer/RESULTS.md).
 
+## Iteration 6 Python exchange population
+
+The explicit `daggerml.exchange` layer and repository execution example stay in the
+unchanged root-source Python coverage gate. No new exclusion, source omission,
+threshold reduction or memory suppression. Host-side tests measure bounded descriptor
+IO, selected-role/history inspection and meaningful bootstrap, file, cleanup and
+publication failures. Native production and existing local/transfer layers are unchanged.
+
+Private barriers distinguish persisted unknown B before child spawn, done B after
+actual child reaping, separate worker completion/reaping before caller pause and
+actual A precommit/postcommit loss. Successful new actual-A puts are tracked before
+real map-full and substituted consuming-commit failure; fresh readers check whole
+logical rollback. Exact whole `data.mdb` equality additionally preserves raw different/
+malformed-ref bytes. Generated history/repeat-receive properties and a genuine recorded
+failure relabelled as success strengthen selection/classification oracles.
+
+Staged/installed worker/child/receiver processes are not host-coverage-instrumented.
+Safe private barriers/direct-worker disposition are not general process-tree cleanup,
+power-loss or security assurance. Existing binding/native CLI memory workloads remain,
+not new installed-process memory checks. Actual counts, installed/runtime provenance,
+negative-oracle probes and limitations belong to
+[Iteration 6 results](../../dml-design/iterations/06-local-repository-execution/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

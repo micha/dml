@@ -21,6 +21,10 @@ one pinned commit's complete all-parent typed object closure through bounded bun
 using the low-level public packed insertion seam. The
 [transfer story](../../examples/pinned_transfer.py) preserves recorded attempts and
 bytes/IDs without running copied source or installing source refs.
+The separately imported [exchange layer](../../docs/spec-next/repository-execution.md)
+connects pinned transfer and the unchanged local runner for one fresh step in local B,
+then validates/returns its exact history under an explicit A ref without adoption.
+See the [repository execution story](../../examples/repository_execution.py).
 
 ## Local build
 
