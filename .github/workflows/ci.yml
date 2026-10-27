@@ -11,6 +11,7 @@ concurrency:
 jobs:
   build-and-test:
     name: ${{ matrix.name }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -120,7 +121,7 @@ jobs:
         shell: msys2 {0}
         env:
           DML_BIN: ${{ matrix.dml_bin }}
-        run: python -m pytest -q
+        run: python -u -m pytest -vv -o faulthandler_timeout=60
 
       - name: Upload Meson logs
         if: always()
