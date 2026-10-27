@@ -237,8 +237,13 @@ def test_binding_roundtrip_and_identity(tmp_path_factory, source, timeout):
     (b"x" * (1024*1024+1), sys.executable, 1, ValueError), (b"x", "python", 1, ValueError),
     (b"x", sys.executable + "\0", 1, ValueError), (b"x", sys.executable + "e\u0301", 1, ValueError),
     (b"x", sys.executable, 0, ValueError),
-    (b"x", sys.executable, 3600001, ValueError)])
-def test_binding_bounds(source, interpreter, timeout, error):
+    (b"x", sys.executable, 3600001, ValueError)],
+    ids=("source-type", "interpreter-type", "timeout-type", "empty-source", "oversize-source",
+         "relative-interpreter", "nul-interpreter", "non-nfc-interpreter", "timeout-zero", "timeout-large"))
+def test_binding_bounds(request, source, interpreter, timeout, error):
+    # Collected IDs enter PYTEST_CURRENT_TEST. Keep even giant input cases portable
+    # and prevent CI error/verbose output from expanding the captured source bytes.
+    assert len(request.node.nodeid) <= 160
     with pytest.raises(error):
         local.put_local_binding(None, source=source, interpreter=interpreter, timeout_ms=timeout)
 
