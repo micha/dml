@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 
@@ -28,10 +29,21 @@ def editor_project(tmp_path):
         path.chmod(0o755)
         return path
 
-    compiler = executable(
-        "cc", f"echo '#include <...> search starts here:' >&2\n"
-        f"echo ' {headers}' >&2\necho 'End of search list.' >&2\n",
-    )
+    if os.name == "nt":
+        # Native Windows Python cannot execute a POSIX shebang compiler fixture.
+        # A CMD fixture is discoverable through PATHEXT and runs in subprocess.
+        compiler = binaries / "cc.cmd"
+        compiler.write_text(
+            "@echo off\n"
+            "echo #include ^<...^> search starts here: 1>&2\n"
+            f"echo  {headers} 1>&2\n"
+            "echo End of search list. 1>&2\n"
+        )
+    else:
+        compiler = executable(
+            "cc", f"echo '#include <...> search starts here:' >&2\n"
+            f"echo ' {headers}' >&2\necho 'End of search list.' >&2\n",
+        )
     executable("ninja", "exit 0\n")
     executable(
         "meson",
@@ -43,9 +55,9 @@ def editor_project(tmp_path):
     directory.mkdir(parents=True)
     entries = [
         {"directory": str(directory), "file": "../../src/core.c",
-         "command": "cc -DCORE=1 -c ../../src/core.c"},
+         "command": f"{shlex.quote(str(compiler))} -DCORE=1 -c ../../src/core.c"},
         {"directory": str(directory), "file": "../../python/core.c",
-         "arguments": ["cc", "-DPYTHON=1", "-c", "../../python/core.c"]},
+         "arguments": [str(compiler), "-DPYTHON=1", "-c", "../../python/core.c"]},
     ]
     (directory / "compile_commands.json").write_text(json.dumps(entries))
     env = {**os.environ, "PATH": str(binaries) + os.pathsep + os.environ["PATH"]}
@@ -84,7 +96,8 @@ def test_setup_help_and_invalid_arguments(editor_project):
 
 def test_setup_rejects_missing_system_header_search_list(editor_project):
     script, root, compiler, _, env = editor_project
-    compiler.write_text(f"#!{shutil.which('bash')}\nexit 0\n")
+    compiler.write_text("@echo off\nexit /b 0\n" if os.name == "nt"
+                        else f"#!{shutil.which('bash')}\nexit 0\n")
     result = run_setup(script, env)
     assert result.returncode != 0
     assert "could not discover C system headers" in result.stderr

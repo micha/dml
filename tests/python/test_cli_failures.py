@@ -33,7 +33,7 @@ def test_cli_allocation_failure_sweep(history_fixture, command):
             "snapshot-uri": ["snapshot", "--commit", str(second["commit"])]}[command]
     failed = 0
     for nth in range(1, 2000):
-        result = subprocess.run([str(DRIVER), "1", str(nth), "--json", "--repo", str(path), *args], capture_output=True, text=True)
+        result = subprocess.run([str(DRIVER), "1", str(nth), "--json", "--repo", str(path), *args], capture_output=True, text=True, encoding="utf-8")
         if result.returncode == 0:
             assert json.loads(result.stdout)["command"]
             break
@@ -69,7 +69,7 @@ def test_diagnostic_allocation_failure_and_cycle_detection(history_fixture):
     path, first, second = history_fixture
     fallback = False
     for nth in range(1, 50):
-        result = subprocess.run([str(DRIVER), "1", str(nth), "--json", "--repo", str(path), "ref", "get", "unknown"], capture_output=True, text=True)
+        result = subprocess.run([str(DRIVER), "1", str(nth), "--json", "--repo", str(path), "ref", "get", "unknown"], capture_output=True, text=True, encoding="utf-8")
         assert result.returncode == 1 and result.stdout == ""
         error = json.loads(result.stderr)["error"]
         fallback |= error["detail"] == "diagnostic allocation failed"
@@ -80,7 +80,7 @@ def test_diagnostic_allocation_failure_and_cycle_detection(history_fixture):
     overwrite(path, "objects/trees/" + zero, encode(5, struct.pack("<I", 0)))
     overwrite(path, "objects/commits/" + zero,
               encode(6, bytes(16) + struct.pack("<I", 1) + bytes(16)))
-    result = subprocess.run([str(DRIVER), "3", "0", "--json", "--repo", str(path), "log", "--commit", zero], capture_output=True, text=True)
+    result = subprocess.run([str(DRIVER), "3", "0", "--json", "--repo", str(path), "log", "--commit", zero], capture_output=True, text=True, encoding="utf-8")
     assert result.returncode == 1 and result.stdout == ""
     assert json.loads(result.stderr)["error"]["code"] == "integrity_error"
     assert "cycle" in result.stderr

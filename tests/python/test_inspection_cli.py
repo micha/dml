@@ -18,7 +18,7 @@ BIN = Path(os.environ.get("DML_BIN", ROOT / "build/check/dml")).resolve()
 
 def cli(path, *args, json_mode=True):
     return subprocess.run([str(BIN), *(["--json"] if json_mode else []), "--repo", str(path), *args],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8")
 
 
 def success(path, *args):
@@ -156,10 +156,10 @@ def test_parser_errors_have_no_success_stdout(tmp_path, args):
 
 def test_global_parser_runtime_errors_and_no_implicit_initialization(tmp_path):
     for args in [[], ["--repo"], ["--json"], ["--repo", str(tmp_path), "--repo", "other", "ref", "get", "main"]]:
-        result = subprocess.run([str(BIN), *args], capture_output=True, text=True)
+        result = subprocess.run([str(BIN), *args], capture_output=True, text=True, encoding="utf-8")
         assert result.returncode == 2 and result.stdout == ""
     for flag in ["--version", "-V", "--help"]:
-        result = subprocess.run([str(BIN), flag], capture_output=True, text=True)
+        result = subprocess.run([str(BIN), flag], capture_output=True, text=True, encoding="utf-8")
         assert result.returncode == 0 and result.stderr == ""
     path = tmp_path / "missing"
     result = cli(path, "ref", "get", "main")
@@ -230,6 +230,18 @@ def test_closed_output_pipe_reports_failure(tmp_path):
         os.close(writer)
     assert result.returncode == 1
     assert json.loads(result.stderr)["error"]["detail"] == "cannot write inspection output"
+
+
+def test_cli_utf8_protocol_is_independent_of_locale(tmp_path, monkeypatch):
+    path = tmp_path / "repo"
+    value = "é\u00a0\U0001f642"
+    with dml.Repository(path, create=True) as repo:
+        with repo.write() as tx:
+            identity = tx.put_datum(value)
+    # Force the fallback used for unspecified subprocess text encoding to ASCII.
+    # The CLI's UTF-8 protocol must still round-trip without a decoding error.
+    monkeypatch.setattr(subprocess, "_text_encoding", lambda: "ascii")
+    assert success(path, "show", "datum", str(identity))["datum"]["value"] == value
 
 
 @pytest.mark.parametrize("value", ["payloadé\n" * 400, bytes(range(256)) * 16])
