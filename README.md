@@ -19,7 +19,7 @@ To enforce commit message body wrapping locally:
 Use `scripts/check.sh` as the standard validation entrypoint.
 
 - `scripts/check.sh` - build, run tests, and enforce 100% coverage
-- `scripts/check.sh -v` - also run C tests under Valgrind
+- `scripts/check.sh -v` - also run C tests, binding ownership and native CLI fault workloads under Valgrind
 - `scripts/check.sh -f` - clean build artifacts before rebuilding
 - `scripts/check.sh -m` - enable Mull mutation testing
 - `scripts/check.sh -c` - build, run tests, and report coverage without percentage gates (used by CI)
@@ -45,8 +45,8 @@ targets `build/check/test_version` by default when present.
 ## C Editor Setup
 
 Run `scripts/setup-lsp.sh` in your build environment (Meson, Ninja, a C compiler,
-Python, and Python development headers are required). It configures separate
-editor builds for the core and Python extension, then writes an ignored
+Python, and Python development headers are required). It configures a separate
+editor build for the shared core and Python extension, then writes an ignored
 `compile_commands.json` at the repository root. No compilation is required.
 
 The database includes compiler-discovered system-header paths for environments
@@ -60,13 +60,16 @@ and [system-header discovery](https://clangd.llvm.org/guides/system-headers).
 
 ## CLI Help
 
-- Primary documentation surface: `dml --help` and `dml <command> --help`
-- Optional `man dml` support may be added later from the same help metadata
+- `dml --help` documents the inspection-only native CLI's global grammar.
+- [CLI contract](docs/spec-next/cli.md) owns selectors, previews, JSON and errors.
+- [Python API](docs/spec-next/python-api.md) constructs existing repository state.
+- [Packaging](docs/packaging-and-distribution.md) explains root builds and console forwarding.
 
 ## Docs
 
 Start with the [as-built specification](docs/spec-next/README.md) for implemented
-DML behavior: datums, snapshot/history objects and transactional repository refs.
+DML behavior: datums, snapshot/history objects, transactional repository refs,
+the low-level Python API and inspection CLI.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

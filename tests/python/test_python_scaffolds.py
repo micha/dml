@@ -19,33 +19,37 @@ def _import_from_package_dir(package_root: Path, module_name: str):
     sys.path.pop(0)
 
 
-def test_daggerml_version_uses_core_module(monkeypatch) -> None:
-  package_dir = ROOT / "python" / "daggerml"
-  daggerml = _import_from_package_dir(package_dir, "daggerml")
-
-  core_module = types.SimpleNamespace(dml_version=lambda: "0.1.0")
-  monkeypatch.setitem(sys.modules, "daggerml._core", core_module)
-
-  assert daggerml.__all__ == ["version"]
+def test_daggerml_version_uses_core_module() -> None:
+  import daggerml
   assert daggerml.version() == "0.1.0"
+  assert Path(daggerml._core.__file__).resolve().parent == ROOT / "build/check"
 
 
-def test_cli_scaffold_entrypoints(monkeypatch, capsys) -> None:
-  package_dir = ROOT / "python" / "daggerml-cli"
-  cli_main = _import_from_package_dir(package_dir, "daggerml_cli.main")
-  cli_pkg = importlib.import_module("daggerml_cli")
-
+def test_cli_native_forwarding(monkeypatch) -> None:
+  import daggerml_cli.main as cli_main
+  import daggerml_cli as cli_pkg
   assert cli_pkg.__all__ == ["main"]
-
-  monkeypatch.setattr(sys, "argv", ["dml"])
-  assert cli_main.main() == 0
-  assert capsys.readouterr().out.strip() == "dml CLI scaffold is installed"
-
-  fake_daggerml = types.SimpleNamespace(version=lambda: "0.1.0")
-  monkeypatch.setattr(importlib, "import_module", lambda _: fake_daggerml)
+  calls = []
+  monkeypatch.setattr(cli_main.subprocess, "run", lambda args, **kwargs:
+                      calls.append(args) or types.SimpleNamespace(returncode=2))
   monkeypatch.setattr(sys, "argv", ["dml", "--version"])
-  assert cli_main.main() == 0
-  assert capsys.readouterr().out.strip() == "0.1.0"
+  assert cli_main.main() == 2
+  assert calls[0][1:] == ["--version"]
+  assert Path(calls[0][0]).name in ("dml", "dml.exe")
+  assert Path(calls[0][0]).parent.name == "_bin"
+
+
+def test_cli_forwarding_failure_and_signal(monkeypatch, capsys) -> None:
+  import daggerml_cli.main as cli_main
+  def missing(*args, **kwargs):
+    raise FileNotFoundError("missing native executable")
+  monkeypatch.setattr(cli_main.subprocess, "run", missing)
+  assert cli_main.main() == 1
+  assert "cannot run bundled" in capsys.readouterr().err
+  monkeypatch.setattr(cli_main.subprocess, "run", lambda *args, **kwargs:
+                      types.SimpleNamespace(returncode=-15))
+  assert cli_main.main() == 143
+
 
 
 def test_adapter_scaffold_entrypoints(capsys) -> None:
@@ -63,6 +67,9 @@ def test_cli_module_main_invocation(monkeypatch, capsys) -> None:
   package_dir = ROOT / "python" / "daggerml-cli"
   sys.path.insert(0, str(package_dir))
   try:
+    import daggerml_cli.main as cli_main
+    monkeypatch.setattr(cli_main.subprocess, "run", lambda *args, **kwargs:
+                        types.SimpleNamespace(returncode=2))
     sys.modules.pop("daggerml_cli.main", None)
     monkeypatch.setattr(sys, "argv", ["dml"])
     with pytest.raises(SystemExit) as exc:
@@ -70,8 +77,8 @@ def test_cli_module_main_invocation(monkeypatch, capsys) -> None:
   finally:
     sys.path.pop(0)
 
-  assert exc.value.code == 0
-  assert capsys.readouterr().out.strip() == "dml CLI scaffold is installed"
+  assert exc.value.code == 2
+  assert capsys.readouterr().out == ""
 
 
 def test_adapter_module_main_invocation(monkeypatch, capsys) -> None:

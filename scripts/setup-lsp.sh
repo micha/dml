@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Keep editor builds separate from coverage/mutation builds. The Python binding
-# is a separate Meson project, so a symlink to the core database is not enough.
+# Keep the single core/binding editor build separate from coverage/mutation builds.
 root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   echo "Usage: scripts/setup-lsp.sh"
-  echo "Configure both Meson projects and generate compile_commands.json for clangd."
+  echo "Configure the core/binding Meson project and generate compile_commands.json for clangd."
   exit 0
 fi
 if [ "$#" -ne 0 ]; then
@@ -33,7 +32,6 @@ configure() {
 }
 
 configure "$root_dir" "$root_dir/build/editor"
-configure "$root_dir/python/daggerml" "$root_dir/build/editor-python"
 
 python3 - "$root_dir" <<'PY'
 import json
@@ -48,7 +46,7 @@ root = Path(sys.argv[1])
 commands = []
 system_flags = {}
 
-for build in ("editor", "editor-python"):
+for build in ("editor",):
     database = root / "build" / build / "compile_commands.json"
     for entry in json.loads(database.read_text()):
         arguments = entry.get("arguments") or shlex.split(entry["command"])

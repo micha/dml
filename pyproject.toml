@@ -5,8 +5,8 @@ build-backend = "mesonpy"
 [project]
 name = "daggerml"
 version = "0.1.0"
-description = "DaggerML Python API and native bindings"
-readme = "README.md"
+description = "DaggerML low-level Python repository API and native inspection CLI"
+readme = "python/daggerml/README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "DaggerML maintainers" }]
@@ -23,9 +23,6 @@ classifiers = [
 limited-api = true
 
 [tool.meson-python.args]
-setup = [
-  "--wrap-mode=forcefallback",
-  "--force-fallback-for=*",
-  "--default-library=static",
-]
-install = ["--skip-subprojects"]
+setup = ["--wrap-mode=forcefallback", "--force-fallback-for=*", "--default-library=static"]
+install = ["--skip-subprojects", "--tags=python-runtime"]
+dist = ["--include-subprojects"]

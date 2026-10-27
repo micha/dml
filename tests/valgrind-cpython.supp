@@ -1,0 +1,193 @@
+# CPython 3.13 runtime cached/interned Unicode allocations observed with
+# PYTHONMALLOC=malloc. Only definite leaks with these precise runtime call
+# chains are suppressed. No DML allocator, ID/record buffer, capsule, or direct
+# decode_datum/decode_object Unicode-return chain matches these patterns.
+# See coverage-exclusions.md (memory-check accounting) and the runtime-only
+# DML_MEMORY_BASELINE comparison. Re-evaluate with another CPython build.
+{
+  cpython-marshalled-unicode
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:_PyUnicode_FromUCS1*
+  fun:r_object
+}
+{
+  cpython-module-dictionary-keys
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:PyDict_SetItemString
+}
+{
+  cpython-interned-runtime-names
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:PyUnicode_InternFromString
+}
+{
+  cpython-type-ready-names
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:type_ready
+}
+{
+  cpython-descriptor-names
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:descr_new
+}
+{
+  cpython-module-method-names
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:_add_methods_to_object
+}
+{
+  cpython-import-config-name
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:config_init_import
+}
+{
+  cpython-config-dictionary-names
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:_PyConfig_AsDict
+}
+{
+  cpython-initial-sys-attribute-name
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:PyObject_SetAttrString
+  fun:_PySys_Create
+}
+{
+  cpython-initial-sys-object-name
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:PySys_SetObject
+  fun:init_interp_main
+}
+{
+  cpython-parser-identifiers
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:_PyPegen_new_identifier
+}
+{
+  cpython-parser-string-constants
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:strings_rule
+}
+{
+  cpython-type-module-name
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:type_get_module
+  fun:PyObject_GetOptionalAttr
+  fun:functools_wraps
+}
+{
+  cpython-builtin-module-name
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:_PyImport_FixupBuiltin
+}
+{
+  cpython-import-name-partition
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:_PyUnicode_FromASCII
+  fun:PyUnicode_RPartition
+  fun:_PyEval_EvalFrameDefault
+  fun:object_vacall
+  fun:PyObject_CallMethodObjArgs
+  fun:PyImport_ImportModuleLevelObject
+}
+{
+  cpython-import-name-split
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:_PyUnicode_FromASCII
+  fun:split
+  fun:_PyEval_EvalFrameDefault
+}
+{
+  cpython-import-name-join
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:_PyUnicode_JoinArray*
+  fun:unicode_join
+  fun:_PyEval_EvalFrameDefault
+  fun:object_vacall
+  fun:PyObject_CallMethodObjArgs
+  fun:PyImport_ImportModuleLevelObject
+}
+{
+  cpython-directory-entry-names
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:malloc
+  fun:PyUnicode_New*
+  fun:unicode_decode_utf8
+  fun:ScandirIterator_iternext
+  fun:_list_extend
+}
+{
+  cpython-parser-dotted-name
+  Memcheck:Leak
+  match-leak-kinds: definite
+  fun:realloc
+  fun:resize_compact
+  fun:_PyUnicodeWriter_Finish
+  fun:PyUnicode_FromFormatV
+  fun:PyUnicode_FromFormat
+  fun:dotted_name_rule
+}

@@ -282,6 +282,17 @@ fi
 export DML_BIN="$build_dir/dml"
 run_python_tests_and_coverage_if_present "$root_dir" "$coverage_dir" "$enforce_coverage"
 
+if [ "$use_valgrind" -eq 1 ]; then
+  echo "==> Checking binding ownership under Valgrind (runtime suppressions documented)"
+  DML_MEMORY_BASELINE=0 PYTHONMALLOC=malloc valgrind \
+    --trace-children=yes --error-exitcode=101 --leak-check=full \
+    --show-leak-kinds=definite --errors-for-leak-kinds=definite --track-origins=yes \
+    --suppressions="$root_dir/tests/valgrind-cpython.supp" \
+    python3 "$root_dir/tests/python/binding_memory.py"
+  echo "==> Checking native CLI allocation cleanup under Valgrind"
+  python3 "$root_dir/tests/python/cli_memory.py"
+fi
+
 if [ "$enable_mutation" -eq 1 ]; then
   run_mull "$root_dir" "$mull_report"
 else
@@ -303,6 +314,8 @@ remove_patterns=(
   # Dependency-only GCC SIMD inline implementations emitted by xxHash. They
   # are not DML behavior; see tests/coverage-exclusions.md for the exact scope.
   '*/lib/gcc/*/include/emmintrin.h'
+  # CPython's limited-API inline refcount/type helpers, not DML ownership code.
+  '*/include/python*/object.h'
 )
 
 if [ -n "${LCOV_EXCLUDES:-}" ]; then

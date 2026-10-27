@@ -19,9 +19,12 @@ Installed headers separate these module boundaries:
 - [repo.h](../include/dml/repo.h): opaque repository/storage-transaction handles,
   typed object storage and ref operations.
 
-xxHash, LMDB, utf8proc and uriparser remain private static dependencies. The CLI and
-Python package entry points remain scaffolds; they do not expose the repository
-workflow exercised by the native test drivers.
+xxHash, LMDB, utf8proc and uriparser remain private static dependencies. The root
+Meson project links this core into both the inspection CLI and Python extension.
+The low-level Python layer supplies owned immutable descriptions and conservative
+transaction contexts around opaque native handles; it does not duplicate codecs
+or use subprocess test drivers. The Python console entry forwards to the same
+native CLI executable bundled in `daggerml`, never PATH's `dml`.
 
 ## Technical navigation
 
@@ -31,6 +34,9 @@ Start with [spec-next/README.md](spec-next/README.md) for the implemented contra
 - [Snapshot and history objects](spec-next/objects.md): fields, names and ordering.
 - [Local repository and transactions](spec-next/repository.md): storage, direct
   reference checks, refs and handle lifecycle.
+- [Python API](spec-next/python-api.md): conversions, exceptions and native lifetime/context policy.
+- [Inspection CLI](spec-next/cli.md): grammar, traversal and presentation.
+- [Packaging](packaging-and-distribution.md): shared native builds and installed entry paths.
 - [Glossary](spec-next/glossary.md): shared vocabulary.
 
 The [old draft specification](spec/overview.md) describes proposed broader layers;

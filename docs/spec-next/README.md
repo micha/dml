@@ -41,12 +41,26 @@ flowchart TD
     RECORDS["records.md<br/>Datums, encoding, record identity and errors"]
     OBJECTS["objects.md<br/>Snapshot/history fields, names and views"]
     REPO["repository.md<br/>Local storage, refs, transactions and ownership"]
+    PY["python-api.md<br/>Python values, errors and contexts"]
+    CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
+    PACK["../packaging-and-distribution.md<br/>Native artifacts and local builds"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
     TESTS["../../tests/<br/>Behavior checks"]
     README --> AGENTS
     README --> RECORDS
     README --> OBJECTS
     README --> REPO
+    README --> PY
+    README --> CLI
+    README --> PACK
+    PY --> REPO
+    PY --> RECORDS
+    PY --> OBJECTS
+    CLI --> REPO
+    CLI --> OBJECTS
+    CLI --> RECORDS
+    PACK --> PY
+    PACK --> CLI
     AGENTS --> GUIDE
     AGENTS --> GLOSSARY
     RECORDS --> GLOSSARY
@@ -74,6 +88,9 @@ flowchart TD
 | Datum kinds, canonical records, record IDs, URI/text behavior and error representation | [records.md](records.md) |
 | Literal-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
 | Repository initialization, storage keys, transactions, direct reference checks, refs and handle ownership | [repository.md](repository.md) |
+| Python conversions, owned descriptions, exceptions, thread/finalizer policy and contexts | [python-api.md](python-api.md) |
+| Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
+| Native linking, packaged executable, build/install and distribution paths | [Packaging and distribution](../packaging-and-distribution.md) |
 
 ## What exists today
 
@@ -84,7 +101,10 @@ flowchart TD
   storage transactions.
 - C tests and Python tests driving native test helpers, including fresh-process
   snapshot/history inspection and atomic object/ref rollback.
-- Version-only/scaffold CLI, Python package and example adapter entry points.
+- A linked low-level Python API constructing and reading that state through real
+  native handles, with explicit references and atomic transaction contexts.
+- A native inspection CLI and Python console forwarding to the bundled executable,
+  with human/JSON presentation, snapshots and all-parent history traversal.
 
 ## Development policy
 
@@ -107,6 +127,7 @@ behavior as implemented before the corresponding code exists.
 Technical documents describe the current implemented contract. MUST, SHOULD and
 MAY are normative when used there; examples are explicitly informative. Source and
 test links provide evidence; actual validation runs and outstanding gates are in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md).
+[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
+and [Iteration 2 delivery notes](../../../dml-design/iterations/02-repository-usability/RESULTS.md).
 If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

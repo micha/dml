@@ -42,6 +42,10 @@ void *dml_test_malloc(size_t size) {
   return fail(DML_TEST_ALLOCATE) ? NULL : malloc(size);
 }
 
+void *dml_test_realloc(void *pointer, size_t size) {
+  return fail(DML_TEST_ALLOCATE) ? NULL : realloc(pointer, size);
+}
+
 void *dml_test_calloc(size_t count, size_t size) {
   return fail(DML_TEST_ALLOCATE) ? NULL : calloc(count, size);
 }

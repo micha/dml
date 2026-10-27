@@ -39,15 +39,15 @@ def editor_project(tmp_path):
         'mkdir -p "$2/meson-private"\ntouch "$2/meson-private/coredata.dat"\n',
     )
     (binaries / "python3").symlink_to(sys.executable)
-    for build, source in (("editor", "src/core.c"), ("editor-python", "python/core.c")):
-        directory = root / "build" / build
-        directory.mkdir(parents=True)
-        entry = {"directory": str(directory), "file": "../../" + source}
-        if build == "editor":
-            entry["command"] = "cc -DCORE=1 -c ../../" + source
-        else:
-            entry["arguments"] = ["cc", "-DPYTHON=1", "-c", "../../" + source]
-        (directory / "compile_commands.json").write_text(json.dumps([entry]))
+    directory = root / "build" / "editor"
+    directory.mkdir(parents=True)
+    entries = [
+        {"directory": str(directory), "file": "../../src/core.c",
+         "command": "cc -DCORE=1 -c ../../src/core.c"},
+        {"directory": str(directory), "file": "../../python/core.c",
+         "arguments": ["cc", "-DPYTHON=1", "-c", "../../python/core.c"]},
+    ]
+    (directory / "compile_commands.json").write_text(json.dumps(entries))
     env = {**os.environ, "PATH": str(binaries) + os.pathsep + os.environ["PATH"]}
     return script, root, compiler, headers, env
 
@@ -58,7 +58,7 @@ def run_setup(script, env, *args):
     )
 
 
-def test_setup_merges_projects_and_discovers_system_headers(editor_project):
+def test_setup_core_and_binding_discovers_system_headers(editor_project):
     script, root, compiler, headers, env = editor_project
     for _ in range(2):  # Initial setup and reconfiguration both work.
         result = run_setup(script, env)

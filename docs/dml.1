@@ -1,34 +1,27 @@
-.TH DML 1 "February 2026" "dml 0.1.0" "User Commands"
+.TH DML 1 "October 2026" "dml 0.1.0" "User Commands"
 .SH NAME
-dml \- manage DaggerML repositories
+dml \- inspect local DaggerML repository state
 .SH SYNOPSIS
 .B dml
-.RB [ \-h | \--help | \--version ]
+.RB [ \--help | \--version | \-V ]
 .br
 .B dml
-.I <command>
-.RB [ <args> ... ]
+.RB [ \--json ]
+.BI \--repo " PATH"
+.I COMMAND
+.RB [ ARGS ... ]
 .SH DESCRIPTION
-This man page is a compatibility surface for environments that expect
-.BR man (1)
-documentation.
-The authoritative command documentation is the CLI help output:
+The native inspection CLI resolves refs, shows typed objects, displays snapshots,
+and traverses all-parent commit history. It does not initialize or mutate repositories.
+.SH DOCUMENTATION
+Global grammar is available through:
 .IP \[bu] 2
 .B dml --help
+.PP
+The owning command, JSON, preview and diagnostic contract is:
 .IP \[bu] 2
-.B dml <command> --help
-
-To avoid drift, command semantics, arguments, and examples are not duplicated
-here.
-
-.SH SOURCE OF TRUTH
-The source of truth for command documentation is CLI help metadata, as defined
-by:
+.B docs/spec-next/cli.md
+.PP
+Build and console forwarding paths are documented in:
 .IP \[bu] 2
-.B docs/spec/cli.md
-(Section 5)
-
-.SH SEE ALSO
-.BR dml (1),
-.BR docs/spec/cli.md ,
-.BR docs/spec/overview.md
+.B docs/packaging-and-distribution.md

@@ -1,31 +1,24 @@
-"""Entry point for the ``dml`` command."""
+"""Forward to the native executable bundled in daggerml, never to PATH's dml."""
 
 from __future__ import annotations
 
-import argparse
 import importlib
-
-
-def build_parser() -> argparse.ArgumentParser:
-  parser = argparse.ArgumentParser(prog="dml", description="DaggerML CLI")
-  parser.add_argument(
-    "--version",
-    action="store_true",
-    help="Show the installed DaggerML core version.",
-  )
-  return parser
+import os
+from pathlib import Path
+import subprocess
+import sys
 
 
 def main() -> int:
-  args = build_parser().parse_args()
-  if args.version:
     daggerml = importlib.import_module("daggerml")
-    print(daggerml.version())
-    return 0
-
-  print("dml CLI scaffold is installed")
-  return 0
+    executable = Path(daggerml.__file__).resolve().parent / "_bin" / ("dml.exe" if os.name == "nt" else "dml")
+    try:
+        result = subprocess.run([str(executable), *sys.argv[1:]], check=False)
+    except OSError as error:
+        print(f"dml: cannot run bundled native executable: {error}", file=sys.stderr)
+        return 1
+    return result.returncode if result.returncode >= 0 else 128 - result.returncode
 
 
 if __name__ == "__main__":
-  raise SystemExit(main())
+    raise SystemExit(main())

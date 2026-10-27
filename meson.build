@@ -2,12 +2,15 @@ project(
   'dml',
   'c',
   version: '0.1.0',
+  meson_version: '>=1.4',
   default_options: [
     'c_std=c11',
     'default_library=static',
     'warning_level=3',
   ],
 )
+
+py = import('python').find_installation(pure: false)
 
 xxhash_proj = subproject('xxhash', default_options: ['default_library=static'])
 xxhash_dep = xxhash_proj.get_variable('xxhash_dep')
@@ -64,6 +67,8 @@ dml_cli = executable(
   include_directories: dml_inc,
   dependencies: dml_dep,
   install: true,
+  install_dir: py.get_install_dir() / 'daggerml' / '_bin',
+  install_tag: 'python-runtime',
 )
 
 test_version = executable(
@@ -142,5 +147,37 @@ fault_test = executable(
   dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
 )
 test('test_faults', fault_test, is_parallel: false)
+
+py.extension_module(
+  '_core', 'python/daggerml/src/_core_module.c',
+  dependencies: dml_dep,
+  subdir: 'daggerml',
+  install: true,
+  install_tag: 'python-runtime',
+  limited_api: '3.8',
+)
+executable(
+  'test_cli_fault_driver', 'tests/c/cli_fault_driver.c', 'tests/c/fault_injection.c',
+  include_directories: dml_inc,
+  link_with: fault_core,
+  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
+  install: false,
+)
+
+py.extension_module(
+  '_core_fault', 'python/daggerml/src/_core_module.c', 'tests/c/fault_injection.c',
+  include_directories: [dml_inc, include_directories('tests/c')],
+  link_with: fault_core,
+  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
+  c_args: ['-DDML_PY_FAULTS'],
+  limited_api: '3.8', install: false,
+)
+
+py.install_sources(
+  'python/daggerml/daggerml/__init__.py',
+  'python/daggerml/daggerml/_core.pyi',
+  'python/daggerml/daggerml/py.typed',
+  subdir: 'daggerml', install_tag: 'python-runtime',
+)
 
 meson.override_dependency('dml', dml_dep)

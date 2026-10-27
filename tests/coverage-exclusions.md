@@ -37,8 +37,9 @@ not justify excluding a path. The default gate still requires 100% of the
 ## Exact exclusions
 
 Source comments carry `LCOV_EXCL_LINE` for an unmeasured line and
-`LCOV_EXCL_BR_LINE` for an unmeasured branch group. No functions are excluded.
-The latter is **line-wide**: when a condition or switch has an impossible edge,
+`LCOV_EXCL_BR_LINE` for an unmeasured branch group. No DML production functions
+are excluded; the CPython dependency-header exclusion below removes only dependency
+functions. The latter is **line-wide**: when a condition or switch has an impossible edge,
 lcov also removes its already-tested reachable edges from the percentage's
 denominator. The assertions for reachable behavior remain. This tooling
 limitation must not be described as every original branch having been exercised.
@@ -69,3 +70,70 @@ removal excludes all ten dependency-header lines, including eight previously hit
 lines. See [delivery notes](../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md#review-follow-up)
 for actual marker-free and gated counts, excluded populations, commands and memory
 check results. No excluded path is evidence of a passing test.
+
+## Iteration 2 binding and CLI exclusions
+
+The old exclusions above are unchanged. Added precise locations:
+
+| Location | No-value rationale | Retained assurance |
+| --- | --- | --- |
+| `python/daggerml/src/_core_module.c`, `repo_schema()` status guard | The live-handle helper and non-null local output already establish this allocation-free native query's complete preconditions. It cannot newly fail. | Closed/wrong-thread/invalid native handles and successful schema reads are tested. |
+| Same source, `txn_begin()`'s `Py_INCREF(owner)` and `decode_datum()`'s `Py_INCREF(Py_None)`/NULL case label | CPython generates immortal/refcount branches, not alternate DML ownership paths. A live capsule owner is mortal and None is immortal on this Python build. The NULL case label marker accounts for GCC attributing the inline branch to that label. | Owner retention, successful/failing capsule construction, explicit cleanup, queued foreign-thread cleanup and isolated unsupported abandonment tests remain measured. |
+| `src/cli.c`, `history()` traversal-array size guard and error-return line | Overflow requires exabytes of already-allocated traversal state on the supported 64-bit matrix. Repeating giant graphs adds no distinct cleanup/storage assurance. | Real initial/reallocation failures, both traversal arrays, late failures, shared ancestors, limits and a simulated-hash cycle fixture are tested. |
+| `src/cli.c`, positive limit parser's `*end` guard | Every input byte was already checked as a decimal digit, so successful `strtoumax` consumes the whole string. A fabricated partial parse would violate the dependency's contract. | Empty/non-digit/negative/zero/overflow limits and valid limits are tested. |
+| `src/cli.c`, parser's `parsed > SIZE_MAX` guard | uintmax_t and size_t are both 64-bit on the supported matrix. This guard currently contributes no measured branch; retain it and re-evaluate on another width. | Decimal overflow is exercised through errno/ERANGE; no smaller target-width support is inferred. |
+| `src/cli.c`, final `close_status` guard | The sole read transaction was just consumed by abort. The handle is live and idle, or null after open failure; repository close cannot newly fail. | All open/traversal/read failures clean up, and native close-with-active rejection remains tested independently. |
+| `scripts/check.sh`, `*/include/python*/object.h` filter | CPython limited-API inline type/refcount helpers are dependency implementation, not DML behavior. | Binding buffers, handles, return values and reference-stealing/allocation errors have real tests and memory workloads. No DML source file is removed. |
+
+In particular, datum decoding is **not excluded** as allocation-free: URI/text
+validation can allocate again. URI allocation sweeps exercise decode failure
+following an already-successful typed read. No binding/CLI allocation-failure,
+rollback, parser, output-write or unsafe-finalization handler is excluded.
+
+At the passing default checkpoint, marker-free versus retained measurements:
+
+| Population | Lines | Functions | Branch outcomes |
+| --- | --- | --- | --- |
+| Marker-free, retaining GCC/CPython headers | 1584/1592 | 129/129 | 1483/1524 |
+| Default gate | 1555/1555 | 125/125 | 1409/1409 |
+
+All exclusions combined remove **37 lines** (29 had hits), **115 outcomes** (74
+had hits), and **4 dependency functions** (all hit). No DML function is excluded.
+Iteration 2 additions remove 21 lines (20 hit), 48 outcomes (28 hit), and those 4
+functions; the prior population removes 16 lines/67 outcomes as previously
+cataloged. New per-source removals are:
+
+- CPython `object.h`: 20 lines, 32 outcomes, 4 functions (`Py_XDECREF`, `_Py_NewRef`,
+  `PyType_HasFeature`, `Py_TYPE`); 20 lines/19 outcomes/4 functions had hits.
+- Binding: 0 lines, 6 outcomes; 3 outcomes had hits.
+- CLI: 1 line, 10 outcomes; 0 lines/6 outcomes had hits.
+
+These are denominator removals, not claimed passing tests. Full commands,
+intermediate failures and source state are in
+[Iteration 2 results](../../dml-design/iterations/02-repository-usability/RESULTS.md).
+
+## Memory-check accounting
+
+`check.sh -v` now additionally exercises the actual binding under Valgrind through
+[its standalone workload](python/binding_memory.py), and a native CLI allocation
+sweep through [its workload](python/cli_memory.py). It uses `PYTHONMALLOC=malloc`
+and `--trace-children=yes` to follow Nix's Python exec wrapper into CPython.
+A wrapper-only run without exec tracing is not Python memory evidence.
+
+[The suppression file](valgrind-cpython.supp) matches definite-leak reports with
+specific CPython cached/interned Unicode call chains: unmarshalling, module/type
+initialization, parser identifiers and import-name processing. It contains no
+DML buffer/handle allocator or direct binding Unicode-return chain. Neither
+invalid-access nor uninitialized-value errors are suppressed. Re-evaluate these
+patterns for a new Python build; they are not a blanket CPython/source suppression.
+
+`DML_MEMORY_BASELINE=1` runs the same import setup with no repository workload.
+The runtime-only and full-workload checks had identical exit heap populations;
+both reported zero unsuppressed memory errors/leaks. Exact suppressed and reachable
+counts depend on the current source/runtime and are recorded per run in results.
+This is not a claim that the Python process has no retained runtime allocations.
+
+Unsupported foreign-thread last-owner abandonment deliberately leaves native
+resources unreclaimed and is tested only in disposable subprocesses. It is **not**
+part of leak-free supported-finalization evidence. The documented ResourceWarning
+and warnings-as-errors/unraisable behavior are tested rather than excluded.

@@ -10,6 +10,7 @@
 #include "fault_control.h"
 
 void *dml_test_malloc(size_t size);
+void *dml_test_realloc(void *pointer, size_t size);
 void *dml_test_calloc(size_t count, size_t size);
 utf8proc_ssize_t dml_test_text(const utf8proc_uint8_t *text, utf8proc_ssize_t len,
                               utf8proc_uint8_t **out, utf8proc_option_t options);
@@ -30,6 +31,7 @@ XXH128_hash_t dml_test_hash(const void *data, size_t len);
 
 #ifndef DML_TEST_IMPLEMENTATION
 #define malloc dml_test_malloc
+#define realloc dml_test_realloc
 #define calloc dml_test_calloc
 #define utf8proc_map dml_test_text
 #define uriParseSingleUriExA dml_test_uri_parse
