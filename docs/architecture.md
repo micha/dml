@@ -4,24 +4,36 @@ Authority boundary:
 
 - This document is authoritative for the implemented module boundaries and
   navigation to the current sources of truth.
-- For normative technical behavior, see the spec suite listed below.
+- For normative implemented behavior, see the
+  [as-built specification](spec-next/README.md).
 
-The repository implements a native C datum codec and LMDB-backed transactional
-storage layer. Installed headers separate error/status types, packed datum APIs,
-and opaque repository/transaction handles. xxHash, LMDB, utf8proc, and
-uriparser remain private static dependencies.
+The native C core implements datums, literal nodes, rooted DAGs, trees and commits,
+with full-record content IDs. LMDB-backed storage transactions persist immutable
+objects and atomically create or update repository-scoped refs to commits.
+Installed headers separate these module boundaries:
 
-Execution, DAG/commit codecs, remotes, and public Python bindings remain future
-layers described only by their authoritative specifications.
+- [error.h](../include/dml/error.h): status and error representation.
+- [record.h](../include/dml/record.h): datum codecs, buffers and ID text conversion.
+- [object.h](../include/dml/object.h): snapshot/history codecs, borrowed views,
+  the ASCII name profile and immutable-object identity.
+- [repo.h](../include/dml/repo.h): opaque repository/storage-transaction handles,
+  typed object storage and ref operations.
 
-For current design and behavior, use the spec suite:
+xxHash, LMDB, utf8proc and uriparser remain private static dependencies. The CLI and
+Python package entry points remain scaffolds; they do not expose the repository
+workflow exercised by the native test drivers.
 
-- `docs/spec/overview.md`
-- `docs/spec/object-model.md`
-- `docs/spec/execution.md`
-- `docs/spec/remotes.md`
-- `docs/spec/cli.md`
-- `docs/spec/python-bindings.md`
+## Technical navigation
 
-For the implemented lifecycle and ownership contract, see
-`docs/core-storage.md`.
+Start with [spec-next/README.md](spec-next/README.md) for the implemented contract:
+
+- [Records and datums](spec-next/records.md): common envelope, identity and ownership.
+- [Snapshot and history objects](spec-next/objects.md): fields, names and ordering.
+- [Local repository and transactions](spec-next/repository.md): storage, direct
+  reference checks, refs and handle lifecycle.
+- [Glossary](spec-next/glossary.md): shared vocabulary.
+
+The [old draft specification](spec/overview.md) describes proposed broader layers;
+it is not evidence that those layers are implemented. Design agreements and future
+iteration planning live in the sibling
+[dml-design checkout](../../dml-design/README.md).

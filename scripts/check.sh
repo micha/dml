@@ -300,6 +300,9 @@ remove_patterns=(
   '*/subprojects/*'
   '*/tests/*'
   '*/build/check/*'
+  # Dependency-only GCC SIMD inline implementations emitted by xxHash. They
+  # are not DML behavior; see tests/coverage-exclusions.md for the exact scope.
+  '*/lib/gcc/*/include/emmintrin.h'
 )
 
 if [ -n "${LCOV_EXCLUDES:-}" ]; then

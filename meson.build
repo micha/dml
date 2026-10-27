@@ -23,19 +23,21 @@ uriparser_dep = uriparser_proj.get_variable('uriparser_dep')
 
 dml_inc = include_directories('include')
 
+dml_sources = files(
+  'src/dml.c',
+  'src/encoding.c',
+  'src/error.c',
+  'src/object.c',
+  'src/object_id.c',
+  'src/record.c',
+  'src/repo.c',
+  'src/text.c',
+  'src/uri.c',
+)
+
 libdml = static_library(
   'dml',
-  files(
-    'src/dml.c',
-    'src/encoding.c',
-    'src/error.c',
-    'src/object.c',
-    'src/object_id.c',
-    'src/record.c',
-    'src/repo.c',
-    'src/text.c',
-    'src/uri.c',
-  ),
+  dml_sources,
   include_directories: dml_inc,
   dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
   install: true,
@@ -117,5 +119,28 @@ executable(
   'test_history_driver', 'tests/c/history_driver.c',
   include_directories: dml_inc, dependencies: dml_dep,
 )
+
+boundary_test = executable(
+  'test_boundaries', 'tests/c/test_boundaries.c',
+  include_directories: dml_inc, dependencies: dml_dep,
+)
+test('test_boundaries', boundary_test)
+
+# Compile the same sources with dependency-call substitution only in this
+# private test core. The installed library has no hooks or mutable fault state.
+fault_core = static_library(
+  'dml_test_fault_core', dml_sources,
+  include_directories: dml_inc,
+  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
+  c_args: ['-include', meson.current_source_dir() / 'tests/c/fault_injection.h'],
+  install: false,
+)
+fault_test = executable(
+  'test_faults', 'tests/c/test_faults.c', 'tests/c/fault_injection.c',
+  include_directories: dml_inc,
+  link_with: fault_core,
+  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
+)
+test('test_faults', fault_test, is_parallel: false)
 
 meson.override_dependency('dml', dml_dep)

@@ -27,10 +27,13 @@ static int ascii_equal_ci(const char *first, const char *last, const char *text)
 }
 
 static int hex_value(uint8_t value) {
-  if (value >= '0' && value <= '9') return value - '0';
-  if (value >= 'A' && value <= 'F') return value - 'A' + 10;
-  if (value >= 'a' && value <= 'f') return value - 'a' + 10;
-  return -1;
+  if (value >= '0' && /* LCOV_EXCL_BR_LINE: validated hex is never below '0'. */
+      value <= '9') return value - '0';
+  if (value >= 'A' && /* LCOV_EXCL_BR_LINE: only letters remain after the digit case. */
+      value <= 'F') return value - 'A' + 10;
+  if (value >= 'a' && /* LCOV_EXCL_BR_LINE: only lowercase hexadecimal remains. */
+      value <= 'f') return value - 'a' + 10; /* LCOV_EXCL_BR_LINE */
+  return -1; /* LCOV_EXCL_LINE: the original URI parser rejects non-hex escapes. */
 }
 
 static int is_unreserved(uint8_t value) {
@@ -53,9 +56,10 @@ static dml_status normalize_escapes(const uint8_t *data, size_t len,
       result[written++] = (char)data[i];
       continue;
     }
-    if (len - i < 3 || hex_value(data[i + 1]) < 0 || hex_value(data[i + 2]) < 0) {
-      free(result);
-      return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
+    /* The original URI grammar has already rejected malformed percent escapes. */
+    if (len - i < 3 || hex_value(data[i + 1]) < 0 || hex_value(data[i + 2]) < 0) { /* LCOV_EXCL_BR_LINE */
+      free(result); /* LCOV_EXCL_LINE */
+      return dml_set_error(error, DML_INVALID_PAYLOAD, 0, /* LCOV_EXCL_LINE */
                            "record_type=datum;detail=uri_syntax");
     }
     uint8_t decoded = (uint8_t)((hex_value(data[i + 1]) << 4) | hex_value(data[i + 2]));
@@ -114,7 +118,9 @@ dml_status dml_uri_canonicalize(const uint8_t *data, size_t len, dml_buffer *out
                          status,
                          "record_type=datum;detail=uri_syntax");
   }
-  if (uri.scheme.first == NULL || uri.scheme.first == uri.scheme.afterLast) {
+  /* A parsed non-null scheme is nonempty by the RFC grammar; missing scheme is tested. */
+  if (uri.scheme.first == NULL ||
+      uri.scheme.first == uri.scheme.afterLast) { /* LCOV_EXCL_BR_LINE */
     uriFreeUriMembersA(&uri);
     return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
                          "record_type=datum;detail=uri_not_absolute");
@@ -144,8 +150,8 @@ dml_status dml_uri_canonicalize(const uint8_t *data, size_t len, dml_buffer *out
   }
   status = uriNormalizeSyntaxExA(&uri, normalization_mask);
   if (status != URI_SUCCESS ||
-      uriToStringCharsRequiredA(&uri, &chars_required) != URI_SUCCESS ||
-      chars_required < 0) {
+      (status = uriToStringCharsRequiredA(&uri, &chars_required)) != URI_SUCCESS ||
+      chars_required < 0) { /* LCOV_EXCL_BR_LINE: success supplies a nonnegative required length. */
     uriFreeUriMembersA(&uri);
     free(normalized_input);
     return dml_set_error(error, status == URI_ERROR_MALLOC ? DML_OUT_OF_MEMORY

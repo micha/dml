@@ -187,7 +187,9 @@ dml_status dml_repo_open(const char *path, const dml_repo_options *options,
     if (!options->create) {
       return dml_set_error(error, DML_NOT_FOUND, ENOENT, "repository path does not exist");
     }
-    if (dml_mkdir(path) != 0 && errno != EEXIST) {
+    /* EEXIST here requires another creator between stat and mkdir; no-value race simulation. */
+    if (dml_mkdir(path) != 0 &&
+        errno != EEXIST) { /* LCOV_EXCL_BR_LINE */
       return dml_set_error(error, DML_STORAGE_ERROR, errno,
                            "creating repository directory failed");
     }
@@ -376,7 +378,7 @@ static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
   if (type == DML_REC_DATUM) return validate_references(txn, data, len, error);
   dml_object_view view;
   dml_status status = dml_object_decode(data, len, &view, error);
-  if (status != DML_OK) return status;
+  if (status != DML_OK) return status; /* LCOV_EXCL_BR_LINE: caller already checked type, encoding and ID. */
   MDB_val ignored;
   if (type != DML_REC_TREE) {
     dml_record_type referenced_type = type == DML_REC_NODE ? DML_REC_DATUM

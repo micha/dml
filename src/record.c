@@ -269,7 +269,7 @@ dml_status dml_datum_encode(const dml_datum_input *input, dml_buffer *out,
     return dml_set_error(error, DML_INVALID_KIND, 0,
                          "record_type=datum;detail=kind");
   }
-  switch (input->kind) {
+  switch (input->kind) { /* LCOV_EXCL_BR_LINE: valid kinds already checked; all ten tested. */
     case DML_DATUM_NULL: payload_len = 0; break;
     case DML_DATUM_BOOL: payload_len = 1; break;
     case DML_DATUM_I64:
@@ -313,7 +313,8 @@ dml_status dml_datum_encode(const dml_datum_input *input, dml_buffer *out,
         return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid id array");
       }
       if (!dml_size_mul(input->value.ids.count, 16, &payload_len) ||
-          !dml_size_add(payload_len, 4, &payload_len) || input->value.ids.count > UINT32_MAX) {
+          !dml_size_add(payload_len, 4, &payload_len) || /* LCOV_EXCL_BR_LINE: multiple of 16 leaves room for 4. */
+          input->value.ids.count > UINT32_MAX) {
         return dml_set_error(error, DML_INVALID_BOUNDS, 0, "datum collection too large");
       }
       break;
@@ -322,7 +323,8 @@ dml_status dml_datum_encode(const dml_datum_input *input, dml_buffer *out,
         return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid map array");
       }
       if (!dml_size_mul(input->value.map.count, 32, &payload_len) ||
-          !dml_size_add(payload_len, 4, &payload_len) || input->value.map.count > UINT32_MAX) {
+          !dml_size_add(payload_len, 4, &payload_len) || /* LCOV_EXCL_BR_LINE: multiple of 32 leaves room for 4. */
+          input->value.map.count > UINT32_MAX) {
         return dml_set_error(error, DML_INVALID_BOUNDS, 0, "datum map too large");
       }
       break;
@@ -342,7 +344,7 @@ dml_status dml_datum_encode(const dml_datum_input *input, dml_buffer *out,
   dml_write_u64_le(record + 24, payload_len);
   dml_write_u64_le(record + 32, DML_DATUM_PREFIX_SIZE);
   uint8_t *payload = record + DML_DATUM_PREFIX_SIZE;
-  switch (input->kind) {
+  switch (input->kind) { /* LCOV_EXCL_BR_LINE: exhaustive after kind validation; all ten tested. */
     case DML_DATUM_NULL: break;
     case DML_DATUM_BOOL: payload[0] = input->value.boolean ? 1 : 0; break;
     case DML_DATUM_I64: dml_write_u64_le(payload, (uint64_t)input->value.i64); break;

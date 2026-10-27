@@ -105,7 +105,7 @@ dml_status dml_object_decode(const uint8_t *data, size_t len, dml_object_view *o
   dml_status status = dml_record_validate(data, len, error);
   if (status != DML_OK) return status;
   uint16_t type = dml_read_u16_le(data + 6);
-  if (type < DML_REC_NODE || type > DML_REC_COMMIT) {
+  if (type < DML_REC_NODE || type > DML_REC_COMMIT) { /* LCOV_EXCL_BR_LINE: validate() permits only META..COMMIT. */
     return invalid(error, DML_INVALID_KIND, "record is not a node/DAG/tree/commit");
   }
   out->record = data;
@@ -174,14 +174,16 @@ dml_status dml_object_encode(const dml_object_input *input, dml_buffer *out,
       for (size_t i = 0; i < count; i++) {
         dml_status status = dml_name_validate(items[i].name, error);
         if (status != DML_OK) return status;
-        if (!dml_size_add(len, 20 + items[i].name.len, &len) || len > UINT32_MAX) {
-          return invalid(error, DML_INVALID_BOUNDS, "tree is too large");
+        /* No-value multi-GiB repetition of checked arithmetic; see tests/coverage-exclusions.md. */
+        if (!dml_size_add(len, 20 + items[i].name.len, &len) || len > UINT32_MAX) { /* LCOV_EXCL_BR_LINE */
+          return invalid(error, DML_INVALID_BOUNDS, "tree is too large"); /* LCOV_EXCL_LINE */
         }
       }
       if (count != 0) {
         size_t allocation;
-        if (!dml_size_mul(count, sizeof(*sorted), &allocation)) {
-          return invalid(error, DML_INVALID_BOUNDS, "tree array is too large");
+        /* Valid u32-bounded counts cannot overflow allocation size on supported 64-bit hosts. */
+        if (!dml_size_mul(count, sizeof(*sorted), &allocation)) { /* LCOV_EXCL_BR_LINE */
+          return invalid(error, DML_INVALID_BOUNDS, "tree array is too large"); /* LCOV_EXCL_LINE */
         }
         sorted = malloc(allocation);
         if (sorted == NULL) return invalid(error, DML_OUT_OF_MEMORY, "allocating tree entries");
@@ -198,7 +200,7 @@ dml_status dml_object_encode(const dml_object_input *input, dml_buffer *out,
     return invalid(error, DML_OUT_OF_MEMORY, "allocating object record");
   }
   dml_encode_header(data, input->type, (uint32_t)len);
-  switch (input->type) {
+  switch (input->type) { /* LCOV_EXCL_BR_LINE: exhaustive after the first switch; cases tested. */
     case DML_REC_NODE:
       dml_write_u32_le(data + 20, DML_NODE_LITERAL);
       memcpy(data + 24, input->value.node.datum.bytes, 16);
@@ -222,7 +224,7 @@ dml_status dml_object_encode(const dml_object_input *input, dml_buffer *out,
       }
       break;
     }
-    default: break; /* Type checked above. */
+    default: break; /* LCOV_EXCL_LINE: Type checked above. */
   }
   free(sorted);
   dml_status status = dml_validate_object(data, len, input->type, error);

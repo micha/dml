@@ -82,8 +82,18 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Use lcov/gcov for line, function, and branch coverage tracking; target 100%
   coverage.
 - Use coverage.py for Python source coverage; target 100% line coverage.
-- If exclusions are needed to reach practical coverage goals, discuss and agree
-  on them before merging.
+- Coverage is a means of improving assurance, not an end in itself. The user
+  authorizes narrow exclusions for precise lines/branches/regions where exercising
+  them adds no useful assurance (for example proven-unreachable defensive edges or
+  dependency/compiler-generated code). Record each excluded location and its
+  reasoning in delivery notes; distinguish excluded code from tested code.
+- Add meaningful boundary/error and allocation-failure tests. Difficulty alone
+  does not justify an exclusion. Do not hide real behavior or bugs, lower the
+  remaining coverage thresholds, or treat skipped/failing checks as passed.
+  New exclusions that do not meet this no-value policy need a user decision.
+- [Coverage scope and exclusions](tests/coverage-exclusions.md) catalogs the exact
+  markers and their invariants. The private fault-test core substitutes dependency
+  calls only in test builds; do not add fault state to the installed library.
 - Use Valgrind for memory checks when requested or when touching memory-critical
   code paths.
 - Use `scripts/check.sh` as the standard end-to-end validation entrypoint.
@@ -148,4 +158,5 @@ and reference their locations.
 ## See Also
 
 - Architecture overview: `docs/architecture.md`
-- Spec overview: `docs/spec/overview.md`
+- As-built spec orientation: `docs/spec-next/README.md`
+- Old draft spec overview: `docs/spec/overview.md`

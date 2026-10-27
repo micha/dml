@@ -24,7 +24,7 @@ static dml_status compute_id(const uint8_t *data, size_t len, dml_object_id *out
     return dml_set_error(error, DML_INVALID_KIND, 0,
                          "record_type=datum;detail=record_type");
   }
-  if (type < DML_REC_DATUM || type > DML_REC_COMMIT) {
+  if (type < DML_REC_DATUM || type > DML_REC_COMMIT) { /* LCOV_EXCL_BR_LINE: validated type is META..COMMIT. */
     return dml_set_error(error, DML_INVALID_KIND, 0, "record is not an immutable object");
   }
   masked = malloc(len);

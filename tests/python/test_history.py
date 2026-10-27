@@ -233,6 +233,19 @@ def test_missing_direct_references_reject_on_put_and_read(tmp_path: pathlib.Path
   assert inspect(repo, "main") == (first[-1], [], 42)
 
 
+@pytest.mark.parametrize("corruption", ["offset", "message_length"])
+def test_legacy_tombstone_bounds_are_checked(tmp_path: pathlib.Path, corruption: str) -> None:
+  repo = tmp_path / "repo"
+  first = snapshot(repo, 42)
+  # Test-only injection of the recognized legacy tombstone shape; no excision API.
+  body = struct.pack("<IQI", 1, 0 if corruption == "offset" else 36,
+                     1 if corruption == "message_length" else 0)
+  packed = struct.pack("<IHHIII", 0x314C4D44, 1, 8, 36, 0, 0) + body
+  overwrite(repo, f"objects/datums/{first[0]}", packed)
+  result = get(repo, 2, first[0], check=False)
+  assert result.returncode == 1 and b"invalid_bounds" in result.stderr
+
+
 def test_store_requires_explicit_matching_type(tmp_path: pathlib.Path) -> None:
   repo = tmp_path / "repo"
   first = snapshot(repo, 42)
