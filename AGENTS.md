@@ -37,6 +37,11 @@ and `discussion.md` before continuing the discussion. Read the shared
   coordinator monitoring/review and fixes, then focused worker commit/push after
   acceptance and exact-SHA CI verification/fixes. No extra workers, release,
   package publication, cloud experiments or later feature turn are authorized.
+- Iteration 6's [plan and handoff](iterations/06-local-repository-execution/HANDOFF.md)
+  are approved for synchronous execution across local repositories, with the
+  unchanged-caller-head/explicit-return-ref boundary. Implementation/delegation,
+  implementation commit/push and CI launch remain pending separate authorization.
+  Do not inherit Iteration 5's completed worker/publication authorization.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise

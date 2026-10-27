@@ -1,7 +1,12 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: Iteration 5 implementation, independent coordinator review,
-worker commit/push and final exact-SHA CI verification are complete through
+Latest checkpoint: the user agreed to Iteration 6's direction: synchronous execution
+in a separate local repository, with pinned input transfer and recorded history
+returned to the caller. The user approved the detailed design/example/handoff and
+requested a local checkpoint ready for handoff. Implementation/delegation and
+implementation publication/CI remain unauthorized; illustrative APIs/provisional
+details are not as-built contracts. Iteration 5 implementation, independent coordinator
+review, worker commit/push and final exact-SHA CI verification are complete through
 `0ec769b`; all six CI jobs pass on the first run. Bounded turn accepted and stopped.
 No release/package publication or later feature. Delivery/assurance limits remain
 explicit in RESULTS/REVIEW and the as-built transfer contract.
@@ -1157,7 +1162,107 @@ repository has no remote; no push is requested or performed. Implementation rema
 clean at published `0ec769b`. Iteration 6 discussion is invited, but no next direction,
 plan, worker assignment or implementation is yet approved.
 
+## Iteration 6 agreed direction: execution across local repositories
+
+The user agreed to the assistant's proposed direction. This selects a bounded
+next-turn direction for discussion/planning, not implementation authorization or
+an exact helper/API/ref protocol.
+
+- Repository A supplies a pinned snapshot containing captured implementation and
+  named inputs; transfer it into a fresh local repository B.
+- Execute one step in B using the existing local runner, then return B's recorded
+  history to A through a bundle and an explicitly named destination ref.
+- Keep request/attempt occurrences and ordered history inspectable from A. Two
+  fresh runs remain distinct occurrences even when their result content matches.
+  Transfer/inspection must not rerun the computation.
+- Create the computational request and attempt in B after input import for this
+  slice. A supplies inputs and later receives history; transferring immutable
+  history does not transfer mutable reservation refs or execution authority.
+- Same machine, separate repositories/processes, synchronous file-mediated exchange
+  and a thin Python composition layer. A missing native primitive requires evidence
+  and a separate scope decision; no C expansion is presumed.
+- Exercise worker failure, interruption before result return, destination-ref conflict
+  and successful return import with lost acknowledgement. Missing returned history
+  is unknown at the caller, not automatically a computational failure; B may have
+  recorded evidence the caller has not received.
+- Defer caller-recorded prelaunch requests continued by B, network/cloud, remote
+  registry, scheduling, reuse, automatic recovery and general merge machinery.
+
+Learning goal: connect existing execution and transfer mechanisms into an inspectable
+computation across repository boundaries without inventing another repository model.
+Exact request ownership mechanics, bootstrap/head/ref names, return selection,
+exception/result shapes and cleanup/file ownership remain for the worked example
+and candidate design. No worker restart, code/spec changes, build/prototype, publication
+or later feature work is authorized by this direction agreement.
+
+The user subsequently agreed to keep A's existing orchestration head unchanged:
+import B's completion under a caller-chosen return ref and inspect both histories
+explicitly. No adoption/combining of snapshots is needed for this slice. This isolates
+execution/history exchange from merge policy. B's working ref is explicit; exact
+names and helper mechanics remain candidate-design choices.
+
+### Iteration 6 candidate preparation
+
+At the user's request, the assistant prepared
+[DESIGN](iterations/06-local-repository-execution/DESIGN.md),
+[EXAMPLE](iterations/06-local-repository-execution/EXAMPLE.md) and
+[HANDOFF](iterations/06-local-repository-execution/HANDOFF.md). These develop the
+agreed A → B → A direction and unchanged-caller-head boundary; the detailed plan
+and exact APIs/protocol have not yet been accepted or implemented.
+
+Assistant-proposed choices include a separately imported public-API-only composition
+module with explicit prepare/execute/receive stages, pinned tree-entry selection,
+retained caller-owned workspaces/fresh B, a local one-shot marker, bounded job/return
+descriptors and unchanged local execution in a fresh worker process. A private
+validation repository checks the selected returned computation before the existing
+atomic import publishes A's explicit return ref. That avoids accepting an unrelated
+valid bundle or needing private APIs/a transfer callback. This duplicate import IO
+is a deliberate prototype cost, not a scale/performance claim.
+
+The plan distinguishes recorded computational failure from exchange/driver failure,
+unknown B attempts from done B outcomes not yet received by A, and successful A
+commit from lost response. Workspace/B are retained; neither receipt strings nor
+historical scratch paths authorize cleanup or resumption. Worker/child process-tree,
+spawn/global deadline, authentication/sandbox, full-environment capture and filesystem
+power-loss limits remain explicit. No automatic retry/recovery or new C operation.
+
+Preparation inspected clean implementation `0ec769b` and design checkpoint `26c9afa`
+plus subsequent discussion edits. No implementation/as-built edits, builds/tests,
+prototypes, worker restart, delegation, commit/push or CI launch occurred. New design
+notes are local/uncommitted. Next is user review of the candidate and separate
+implementation/delegation/publication authorization if desired.
+
+### Iteration 6 plan approval and handoff checkpoint
+
+The user approved the detailed design/example/handoff, asked to prepare for handoff,
+and requested a local checkpoint commit. This accepts the assistant-origin choices
+as the bounded plan: explicit prepare/execute/receive stages, pinned tree-entry
+selection, retained one-shot workspaces with transport-only correlation tokens,
+unchanged local execution in B and isolated selected-completion validation before
+atomic explicit-ref import into A. Illustrative APIs/provisional engineering details
+remain refinable; plan approval is not an as-built contract or implementation GO.
+
+The conditional handoff is ready for a future authorized assignment and lists
+preflight/build ownership, evidence, review freeze and publication gates. No worker
+was restarted or assigned, and no implementation/spec edits, builds/tests/prototypes
+or CI launches occurred. Separate implementation/delegation and implementation
+commit/push/CI authorization remain required; do not inherit Iteration 5's completed
+request. The local checkpoint includes the approved planning documents and reconciled
+scope/orientation/resume notes. Earlier uncommitted/pending-review statements preserve
+preparation provenance. Design has no remote; no push is requested or performed.
+Implementation remains clean at published `0ec769b`.
+
 ## Resume point
+
+Iteration 6's [design](iterations/06-local-repository-execution/DESIGN.md),
+[worked example](iterations/06-local-repository-execution/EXAMPLE.md) and
+[conditional handoff](iterations/06-local-repository-execution/HANDOFF.md) are approved
+and prepared for handoff, included in the requested local design checkpoint.
+Next is separate authorization before implementation/delegation/publication; do not
+restart the completed window-2 worker or inherit Iteration 5's request. Illustrative
+APIs/provisional details are not as-built contracts. Iteration 5 delivery notes were
+checkpointed locally as `26c9afa`; this checkpoint records subsequent Iteration 6
+agreements and planning.
 
 Iteration 5 is implemented, independently accepted and published as `0ec769b`;
 all six final exact-SHA CI jobs pass. Read
@@ -1166,8 +1271,8 @@ all six final exact-SHA CI jobs pass. Read
 [as-built transfer contract](../dml/docs/spec-next/transfer.md). Implementation
 checkout/index are clean and remote master matches. The worker is stopped;
 no later feature, release or package publication is authorized. The user accepted
-the delivery and requested checkpointing these design notes locally before discussing
-Iteration 6; no next-turn direction or implementation is approved. The approved
+the delivery and checkpointed the design notes locally before discussing Iteration 6;
+its separately agreed direction is above, not implementation approval. The approved
 planning documents preserve their candidate provenance, not additional implementation
 permission.
 
