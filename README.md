@@ -6,14 +6,25 @@ its existing draft specifications.
 
 ## Start here
 
-- Iteration 7 [candidate design](iterations/07-asynchronous-local-execution/DESIGN.md),
-  [worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
-  [conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md): agreed
-  direction for asynchronous same-machine execution and inspectable progress; detailed
-  plan prepared for review, not yet approved or implemented. Proposed separate live
-  process ownership/saved handle, coherent snapshot discovery and validated P/U/F
-  packets keep publication distinct from completion. Implementation/delegation/
-  publication are not authorized.
+- Iteration 8 [design](iterations/08-caller-recorded-requests/DESIGN.md),
+  [worked example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
+  [conditional handoff](iterations/08-caller-recorded-requests/HANDOFF.md): approved bounded
+  plan, included in the requested local design checkpoint. A explicitly records Q before
+  launch; B registers imported Q locally and creates only T. Atomic submission/request
+  refs, public local seams and pinned-Q validation preserve identity across repositories.
+  Plan approval is not implementation/delegation/publication GO.
+
+- Iteration 7 [delivery](iterations/07-asynchronous-local-execution/RESULTS.md) and
+  [coordinator review](iterations/07-asynchronous-local-execution/REVIEW.md): asynchronous
+  same-machine start/observe/receive and immutable validated P/U/F snapshots are implemented,
+  independently accepted and published as `a8d6463`; all six final exact-SHA CI jobs pass
+  on the first run. Saved handle/live process ownership, unknown versus failure and
+  publication versus completion remain distinct; existing A heads stay unchanged.
+  The bounded turn is complete and stopped. [Design](iterations/07-asynchronous-local-execution/DESIGN.md),
+  [example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
+  [handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) preserve the approved
+  plan/provenance, not permission for another turn. The
+  [as-built contract](../dml/docs/spec-next/asynchronous-execution.md) owns actual behavior.
 
 - Iteration 6 [delivery](iterations/06-local-repository-execution/RESULTS.md) and
   [coordinator review](iterations/06-local-repository-execution/REVIEW.md): pinned
@@ -85,27 +96,54 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
-The user accepted Iteration 6, agreed to Iteration 7's asynchronous same-machine
-execution/inspectable-progress direction and instructed preparation of the
-[candidate design](iterations/07-asynchronous-local-execution/DESIGN.md),
-[worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
-[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md).
-These are ready for review, not yet approved or implemented. Recommended mechanics:
-separate saved observation handle from application-owned live worker launch; a finite
-example supervisor reaps the worker while short-lived clients observe from saved state;
-coherent live B reads followed by pinned export and isolated validation; immutable
-initial/publication/completion packets received under explicit refs without A head
-movement. Publication is provisional evidence, and `done` requires retrieved validated
-final computation/cleanup—not outer-worker exit or prior A import. Transparent exit
-of the sole process owner with an unowned detached worker is deliberately not promised;
-review that ownership refinement before plan approval. See the
-[discussion](discussion.md#iteration-7-candidate-preparation).
-Planning inspected clean implementation `a0aa05d`; no code/spec edits, tests/prototypes,
-worker restart, delegation or publication occurred. The user requested a local checkpoint
-of these plans and the Iteration 6 delivery notes; that request does not approve the
-candidate plan. Implementation/delegation/publication require separate authorization;
-do not inherit Iteration 6's completed GO. This design repository has no remote and
-no push is requested.
+The user approved Iteration 8's bounded
+[design](iterations/08-caller-recorded-requests/DESIGN.md),
+[worked example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
+[conditional handoff](iterations/08-caller-recorded-requests/HANDOFF.md), and requested a
+local checkpoint including accumulated Iteration 7 delivery/review notes. The approved
+plan explicitly records Q in A under atomic submission/request refs, transfers pinned
+Cq/Q, then registers Q locally in B and atomically creates only T before existing execution.
+Exact expected Q extends both synchronous/asynchronous validation; existing A heads and
+request refs stay unchanged during return. Public builder/first-attempt seams avoid private
+local access or pretending first dispatch is retry. Bootstrap has no selected T while caller
+already knows Q. No global replay/exactly-once capability claim. See
+[approval checkpoint](discussion.md#iteration-8-plan-approval-and-design-checkpoint).
+
+Approval selects the plan, not implemented behavior or implementation/delegation GO.
+Illustrative API/format spellings remain refinable. Planning/approval inspected clean
+`a8d6463`; no implementation/spec edits, tests/prototypes, worker restart/assignment or CI.
+The checkpoint preserves the accumulated delivery and planning notes; earlier uncommitted/
+pending-approval statements retain provenance. No implementation commit/push permission
+or design push; do not inherit Iteration 7's completed authorization.
+
+Iteration 7 is implemented, independently accepted and published as `a8d6463`; all
+six final exact-SHA CI jobs pass on the first run. The bounded turn is complete and
+stopped. The separate explicitly imported exchange helpers start one fixed installed
+worker, observe coherent pinned P/U/F history and receive selected validated packets
+under explicit A refs without moving existing heads. Saved observation identity is
+separate from application-owned live process reaping; fresh clients can exit/reobserve
+without relaunching. P/U is working evidence, F is done only after validated recorded
+computation/separate cleanup has been retrieved. Unknown never becomes failure merely
+from worker exit or elapsed time. No unowned detached lifetime guarantee.
+
+Worker and coordinator fresh standard `-v` checks pass: 831 Python tests, seven C
+executables, 2013/2013 Python statements and unchanged native/memory gates; 141 native
+CLI Valgrind processes pass. Coordinator's separate installed workflow passes 208
+independent checks. Real process barriers, typed-byte oracles, coherent ref races,
+concurrent readers, late successful-new-put rollback and genuine post-F profile overflow
+are exercised. Host coverage is not installed-child coverage; trust/capture, process,
+profile, precise exclusions/runtime suppressions and Python mutation-tool gaps remain
+qualified in [RESULTS](iterations/07-asynchronous-local-execution/RESULTS.md) and
+[REVIEW](iterations/07-asynchronous-local-execution/REVIEW.md). The
+[as-built contract](../dml/docs/spec-next/asynchronous-execution.md) owns actual behavior.
+
+Reviewed 22-file implementation is clean at published `a8d6463`, remote master matches;
+[exact-SHA CI](https://github.com/micha/dml/actions/runs/40602956772) passes all six jobs,
+no fix needed. No extra worker, release/tag/package publication, cloud/global tooling,
+automatic recovery, detached service or later feature turn. Delivery/status notes are
+included in the requested local design checkpoint; no design push requested and this
+repository has no remote. Earlier planning/GO statements preserve provenance, not
+permission to restart the completed worker.
 
 Iteration 6 implements one pinned step in independent local B and exact recorded
 history return to A. The separate explicit `daggerml.exchange` layer composes public

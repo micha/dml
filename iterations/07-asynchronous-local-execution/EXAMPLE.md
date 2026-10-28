@@ -1,5 +1,11 @@
 # Iteration 7 worked example: start, observe, receive
 
+Current status: this bounded acceptance plan was approved and implemented with explicit
+application process ownership. Implementation/review/publication are complete at `a8d6463`,
+all six exact-SHA CI jobs pass, work is stopped. [RESULTS.md](RESULTS.md) and
+[REVIEW.md](REVIEW.md) own actual evidence and refinements, including finite cooperative
+example gates. Preparation-only statements below preserve planning provenance.
+
 Status: candidate acceptance story prepared at the user's request, **not executed**.
 Direction is agreed; this detailed plan/ownership choice is not yet approved.
 No implementation, experiment, delegation or publication authorization.

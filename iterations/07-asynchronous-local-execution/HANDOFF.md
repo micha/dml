@@ -1,5 +1,13 @@
 # Iteration 7 conditional handoff: asynchronous local execution and progress
 
+Current status: the user approved this bounded plan and declared GO, including separate
+saved observation handle/live application process ownership. Existing window-2 worker
+implemented in a verified new session; independent review/fixes, focused commit/push and
+exact-SHA CI are complete at `a8d6463`, all six jobs pass. See [RESULTS.md](RESULTS.md),
+[REVIEW.md](REVIEW.md) and [COORDINATION.md](COORDINATION.md). Work is complete and stopped.
+Preparation/GO gates below preserve provenance, not permission to restart or begin another
+turn. Scope/stop line remains unchanged.
+
 Status: user-agreed direction and authorized planning only. The [design](DESIGN.md)
 and [example](EXAMPLE.md) are **candidate documents awaiting review/approval**.
 No implementation, worker assignment/restart, experiments, implementation commit/push

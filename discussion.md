@@ -1,16 +1,27 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: the user requested a local checkpoint of Iteration 6's accepted
-delivery and Iteration 7's candidate planning notes. The user accepted Iteration 6,
-agreed to Iteration 7's proposed direction and authorized planning, but has not yet
-approved its detailed candidate plan. The candidate
+Latest checkpoint: the user approved Iteration 8's bounded
+[design](iterations/08-caller-recorded-requests/DESIGN.md),
+[worked example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
+[conditional handoff](iterations/08-caller-recorded-requests/HANDOFF.md), and requested
+a local design checkpoint including the accumulated Iteration 7 delivery/review notes.
+This approves the plan, not implementation/delegation/publication GO. Illustrative API/
+format spellings remain refinable. See [approval](#iteration-8-plan-approval-and-design-checkpoint).
+Iteration 7 implementation, independent review, focused worker
+commit/push and exact-SHA CI verification are complete at `a8d6463`; all six jobs pass
+on the first run. The bounded turn is accepted and stopped. Read
+[RESULTS](iterations/07-asynchronous-local-execution/RESULTS.md) and
+[REVIEW](iterations/07-asynchronous-local-execution/REVIEW.md) for actual evidence/limits.
+No extra worker, release/package publication, cloud/global tooling or later feature turn.
+The preceding local checkpoint preserved Iteration 6's accepted delivery and Iteration 7's
+then-candidate plans; earlier pending/GO statements retain chronological provenance.
+The
 [design](iterations/07-asynchronous-local-execution/DESIGN.md),
 [worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
-[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) are prepared
-for review. They recommend separate saved observation identity/live process ownership,
-coherent B snapshot discovery and validated immutable P/U/F packets. Detailed plan
-approval and implementation/delegation/publication remain pending; no tests/prototypes
-or worker restart occurred during preparation.
+[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) preserve the
+approved bounded plan, not permission to restart implementation. Actual saved handle/live
+owner, coherent pinned snapshot discovery and immutable P/U/F packets are specified by the
+[as-built contract](../dml/docs/spec-next/asynchronous-execution.md).
 Iteration 6 implementation, independent coordinator review,
 focused worker commit/push and final exact-SHA CI verification are complete through
 `a0aa05d`; all six jobs pass on the first run. The bounded turn is accepted and stopped.
@@ -1412,16 +1423,174 @@ pre-checkpoint provenance. This design repository has no remote; no push is requ
 or performed. Implementation remains clean at already published `a0aa05d`; no worker
 restart, source/spec edit, build/test/prototype or new CI launch occurs for this checkpoint.
 
+### Iteration 7 implementation and publication authorization
+
+The user declared Iteration 7 GO and authorized the existing window-2 agent in a new
+Pi session to implement the bounded plan. This approves the candidate design/example/
+handoff, including separate saved observation identity and live application-owned worker
+reaping; it does not promise unowned detached lifetime. Coordinator monitors, independently
+reviews and provides feedback/fixes until satisfactory, then worker commits/pushes and
+fixes exact-SHA CI issues. This supersedes the earlier preparation-only permission
+statements, not the scope/stop line. No extra workers, release/package publication, cloud
+experiments or later feature turn.
+
+[COORDINATION](iterations/07-asynchronous-local-execution/COORDINATION.md) records live
+pane verification, `/new`/empty-session confirmation and assignment to `%215`; coordinator
+is `%197`. Both checkouts were initially clean at implementation `a0aa05d` and design
+`93ef0ce`. Worker owns runtime/tests/as-built docs/RESULTS and exclusive `build/check`
+**and** `build/coverage` through baseline/implementation. Coordinator owns review/design
+status; independent checks wait for source freeze and explicit release of both builds.
+Commit/push waits for coordinator acceptance. No design checkpoint commit/push requested.
+
+### Iteration 7 delivery and final publication checkpoint
+
+The fresh-session existing window-2 worker implemented the bounded Python asynchronous
+slice: fixed installed worker, separate saved observation handle/live application-owned
+launch and reaping, retained launch/execute one-shot markers and readiness before dispatch,
+coherent B reads followed by pinned export/isolated validation and immutable P/U/F packets.
+Independent expected selection and history validation precede atomic explicit-ref A import;
+existing A heads and earlier snapshots stay unchanged. P/U is working, publication is
+provisional, unknown never implies failure. F is done only with validated retrieved recorded
+computation/separate cleanup, independent of outer-worker exit or prior A reception.
+
+Coordinator feedback strengthened prior-Q/T-in-C/race/pin evidence, actual production-limit
+post-F overflow, finite cooperative example gates instead of timing windows, concurrent
+observers, valid same-selection other-token packets and receiver validation-cleanup failure.
+Worker and independent coordinator default `-v` checks pass: seven C executables, **831
+Python tests**, **2013/2013 Python statements**, retained C 1681/1681 lines, 132/132 functions,
+1562/1562 outcomes and unchanged binding/141 CLI memory gates. Coordinator separate installed
+workflow passes **208 independent checks** with fresh clients/offline A/B, complete typed-byte
+oracles, prior history in C, same Q/T, failure evidence, head preservation and wrong-phase
+rejection. Host coverage is not installed-child instrumentation; precise exclusions/runtime
+suppressions, Python mutation-tool gap/six selected worker probes, trust/capture/profile and
+finite process/platform limits remain in [RESULTS](iterations/07-asynchronous-local-execution/RESULTS.md),
+[REVIEW](iterations/07-asynchronous-local-execution/REVIEW.md) and the as-built contract.
+
+After explicit independent acceptance worker inspected/staged only the reviewed **22-file**
+slice and normally committed/pushed **`a8d646379a52878d087d28bc216b7baa4f9ef3db`**. Coordinator
+verifies committed surface, clean implementation tree/index, matching remote master and
+[exact-SHA CI run 40602956772](https://github.com/micha/dml/actions/runs/40602956772). All six
+jobs succeed on first run: seven C everywhere; Linux/strict 831 Python, macOS 827 with four
+existing skips, Windows 826 with five existing skips. Full logs/job JSON, sole automatic
+push workflow list and finite watch exit 0 verified. No CI fix/rerun or manual/release
+workflow. Informational CI `-c` remains distinct from local default/memory `-v`.
+
+Worker finalized only RESULTS and acknowledged stopped status. Implementation, review and
+publication/CI are complete and stopped. No extra workers, force push/new remote, release/
+tag/package publication, cloud/global tooling, detached service/automatic recovery or later
+feature turn. No design checkpoint commit/push requested; notes remain local/uncommitted.
+Earlier approval/GO/next-step statements preserve provenance, not permission to restart.
+
+## Iteration 8 agreed direction: caller-recorded requests
+
+The user agreed to the proposed next direction. This selects a bounded next-turn goal,
+not an exact API/schema, detailed plan approval or implementation/delegation/publication
+authorization. Iteration 7's completed GO is not inherited.
+
+- A explicitly records request Q, with selected intent, binding and inputs, before any
+  worker starts. Record it under an explicit submission ref without hidden start-time
+  side effects or automatic movement of A's existing heads.
+- Transfer the pinned request history to fresh same-machine B. B creates an attempt T
+  linked to that **same Q**, rather than creating a replacement request occurrence.
+- Reuse asynchronous local execution and initial/publication/completion P/U/F observations.
+  Receive selected validated history under explicit A refs, preserving Q and existing heads.
+- Inspect Q before launch; a request remains recorded when launch fails or never happens.
+  Do not invent an attempt or outcome from missing dispatch evidence. Exact attempt-creation
+  and dispatch boundaries still need the worked example/design.
+- Fresh observation clients can continue from saved identity without relaunching. Reject
+  otherwise-valid returned history for a different, computationally identical request.
+- Two matching submissions create distinct requests/attempts while result content can match.
+  No automatic retry, abandoned-request recovery or global exactly-once claim.
+- Keep same-machine/public local runner/transfer/observation composition. Add only the narrow
+  public operation needed for explicitly supplied recorded requests; exact authority and
+  validation mechanics remain open. Copied immutable history does not itself transfer
+  mutable reservation refs or dispatch permission.
+- No network/cloud, scheduler, reuse/facets, resource management, observer/UI or later feature.
+
+Learning goal: preserve what the caller asked for independently of worker launch and make
+request identity continuous across repository boundaries before adding network transport.
+Next is a worked example and bounded candidate design/handoff. No implementation/spec edits,
+worker restart/assignment, experiments, commit/push or CI are authorized by this agreement.
+
+### Iteration 8 candidate preparation
+
+At the user's instruction to proceed with the next planning step, the assistant prepared
+[DESIGN](iterations/08-caller-recorded-requests/DESIGN.md),
+[EXAMPLE](iterations/08-caller-recorded-requests/EXAMPLE.md) and
+[HANDOFF](iterations/08-caller-recorded-requests/HANDOFF.md). This is planning authorization,
+not candidate-plan approval or implementation/delegation/publication GO.
+
+Recommended mechanics: narrow public local request-only builder, separate explicit atomic
+A request-recording helper adding Q/Cq under create-only submission and A-local reservation
+refs; strict pinned submission history rather than arbitrary snapshots containing Q; public
+first-attempt operation that registers imported Q locally in B while atomically recording
+only T/P before dispatch. It preserves existing child reservation checks and executor/
+publication/finalization, rather than treating first dispatch as retry or having exchange
+synthesize refs/call private local helpers. Optional pinned-Q exchange selection extends
+both synchronous and asynchronous validators; expected exact Cq/Q rejects another matching
+request, while the existing fresh-Q-in-B mode stays enabled.
+
+These are assistant-origin candidate choices awaiting review. Bootstrap still has no selected
+T/packet, but Q is independently known from A/expected; no new request-only phase. A's request
+refs stay at Cq during receive, B refs do not transfer. Explicit invocation/one-shot workspace
+provides cooperative dispatch control, not a global capability/exactly-once scheme. A copied
+Q could be explicitly attempted in another fresh B; no automatic replay/recovery is proposed.
+Separate saved identity/live application process ownership and retrieved-final done boundary
+remain those of Iteration 7.
+
+Planning inspected clean implementation `a8d646379a52878d087d28bc216b7baa4f9ef3db`, especially
+local preparation/context/reservation seams and exchange initial/discovery/return checks.
+No implementation/spec edits, tests/build/prototypes, worker restart/assignment, commit/push
+or CI launch occurred. Existing uncommitted Iteration 7 delivery/status notes are preserved;
+candidate Iteration 8 plans remain local/uncommitted. Next is review/approval and separate
+implementation/delegation/publication permission. No design checkpoint/push requested.
+
+### Iteration 8 plan approval and design checkpoint
+
+The user approved the bounded design/example/conditional handoff and requested a local
+checkpoint. This accepts the assistant-origin choices as the plan: explicit atomic A
+request recording under submission/request refs, pinned Cq/Q selection, narrow public
+request builder and first registration/attempt operation in B, exact-Q validation through
+existing synchronous/asynchronous return and unchanged caller heads/request refs. No
+global replay/exactly-once claim. Illustrative names/formats remain engineering refinements;
+plan approval does not establish as-built behavior or authorize implementation/delegation.
+
+The local checkpoint includes accumulated Iteration 7 authorization/coordination, delivery,
+independent review/commit/push/exact-SHA CI evidence, completed stop line; Iteration 8 agreed
+direction/approved design/example/handoff; and updated scope/orientation/resume notes.
+Earlier uncommitted/pending-review statements preserve their historical provenance.
+Implementation remains clean at published `a8d6463`; no source/spec edit, worker restart/
+assignment, build/test/prototype or CI launch accompanies this approval/checkpoint. Separate
+implementation/delegation and focused implementation commit/push/CI permission remain
+required. This design repository has no remote; no push is requested or performed.
+
 ## Resume point
 
-Iteration 7's direction is agreed and the candidate
-[design](iterations/07-asynchronous-local-execution/DESIGN.md),
+Iteration 8's bounded [design](iterations/08-caller-recorded-requests/DESIGN.md),
+[worked example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
+[conditional handoff](iterations/08-caller-recorded-requests/HANDOFF.md) are approved and
+included in the user-requested local design checkpoint alongside Iteration 7's accepted
+delivery notes. Explicit atomic two-ref A request publication, public builder/imported-
+request first-attempt seams, pinned Cq/Q validation and B-local registration are the plan;
+illustrative spellings remain refinable. No implementation, worker restart/delegation,
+experiment, implementation commit/push or CI authorization. Await separate GO; Iteration 7's
+completed authorization is not inherited. See
+[approval checkpoint](#iteration-8-plan-approval-and-design-checkpoint).
+
+Iteration 7 is implemented, independently accepted and published as `a8d6463`; all six
+final exact-SHA CI jobs pass on first run. Read
+[RESULTS](iterations/07-asynchronous-local-execution/RESULTS.md),
+[REVIEW](iterations/07-asynchronous-local-execution/REVIEW.md) and the
+[as-built asynchronous contract](../dml/docs/spec-next/asynchronous-execution.md).
+Implementation tree/index are clean and remote master matches. The bounded turn is complete
+and stopped; no worker restart or later feature/release/package publication is authorized.
+Saved observation identity/live process ownership, coherent pinned P/U/F packets, unknown
+versus failure, provisional publication and existing A-head preservation remain explicit.
+The [design](iterations/07-asynchronous-local-execution/DESIGN.md),
 [worked example](iterations/07-asynchronous-local-execution/EXAMPLE.md) and
-[conditional handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) are prepared
-for review. Review the separate process-owner/saved-handle boundary, bootstrap readiness,
-pinned progress discovery and `done` evidence mapping before accepting the plan.
-Exact APIs/protocol remain proposed; no implementation, experiment, delegation, worker
-restart or publication is authorized. Iteration 6's completed GO is not inherited.
+[handoff](iterations/07-asynchronous-local-execution/HANDOFF.md) preserve approved plan/
+provenance, not permission for another turn. Design delivery/status notes are included in
+this requested local checkpoint; no design push requested. Prior checkpoint is `93ef0ce`.
 
 Iteration 6 is implemented, independently accepted and published as `a0aa05d`; all
 six final exact-SHA CI jobs pass on the first run. Read
@@ -1436,8 +1605,8 @@ The [design](iterations/06-local-repository-execution/DESIGN.md),
 plan/provenance, not permission to restart. These delivery and candidate-planning notes
 are included in the requested local checkpoint; no design push is requested. Prior
 planning checkpoint is `0bc75c1`;
-Iteration 5 delivery checkpoint is `26c9afa`. Iteration 7's separately agreed direction
-is above, not implementation approval.
+Iteration 5 delivery checkpoint is `26c9afa`. Iteration 7's separately authorized completed
+turn is above; older candidate-planning statements retain their checkpoint provenance.
 
 Iteration 5 is implemented, independently accepted and published as `0ec769b`;
 all six final exact-SHA CI jobs pass. Read

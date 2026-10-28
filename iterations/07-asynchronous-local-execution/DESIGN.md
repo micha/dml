@@ -1,5 +1,11 @@
 # Iteration 7 candidate design: asynchronous local execution and progress
 
+Current status: the user approved this bounded plan and declared GO, including separate
+saved handle/live application process ownership. Implementation, independent review,
+focused commit/push and exact-SHA CI are complete at `a8d6463`; all six jobs pass. See
+[RESULTS.md](RESULTS.md) and [REVIEW.md](REVIEW.md). The turn is complete and stopped;
+preparation/GO statements below preserve provenance, not permission to restart.
+
 Status: the user agreed to the direction and authorized preparation of the worked
 example, candidate design and handoff. **This plan is not yet approved; implementation,
 worker assignment/restart, experiments, implementation commit/push and CI launch are

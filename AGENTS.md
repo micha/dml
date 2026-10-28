@@ -47,13 +47,25 @@ and `discussion.md` before continuing the discussion. Read the shared
   [review](iterations/06-local-repository-execution/REVIEW.md). This is not permission
   to restart implementation or begin another turn. No extra workers, release/package
   publication, cloud experiments or later feature turn are authorized.
-- Iteration 7's [direction](discussion.md#iteration-7-agreed-direction-asynchronous-execution-and-inspectable-progress)
-  is agreed for asynchronous same-machine execution and inspectable progress through
-  bounded adapter invocations. The user authorized preparing the candidate
-  [plan and handoff](iterations/07-asynchronous-local-execution/HANDOFF.md), now awaiting
-  review/approval. This is planning, not implementation, delegation, worker restart,
-  experiments, commit/push or CI authorization. Review the separate saved-handle/live-
-  process-owner boundary before plan approval. Do not inherit Iteration 6's completed GO.
+- Iteration 7's [plan and handoff](iterations/07-asynchronous-local-execution/HANDOFF.md)
+  are approved for asynchronous same-machine execution and inspectable progress through
+  bounded adapter invocations, with separate saved observation handle/live application
+  process ownership. The user declared GO and authorized implementation by the existing
+  window-2 agent in a new session, coordinator monitoring/independent review and fixes
+  until satisfactory, then focused worker commit/push and exact-SHA CI verification/fixes.
+  This bounded turn is complete and stopped at published `a8d6463`, all six exact-SHA
+  CI jobs successful; see [review](iterations/07-asynchronous-local-execution/REVIEW.md).
+  This is not permission to restart implementation or begin another turn. No extra
+  workers, release/package publication, cloud experiments, detached supervision service
+  or later feature turn are authorized.
+  See [coordination](iterations/07-asynchronous-local-execution/COORDINATION.md).
+- Iteration 8's [plan and handoff](iterations/08-caller-recorded-requests/HANDOFF.md)
+  are approved: A explicitly records Q before launch; B registers imported Q locally
+  and creates only T, reusing asynchronous observation/explicit-ref return. The public
+  seams, atomic two-ref A publication and pinned-Q validation are the bounded plan;
+  illustrative spellings remain refinable. The user requested a local design checkpoint,
+  not implementation, delegation, worker restart, experiment, implementation commit/push
+  or CI authorization. Do not inherit Iteration 7's completed GO.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise
