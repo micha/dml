@@ -42,6 +42,10 @@ Read the shared [glossary](glossary.md) for terminology.
   fresh passing suite, and finite checks do not establish untested guarantees.
 - Validate local Markdown links, section references and whitespace. Cross-repository
   links are orientation links and depend on the documented sibling-checkout layout.
+- Relevant storage-contract changes also require review/update of the informative
+  [LMDB entity diagram](../lmdb-entity-diagram.html), following
+  [visualization maintenance](../documentation-guidelines.md#as-built-visualization-maintenance).
+  Keep it as-implemented and self-contained; never populate it from future design plans.
 
 ## Pre-1.0 development
 

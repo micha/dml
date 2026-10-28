@@ -134,6 +134,10 @@ formatter or linter, defer to its rules and update this section accordingly.
   ownership, and cross-reference patterns.
 - Document new modules with a short overview and usage example.
 - Keep README or docs updated when commands or configuration change.
+- Keep `docs/lmdb-entity-diagram.html` aligned with implemented storage when relevant
+  entities, keys, packed fields, relationships or boundary claims change. Follow
+  [as-built visualization maintenance](docs/documentation-guidelines.md#as-built-visualization-maintenance);
+  design proposals and future APIs are not diagram content.
 - Include links to external systems or services when relevant.
 
 ## OpenCode Slash Commands

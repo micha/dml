@@ -93,6 +93,7 @@ specification below remains design context, not an implementation claim.
 - `docs/documentation-guidelines.md` (How to write and maintain docs)
 - `docs/packaging-and-distribution.md` (Python package layout and release plan)
 - `docs/architecture.md` (Architecture overview)
+- [LMDB entity map](docs/lmdb-entity-diagram.html) (Offline interactive diagram of implemented storage; open in a browser)
 - `docs/core-storage.md` (Native datum codec and local repository API)
 - [docs/spec-next/README.md](docs/spec-next/README.md) (As-built specification)
 - [tests/coverage-exclusions.md](tests/coverage-exclusions.md) (Coverage scope and rationale)

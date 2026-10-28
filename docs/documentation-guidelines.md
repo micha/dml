@@ -76,6 +76,30 @@ Before finishing doc changes, verify:
 - Cross-references point to correct files/sections.
 - Exceptions are explicit, minimal, and justified.
 
+## As-built visualization maintenance
+
+`docs/lmdb-entity-diagram.html` is the maintained, informative visualization of
+**currently implemented LMDB storage**, not a proposed model or a normative schema.
+The as-built contracts in `docs/spec-next/` remain authoritative for technical behavior.
+
+- Review and update the diagram in the same change when implemented key families,
+  persisted entities, packed fields, storage-ID hash inputs, reference relationships,
+  cardinalities, schema version or displayed validation/ownership boundaries change.
+  Changes to application roles need a diagram update only if they affect its displayed
+  claims or storage model.
+- Verify against maintained native sources/public headers, relevant tests and the
+  owning as-built contracts, not old draft specs, design plans or enum names alone.
+  Do not draw planned entities or unsupported APIs as implemented.
+- Distinguish native persisted objects, embedded fields, mutable refs and metadata.
+  Application-level DAG conventions are not additional native entity types; transport
+  files and external resources are not LMDB entities merely because they describe them.
+- Keep the HTML a single self-contained offline file, including its styles/scripts.
+  Repository-local authority/source links are allowed; no CDN/runtime dependency.
+- Keep `tests/python/test_lmdb_entity_diagram.py` current and run its focused checks
+  when changing the diagram or its storage model. These scope/link checks do not replace
+  semantic review of fields, relationships and boundary claims. Check browser behavior
+  when changing rendering or interactions.
+
 ## 9. Current Canonical Ownership (Spec Suite)
 
 - Packed-record model, encoding, hashing, keyspace, validation:
