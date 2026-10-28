@@ -89,11 +89,11 @@ def test_diagram_marks_body_identity_only_for_immutable_objects() -> None:
 def test_diagram_envelope_identity_matches_native_zeroing() -> None:
   html = DIAGRAM.read_text(encoding="utf-8")
   annotations = re.findall(
-    r"\{ field: '[^']*\(u(16|32), byte (\d+)[^']*', hashed: (true|false) \}", html
+    r"\{ offset: (\d+), width: (\d+), label: '[^']+', color: '[^']+', value: '[^']+', hashed: (true|false) \}", html
   )
   assert len(annotations) == 6
-  included = {(int(offset), int(bits) // 8) for bits, offset, hashed in annotations if hashed == "true"}
-  zeroed = {(int(offset), int(bits) // 8) for bits, offset, hashed in annotations if hashed == "false"}
+  included = {(int(offset), int(width)) for offset, width, hashed in annotations if hashed == "true"}
+  zeroed = {(int(offset), int(width)) for offset, width, hashed in annotations if hashed == "false"}
   assert included == {(4, 2), (6, 2), (12, 4)}
   implementation = (ROOT / "src" / "object_id.c").read_text(encoding="utf-8")
   native_zeroed = {
@@ -103,3 +103,45 @@ def test_diagram_envelope_identity_matches_native_zeroing() -> None:
   assert zeroed == native_zeroed == {(0, 4), (8, 4), (16, 4)}
   assert "XXH3_128bits(masked, len)" in implementation
   assert "zeroed, not omitted" in html
+
+
+def test_entity_panels_render_packed_layouts_with_conditional_masking() -> None:
+  html = DIAGRAM.read_text(encoding="utf-8")
+  assert "heading('Overview', 'h2')" in html
+  assert "Storage, not SQL" not in html
+  assert "renderEntityLayout(entity)" in html
+  assert "const masked = hashed && field.hashed === false" in html
+  assert "memoryRows(envelope, entity.hashedFields)" in html
+  assert "memoryRows(bodyLayouts[entity.id])" in html
+  assert "repeating-linear-gradient(45deg" in html
+  assert "repeating-linear-gradient(-45deg" in html
+  for category in ("envelope", "size", "kind", "reference", "name", "data"):
+    assert f".field-{category} {{ --field-color:" in html
+  assert "link.href = `#entity-${target}`" in html
+  assert "event.preventDefault(); select(target)" in html
+  assert "LITERAL → Datum / SUBDAG → DAG', ['datum', 'dag']" in html
+  assert "['NULL', 0" in html
+  assert "['BOOL', 1" in html
+  assert "['I64', 8" in html
+  assert "['F64', 8" in html
+  assert "layoutField('44 + 16i', 16" in html
+  assert "layoutField('44 + 32i', 16" in html
+  assert "layoutField('60 + 32i', 16" in html
+  assert "layoutField('40 + 16i', 16" in html
+  assert "p ← p + 20 + m" in html
+
+
+def test_diagram_has_no_header_footer_or_toolbar_and_retains_keyboard_navigation() -> None:
+  html = DIAGRAM.read_text(encoding="utf-8")
+  assert "<header>" not in html
+  assert "<footer>" not in html
+  assert "  footer {" not in html
+  assert 'class="toolbar"' not in html
+  for removed_id in ("entity-picker", "zoom-in", "zoom-out", "reset"):
+    assert f"getElementById('{removed_id}')" not in html
+    assert f'id="{removed_id}"' not in html
+  assert 'tabindex="0" role="img"' in html
+  assert "svg.addEventListener('keydown'" in html
+  for key in ("+", "-", "0"):
+    assert f"event.key === '{key}'" in html
+  assert "event.key === 'Escape'" in html

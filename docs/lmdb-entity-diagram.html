@@ -8,20 +8,14 @@
   :root { color-scheme: dark; --bg: #10151f; --panel: #192230; --text: #e7edf7; --muted: #aab9cf; --accent: #7bdcc7; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, sans-serif; }
-  header { padding: 20px 28px 16px; border-bottom: 1px solid #334256; }
-  h1 { margin: 0; font-size: 25px; letter-spacing: -.5px; }
-  header p { margin: 5px 0 0; color: var(--muted); }
-  .badge { font-size: 12px; color: var(--accent); border: 1px solid #41695f; border-radius: 20px; padding: 3px 10px; vertical-align: middle; margin-left: 12px; white-space: nowrap; }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; }
   .diagram { position: relative; min-width: 0; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 20px; align-items: center; }
-  button, select { background: var(--panel); color: var(--text); border: 1px solid #4c607a; border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
-  button:hover { border-color: var(--accent); }
-  button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-  .hint { font-size: 12px; color: var(--muted); padding: 0 20px 12px; }
-  #canvas { width: 100%; height: calc(100vh - 207px); min-height: 480px; display: block; background: #121a26; touch-action: none; cursor: grab; }
+  select { background: var(--panel); color: var(--text); border: 1px solid #4c607a; border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  #canvas { width: 100%; height: calc(100vh - 72px); min-height: 480px; display: block; background: #121a26; touch-action: none; cursor: grab; }
+  #canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   #canvas.dragging { cursor: grabbing; }
-  aside { border-left: 1px solid #334256; padding: 24px; overflow-wrap: anywhere; }
+  aside { border-left: 1px solid #334256; padding: 24px; overflow-wrap: anywhere; max-height: 100vh; overflow-y: auto; }
   aside h2 { margin: 0 0 8px; font-size: 23px; }
   aside h3 { margin: 22px 0 6px; font-size: 14px; color: var(--accent); }
   aside p { margin: 8px 0; }
@@ -31,6 +25,25 @@
   a { color: #9bbfff; }
   .note { color: var(--muted); font-size: 13px; }
   .key { background: #101722; padding: 12px; border-radius: 6px; }
+  .memory-layout { margin: 12px 0; }
+  .memory-row { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 8px; margin: 3px 0; }
+  .offset { font: 12px/1.4 ui-monospace, monospace; color: var(--muted); padding-top: 10px; }
+  .memory-field { position: relative; border: 1px solid var(--field-color); border-left-width: 4px; border-radius: 4px; padding: 8px 10px; background: #182331; font-size: 13px; }
+  .memory-field .width { float: right; margin-left: 8px; color: var(--muted); font: 11px/1.8 ui-monospace, monospace; }
+  .memory-field .value { display: block; font: 11px/1.5 ui-monospace, monospace; color: var(--muted); }
+  .memory-field a { color: var(--field-color); font-weight: 600; }
+  .field-envelope { --field-color: #baa6ed; }
+  .field-size { --field-color: #8dbbff; }
+  .field-kind { --field-color: #efc27e; }
+  .field-reference { --field-color: #7bdcc7; }
+  .field-name { --field-color: #eea6c4; }
+  .field-data { --field-color: #b9c5d5; }
+  .masked { background-image: repeating-linear-gradient(45deg, transparent 0 6px, #bac8dd20 6px 8px), repeating-linear-gradient(-45deg, transparent 0 6px, #bac8dd20 6px 8px); }
+  .memory-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11px; margin: 12px 0; }
+  .memory-legend span { border-left: 4px solid var(--field-color); padding-left: 5px; }
+  .repeat { border-left: 2px dashed #536985; padding-left: 8px; }
+  .layout-caption { color: var(--muted); font-size: 11px; }
+  .variant-picker { width: 100%; margin: 8px 0; }
   .entity { cursor: pointer; }
   .entity .card { fill: #1b293c; stroke: #536985; stroke-width: 1.5; }
   .entity .stripe { fill: #81aef0; }
@@ -49,27 +62,14 @@
   .faded { opacity: .17; }
   .edge.active { stroke: var(--accent); stroke-width: 3; }
   .legend { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 20px; color: var(--muted); font-size: 12px; }
-  footer { border-top: 1px solid #334256; padding: 14px 28px; font-size: 12px; color: var(--muted); }
-  @media (max-width: 850px) { main { grid-template-columns: 1fr; } aside { border-left: 0; border-top: 1px solid #334256; } #canvas { height: 65vh; } }
-  @media print { .toolbar, .hint { display: none; } main { display: block; } #canvas { height: 900px; } aside { border: 0; } }
+  @media (max-width: 850px) { main { grid-template-columns: 1fr; } aside { border-left: 0; border-top: 1px solid #334256; max-height: none; } #canvas { height: 65vh; } }
+  @media print { main { display: block; } #canvas { height: 900px; } aside { border: 0; max-height: none; overflow: visible; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>DML / LMDB entity map <span class="badge">Implemented · schema 1</span></h1>
-  <p>One main key/value database. Five immutable object types. Mutable named heads.</p>
-</header>
 <main>
   <section class="diagram" aria-label="Interactive entity diagram">
-    <div class="toolbar">
-      <button id="zoom-in" aria-label="Zoom in">+</button>
-      <button id="zoom-out" aria-label="Zoom out">−</button>
-      <button id="reset">Fit diagram</button>
-      <label for="entity-picker">Inspect</label>
-      <select id="entity-picker"><option value="">Overview</option></select>
-    </div>
-    <div class="hint">Drag to pan · scroll to zoom · select a card for fields and relationships · Escape clears selection</div>
-    <svg id="canvas" viewBox="0 0 1200 1160" role="img" aria-labelledby="svg-title svg-description">
+    <svg id="canvas" viewBox="0 0 1200 1160" tabindex="0" role="img" aria-labelledby="svg-title svg-description">
       <title id="svg-title">DML persisted entity relationships</title>
       <desc id="svg-description">Refs target commits. Commits reference trees and parent commits. Trees embed named DAG entries. DAGs reference root and binding nodes. Literal nodes reference datums; sub-DAG nodes reference DAGs. Composite datums reference other datums. Schema metadata has no object references. Arrow labels count targets per source; referenced targets may be shared. A diamond marks fields hashed into the immutable entity's content ID; a dash marks ref or metadata fields with no content-addressed ID.</desc>
       <defs>
@@ -95,18 +95,7 @@
   </section>
   <aside id="details" aria-live="polite" aria-label="Entity details"></aside>
 </main>
-<footer>
-  Informative as-built visualization, not a live repository browser or a normative schema.
-  Authorities: <a href="spec-next/repository.md">repository &amp; keys</a> ·
-  <a href="spec-next/objects.md">snapshot/history objects</a> ·
-  <a href="spec-next/records.md">records &amp; datums</a>.
-  Implementation: <a href="../src/repo.c">src/repo.c</a>, <a href="../src/object.c">src/object.c</a>,
-  and <a href="../src/object_id.c">src/object_id.c</a>.
-  Identity authority: <a href="spec-next/records.md#record-identity">record hashing</a>.
-  The diagram works offline; source links require the repository alongside this file.
-  <a href="documentation-guidelines.md#as-built-visualization-maintenance">Maintenance: update with implemented storage changes, not design proposals.</a>
-</footer>
-<noscript><p>Enable JavaScript to render the entity cards and use the interactive diagram. The linked specification describes the same storage model.</p></noscript>
+<noscript><p>Enable JavaScript to render the entity cards and use the interactive diagram.</p></noscript>
 <script>
 'use strict';
 // Informative projection of src/repo.c, src/object.c and docs/spec-next/{repository,objects,records}.md.
@@ -152,17 +141,16 @@ const entities = [
 // Full-record storage identity: all immutable body bytes are hashed, including
 // counts, name lengths, names, ordered arrays and raw referenced IDs. Not a reuse key.
 const identityEnvelope = [
-  { field: 'magic (u32, byte 0)', hashed: false },
-  { field: 'record format version (u16, byte 4)', hashed: true },
-  { field: 'record type (u16, byte 6)', hashed: true },
-  { field: 'total record length (u32, byte 8)', hashed: false },
-  { field: 'reserved flags (u32, byte 12; currently zero)', hashed: true },
-  { field: 'checksum (u32, byte 16)', hashed: false }
+  { offset: 0, width: 4, label: 'magic', color: 'envelope', value: 'u32 · 0x314c4d44', hashed: false },
+  { offset: 4, width: 2, label: 'format version', color: 'envelope', value: 'u16 · 1', hashed: true },
+  { offset: 6, width: 2, label: 'record type', color: 'kind', value: 'u16', hashed: true },
+  { offset: 8, width: 4, label: 'total record length', color: 'size', value: 'u32 · complete record size', hashed: false },
+  { offset: 12, width: 4, label: 'reserved flags', color: 'envelope', value: 'u32 · 0', hashed: true },
+  { offset: 16, width: 4, label: 'checksum', color: 'envelope', value: 'u32 · 0', hashed: false }
 ];
 const svg = document.getElementById('canvas');
 const cards = document.getElementById('entities');
 const details = document.getElementById('details');
-const picker = document.getElementById('entity-picker');
 const ns = 'http://www.w3.org/2000/svg';
 function svgElement(tag, attributes, text) {
   const element = document.createElementNS(ns, tag);
@@ -171,7 +159,7 @@ function svgElement(tag, attributes, text) {
   return element;
 }
 for (const entity of entities) {
-  const group = svgElement('g', { class: `entity ${entity.category || ''}`, transform: `translate(${entity.x} ${entity.y})`,
+  const group = svgElement('g', { id: `entity-${entity.id}`, class: `entity ${entity.category || ''}`, transform: `translate(${entity.x} ${entity.y})`,
     tabindex: '0', role: 'button', 'aria-label': `Inspect ${entity.title}`, 'aria-pressed': 'false', 'data-id': entity.id });
   group.append(svgElement('rect', { class: 'card', width: 280, height: 200, rx: 12 }));
   group.append(svgElement('rect', { class: 'stripe', x: 16, y: 20, width: 4, height: 26, rx: 2 }));
@@ -185,8 +173,6 @@ for (const entity of entities) {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(entity.id); }
   });
   cards.append(group);
-  const option = document.createElement('option');
-  option.value = entity.id; option.textContent = entity.title; picker.append(option);
 }
 function paragraph(text, className = '') {
   const element = document.createElement('p'); element.textContent = text; element.className = className; return element;
@@ -199,9 +185,135 @@ function list(items) {
   for (const text of items) { const item = document.createElement('li'); item.textContent = text; element.append(item); }
   return element;
 }
+// Offsets describe packed LMDB values, not native C structs. Symbolic offsets
+// are relative to the start of each repeated entry; rows are not drawn to scale.
+function layoutField(offset, width, label, color, value = '', targets = []) {
+  return { offset, width, label, color, value, targets };
+}
+const bodyLayouts = {
+  ref: [layoutField(0, 16, 'target commit ID', 'reference', 'raw ID', ['commit'])],
+  schema: [layoutField(20, 4, 'schema version', 'kind', 'u32 · 1')],
+  node: [layoutField(20, 4, 'node kind', 'kind', 'u32 · 1 = LITERAL, 2 = SUBDAG'),
+    layoutField(24, 16, 'target ID', 'reference', 'LITERAL → Datum / SUBDAG → DAG', ['datum', 'dag'])],
+  dag: [layoutField(20, 16, 'root node ID', 'reference', 'raw ID', ['node']),
+    layoutField(36, 4, 'binding count', 'size', 'u32 · n')],
+  tree: [layoutField(20, 4, 'entry count', 'size', 'u32 · n')],
+  commit: [layoutField(20, 16, 'tree ID', 'reference', 'raw ID', ['tree']),
+    layoutField(36, 4, 'parent count', 'size', 'u32 · n')],
+  datum: [layoutField(20, 4, 'datum kind', 'kind', 'u32 · 1…10'),
+    layoutField(24, 8, 'payload length', 'size', 'u64 · bytes after offset 40'),
+    layoutField(32, 8, 'payload offset', 'size', 'u64 · 40')]
+};
+const datumKinds = [
+  ['NULL', 0, 'empty'], ['BOOL', 1, '0 or 1'], ['I64', 8, 'signed integer'],
+  ['F64', 8, 'canonical IEEE-754 binary64'], ['BYTES', 'L', 'uninterpreted bytes'],
+  ['STRING', 'L', 'NFC UTF-8'], ['URI', 'L', 'canonical absolute URI'],
+  ['LIST', null, 'ordered; duplicates allowed'], ['SET', null, 'sorted unique IDs'],
+  ['MAP', null, 'pairs sorted by unique key IDs']
+];
+function memoryRows(fields, hashed = false) {
+  const diagram = document.createElement('div'); diagram.className = 'memory-layout';
+  for (const field of fields) {
+    const row = document.createElement('div'); row.className = 'memory-row';
+    const offset = document.createElement('div'); offset.className = 'offset';
+    offset.textContent = `+${field.offset}`;
+    const masked = hashed && field.hashed === false;
+    const block = document.createElement('div');
+    block.className = `memory-field field-${field.color}${masked ? ' masked' : ''}`;
+    block.setAttribute('data-offset', field.offset);
+    block.setAttribute('data-width', field.width);
+    block.setAttribute('data-masked', String(masked));
+    const width = document.createElement('span'); width.className = 'width'; width.textContent = `${field.width} B`;
+    block.append(width);
+    const label = document.createElement('span'); label.textContent = field.label; block.append(label);
+    for (const target of field.targets || []) {
+      const link = document.createElement('a'); link.href = `#entity-${target}`;
+      link.textContent = ` → ${entities.find(item => item.id === target).title}`;
+      link.setAttribute('data-target', target);
+      link.addEventListener('click', event => { event.preventDefault(); select(target); });
+      block.append(link);
+    }
+    const value = document.createElement('span'); value.className = 'value';
+    value.textContent = `${field.value}${masked ? ' · masked → 0 before hashing' : ''}`;
+    block.append(value); row.append(offset, block); diagram.append(row);
+  }
+  return diagram;
+}
+function repeatedLayout(title, fields) {
+  const group = document.createElement('div'); group.className = 'repeat';
+  group.append(heading(title), memoryRows(fields)); return group;
+}
+function datumPayload(kindIndex) {
+  const [kind, width, description] = datumKinds[kindIndex];
+  const container = document.createElement('div');
+  container.append(heading(`${kind} payload · kind ${kindIndex + 1}`));
+  if (width !== null) {
+    container.append(memoryRows([layoutField(40, width, 'payload', 'data', description)]));
+    return container;
+  }
+  container.append(memoryRows([layoutField(40, 4, 'item count', 'size', 'u32 · n')]));
+  const fields = kind === 'MAP'
+    ? [layoutField('44 + 32i', 16, 'key datum ID', 'reference', 'raw ID', ['datum']),
+      layoutField('60 + 32i', 16, 'value datum ID', 'reference', 'raw ID', ['datum'])]
+    : [layoutField('44 + 16i', 16, 'element datum ID', 'reference', 'raw ID', ['datum'])];
+  container.append(repeatedLayout(`Repeat n times · i = 0…n−1 · ${description}`, fields));
+  return container;
+}
+function renderEntityLayout(entity) {
+  details.append(heading(entity.title, 'h2'));
+  const key = document.createElement('code'); key.textContent = entity.key;
+  const keyBox = document.createElement('div'); keyBox.className = 'key'; keyBox.append(key);
+  details.append(heading('LMDB key · outside value / hash input'), keyBox,
+    heading(`Packed value · ${entity.size}`),
+    paragraph('Byte offsets from value start · little-endian integers · no padding · schematic rows, not to scale', 'layout-caption'));
+  const legend = document.createElement('div'); legend.className = 'memory-legend';
+  for (const [color, text] of [['envelope', 'Envelope'], ['size', 'Lengths / counts'], ['kind', 'Type / kind'],
+    ['reference', 'Referenced IDs'], ['name', 'Names'], ['data', 'Value bytes']]) {
+    const swatch = document.createElement('span'); swatch.className = `field-${color}`; swatch.textContent = text; legend.append(swatch);
+  }
+  details.append(legend);
+  details.append(paragraph(entity.hashedFields
+    ? 'Cross-hatched = zeroed before hashing; all other value bytes are included in XXH3-128. Fields are zeroed, not removed.'
+    : 'No content ID computed for this value; no fields are hash-masked.', 'layout-caption'));
+  if (entity.id !== 'ref') {
+    const type = { schema: 1, datum: 2, node: 3, dag: 4, tree: 5, commit: 6 }[entity.id];
+    const envelope = identityEnvelope.map(field => ({ ...field, value: field.offset === 6 ? `u16 · ${type}` : field.value }));
+    details.append(heading('Envelope · bytes 0–19'), memoryRows(envelope, entity.hashedFields));
+  }
+  const body = memoryRows(bodyLayouts[entity.id]);
+  details.append(heading(entity.id === 'ref' ? 'Raw value · no envelope' : 'Body'), body);
+  if (entity.id === 'dag' || entity.id === 'tree') {
+    const dag = entity.id === 'dag';
+    details.append(repeatedLayout(`Repeat n ${dag ? 'bindings' : 'entries'} · p starts at ${dag ? 40 : 24}`,
+      [layoutField('p', 4, 'name length', 'size', 'u32 · m (1…128)'),
+        layoutField('p + 4', 'm', 'name bytes', 'name', 'ASCII · no terminator'),
+        layoutField('p + 4 + m', 16, dag ? 'node ID' : 'DAG ID', 'reference', 'raw ID', [dag ? 'node' : 'dag'])]),
+      paragraph('Next entry: p ← p + 20 + m · names strictly sorted / unique', 'layout-caption'));
+  }
+  if (entity.id === 'commit') details.append(repeatedLayout('Repeat n parents · i = 0…n−1 · ordered, no duplicates',
+    [layoutField('40 + 16i', 16, 'parent commit ID', 'reference', 'raw ID', ['commit'])]));
+  if (entity.id === 'datum') {
+    const label = document.createElement('label'); label.htmlFor = 'datum-kind'; label.textContent = 'Payload layout';
+    const variants = document.createElement('select'); variants.id = 'datum-kind'; variants.className = 'variant-picker';
+    datumKinds.forEach(([kind], index) => {
+      const option = document.createElement('option'); option.value = String(index); option.textContent = `${index + 1} · ${kind}`; variants.append(option);
+    });
+    variants.value = '2';
+    const payload = document.createElement('div');
+    function showKind(index) {
+      const fields = bodyLayouts.datum.map((field, position) => position === 0
+        ? { ...field, value: `u32 · ${index + 1} = ${datumKinds[index][0]}` } : field);
+      body.replaceChildren(memoryRows(fields));
+      payload.replaceChildren(datumPayload(index));
+    }
+    showKind(2);
+    variants.addEventListener('change', () => showKind(Number(variants.value)));
+    details.append(label, variants, payload);
+  }
+  const source = document.createElement('a'); source.href = `spec-next/${entity.source}`; source.textContent = 'Layout & rules specification →'; details.append(source);
+}
 function select(id = '') {
   const entity = entities.find(item => item.id === id);
-  picker.value = entity ? id : '';
   const related = new Set(entity ? [id] : entities.map(item => item.id));
   document.querySelectorAll('#edges > g').forEach(edge => {
     const active = !entity || edge.dataset.from === id || edge.dataset.to === id;
@@ -215,36 +327,22 @@ function select(id = '') {
     card.setAttribute('aria-pressed', String(!!entity && card.dataset.id === id));
   });
   details.replaceChildren();
+  details.scrollTop = 0;
   if (!entity) {
-    details.append(heading('Storage, not SQL', 'h2'), paragraph('Select an entity to inspect its key, packed fields, and direct relationships.'),
+    details.append(heading('Overview', 'h2'), paragraph('Select an entity to inspect its packed byte layout and linked reference fields.'),
+      paragraph('Drag to pan · scroll to zoom · focus the diagram and use + / − to zoom, 0 to fit · Escape returns to Overview', 'layout-caption'),
       heading('Physical layout'), paragraph('All seven key families coexist in LMDB’s main database. These cards are logical entity types, not SQL tables or named LMDB databases.'),
       heading('Content identity'), paragraph('The five immutable object types use 16-byte XXH3-128 content IDs. Keys use 32 lowercase hex characters; embedded references use raw 16-byte IDs.'),
       heading('Storage identity · record facet'), paragraph('Here storage identity means the implemented full-record/content ID, not a computational reuse identity. ◆ marks every body field hashed for Datum, Node, DAG, Tree and Commit. Refs and schema metadata have no content-addressed entity ID (—).'),
-      heading('Hash domain'), list(identityEnvelope.map(item => `${item.hashed ? '◆ Included' : '○ Zeroed before hashing'}: ${item.field}`)),
+      heading('Hash domain'), list(identityEnvelope.map(item => `${item.hashed ? '◆ Included' : '○ Zeroed before hashing'}: ${item.label} (${item.width} bytes, byte ${item.offset})`)),
       paragraph('XXH3-128 hashes the entire validated packed byte sequence after zeroing magic, total-record-length and checksum bytes; those positions are zeroed, not omitted. The sequence length still matters. Record format version, record type, reserved flags and the complete body remain included. Names, embedded counts/lengths, ordering and raw 16-byte referenced IDs contribute. The LMDB key/path and the entity ID itself are not hash inputs.'),
       heading('Packed fields'), paragraph('Object records have a 20-byte envelope. Entries, bindings, and parent lists are embedded arrays; they have no separate keys or secondary indexes.'),
       heading('Validation & publication'), paragraph('The C storage layer checks direct references and their expected types and content IDs, not transitive graph integrity. Insert referenced children first. One write transaction can publish objects and a ref atomically.'),
       heading('Scope'), paragraph('Execution requests, attempts, and results use ordinary DAGs built from these object types, not additional native LMDB entities. Exchange/transfer packets are external transport files, not stored entity types. Tombstone recognition exists on reads, but no public tombstone writer or excision operation is implemented.', 'note'));
     return;
   }
-  const key = document.createElement('code'); key.textContent = entity.key;
-  const keyBox = document.createElement('div'); keyBox.className = 'key'; keyBox.append(key);
-  details.append(heading(entity.title, 'h2'), paragraph(entity.summary), heading('LMDB key'), keyBox,
-    paragraph(entity.size, 'note'), heading('Stored body / key fields'), list(entity.fields.map(field => `${entity.hashedFields ? '◆ Hashed' : '— No content ID'}: ${field}`)),
-    heading('Storage identity · record facet'),
-    paragraph(entity.hashedFields
-      ? 'Every displayed body field contributes to this entity’s full-record/content ID, including embedded counts, name-length prefixes, name bytes, ordered arrays and referenced raw IDs. Referenced records are not recursively expanded into the hash input; their IDs contribute. The storage key/path and this entity’s own ID do not.'
-      : entity.id === 'ref'
-        ? 'No content-addressed ref ID is computed. The name locates a mutable key; its value is the target Commit ID, computed from that commit’s record—not from the ref name or target field.'
-        : 'No content-addressed schema-metadata ID is computed. This record is stored under the fixed meta/schema key; schema_version is validated but not used to derive an entity ID.'),
-    ...(entity.hashedFields ? [heading('Common envelope hash inputs'),
-      list(identityEnvelope.map(item => `${item.hashed ? '◆ Included' : '○ Zeroed before hashing'}: ${item.field}`)),
-      paragraph('The entire validated packed byte sequence is hashed with XXH3-128 after those three envelope fields are zeroed, not removed. Record format version, type, reserved flags and all body bytes remain included. This is storage identity, not a reuse key.', 'note')] : []),
-    heading('Outgoing & incoming relationships'), list(entity.links), heading('Rules & boundaries'), list(entity.rules));
-  const source = document.createElement('a'); source.href = `spec-next/${entity.source}`; source.textContent = 'Read authoritative specification →';
-  details.append(source);
+  renderEntityLayout(entity);
 }
-picker.addEventListener('change', () => select(picker.value));
 let view = { x: 0, y: 0, width: 1200, height: 1160 };
 function renderView() { svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.width} ${view.height}`); }
 function zoom(factor, anchor = { x: view.x + view.width / 2, y: view.y + view.height / 2 }) {
@@ -260,9 +358,13 @@ function point(event) {
 svg.addEventListener('wheel', event => {
   event.preventDefault(); zoom(Math.exp(Math.max(-200, Math.min(200, event.deltaY)) * .002), point(event));
 }, { passive: false });
-document.getElementById('zoom-in').addEventListener('click', () => zoom(.8));
-document.getElementById('zoom-out').addEventListener('click', () => zoom(1.25));
-document.getElementById('reset').addEventListener('click', () => { view = { x: 0, y: 0, width: 1200, height: 1160 }; renderView(); });
+svg.addEventListener('keydown', event => {
+  if (event.key === '+' || event.key === '=') { event.preventDefault(); zoom(.8); }
+  else if (event.key === '-') { event.preventDefault(); zoom(1.25); }
+  else if (event.key === '0') {
+    event.preventDefault(); view = { x: 0, y: 0, width: 1200, height: 1160 }; renderView();
+  }
+});
 let drag = null;
 let suppressClick = false;
 svg.addEventListener('pointerdown', event => {
