@@ -50,6 +50,13 @@ The additive [caller-request contract](spec-next/caller-requests.md) owns Q-only
 public local request builder/imported-Q first registration and exact pinned-Q validation;
 exchange never calls private local preparation or manufactures operational reservation refs.
 
+The separately imported `daggerml.ssh` and fixed installed `ssh_worker` transport only
+caller-Q jobs over explicit SSH stage/execute/fetch. Public exchange job reading and unchanged
+execute/receive remain authoritative; no private local/transfer/native codec is used.
+Its [contract](spec-next/ssh-execution.md) separates local-client reaping from remote lifetime
+and recorded scratch cleanup from local Docker acceptance-fixture retirement. No Docker
+runtime dependency or native storage entity is added.
+
 ## Technical navigation
 
 Start with [spec-next/README.md](spec-next/README.md) for the implemented contract:
@@ -65,6 +72,8 @@ Start with [spec-next/README.md](spec-next/README.md) for the implemented contra
   complete typed object closure and atomic import/ref behavior.
 - [Execution across local repositories](spec-next/repository-execution.md): explicit
   prepare/execute/receive, selected-history validation and return publication.
+- [Synchronous SSH execution](spec-next/ssh-execution.md): strict endpoint/transport,
+  fixed helper and unchanged exact-Q packet reception.
 - [Inspection CLI](spec-next/cli.md): grammar, traversal and presentation.
 - [Packaging](packaging-and-distribution.md): shared native builds and installed entry paths.
 - [Glossary](spec-next/glossary.md): shared vocabulary.

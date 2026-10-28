@@ -179,6 +179,8 @@ py.install_sources(
   'python/daggerml/daggerml/transfer.py',
   'python/daggerml/daggerml/exchange.py',
   'python/daggerml/daggerml/exchange_worker.py',
+  'python/daggerml/daggerml/ssh.py',
+  'python/daggerml/daggerml/ssh_worker.py',
   'python/daggerml/daggerml/_core.pyi',
   'python/daggerml/daggerml/py.typed',
   subdir: 'daggerml', install_tag: 'python-runtime',

@@ -35,6 +35,7 @@ __all__ = [
     "record_exchange_request",
     "ReceivedRun",
     "ExchangeError",
+    "read_exchange_spec",
     "prepare_exchange",
     "execute_exchange",
     "receive_exchange",
@@ -228,6 +229,11 @@ def _job(workspace):
         JOB_FORMAT,
     )
     return _spec_values(document)
+
+
+def read_exchange_spec(workspace) -> ExchangeSpec:
+    """Read one bounded strict job into an owned description; never dispatch."""
+    return _job(_path(workspace))
 
 
 def _spec_values(document):

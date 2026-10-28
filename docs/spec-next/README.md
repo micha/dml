@@ -47,6 +47,7 @@ flowchart TD
     EXCHANGE["repository-execution.md<br/>Pinned local A-B-A steps and explicit validated return"]
     REQUEST["caller-requests.md<br/>Explicit caller Q and imported-Q first attempt"]
     ASYNC["asynchronous-execution.md<br/>Owned worker launch and immutable progress packets"]
+    SSH["ssh-execution.md<br/>Strict SSH stage/invoke/fetch and local-client ownership"]
     CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
     PACK["../packaging-and-distribution.md<br/>Native artifacts and local builds"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
@@ -70,6 +71,10 @@ flowchart TD
     ASYNC --> EXCHANGE
     ASYNC --> LOCAL
     ASYNC --> TRANSFER
+    README --> SSH
+    SSH --> EXCHANGE
+    SSH --> REQUEST
+    SSH --> LOCAL
     README --> CLI
     README --> PACK
     PY --> REPO
@@ -119,6 +124,7 @@ flowchart TD
 | One pinned step across local repositories, retained workspaces and selected-completion return validation | [repository-execution.md](repository-execution.md) |
 | Explicit caller request recording, imported-Q first registration and exact Cq/Q exchange selection | [caller-requests.md](caller-requests.md) |
 | Saved observation identity, live worker ownership, coherent progress discovery and immutable P/U/F packets | [asynchronous-execution.md](asynchronous-execution.md) |
+| Caller-Q synchronous SSH transport, fixed helper and client/retained-workspace ownership | [ssh-execution.md](ssh-execution.md) |
 | Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
 | Native linking, packaged executable, build/install and distribution paths | [Packaging and distribution](../packaging-and-distribution.md) |
 
@@ -149,6 +155,9 @@ flowchart TD
 - Additive asynchronous launch/observe/receive with separate application-owned live
   process and saved handle, coherent pinned P/U/F packets and independent explicit-ref
   reception, without turning provisional publication/unknown history into final success.
+- A separately imported caller-Q-only synchronous SSH layer/fixed installed helper for
+  bounded stage/execute/fetch, preserving exact request and existing atomic explicit-ref
+  receive, with strict endpoint/host-key configuration and separate fixture ownership.
 - A native inspection CLI and Python console forwarding to the bundled executable,
   with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
   all-parent history traversal.
@@ -181,6 +190,7 @@ and [Iteration 4 results](../../../dml-design/iterations/04-local-recorded-execu
 and [Iteration 5 results](../../../dml-design/iterations/05-pinned-snapshot-transfer/RESULTS.md)
 and [Iteration 6 results](../../../dml-design/iterations/06-local-repository-execution/RESULTS.md)
 and [Iteration 7 results](../../../dml-design/iterations/07-asynchronous-local-execution/RESULTS.md)
-and [Iteration 8 results](../../../dml-design/iterations/08-caller-recorded-requests/RESULTS.md).
+and [Iteration 8 results](../../../dml-design/iterations/08-caller-recorded-requests/RESULTS.md)
+and [Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md).
 If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

@@ -33,6 +33,11 @@ The additive [caller-request contract](../../docs/spec-next/caller-requests.md) 
 [finite caller-Q story](../../examples/caller_requests.py) record Q before launch under
 atomic explicit refs, then register the imported exact Q and create only T in fresh B.
 
+The separately imported [SSH layer](../../docs/spec-next/ssh-execution.md) and
+[endpoint-driven story](../../examples/ssh_execution.py) synchronously stage/invoke/fetch
+caller-Q jobs through a fixed installed helper, then use unchanged exact-Q receive.
+Docker is separate local test support, never a package/runtime dependency.
+
 ## Local build
 
 Build **from the repository root**, not this source directory:

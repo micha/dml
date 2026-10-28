@@ -25,7 +25,7 @@ from that subdirectory. Maintained Python/native binding sources still live ther
 The `python-runtime` Meson install tag selects only:
 
 - `daggerml/__init__.py`, `local.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
-  `_core.pyi`, `py.typed`;
+  `ssh.py`, `ssh_worker.py`, `_core.pyi`, `py.typed`;
 - the linked `_core` extension;
 - the native `daggerml/_bin/dml` (`dml.exe` on Windows).
 
@@ -81,6 +81,10 @@ installed worker while short-lived clients observe immutable P/U/F packets. The
 boundary; the example child is captured source, not an installed runtime/fault hook. The [caller-Q story](../examples/caller_requests.py) uses the
 same installed modules/worker with explicit prelaunch request recording and exact-Q
 first attempt; its [owning contract](spec-next/caller-requests.md) defines that delta.
+The [SSH story](../examples/ssh_execution.py) uses installed explicit endpoint-driven
+stage/execute/fetch and unchanged exact-Q receive; its [SSH contract](spec-next/ssh-execution.md)
+owns transport/client ownership. Docker/Nix/key/image/private-loss fixture support under
+[tests/ssh](../tests/ssh/README.md) is never packaged or imported by normal runtime/default tests.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory
 workloads to the C tests; [coverage/memory accounting](../tests/coverage-exclusions.md)

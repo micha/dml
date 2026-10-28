@@ -12,6 +12,8 @@ handles/values, [repository](repository.md) storage and [CLI](cli.md) inspection
 Vocabulary follows the [glossary](glossary.md). The additive
 [asynchronous contract](asynchronous-execution.md) owns saved handles/live worker launch,
 bootstrap readiness and immutable initial/publication/completion observation packets.
+The separate [SSH contract](ssh-execution.md) owns caller-Q-only synchronous network
+transport/fixed invocation; its fetch candidates use this document's unchanged receive.
 Normative sections describe implemented
 behavior; example orchestration is informative. The additive [caller-request contract](caller-requests.md)
 owns explicit Q-only A recording, public imported-Q first registration and the exact
@@ -22,10 +24,11 @@ Cq/Q selection delta in both return paths. Fresh-Q-in-B behavior below is the de
 
 ```python
 from daggerml.exchange import (
-    prepare_exchange, execute_exchange, receive_exchange,
+    prepare_exchange, read_exchange_spec, execute_exchange, receive_exchange,
     ExchangeSpec, ReceivedRun, ExchangeError,
 )
 
+read_exchange_spec(workspace) -> ExchangeSpec
 prepare_exchange(repository_path, *, commit: ObjectId, binding_name: str,
                  inputs_name: str, intent_uri: str, worker_ref: str,
                  workspace, request: Optional[ObjectId] = None) -> ExchangeSpec
@@ -33,6 +36,10 @@ execute_exchange(workspace, *, map_size: int = 0) -> LocalRun
 receive_exchange(repository_path, *, workspace, expected: ExchangeSpec,
                  ref: str, map_size: int = 0) -> ReceivedRun
 ```
+
+`read_exchange_spec` promotes the existing bounded strict job reader and returns an owned
+`ExchangeSpec`. It reads only `job.json`, does not inspect/import B, dispatch, mutate refs or
+validate repository history. Both original fresh-Q and caller-Q descriptions remain readable.
 
 All stages close their own repository handles. Callers MUST close other handles for
 that physical repository first. Preparation/receive require initialized caller A;

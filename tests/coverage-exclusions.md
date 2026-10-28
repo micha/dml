@@ -256,6 +256,33 @@ sacrificed. Genuine production-limit post-F overflow remains separate from scale
 substituted faults. Installed outside-checkout provenance/story and mutation gaps/
 selected probes are qualified in [Iteration 8 results](../../dml-design/iterations/08-caller-recorded-requests/RESULTS.md).
 
+## Iteration 9 SSH population
+
+The separately imported SSH client/fixed helper and endpoint-driven example remain in the
+unchanged Python source gate. No new exclusion, source omission, suppression, weakened
+threshold or reduced boundary input. Host helper/statement coverage includes strict endpoint/
+framing, exact owned job parsing, guard and client ownership/IO errors, including explicit
+retained local Popen when shutdown disposition cannot be established. It is not every Python
+branch or instrumented installed SSH/container execution. Default tests never start Docker.
+
+The separately mandatory [installed local gate](ssh/README.md) uses actual fixed helper/SSH
+streams and source/native/runtime provenance, strict host-key/authentication, quoted remote
+paths, independent typed all-parent/every-byte oracles and fresh endpoint-offline reception.
+Private finite remote substitutions pause before computational spawn or after actual child
+reaping, release gates/prove owned-writer disposition on all error paths and retain blockers,
+not installed fault hooks or arbitrary remote-lifetime guarantees. The approved loopback-only
+host-network fixture is not network-namespace isolation/second-host evidence.
+
+Fetched candidates additionally exercise successful genuinely new actual-A puts/readback
+before late different/raw refs, real small-map failure and private consuming-commit failure;
+validation-store/preexisting Q rows do not count. Fresh complete typed/raw/compact exact-byte
+oracles retain whole-batch rollback with comparable physical layout. Actual A pre/postcommit
+process barriers distinguish absent batch versus complete import despite response loss.
+Real unchanged production 4 MiB+1 post-F export overflow retains B completion without a
+successful packet. Existing native/binding/141 CLI memory workloads and runtime/finalizer
+qualifications remain; actual commands/provenance/mutation/profile/platform/trust/fixture
+retention distinctions belong to [Iteration 9 results](../../dml-design/iterations/09-ssh-container-execution/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

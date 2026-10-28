@@ -39,6 +39,10 @@ build.
 CI uses `scripts/check.sh -c`: coverage reports are informational, while build,
 test, and report-generation failures still fail the job.
 
+The explicit [installed local SSH/container gate](tests/ssh/README.md) is separately mandatory
+for SSH acceptance; default checks/imports never start Docker or an SSH service. Its approved
+host-network fixture is loopback-only and has no shared project/exchange mounts.
+
 Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
 targets `build/check/test_version` by default when present.
 
@@ -87,6 +91,10 @@ from its live process owner and retrieve immutable initial/publication/completio
 The additive [caller-request contract](docs/spec-next/caller-requests.md) and
 [caller-Q story](examples/caller_requests.py) explicitly record Q before launch,
 then create only T in fresh B while preserving exact Q and caller submission refs.
+The separate [SSH contract](docs/spec-next/ssh-execution.md) and
+[endpoint-driven story](examples/ssh_execution.py) add synchronous caller-Q stage/execute/fetch
+through a fixed installed helper, keeping strict host-key checks, unknown outcomes and
+unchanged exact-Q explicit-ref reception. Docker is local acceptance support only.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
