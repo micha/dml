@@ -229,6 +229,33 @@ binding/141 native CLI memory workloads remain separate from installed process-m
 Python mutation evidence. Commands, provenance, faults and remaining qualifications belong
 to [Iteration 7 results](../../dml-design/iterations/07-asynchronous-local-execution/RESULTS.md).
 
+## Iteration 8 caller-request population
+
+Public local request construction/first registration, explicit exchange recording and
+pinned-Q mode plus the maintained caller story remain in the unchanged source gate.
+No new exclusion, source omission, suppression, reduced oversized input or threshold
+change. Host statements are not all Python branches or installed-process coverage.
+
+Successful genuinely new actual-A Q/Cq puts/readback precede late two-ref, real native
+map-full and substituted consuming-commit/description-allocation failure. Successful
+new B T/P puts precede late reservation-create failure without spawn. Private raw-ref
+early-read substitutions exercise late native create against actual malformed keys;
+ordinary malformed-ref reads also retain their early rejection. Whole-file equality
+preserves raw corruption; fresh independent typed readers check all old/new records.
+Real recording-only pre/postcommit barriers distinguish no batch from complete Q/Cq
+publication despite response loss, without automatic re-recording.
+
+Both synchronous F and asynchronous P/U/F reject a genuinely typed-complete P parented
+by expected Cq whose T points to another matching Q while expected Q remains in its
+tree. This association oracle is distinct from foreign-Cq/missing-base rejection.
+All-parent breadth-first typed-byte oracles, previous Q/T history, coherent actual ref
+races, concurrent readers, validation cleanup before A writes and actual new-A return
+rollback/response-loss remain exercised in both modes. Real finite worker barriers
+pause before child spawn or after actual reaping; no live computational child is
+sacrificed. Genuine production-limit post-F overflow remains separate from scaled or
+substituted faults. Installed outside-checkout provenance/story and mutation gaps/
+selected probes are qualified in [Iteration 8 results](../../dml-design/iterations/08-caller-recorded-requests/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

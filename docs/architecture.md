@@ -46,6 +46,9 @@ storage and atomic explicit-ref return to A without moving existing heads.
 Its additive [asynchronous contract](spec-next/asynchronous-execution.md) separates saved
 observation identity/live worker ownership and pins validated P/U/F packets through
 coherent public storage reads, without another executor or detached supervision service.
+The additive [caller-request contract](spec-next/caller-requests.md) owns Q-only A recording,
+public local request builder/imported-Q first registration and exact pinned-Q validation;
+exchange never calls private local preparation or manufactures operational reservation refs.
 
 ## Technical navigation
 

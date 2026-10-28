@@ -13,6 +13,8 @@ path, workspace, expected_file, marker, stage = sys.argv[1:]
 values = json.loads(Path(expected_file).read_text(encoding="utf-8"))
 for key in ("commit", "binding", "inputs"):
     values[key] = d.ObjectId.from_hex(values[key])
+if values.get("request") is not None:
+    values["request"] = d.ObjectId.from_hex(values["request"])
 expected = ex.ExchangeSpec(**values)
 
 
@@ -30,7 +32,7 @@ if stage == "unknown":
     )  # Pre-dispatch committed, no child spawned.
     ex.execute_exchange(workspace)
 elif stage == "worker-done":
-    original = local.run_step
+    original = local.run_step if expected.request is None else local.run_request
 
     def done(*args, **kwargs):
         result = original(
@@ -39,7 +41,10 @@ elif stage == "worker-done":
         barrier()
         return result
 
-    local.run_step = done
+    if expected.request is None:
+        local.run_step = done
+    else:
+        local.run_request = done
     ex.execute_exchange(workspace)
 elif stage == "caller":
     # Separate real worker process completed/reaped before caller pauses. The
@@ -86,6 +91,7 @@ else:
         global puts
         result = original_put(self, kind, record)
         if active and (kind, result) in new:
+            assert self.get_record(kind, result) == record
             puts += 1
             if stage == "receive-pre" and puts == 3:
                 barrier()
@@ -94,6 +100,7 @@ else:
     def committing(self):
         original_commit(self)
         if active and stage == "receive-post":
+            assert puts >= 3
             barrier()
 
     transfer.import_commit = importing

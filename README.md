@@ -84,6 +84,9 @@ under a caller-chosen ref while leaving A's existing heads alone.
 The additive [asynchronous contract](docs/spec-next/asynchronous-execution.md) and
 [finite application story](examples/asynchronous_execution.py) separate a saved handle
 from its live process owner and retrieve immutable initial/publication/completion packets.
+The additive [caller-request contract](docs/spec-next/caller-requests.md) and
+[caller-Q story](examples/caller_requests.py) explicitly record Q before launch,
+then create only T in fresh B while preserving exact Q and caller submission refs.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

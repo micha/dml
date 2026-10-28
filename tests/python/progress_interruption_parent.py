@@ -33,13 +33,16 @@ elif stage == "publication":
     local._finalize = lambda *a, **k: barrier()
     ex.execute_exchange(h.workspace)
 elif stage == "completion":
-    original = local.run_step
+    original = local.run_step if h.expected.request is None else local.run_request
 
     def done(*a, **k):
         original(*a, **k)  # real reaping, cleanup, final storage commit
         barrier()
 
-    local.run_step = done
+    if h.expected.request is None:
+        local.run_step = done
+    else:
+        local.run_request = done
     ex.execute_exchange(h.workspace)
 else:
     original_import, original_put, original_commit = (
@@ -78,6 +81,7 @@ else:
     def committing(self):
         original_commit(self)
         if active and stage == "receive-post":
+            assert puts >= 3
             barrier()
 
     transfer.import_commit, d.Transaction.put_record, d.Transaction.commit = (

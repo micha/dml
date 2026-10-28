@@ -29,6 +29,9 @@ The additive [asynchronous contract](../../docs/spec-next/asynchronous-execution
 and [finite application story](../../examples/asynchronous_execution.py) retain explicit
 live worker ownership while saved handles support fresh-client progress observation
 and independently validated immutable P/U/F reception.
+The additive [caller-request contract](../../docs/spec-next/caller-requests.md) and
+[finite caller-Q story](../../examples/caller_requests.py) record Q before launch under
+atomic explicit refs, then register the imported exact Q and create only T in fresh B.
 
 ## Local build
 

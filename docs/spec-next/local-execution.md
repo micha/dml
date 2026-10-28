@@ -12,7 +12,10 @@ name profiles, direct validation and storage transactions. [CLI](cli.md) owns
 ordinary inspection. These roles are document-local conventions, not core kinds,
 globally reserved names or permissions. Vocabulary follows the [glossary](glossary.md).
 
-Normative sections describe the implemented synchronous local adapter.
+Normative sections describe the implemented synchronous local adapter. The additive
+[caller-request contract](caller-requests.md) owns public `put_local_request` and
+`run_request`, request-only recording and imported-Q first registration. They reuse
+this document's unchanged ordinary roles, child checks and execution/finalization.
 
 ## Public surface
 
@@ -54,7 +57,7 @@ A fresh invocation creates a new request and attempt and launches once. `retry_s
 requires an exact reserved request DAG; it selects that request's original binding
 and inputs and creates only a new attempt. Changing source/configuration requires
 a new binding/request. There is no implicit retry, old-attempt dispatch or result
-reuse. Callers MUST close their repository handles before invoking either driver;
+reuse. Callers MUST close their repository handles before invoking drivers;
 the low-level single-wrapper policy remains unchanged.
 
 Frozen `LocalContext` owns `repository_path`, `pre_dispatch`, request/attempt
@@ -113,7 +116,7 @@ The caller owns one coordination head. Tree names and ordinary ref names are
 `request-<request-id>` and `attempt-<attempt-id>`; the child publication tree entry
 is `publication-<attempt-id>`. These satisfy the core ASCII profile.
 
-1. The driver allocates its own scratch and generates occurrence identifiers. One
+1. For `run_step`/`retry_step`, the driver allocates its own scratch and generates occurrence identifiers. One
    write storage transaction creates request/initial attempt, preserves unrelated
    head-tree entries, creates a pre-dispatch DML commit with the previous head as
    parent, moves the head, creates a request reservation ref (fresh requests only)

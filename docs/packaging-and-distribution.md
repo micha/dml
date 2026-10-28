@@ -78,7 +78,9 @@ selection and validated explicit-ref return without adoption.
 The [asynchronous story](../examples/asynchronous_execution.py) retains/reaps the fixed
 installed worker while short-lived clients observe immutable P/U/F packets. The
 [asynchronous contract](spec-next/asynchronous-execution.md) owns its process/packet
-boundary; the example child is captured source, not an installed runtime/fault hook.
+boundary; the example child is captured source, not an installed runtime/fault hook. The [caller-Q story](../examples/caller_requests.py) uses the
+same installed modules/worker with explicit prelaunch request recording and exact-Q
+first attempt; its [owning contract](spec-next/caller-requests.md) defines that delta.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory
 workloads to the C tests; [coverage/memory accounting](../tests/coverage-exclusions.md)

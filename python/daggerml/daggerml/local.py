@@ -3,6 +3,7 @@
 See docs/spec-next/local-execution.md for the cooperative publication contract.
 Inspection never executes source. This module is not a sandbox or recovery service.
 """
+
 from __future__ import annotations
 
 import os
@@ -19,8 +20,20 @@ from typing import Optional, Sequence, Tuple
 
 from . import Datum, DmlError, LiteralNode, NotFoundError, ObjectId, Repository, SubDAGNode, Transaction
 
-__all__ = ["put_local_binding", "run_step", "retry_step", "child_context", "publish_result",
-           "LocalContext", "LocalRun", "LocalExecutionError", "ProtocolError", "ConflictError"]
+__all__ = [
+    "put_local_binding",
+    "put_local_request",
+    "run_request",
+    "run_step",
+    "retry_step",
+    "child_context",
+    "publish_result",
+    "LocalContext",
+    "LocalRun",
+    "LocalExecutionError",
+    "ProtocolError",
+    "ConflictError",
+]
 
 ADAPTER_URI = "urn:daggerml:local-python-v1"
 MAX_SOURCE_BYTES = 1024 * 1024
@@ -180,6 +193,45 @@ def _request(tx: Transaction, request: ObjectId):
     return occurrence, binding, inputs
 
 
+def put_local_request(
+    tx: Transaction,
+    *,
+    request_id: str,
+    intent_uri: str,
+    binding: ObjectId,
+    inputs: ObjectId,
+) -> ObjectId:
+    """Build ordinary Q only; caller owns uniqueness, refs and transaction commit."""
+    _occurrence(request_id, "q")
+    if type(intent_uri) is not str:
+        raise TypeError("intent_uri requires str")
+    if not isinstance(binding, ObjectId) or not isinstance(inputs, ObjectId):
+        raise TypeError("binding and inputs require ObjectId")
+    _binding(tx, binding)
+    tx.get_dag(inputs)
+    return _record(
+        tx,
+        request_id,
+        {"role": "local-request-v1", "intent": Datum.uri(intent_uri)},
+        (("binding", binding), ("inputs", inputs)),
+    )
+
+
+def _submission(tx: Transaction, commit: ObjectId, request: ObjectId):
+    request_id, binding, inputs = _request(tx, request)
+    parents = tx.get_commit(commit).parents
+    if len(parents) != 1:
+        raise ProtocolError("submission requires one basis parent")
+    basis = _tree(tx, parents[0])
+    tree = _tree(tx, commit)
+    name = "request-" + request_id
+    if name in basis or tree.pop(name, None) != request or tree != basis:
+        raise ProtocolError("submission must add only the exact request")
+    if binding not in basis.values() or inputs not in basis.values():
+        raise ProtocolError("submission basis lacks binding or inputs")
+    return request_id, binding, inputs
+
+
 def _tree(tx: Transaction, commit: ObjectId):
     return dict(tx.get_tree(tx.get_commit(commit).tree))
 
@@ -254,8 +306,17 @@ def _exists(tx: Transaction, ref: str) -> bool:
     return True
 
 
-def _prepare(path: str, head_ref: str, scratch: str, *, intent_uri=None,
-             binding=None, inputs=None, request=None) -> LocalContext:
+def _prepare(
+    path: str,
+    head_ref: str,
+    scratch: str,
+    *,
+    intent_uri=None,
+    binding=None,
+    inputs=None,
+    request=None,
+    request_commit=None,
+) -> LocalContext:
     with Repository(path) as repo:
         for _ in range(COLLISION_TRIES):
             with repo.write() as tx:
@@ -266,6 +327,15 @@ def _prepare(path: str, head_ref: str, scratch: str, *, intent_uri=None,
                     tx.get_dag(inputs)
                     request_id = _new_id("q")
                     selected_request = None
+                elif request_commit is not None:
+                    if base != request_commit:
+                        raise ConflictError("head differs from pinned submission")
+                    request_id, binding, inputs = _submission(
+                        tx, request_commit, request
+                    )
+                    if _exists(tx, "request-" + request_id):
+                        raise ConflictError("request already registered locally")
+                    selected_request = request
                 else:
                     request_id, binding, inputs = _request(tx, request)
                     reserved = _tree(tx, tx.get_ref("request-" + request_id))
@@ -276,24 +346,52 @@ def _prepare(path: str, head_ref: str, scratch: str, *, intent_uri=None,
                         raise ConflictError("head contains another request description")
                 attempt_id = _new_id("a")
                 qref, aref = "request-" + request_id, "attempt-" + attempt_id
-                if ((request is None and (_exists(tx, qref) or qref in tree))
-                        or _exists(tx, aref) or aref in tree or "publication-" + attempt_id in tree):
+                if (
+                    (request is None and (_exists(tx, qref) or qref in tree))
+                    or _exists(tx, aref)
+                    or aref in tree
+                    or "publication-" + attempt_id in tree
+                ):
                     tx.abort()
                     continue
                 if selected_request is None:
-                    selected_request = _record(tx, request_id,
-                                               {"role": "local-request-v1", "intent": Datum.uri(intent_uri)},
-                                               (("binding", binding), ("inputs", inputs)))
-                attempt = _record(tx, attempt_id, {"role": "local-attempt-v1",
-                                  "publication-ref": aref, "scratch": scratch}, (("request", selected_request),))
+                    selected_request = put_local_request(
+                        tx,
+                        request_id=request_id,
+                        intent_uri=intent_uri,
+                        binding=binding,
+                        inputs=inputs,
+                    )
+                attempt = _record(
+                    tx,
+                    attempt_id,
+                    {
+                        "role": "local-attempt-v1",
+                        "publication-ref": aref,
+                        "scratch": scratch,
+                    },
+                    (("request", selected_request),),
+                )
                 tree[qref], tree[aref] = selected_request, attempt
                 commit = tx.put_commit(tx.put_tree(tree), parents=(base,))
                 tx.update_ref(head_ref, commit)
-                if request is None:
-                    tx.create_ref(qref, commit)
+                if request is None or request_commit is not None:
+                    tx.create_ref(
+                        qref, commit if request_commit is None else request_commit
+                    )
                 tx.create_ref(aref, commit)
-            return LocalContext(path, commit, request_id, attempt_id, selected_request, attempt,
-                                aref, binding, inputs, scratch)
+            return LocalContext(
+                path,
+                commit,
+                request_id,
+                attempt_id,
+                selected_request,
+                attempt,
+                aref,
+                binding,
+                inputs,
+                scratch,
+            )
     raise ConflictError("occurrence collision limit exhausted")
 
 
@@ -478,6 +576,30 @@ def run_step(repository_path, *, head_ref: str, intent_uri: str, binding: Object
     if not isinstance(binding, ObjectId) or not isinstance(inputs, ObjectId):
         raise TypeError("binding and inputs require ObjectId")
     return _run(repository_path, head_ref, scratch_dir, intent_uri=intent_uri, binding=binding, inputs=inputs)
+
+
+def run_request(
+    repository_path,
+    *,
+    head_ref: str,
+    request_commit: ObjectId,
+    request: ObjectId,
+    scratch_dir=None,
+) -> LocalRun:
+    """Register an imported unreserved submission and create only T before dispatch.
+
+    Exact head/submission/Q and absent local reservation are checked atomically.
+    This local first-registration guard is not global exactly-once execution.
+    """
+    if not isinstance(request_commit, ObjectId) or not isinstance(request, ObjectId):
+        raise TypeError("request_commit and request require ObjectId")
+    return _run(
+        repository_path,
+        head_ref,
+        scratch_dir,
+        request=request,
+        request_commit=request_commit,
+    )
 
 
 def retry_step(repository_path, *, head_ref: str, request: ObjectId, scratch_dir=None) -> LocalRun:

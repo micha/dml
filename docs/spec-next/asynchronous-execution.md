@@ -13,6 +13,9 @@ roles and direct-child disposition. [Transfer](transfer.md) owns complete pinned
 and atomic create-or-same-target refs. [Python API](python-api.md) owns native handles;
 [CLI](cli.md) owns inspection. Vocabulary follows the [glossary](glossary.md).
 Normative sections describe implemented behavior; example orchestration is informative.
+[Caller requests](caller-requests.md) owns explicit prelaunch Q, imported-Q first
+registration and exact Cq/Q mode-specific discovery/validation. This document's
+ownership, phases/packets, unknown and done boundaries apply unchanged in both modes.
 
 ## Public surface and descriptions
 
@@ -89,7 +92,7 @@ The worker calls public `execute_exchange` once. Execute retains its separate ex
 `started` boundary; direct synchronous execute does not require `launched`. Execute rejects
 preexisting `worker-ready.json` alongside B/output. After bootstrap/import, selection/ref
 validation and repository handle closure, it publishes readiness **before** public
-`local.run_step`. Readiness IO failure prevents dispatch and retains B/markers. Readiness
+`local.run_step` (default fresh-Q mode) or public `local.run_request` (caller-Q mode). Readiness IO failure prevents dispatch and retains B/markers. Readiness
 has exactly `format`, `token`, `commit`, with format `daggerml-local-exchange-ready-v1`.
 It conveys no occurrence, outcome or process health. The independent launch and actual
 execute markers are cooperative one-shot boundaries, not exactly-once external execution.
@@ -103,7 +106,8 @@ missing/unreadable B or corrupt refs raises rather than being concealed as boots
 
 One public read storage transaction in B reads the explicit worker head and, if needed,
 its selected attempt publication ref. It derives exactly one fresh request/attempt from
-tree-name differences relative to C; existing prior requests/attempts/publications in C
+tree-name differences relative to C in default mode; [caller mode](caller-requests.md#exact-q-through-synchronous-and-asynchronous-return)
+derives exact Q from pinned submission and requires only one fresh T. Existing prior requests/attempts/publications in C
 remain preserved and unrelated. It does not scan repository-wide refs or pick the first
 prefix match. A head still at C yields bootstrap. For initial P, an unchanged attempt ref
 selects P; a valid publication U selects U. A final head selects F and validates its exact
@@ -125,7 +129,7 @@ bundle import. Source reservation refs need not exist in the packet or receiving
 
 | Selected history | Required evidence | Lifecycle |
 | --- | --- | --- |
-| P / initial | Parents exactly `(C,)`; exact C tree plus only fresh request Q/initial attempt T; selected intent/binding/inputs, roles/root/types, association, publication ref and inert scratch spelling; no final fields | `working` |
+| P / initial | Default mode: parents exactly `(C,)`; exact C tree plus only fresh request Q/initial attempt T. Caller mode: exact Cq plus only T linked to pinned Q. Both validate selected intent/binding/inputs, roles/root/types, association, publication ref and inert scratch spelling; no final fields | `working` |
 | U / publication | Valid P above; parents exactly `(P,)`; exact P tree plus matching T-associated publication/result; initial T unchanged without final fields | `working` |
 | F / completion | Existing full selected-completion validation, final T preserves initial field nodes and adds `done`, computation/cleanup; exact tree and ordered `(P,)` or `(P,U)` parents | `done` |
 
@@ -145,7 +149,7 @@ rollback, multi-file/repository atomicity or power-loss durability.
 Strict bounded UTF-8 JSON descriptor rules and 8,192-byte limit are inherited from
 [exchange framing](repository-execution.md#preparation-and-retained-workspace), as are
 exchange paths/errors and owning transfer bounds. Saved handles have exactly `format`,
-`workspace`, `expected` (the exact job object), format `daggerml-local-exchange-handle-v1`,
+`workspace`, `expected` (the exact job object), format `daggerml-local-exchange-handle-v2`,
 and exclusive file creation. Observation receipts have exactly `format`, `token`, `commit`,
 `phase`, `selected_commit`, `pre_dispatch`, `request_id`, `attempt_id`, format
 `daggerml-local-exchange-observation-v1`. No serialized lifecycle/success/PID assertion is

@@ -16,6 +16,8 @@ complete typed closure checks and optional atomic ref creation. The explicit
 for one pinned step in independent local B and a validated explicit-ref return to A.
 Its additive [asynchronous contract](asynchronous-execution.md) owns saved handles,
 live application-owned worker launch and bounded immutable progress observation/reception.
+The additive [caller-request contract](caller-requests.md) owns request-only construction,
+explicit atomic A recording and public imported-Q first registration through these APIs.
 
 ## Values and descriptions
 

@@ -13,7 +13,10 @@ Vocabulary follows the [glossary](glossary.md). The additive
 [asynchronous contract](asynchronous-execution.md) owns saved handles/live worker launch,
 bootstrap readiness and immutable initial/publication/completion observation packets.
 Normative sections describe implemented
-behavior; example orchestration is informative.
+behavior; example orchestration is informative. The additive [caller-request contract](caller-requests.md)
+owns explicit Q-only A recording, public imported-Q first registration and the exact
+Cq/Q selection delta in both return paths. Fresh-Q-in-B behavior below is the default
+`request=None` mode.
 
 ## Public stages and owned descriptions
 
@@ -25,7 +28,7 @@ from daggerml.exchange import (
 
 prepare_exchange(repository_path, *, commit: ObjectId, binding_name: str,
                  inputs_name: str, intent_uri: str, worker_ref: str,
-                 workspace) -> ExchangeSpec
+                 workspace, request: Optional[ObjectId] = None) -> ExchangeSpec
 execute_exchange(workspace, *, map_size: int = 0) -> LocalRun
 receive_exchange(repository_path, *, workspace, expected: ExchangeSpec,
                  ref: str, map_size: int = 0) -> ReceivedRun
@@ -35,11 +38,12 @@ All stages close their own repository handles. Callers MUST close other handles 
 that physical repository first. Preparation/receive require initialized caller A;
 execute creates independent B at `workspace/worker.dml`. No stage automatically
 starts another stage. The example starts a fresh worker process, but the public
-execute helper itself is synchronous and calls the existing public `local.run_step`.
+execute helper itself is synchronous and calls public `local.run_step` in default mode,
+or public `local.run_request` with a [caller-pinned Q](caller-requests.md#pinned-submission-and-first-registration-in-b).
 No new native operation, execution CLI command or process supervisor is involved.
 
 Frozen `ExchangeSpec` owns `token`, `commit`, `binding_name`, `inputs_name`, `binding`,
-`inputs`, `intent_uri` and `worker_ref`. It requires `ObjectId` IDs, exact strings,
+`inputs`, `intent_uri`, `worker_ref` and optional pinned `request`. It requires `ObjectId` IDs, exact strings,
 the existing ASCII name profile and an already canonical absolute intent URI accepted
 by the native URI helper. `token` is fresh UUID4 lowercase hex, a **transport-only
 correlation token**, not a DML request/attempt occurrence or authentication. Expected
@@ -84,7 +88,8 @@ binding fields against the existing local record contract and reads the input DA
 it does not impose an argument schema or prove external executable availability.
 After handles close, it exports C's complete all-parent typed object closure.
 A missing/corrupt reached object or transfer-profile overflow fails before creating
-a workspace. Preparation MUST NOT write A or create computational occurrences.
+a workspace. Preparation MUST NOT write A or create computational occurrences;
+explicit request recording is the separate [A mutation](caller-requests.md#atomic-explicit-recording-in-a).
 
 The workspace must be a new caller-selected directory with an existing parent.
 Preparation creates it exclusively, writes `input.bundle`, then publishes `job.json`
@@ -109,8 +114,10 @@ byte. Bundle file reads use the owning `transfer.MAX_BUNDLE_BYTES`; parsing/reco
 reads still allocate, so these limits are not exact RSS or runtime bounds.
 
 The job has exactly `format`, `token`, `commit`, `binding_name`, `inputs_name`,
-`binding`, `inputs`, `intent_uri`, `worker_ref`, with format
-`daggerml-local-exchange-job-v1`. IDs/token are lowercase 32-hex. Completion has
+`binding`, `inputs`, `intent_uri`, `worker_ref`, `request`, with format
+`daggerml-local-exchange-job-v2`. `request` is required null or lowercase 32-hex;
+null preserves fresh-Q mode, an ID pins exact caller Q. No v1 migration is provided.
+IDs/token are lowercase 32-hex. Completion has
 exactly `format`, `token`, `commit`, `final_commit`, `pre_dispatch`, `request_id`,
 `attempt_id`, with format `daggerml-local-exchange-completion-v1`. Occurrences use
 the existing `q-`/`a-` lowercase 32-hex profiles. Outcome/result/cleanup are derived
@@ -135,7 +142,8 @@ exactly-once execution.
 Execute imports C into fresh B under the explicit `worker_ref`, checks input root,
 selected binding/input DAGs and ref target, closes handles, publishes bounded bootstrap
 readiness, then calls unchanged `local.run_step`. The local runner creates the request/attempt
-in B and owns its
+in B in default mode; [caller mode](caller-requests.md) instead registers exact imported Q
+and creates only T. It owns its
 newly allocated execution scratch. Source refs are not copied from A.
 
 After the runner returns (including recorded failure), execute exports the exact
@@ -154,12 +162,13 @@ repository using unchanged public transfer operations without a ref. It validate
 only consumed selected local records through public descriptions:
 
 - C's selected tree names/IDs match expected; binding/inputs are typed/valid.
-- Pre-dispatch P has exactly `(C,)` as parents. Its tree preserves C and adds only
+- In default mode, pre-dispatch P has exactly `(C,)` as parents. Its tree preserves C and adds only
   this fresh request/initial attempt. Their names do not replace C entries or an
   existing publication name.
 - Request root/role/intent/binding/inputs match expected and occurrence. Initial
   attempt root/role/request/publication-ref/scratch match the selected request and
-  attempt; no copied reservation ref is required.
+  attempt; no copied reservation ref is required. Caller mode's exact Cq/Q and
+  only-new-T requirements are owned by [the selection delta](caller-requests.md#exact-q-through-synchronous-and-asynchronous-return).
 - Final attempt preserves exact initial field nodes, adds `status == done`, typed
   outcome/cleanup and the same occurrence. Final tree preserves P except this final
   attempt, plus accepted publication if present.

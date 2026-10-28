@@ -19,11 +19,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from . import LiteralNode, ObjectId, Repository, SubDAGNode, canonicalize_uri
+from . import (
+    LiteralNode,
+    NotFoundError,
+    ObjectId,
+    Repository,
+    SubDAGNode,
+    canonicalize_uri,
+)
 from . import local, transfer
 
 __all__ = [
     "ExchangeSpec",
+    "RecordedRequest",
+    "record_exchange_request",
     "ReceivedRun",
     "ExchangeError",
     "prepare_exchange",
@@ -41,9 +50,9 @@ __all__ = [
 ]
 
 MAX_DESCRIPTOR_BYTES = 8192
-JOB_FORMAT = "daggerml-local-exchange-job-v1"
+JOB_FORMAT = "daggerml-local-exchange-job-v2"
 COMPLETION_FORMAT = "daggerml-local-exchange-completion-v1"
-HANDLE_FORMAT = "daggerml-local-exchange-handle-v1"
+HANDLE_FORMAT = "daggerml-local-exchange-handle-v2"
 READY_FORMAT = "daggerml-local-exchange-ready-v1"
 OBSERVATION_FORMAT = "daggerml-local-exchange-observation-v1"
 
@@ -99,6 +108,7 @@ class ExchangeSpec:
     inputs: ObjectId
     intent_uri: str
     worker_ref: str
+    request: Optional[ObjectId] = None
 
     def __post_init__(self):
         _hex(self.token)
@@ -108,6 +118,24 @@ class ExchangeSpec:
         for name in (self.binding_name, self.inputs_name, self.worker_ref):
             _name(name)
         _uri(self.intent_uri)
+        if self.request is not None and not isinstance(self.request, ObjectId):
+            raise TypeError("request requires ObjectId or None")
+
+
+@dataclass(frozen=True)
+class RecordedRequest:
+    """Owned explicit A publication; no workspace, token, process or live handle."""
+
+    base: ObjectId
+    commit: ObjectId
+    ref: str
+    request: ObjectId
+    request_id: str
+    binding_name: str
+    inputs_name: str
+    binding: ObjectId
+    inputs: ObjectId
+    intent_uri: str
 
 
 @dataclass(frozen=True)
@@ -143,6 +171,7 @@ def _spec_document(spec):
         "inputs": str(spec.inputs),
         "intent_uri": spec.intent_uri,
         "worker_ref": spec.worker_ref,
+        "request": None if spec.request is None else str(spec.request),
     }
 
 
@@ -194,6 +223,7 @@ def _job(workspace):
             "inputs",
             "intent_uri",
             "worker_ref",
+            "request",
         ),
         JOB_FORMAT,
     )
@@ -208,6 +238,8 @@ def _spec_values(document):
     values = {key: value for key, value in document.items() if key != "format"}
     for name in ("commit", "binding", "inputs"):
         values[name] = ObjectId.from_hex(_hex(values[name]))
+    if values["request"] is not None:
+        values["request"] = ObjectId.from_hex(_hex(values["request"]))
     return ExchangeSpec(**values)
 
 
@@ -222,6 +254,7 @@ def _spec_document_keys():
         "inputs",
         "intent_uri",
         "worker_ref",
+        "request",
     )
 
 
@@ -317,7 +350,110 @@ def _selection(tx, spec):
         raise ExchangeError("pinned tree selection mismatch")
     _binding(tx, spec.binding)
     tx.get_dag(spec.inputs)
+    if spec.request is not None:
+        _submission(tx, spec, tree)
     return tree
+
+
+def _request_selection(tx, spec, request, qid):
+    q = _role(
+        tx,
+        request,
+        "local-request-v1",
+        ("role", "intent", "binding", "inputs"),
+        occurrence=qid,
+    )
+    if (
+        _scalar(tx, q.bindings["intent"], ("uri",)) != spec.intent_uri
+        or _subdag(tx, q.bindings["binding"]) != spec.binding
+        or _subdag(tx, q.bindings["inputs"]) != spec.inputs
+    ):
+        raise ExchangeError("request selection mismatch")
+
+
+def _submission(tx, spec, tree):
+    qid = _hex(_scalar(tx, tx.get_dag(spec.request).root, ("string",)), "q-")
+    _request_selection(tx, spec, spec.request, qid)
+    parents = tx.get_commit(spec.commit).parents
+    if len(parents) != 1:
+        raise ExchangeError("submission requires one basis parent")
+    basis = _tree(tx, parents[0])
+    preserved = dict(tree)
+    name = "request-" + qid
+    if name in basis or preserved.pop(name, None) != spec.request or preserved != basis:
+        raise ExchangeError("submission must add only the exact request")
+    return qid
+
+
+def record_exchange_request(
+    repository_path,
+    *,
+    commit: ObjectId,
+    binding_name: str,
+    inputs_name: str,
+    intent_uri: str,
+    ref: str,
+    map_size: int = 0,
+) -> RecordedRequest:
+    """Explicitly publish Q/Cq and two create-only A refs atomically; never dispatch."""
+    if not isinstance(commit, ObjectId):
+        raise TypeError("commit requires ObjectId")
+    for name in (binding_name, inputs_name, ref):
+        _name(name)
+    _uri(intent_uri)
+    _map_size(map_size)
+    with Repository(repository_path, map_size=map_size) as repo:
+        for _ in range(local.COLLISION_TRIES):
+            with repo.write() as tx:
+                try:
+                    tx.get_ref(ref)
+                except NotFoundError:
+                    pass  # Dangling keys still reject at native create, never repair.
+                else:
+                    raise ExchangeError("submission ref already exists")
+                tree = _tree(tx, commit)
+                if binding_name not in tree or inputs_name not in tree:
+                    raise ExchangeError("selected tree entry missing")
+                _binding(tx, tree[binding_name])
+                tx.get_dag(tree[inputs_name])
+                qid = "q-" + uuid.uuid4().hex
+                qref = "request-" + qid
+                if ref == qref:
+                    raise ExchangeError("submission and request refs must differ")
+                try:
+                    tx.get_ref(qref)
+                except NotFoundError:
+                    collision = qref in tree
+                else:
+                    collision = True
+                if collision:
+                    tx.abort()
+                    continue
+                request = local.put_local_request(
+                    tx,
+                    request_id=qid,
+                    intent_uri=intent_uri,
+                    binding=tree[binding_name],
+                    inputs=tree[inputs_name],
+                )
+                tree[qref] = request
+                submission = tx.put_commit(tx.put_tree(tree), parents=(commit,))
+                tx.create_ref(ref, submission)
+                tx.create_ref(qref, submission)
+                result = RecordedRequest(
+                    commit,
+                    submission,
+                    ref,
+                    request,
+                    qid,
+                    binding_name,
+                    inputs_name,
+                    tree[binding_name],
+                    tree[inputs_name],
+                    intent_uri,
+                )
+            return result
+    raise ExchangeError("request occurrence collision limit exhausted")
 
 
 def prepare_exchange(
@@ -329,6 +465,7 @@ def prepare_exchange(
     intent_uri: str,
     worker_ref: str,
     workspace,
+    request: Optional[ObjectId] = None,
 ) -> ExchangeSpec:
     """Pin named DAGs and write a new retained workspace; never mutate A."""
     if not isinstance(commit, ObjectId):
@@ -351,6 +488,7 @@ def prepare_exchange(
             tree[inputs_name],
             intent_uri,
             worker_ref,
+            request,
         )
         _selection(tx, spec)
     bundle = transfer.export_commit(repository_path, commit=commit)
@@ -402,14 +540,23 @@ def execute_exchange(workspace, *, map_size: int = 0) -> local.LocalRun:
             "commit": str(spec.commit),
         },
     )
-    run = local.run_step(
-        worker,
-        head_ref=spec.worker_ref,
-        intent_uri=spec.intent_uri,
-        binding=spec.binding,
-        inputs=spec.inputs,
-        scratch_dir=workspace,
-    )
+    if spec.request is None:
+        run = local.run_step(
+            worker,
+            head_ref=spec.worker_ref,
+            intent_uri=spec.intent_uri,
+            binding=spec.binding,
+            inputs=spec.inputs,
+            scratch_dir=workspace,
+        )
+    else:
+        run = local.run_request(
+            worker,
+            head_ref=spec.worker_ref,
+            request_commit=spec.commit,
+            request=spec.request,
+            scratch_dir=workspace,
+        )
     output = transfer.export_commit(worker, commit=run.final_commit)
     with open(workspace / "output.bundle", "xb") as stream:
         stream.write(output)
@@ -522,28 +669,22 @@ def _initial(tx, spec, pre, qid, aid):
     initial_tree = _tree(tx, pre)
     if (
         tx.get_commit(pre).parents != (spec.commit,)
-        or qname in base
+        or (spec.request is None and qname in base)
         or aname in base
         or pname in base
     ):
         raise ExchangeError("invalid pre-dispatch parent or fresh names")
     preserved = dict(initial_tree)
-    request, initial = preserved.pop(qname, None), preserved.pop(aname, None)
+    initial = preserved.pop(aname, None)
+    if spec.request is None:
+        request = preserved.pop(qname, None)
+    else:
+        request = preserved.get(qname)
+        if request != spec.request:
+            raise ExchangeError("pre-dispatch lacks exact pinned request")
     if request is None or initial is None or preserved != base:
         raise ExchangeError("pre-dispatch tree mismatch")
-    q = _role(
-        tx,
-        request,
-        "local-request-v1",
-        ("role", "intent", "binding", "inputs"),
-        occurrence=qid,
-    )
-    if (
-        _scalar(tx, q.bindings["intent"], ("uri",)) != spec.intent_uri
-        or _subdag(tx, q.bindings["binding"]) != spec.binding
-        or _subdag(tx, q.bindings["inputs"]) != spec.inputs
-    ):
-        raise ExchangeError("request selection mismatch")
+    _request_selection(tx, spec, request, qid)
     required = ("role", "request", "publication-ref", "scratch")
     a = _role(tx, initial, "local-attempt-v1", required, occurrence=aid)
     scratch = _scalar(tx, a.bindings["scratch"], ("string",))
@@ -839,11 +980,17 @@ def _discover(tx, spec):
         return None
     selected = _tree(tx, head)
     new_names = set(selected) - set(base)
-    requests = [name for name in new_names if name.startswith("request-q-")]
+    if spec.request is None:
+        requests = [name for name in new_names if name.startswith("request-q-")]
+        if len(requests) != 1:
+            raise ExchangeError("worker head lacks exactly one fresh request/attempt")
+        qid = requests[0][8:]
+    else:
+        qid = _submission(tx, spec, base)
     attempts = [name for name in new_names if name.startswith("attempt-a-")]
-    if len(requests) != 1 or len(attempts) != 1:
+    if len(attempts) != 1:
         raise ExchangeError("worker head lacks exactly one fresh request/attempt")
-    qid, aid = requests[0][8:], attempts[0][8:]
+    aid = attempts[0][8:]
     _hex(qid, "q-")
     _hex(aid, "a-")
     attempt = tx.get_dag(selected[attempts[0]])

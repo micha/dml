@@ -39,6 +39,8 @@ def expected_file(directory, spec):
     values = asdict(spec)
     for key in ("commit", "binding", "inputs"):
         values[key] = str(getattr(spec, key))
+    if spec.request is not None:
+        values["request"] = str(spec.request)
     file.write_text(json.dumps(values), encoding="utf-8")
     return file
 
