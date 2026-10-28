@@ -63,9 +63,16 @@ and `discussion.md` before continuing the discussion. Read the shared
   are approved: A explicitly records Q before launch; B registers imported Q locally
   and creates only T, reusing asynchronous observation/explicit-ref return. The public
   seams, atomic two-ref A publication and pinned-Q validation are the bounded plan;
-  illustrative spellings remain refinable. The user requested a local design checkpoint,
-  not implementation, delegation, worker restart, experiment, implementation commit/push
-  or CI authorization. Do not inherit Iteration 7's completed GO.
+  illustrative spellings remain refinable. The user subsequently declared Iteration 8 GO
+  and authorized implementation by the existing window-2 agent in a new Pi session,
+  coordinator monitoring/independent review and fixes until satisfactory, then focused
+  worker commit/push and exact-SHA CI verification/fixes. No extra workers, release/package
+  publication, cloud experiments or later feature turn are authorized. This bounded turn
+  is now complete and stopped through published `865bb79`, all six final exact-SHA CI jobs
+  successful after a reviewed test-only portability fix; see
+  [review](iterations/08-caller-recorded-requests/REVIEW.md). This is not permission to restart
+  implementation or begin another turn. See
+  [coordination](iterations/08-caller-recorded-requests/COORDINATION.md).
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise
@@ -90,6 +97,11 @@ and `discussion.md` before continuing the discussion. Read the shared
 ## Notes and commits
 
 - Maintain design notes here, not under the retired temporary task directory.
+- The user requires `../dml/docs/lmdb-entity-diagram.html` to stay aligned with
+  implemented LMDB entities/relationships, never proposals or future state. Include
+  relevant diagram review in authorized implementation handoffs; follow the
+  implementation [maintenance guidance](../dml/docs/documentation-guidelines.md#as-built-visualization-maintenance).
+  Design discussion alone does not authorize changing the diagram's technical claims.
 - Keep `discussion.md`'s resume point current when recording a checkpoint.
 - Use small, focused changes and validate local Markdown links.
 - Never commit credentials, secret values, or sensitive research data.

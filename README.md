@@ -6,13 +6,17 @@ its existing draft specifications.
 
 ## Start here
 
-- Iteration 8 [design](iterations/08-caller-recorded-requests/DESIGN.md),
-  [worked example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
-  [conditional handoff](iterations/08-caller-recorded-requests/HANDOFF.md): approved bounded
-  plan, included in the requested local design checkpoint. A explicitly records Q before
-  launch; B registers imported Q locally and creates only T. Atomic submission/request
-  refs, public local seams and pinned-Q validation preserve identity across repositories.
-  Plan approval is not implementation/delegation/publication GO.
+- Iteration 8 [delivery](iterations/08-caller-recorded-requests/RESULTS.md) and
+  [coordinator review](iterations/08-caller-recorded-requests/REVIEW.md): caller-recorded Q,
+  imported-Q first attempt and exact pinned request validation are implemented,
+  independently accepted and published through `865bb79`; all six final exact-SHA CI jobs
+  pass after a reviewed test-only Windows portability fix. A records Q before launch;
+  B creates only T. Existing A heads and request refs stay unchanged on return. This
+  bounded turn is complete and stopped. The [design](iterations/08-caller-recorded-requests/DESIGN.md),
+  [example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
+  [handoff](iterations/08-caller-recorded-requests/HANDOFF.md) preserve the approved plan,
+  not permission to restart. The [as-built contract](../dml/docs/spec-next/caller-requests.md)
+  owns actual behavior.
 
 - Iteration 7 [delivery](iterations/07-asynchronous-local-execution/RESULTS.md) and
   [coordinator review](iterations/07-asynchronous-local-execution/REVIEW.md): asynchronous
@@ -96,25 +100,42 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
-The user approved Iteration 8's bounded
-[design](iterations/08-caller-recorded-requests/DESIGN.md),
-[worked example](iterations/08-caller-recorded-requests/EXAMPLE.md) and
-[conditional handoff](iterations/08-caller-recorded-requests/HANDOFF.md), and requested a
-local checkpoint including accumulated Iteration 7 delivery/review notes. The approved
-plan explicitly records Q in A under atomic submission/request refs, transfers pinned
-Cq/Q, then registers Q locally in B and atomically creates only T before existing execution.
-Exact expected Q extends both synchronous/asynchronous validation; existing A heads and
-request refs stay unchanged during return. Public builder/first-attempt seams avoid private
-local access or pretending first dispatch is retry. Bootstrap has no selected T while caller
-already knows Q. No global replay/exactly-once capability claim. See
-[approval checkpoint](discussion.md#iteration-8-plan-approval-and-design-checkpoint).
+Iteration 8 is implemented, independently accepted and published through **`865bb79`**;
+[final exact-SHA CI](https://github.com/micha/dml/actions/runs/40624753242) passes all six jobs.
+The bounded turn is complete and stopped. A explicitly records Q/Cq under atomic submission/
+request refs before launch; fresh B registers exact imported Q and creates only T before
+existing execution. Both return paths pin exact Cq/Q; existing caller heads/request refs stay
+unchanged. Public request builder/first-registration seams preserve local ownership, original
+fresh-Q mode and bootstrap/unknown/publication/cleanup/live-owner boundaries. Strict v2
+job/handle framing requires nullable Q selection; no migration or global replay/exactly-once
+claim. The [as-built contract](../dml/docs/spec-next/caller-requests.md) owns actual behavior.
 
-Approval selects the plan, not implemented behavior or implementation/delegation GO.
-Illustrative API/format spellings remain refinable. Planning/approval inspected clean
-`a8d6463`; no implementation/spec edits, tests/prototypes, worker restart/assignment or CI.
-The checkpoint preserves the accumulated delivery and planning notes; earlier uncommitted/
-pending-approval statements retain provenance. No implementation commit/push permission
-or design push; do not inherit Iteration 7's completed authorization.
+Worker final stable `-v` passes **1085 Python tests/seven C**, Python **2299/2299**, unchanged
+native/memory gates and **141 CLI Valgrind processes**. Coordinator initial independent `-v`
+passes 1081/seven C, separate installed workflow **302 checks**, then independent **254-test**
+postfix caller suite after the test-only correction. Initial Windows CI cancelled with enormous
+physical-byte diffs; dependency-supported layout emulation demonstrates the fixture defect,
+but capped original logs lost its exact test header. The reviewed comparable-map/compact
+exact-byte-assertion fix retains rollback oracles and yields all final CI jobs green.
+[RESULTS](iterations/08-caller-recorded-requests/RESULTS.md) and
+[REVIEW](iterations/08-caller-recorded-requests/REVIEW.md) preserve evidence and trust/profile/
+process/platform/mutation/coverage qualifications; CI informational `-c` is not local `-v`.
+
+Reviewed initial 22-file implementation `509c2f0` plus one-file test correction `865bb79` are
+normally pushed; the Iteration 8 publication checkpoint was clean with remote master
+matching `865bb79`. Worker finalized RESULTS and stopped. No extra workers, release/tag/
+package publication, cloud/global tooling or later feature turn. Earlier planning/GO
+statements preserve provenance, not permission to restart. See
+[coordination](iterations/08-caller-recorded-requests/COORDINATION.md).
+
+The user accepted Iteration 8 and requested maintenance of the self-contained
+[LMDB entity diagram](../dml/docs/lmdb-entity-diagram.html), then storage-identity field
+annotations and a local commit. Diagram/maintenance/tests are committed separately in DML
+as local **`f7113d7`**, not pushed; implementation checkout is clean and ahead of the published
+Iteration 8 SHA. Four focused tests, JavaScript syntax/DOM-stub checks and links/whitespace
+pass; no new full-suite/CI or real-browser audit claimed. This design checkpoint includes
+accumulated Iteration 8 delivery/review/acceptance and diagram-maintenance notes; no design
+push or new feature authorization.
 
 Iteration 7 is implemented, independently accepted and published as `a8d6463`; all
 six final exact-SHA CI jobs pass on the first run. The bounded turn is complete and
