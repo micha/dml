@@ -1,6 +1,21 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: Iteration 8 implementation, independent review, focused publication and
+Latest checkpoint: **Iteration 9 implementation, independent review and final publication/CI
+are complete through `29ed39b`**; all six final exact-SHA jobs pass after a reviewed Windows
+test-harness correction. The bounded turn is complete and stopped. See
+[delivery](#iteration-9-delivery-and-final-publication-checkpoint),
+[RESULTS](iterations/09-ssh-container-execution/RESULTS.md),
+[REVIEW](iterations/09-ssh-container-execution/REVIEW.md) and
+[coordination](iterations/09-ssh-container-execution/COORDINATION.md).
+Docker remains local SSH-host fixture support; approved loopback-only host networking is
+not network-namespace isolation. Exact-Q receive, unknown outcomes and separate cleanup remain.
+Initial unchanged caller-story failure reason stays unknown despite final Windows pass.
+No extra workers, release/package publication, cloud/global tooling or later feature turn.
+The user accepted the delivery and requested a local design checkpoint; see
+[acceptance and checkpoint](#iteration-9-user-acceptance-and-design-checkpoint).
+Earlier GO/planning/no-checkpoint statements preserve chronological provenance.
+
+Iteration 8 implementation, independent review, focused publication and
 final exact-SHA CI are complete through **`865bb79`**; all six jobs pass after a reviewed
 test-only Windows fixture correction. The bounded turn is accepted and stopped. Read
 [RESULTS](iterations/08-caller-recorded-requests/RESULTS.md),
@@ -1685,7 +1700,182 @@ Focused tests, JavaScript syntax/DOM-stub checks, links and whitespace pass; no 
 real-browser or CI evidence claimed. No push, worker restart or later feature authorized.
 This design repository has no remote; its checkpoint is local too.
 
+## Iteration 9 agreed direction: SSH execution against a local container
+
+The user clarified that Docker should host an SSH-accessible execution environment on
+the same machine, rather than replace SSH with bind-mounted container execution. The
+assistant corrected the proposal and the user agreed. This selects bounded direction
+for discussion/planning, not an exact protocol/API, detailed plan approval or implementation/
+delegation/publication GO. Iteration 8's completed authorization is not inherited.
+
+- A records Q and pins Cq before launch, preserving the caller-recorded request boundary.
+- A local container runs an SSH server and an installed Python/DML runtime. Docker is
+  the acceptance fixture standing in for a remote host, **not a new DML execution backend**.
+- Transfer pinned job/history through SSH, not a shared exchange-directory bind mount.
+  B has its own filesystem paths/repository inside the container and creates only T for
+  the exact imported Q through the existing local runner/public first-registration seam.
+- Retrieve B's recorded history through SSH, validate independently against caller Cq/Q,
+  and import under an explicit A return ref without moving existing heads/request refs.
+- Begin synchronously to isolate transport, invocation and failure boundaries. Remote
+  asynchronous observation is deferred.
+- Preserve retained B history until explicit fixture cleanup. SSH disconnect or missing
+  returned history does not establish computational failure or authorize automatic relaunch.
+- The exchange should also apply to an ordinary SSH host; Docker-specific setup belongs
+  in the acceptance fixture. Same-machine namespace/runtime/transport evidence is not
+  proof of arbitrary second-host portability, network security or production supervision.
+- No cloud/second-machine access, remote Docker daemon, scheduler, automatic retry/recovery,
+  registry publication, general environment provisioning or new native entities in this turn.
+
+Learning goal: exercise exact caller request continuation across an SSH transport and
+separate filesystem/runtime boundary, using an entirely local controlled fixture. Exact
+SSH endpoint/host-key/authentication, runtime prerequisites and captured interpreter paths,
+job/receipt framing, transfer mechanism, remote workspace retention, process/connection loss
+and cleanup/ownership mechanics remain for a worked example and bounded design/handoff.
+No container/SSH service, package installation, experiment, implementation/as-built edit,
+worker restart/assignment, commit/push or CI launch is authorized by this direction agreement.
+
+### Iteration 9 candidate preparation
+
+At the user's instruction to proceed with the next planning step, the assistant prepared
+[DESIGN](iterations/09-ssh-container-execution/DESIGN.md),
+[EXAMPLE](iterations/09-ssh-container-execution/EXAMPLE.md) and
+[HANDOFF](iterations/09-ssh-container-execution/HANDOFF.md). This is planning authorization,
+not approval of detailed choices or implementation/delegation/publication GO.
+
+Recommended mechanics: separate public SSH composition plus fixed installed stage/execute/
+fetch helper, strict bounded header/binary bodies, a narrow public exchange spec reader,
+explicit fail-closed endpoint/host-key/authentication and remote interpreter/root settings,
+pre-spawn local dispatch guard plus existing remote one-shot guard. Stage creates no B/T;
+execute calls public existing exchange/local continuation; fetch never executes/finalizes
+and supplies only a transport candidate for unchanged exact-Q atomic A receive. Docker
+remains a local fixture without shared exchange/A/checkout/socket mounts. B history survives
+until explicit fixture retirement; local scratch cleanup and fixture/SSH ownership stay
+separate. These assistant-origin detailed choices await review, not new user agreements.
+
+Planning reinspected clean DML `f7113d7acb3a0fe35eed6cb0013d3074533aef51` (local diagram commit
+over published Iteration8 `865bb79`), public execute/receive/worker/source/packaging seams
+and preserved design checkpoint `74a7bcd` plus direction notes. Read-only tool/service
+metadata confirms Docker29.8.1 active/access and OpenSSH10.5p1 clients; no image inventory,
+pull/build/container, SSH connection/key generation or experiment. Current OpenSSH/Docker
+documentation informed remote quoting/status, loopback port and writable-layer retention.
+Image/base/tool/cache/ABI prerequisites remain unverified and need scoped preflight, not
+assumed permission for arbitrary provisioning or network pulls.
+
+No implementation/as-built/diagram edits, tests/build/prototypes, worker restart/assignment,
+commit/push or CI launch occurred. The diagram remains actual native state, not proposed
+SSH/container entities. New planning notes are local/uncommitted. Next is user review and
+plan approval, then separate bounded implementation/delegation/publication permission.
+No design checkpoint commit/push requested; existing local DML diagram commit must be
+explicitly accounted for before any future authorized implementation push.
+
+## Iteration 9 implementation and publication authorization
+
+The user declared Iteration 9 GO and authorized the existing window-2 agent in a new Pi
+session to implement the bounded design/example/handoff. Coordinator monitors, independently
+reviews and provides feedback/fixes until satisfactory, then directs focused worker commit/
+push and verifies final exact-SHA CI/fixes. This approves the candidate plan for this turn;
+illustrative engineering spellings remain refinable. Earlier planning-only status is historical,
+not the current authorization. No extra workers, release/tag/package publication, cloud/
+second-host/remote-daemon experiments, global tooling/services or later feature turn.
+Missing cached fixture prerequisites requiring downloads/installations need scoped approval.
+
+[COORDINATION](iterations/09-ssh-container-execution/COORDINATION.md) records live verification,
+`/new`/empty-context confirmation and assignment to worker `%215`; coordinator is `%197`.
+Implementation initially clean at `f7113d7`, design `74a7bcd` with preserved planning edits.
+The prior user-authorized local diagram/maintenance commit `f7113d7` is explicitly accounted
+for as an ancestor of the eventual accepted normal push, not Iteration 9 runtime work.
+Worker owns runtime/tests/as-built docs/fixture/example/RESULTS and exclusive both shared
+builds through baseline/implementation. Coordinator owns review/design status; independent
+checks wait for source freeze and explicit release. Publication waits for coordinator
+acceptance; actual installed local SSH/container gate is mandatory separately from CI.
+No design checkpoint commit/push requested.
+
+### Iteration 9 fixture-network refinement
+
+Fresh worker baseline passes before measured edits: 1,089 Python/seven C, retained Python
+2299/2299 and unchanged native/memory gates. Worker builds an offline local scratch fixture
+from cached Nix runtime closure/current wheel, without downloads or shared runtime mounts.
+Its sshd answers inside container loopback, but host bridge/published-port access fails;
+no host firewall/service changes were made. The user explicitly approved the proposed
+`--network host` workaround with sshd bound only to `127.0.0.1` on a dedicated high port.
+This preserves filesystem/runtime separation but does not demonstrate network-namespace
+isolation. Record actual listening exposure/provenance/cleanup and this deviation; approval
+does not permit host configuration changes or broader networking/provisioning.
+See [coordination](iterations/09-ssh-container-execution/COORDINATION.md#preflight-and-approved-fixture-refinement).
+
+## Iteration 9 delivery and final publication checkpoint
+
+The fresh-session existing window-2 worker implemented separately imported SSH stage/execute/
+fetch, strict endpoint/host-key/binary framing/fixed quoted helper and public exchange spec
+reader. A pins Q/Cq; B registers exact imported Q and creates only T. Fetch is nonexecuting
+transport candidate for unchanged authoritative exact-Q/history/outcome/cleanup validation
+before atomic explicit-ref A receive. Caller heads/request refs remain unchanged; transport
+status/loss never invents outcome or authorizes relaunch. No Docker runtime backend/native
+entity change. The [as-built SSH contract](../dml/docs/spec-next/ssh-execution.md) owns behavior.
+
+Worker stable postfix standard `-v` passes **1191 Python/seven C**, Python **2637/2637**,
+unchanged retained native **1681/132/1562**, binding/141CLI memory gates. Coordinator initial
+fresh full `-v` passes1189/seven C, separate offline-installed actual SSH **177 checks** and
+all11 wheel/host/remote artifacts every byte, then independent **104-test** postfix suite.
+Worker final bare installed local gate **271 checks** and nine selected negative probes are
+worker evidence. Meaningful exact-Q typed-complete association, actual-A-new-put rollback/
+map-full/storage loss, real unchanged4MiB+1 post-F overflow and safe private before-spawn/
+after-reap loss remain distinguished from installed/helper coverage, physical disk/power,
+process-tree/security/second-host/full capture guarantees. [RESULTS](iterations/09-ssh-container-execution/RESULTS.md)
+and [REVIEW](iterations/09-ssh-container-execution/REVIEW.md) preserve precise qualifications.
+
+Reviewed22-file `f63ac75` is normally pushed, including unchanged previously authorized local
+six-file diagram ancestor `f7113d7`. Initial exact-SHA CI40699187591 has five successful jobs/
+Windows three failures. Two new private SSH example harnesses incorrectly passed Windows
+interpreter paths to POSIX endpoints; reviewed one-test-file adapter/regressions fix the model,
+not production profile/runtime/example/fixture/gates. Unchanged prior caller-story missed
+publication with early completion; child reason/artifacts absent, cause **unknown**, not a
+15-second deadline diagnosis. Linux repetitions pass but are not Windows reproduction.
+
+Focused correction is normally pushed as **`29ed39be6c1c18e6d57f782dd073acd37939c71c`**;
+[final exact-SHA CI40701925587](https://github.com/micha/dml/actions/runs/40701925587) passes
+**all six jobs**. Seven C everywhere; Linux/strict1191 Python, macOS1187/four existing skips,
+Windows1185/five existing skips/one POSIX-only path parameter inapplicable. Final Windows
+explicitly passes prior caller story/both fixed SSH cases, not a recovered old-cause diagnosis.
+Coordinator verifies completed JSON/full logs/sole automatic push workflow/direct finite
+watch exit0, clean implementation tree/index and matching remote master. Informational CI
+`-c` remains distinct from local `-v` and actual installed fixture evidence.
+
+After independent stopped-writer probe, worker archives final stopped B/provenance and retires
+only labelled owned container/private keys, image/nonsensitive evidence retained/no global
+prune. Coordinator verifies no owned container/listener. Fixture retirement is separate from
+recorded B scratch cleanup. Worker directed to finalize RESULTS only and stop all runtime/
+build/staging/commit/push/CI. Turn complete and stopped. No design checkpoint commit/push,
+additional worker, release/tag/package publication, cloud/global tooling or later feature.
+
+## Iteration 9 user acceptance and design checkpoint
+
+The user accepted the completed delivery (“good work!”) and requested a commit. This local
+design checkpoint includes Iteration 9 direction/planning/authorization, coordination,
+implementation results, independent review/publication/CI evidence, fixture refinement and
+retirement, preserved initial Windows failure uncertainty and the current resume point.
+Earlier no-design-commit statements describe their historical checkpoints, not this request.
+The design repository has no remote; no push is requested or performed. Implementation
+remains clean at already published `29ed39b`; worker remains stopped. No source/build/fixture/
+CI restart, release/package publication or later feature turn is authorized by this checkpoint.
+
 ## Resume point
+
+Iteration 9 is **implemented, independently accepted, published and stopped** through
+**`29ed39b`**; all six final exact-SHA CI jobs pass. Read
+[RESULTS](iterations/09-ssh-container-execution/RESULTS.md),
+[REVIEW](iterations/09-ssh-container-execution/REVIEW.md),
+[COORDINATION](iterations/09-ssh-container-execution/COORDINATION.md) and
+[as-built SSH contract](../dml/docs/spec-next/ssh-execution.md).
+The [design](iterations/09-ssh-container-execution/DESIGN.md),
+[example](iterations/09-ssh-container-execution/EXAMPLE.md) and
+[handoff](iterations/09-ssh-container-execution/HANDOFF.md) preserve approved plan/provenance,
+not permission to restart. Implementation clean/remote master matches; previous diagram commit
+`f7113d7` now published as unchanged ancestor. Fixture retired after stopped-writer evidence
+archive; host-network/no-shared-mount and trust/profile/process/coverage limits remain explicit.
+Prior unchanged Windows caller-story failure cause remains unknown despite final pass.
+The user accepted the delivery and requested this local design checkpoint; no design push
+or additional worker/release/package/cloud/global/later feature turn is authorized.
 
 Iteration 8 is implemented, independently accepted and published through **`865bb79`**;
 all six final exact-SHA CI jobs pass after reviewed test-only portability correction.
@@ -1694,8 +1884,9 @@ The bounded turn is **complete and stopped**. Read
 [REVIEW](iterations/08-caller-recorded-requests/REVIEW.md),
 [COORDINATION](iterations/08-caller-recorded-requests/COORDINATION.md) and the
 [as-built caller-request contract](../dml/docs/spec-next/caller-requests.md).
-Implementation tree/index clean. Iteration 8's published endpoint remains `865bb79`;
-separate local diagram/maintenance commit `f7113d7` is unpushed. A explicitly records Q/Cq
+Earlier checkpoint: implementation tree/index clean. Iteration 8's endpoint remains `865bb79`;
+separate diagram/maintenance commit `f7113d7` was then unpushed (published later with Iteration 9).
+A explicitly records Q/Cq
 under atomic submission/request refs; B registers exact imported Q and creates only T.
 Both return paths retain exact identity and existing caller heads/request refs, with
 unchanged original mode and unknown/publication/cleanup/live-owner limits. The

@@ -6,6 +6,17 @@ its existing draft specifications.
 
 ## Start here
 
+- Iteration 9 [delivery](iterations/09-ssh-container-execution/RESULTS.md) and
+  [independent review](iterations/09-ssh-container-execution/REVIEW.md): synchronous SSH
+  stage/execute/fetch is implemented, independently accepted and published through
+  **`29ed39b`**; all six final exact-SHA CI jobs pass after a Windows test-harness correction.
+  Docker is local fixture support with approved loopback-only host networking/no shared
+  mounts. Exact-Q atomic receive remains authoritative. The bounded turn is complete and
+  stopped. [Design](iterations/09-ssh-container-execution/DESIGN.md),
+  [example](iterations/09-ssh-container-execution/EXAMPLE.md) and
+  [handoff](iterations/09-ssh-container-execution/HANDOFF.md) preserve plan/provenance,
+  not permission to restart. [As-built contract](../dml/docs/spec-next/ssh-execution.md).
+
 - Iteration 8 [delivery](iterations/08-caller-recorded-requests/RESULTS.md) and
   [coordinator review](iterations/08-caller-recorded-requests/REVIEW.md): caller-recorded Q,
   imported-Q first attempt and exact pinned request validation are implemented,
@@ -100,6 +111,36 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
+Iteration 9 is implemented, independently accepted and published through **`29ed39b`**;
+[final exact-SHA CI](https://github.com/micha/dml/actions/runs/40701925587) passes all six jobs.
+The separate SSH layer/fixed helper stages caller-pinned Cq/Q, executes only new T in B and
+fetches nonexecuting candidates for unchanged exact-Q atomic explicit-ref A receive. Caller
+heads/request refs stay unchanged; disconnect/status never imply outcome/relaunch permission.
+Docker is local fixture support, not runtime backend/shared exchange. Approved loopback-only
+host networking demonstrates filesystem/runtime/SSH separation, not network-namespace or
+second-host isolation.
+
+Worker stable postfix `-v` passes **1191 Python/seven C**, Python2637/2637 and unchanged
+native/memory/141CLI gates. Coordinator fresh full `-v` passes1189/seven C, separate installed
+actual SSH **177 checks**, all11 wheel/host/remote artifact bytes, then independent postfix
+**104 tests**. Worker bare installed gate **271 checks** and nine selected negative probes
+remain distinct evidence. [RESULTS](iterations/09-ssh-container-execution/RESULTS.md) and
+[REVIEW](iterations/09-ssh-container-execution/REVIEW.md) qualify trust/capture/profile/process/
+platform/coverage/mutation and real versus substituted faults.
+
+Reviewed22-file `f63ac75` plus one-file Windows host-model correction `29ed39b` are normally
+pushed, including unchanged prior diagram ancestor `f7113d7`. Initial CI had five jobs green/
+Windows three failures: two confirmed new harness bugs are fixed; unchanged prior caller-story
+early child reason remains unknown despite final Windows pass. Implementation checkout/index
+clean and remote master matches. Owned stopped fixture/B evidence archived before container/
+private-key retirement; no owned listener remains, nonsensitive image/evidence retained.
+
+This bounded turn is **complete and stopped**; see
+[coordination](iterations/09-ssh-container-execution/COORDINATION.md). The user accepted the
+delivery and requested this local design checkpoint. No push, extra workers, release/package
+publication, cloud/global tooling or later feature turn. Earlier preparation/GO/no-checkpoint
+statements preserve provenance, not restart permission.
+
 Iteration 8 is implemented, independently accepted and published through **`865bb79`**;
 [final exact-SHA CI](https://github.com/micha/dml/actions/runs/40624753242) passes all six jobs.
 The bounded turn is complete and stopped. A explicitly records Q/Cq under atomic submission/
@@ -130,9 +171,10 @@ statements preserve provenance, not permission to restart. See
 
 The user accepted Iteration 8 and requested maintenance of the self-contained
 [LMDB entity diagram](../dml/docs/lmdb-entity-diagram.html), then storage-identity field
-annotations and a local commit. Diagram/maintenance/tests are committed separately in DML
-as local **`f7113d7`**, not pushed; implementation checkout is clean and ahead of the published
-Iteration 8 SHA. Four focused tests, JavaScript syntax/DOM-stub checks and links/whitespace
+annotations and a local commit. At the earlier maintenance checkpoint, diagram/maintenance/tests
+were committed separately in DML as local **`f7113d7`**, not yet pushed; Iteration 9 later
+publishes that unchanged ancestor.
+Four focused tests, JavaScript syntax/DOM-stub checks and links/whitespace
 pass; no new full-suite/CI or real-browser audit claimed. This design checkpoint includes
 accumulated Iteration 8 delivery/review/acceptance and diagram-maintenance notes; no design
 push or new feature authorization.

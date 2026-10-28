@@ -73,6 +73,20 @@ and `discussion.md` before continuing the discussion. Read the shared
   [review](iterations/08-caller-recorded-requests/REVIEW.md). This is not permission to restart
   implementation or begin another turn. See
   [coordination](iterations/08-caller-recorded-requests/COORDINATION.md).
+- Iteration 9's [plan and handoff](iterations/09-ssh-container-execution/HANDOFF.md)
+  are approved by the user's Iteration 9 GO. The existing window-2 agent is authorized
+  to implement in a new Pi session, with coordinator monitoring/independent review and
+  fixes until satisfactory, then focused worker commit/push and exact-SHA CI fixes.
+  Local Docker/SSH fixture validation is within this bounded turn; missing prerequisites
+  requiring downloads/installations still need scoped approval. The existing local diagram
+  commit `f7113d7` is accounted for as an ancestor of the authorized normal push, not new
+  runtime work. No extra workers, cloud/second-host or remote-daemon experiments, global
+  tooling/services, release/package publication or later feature turn. See
+  [coordination](iterations/09-ssh-container-execution/COORDINATION.md). This bounded turn
+  is complete and stopped through published `29ed39b`; all six final exact-SHA CI jobs
+  succeed after a reviewed test-only Windows harness fix. See
+  [review](iterations/09-ssh-container-execution/REVIEW.md). This is not permission to
+  restart implementation or begin another turn.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise
