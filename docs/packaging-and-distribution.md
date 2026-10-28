@@ -83,7 +83,9 @@ same installed modules/worker with explicit prelaunch request recording and exac
 first attempt; its [owning contract](spec-next/caller-requests.md) defines that delta.
 The [SSH story](../examples/ssh_execution.py) uses installed explicit endpoint-driven
 stage/execute/fetch and unchanged exact-Q receive; its [SSH contract](spec-next/ssh-execution.md)
-owns transport/client ownership. Docker/Nix/key/image/private-loss fixture support under
+owns transport/client ownership. The [SSH progress modes](../examples/ssh_progress.py) use
+separate saved identity/foreground owner and bounded immutable observation/offline receive.
+Docker/Nix/key/image/private-loss fixture support under
 [tests/ssh](../tests/ssh/README.md) is never packaged or imported by normal runtime/default tests.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory

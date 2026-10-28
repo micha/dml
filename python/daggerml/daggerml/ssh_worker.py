@@ -1,9 +1,10 @@
-"""Fixed installed SSH helper: stage, execute or fetch; never arbitrary commands."""
+"""Fixed installed SSH helper: stage/execute/fetch/observe, never arbitrary commands."""
 
 from __future__ import annotations
 
 from pathlib import Path
 import sys
+import tempfile
 
 from . import exchange, transfer
 from .ssh import (
@@ -42,6 +43,30 @@ def serve(action: str, workspace, stdin, stdout) -> None:
         )
         bundle = _read_file(workspace / "output.bundle", transfer.MAX_BUNDLE_BYTES)
         _write_frame(stdout, "fetch", (descriptor, completion, bundle))
+    elif action == "observe":
+        _eof(stdin)
+        descriptor = _read_file(workspace / "job.json", exchange.MAX_DESCRIPTOR_BYTES)
+        expected = _expected(_owned_spec(descriptor))
+        with tempfile.TemporaryDirectory(prefix="dml-ssh-observe-") as temporary:
+            packet = Path(temporary) / "packet"
+            observation = exchange.observe_exchange(
+                exchange.ExchangeHandle(workspace, expected), packet=packet
+            )
+            if observation.packet is None:
+                reply, bodies = "bootstrap", (descriptor,)
+            else:
+                job = _read_file(packet / "job.json", exchange.MAX_DESCRIPTOR_BYTES)
+                if _owned_spec(job) != expected:
+                    raise SSHError("observed job differs from owned selection")
+                receipt = _read_file(
+                    packet / "observation.json", exchange.MAX_DESCRIPTOR_BYTES
+                )
+                bundle = _read_file(
+                    packet / "snapshot.bundle", transfer.MAX_BUNDLE_BYTES
+                )
+                reply, bodies = "observation", (job, receipt, bundle)
+        # Dispose helper packet scratch and handles before emitting successful bytes.
+        _write_frame(stdout, reply, bodies)
     else:
         raise SSHError("unsupported SSH helper action")
     stdout.flush()

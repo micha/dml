@@ -47,6 +47,7 @@ __all__ = [
     "load_exchange_handle",
     "start_exchange",
     "observe_exchange",
+    "read_observation",
     "receive_observation",
 ]
 
@@ -1112,14 +1113,10 @@ def observe_exchange(handle: ExchangeHandle, *, packet) -> ExchangeObservation:
     return observation
 
 
-def receive_observation(
-    repository_path, *, packet, expected: ExchangeSpec, ref: str, map_size: int = 0
-) -> ReceivedObservation:
-    """Independently validate immutable P/U/F before atomic explicit-ref A import."""
+def _read_observation(packet, expected, ref):
+    """Own packet bytes and description once, shared by inspection and reception."""
     if not isinstance(expected, ExchangeSpec):
         raise TypeError("expected requires ExchangeSpec")
-    _name(ref)
-    _map_size(map_size)
     packet = _path(packet)
     if _job(packet) != expected:
         raise ExchangeError("job differs from caller expected selection")
@@ -1152,5 +1149,25 @@ def receive_observation(
     _hex(receipt["attempt_id"], "a-")
     bundle = _read(packet / "snapshot.bundle", transfer.MAX_BUNDLE_BYTES)
     received = _validate_observation(bundle, expected, receipt, ref)
+    return bundle, received
+
+
+def read_observation(packet, *, expected: ExchangeSpec) -> ReceivedObservation:
+    """Validate owned immutable P/U/F in disposable storage, without writing A.
+
+    Returned refs (including nested completion) are None. Historical paths/source
+    remain inert; validation handles and scratch are disposed before return.
+    """
+    _, received = _read_observation(packet, expected, None)
+    return received
+
+
+def receive_observation(
+    repository_path, *, packet, expected: ExchangeSpec, ref: str, map_size: int = 0
+) -> ReceivedObservation:
+    """Independently validate immutable P/U/F before atomic explicit-ref A import."""
+    _name(ref)
+    _map_size(map_size)
+    bundle, received = _read_observation(packet, expected, ref)
     transfer.import_commit(repository_path, bundle, ref=ref, map_size=map_size)
     return received

@@ -23,7 +23,7 @@ profile passed or apply host networking to production. No runtime A/source/excha
 socket mounts. Docker may provide its ordinary container metadata files; no project data
 is exposed through shared execution mounts.
 
-One named/labelled container `dml-iteration9-ssh` is owned by this fixture. The unprivileged
+One named/labelled container `dml-iteration10-ssh` is owned by this fixture. The unprivileged
 `dml` account (uid1000) has a controlled public-key-only sshd profile; root login, password/
 keyboard auth and forwarding are disabled. Keys are generated in the ignored fixture root,
 not in image layers/Git. Known-hosts derives from the owner-created host public key through
@@ -35,9 +35,9 @@ Never print/copy private key contents into prompts, logs or Git.
 From the repository, in the existing development tools shell:
 
 ```sh
-bash tests/ssh/fixture.sh build "$PWD/build/iteration9-owned" \
+bash tests/ssh/fixture.sh build "$PWD/build/iteration10-owned" \
   "$PWD/build/iteration2-packaging/bin/python" /run/current-system/sw/bin/python3
-bash tests/ssh/fixture.sh start "$PWD/build/iteration9-owned" 32769
+bash tests/ssh/fixture.sh start "$PWD/build/iteration10-owned" 32769
 ```
 
 The packaging Python argument MUST identify an **existing** tool environment, not cause
@@ -67,11 +67,34 @@ do not claim unrelated relocated entry launchers were validated.
 Using the **current installed host runtime**, outside source PYTHONPATH:
 
 ```sh
-env -u PYTHONPATH build/iteration9-owned/context/rootfs/opt/dml/bin/python \
-  tests/ssh/integration.py build/iteration9-owned /tmp/NEW-DML-SSH-STORY
+env -u PYTHONPATH build/iteration10-owned/context/rootfs/opt/dml/bin/python \
+  tests/ssh/progress_integration.py build/iteration10-owned /tmp/NEW-DML-SSH-PROGRESS
+# The gate stops its endpoint only after writer disposition. Explicitly restart
+# that same retained endpoint for the existing synchronous regression gate:
+docker --host unix:///var/run/docker.sock start dml-iteration10-ssh
+env -u PYTHONPATH build/iteration10-owned/context/rootfs/opt/dml/bin/python \
+  tests/ssh/integration.py build/iteration10-owned /tmp/NEW-DML-SSH-STORY
 ```
 
-Normal operations use the actual installed fixed helper and binary SSH stream. The gate
+The progress gate retains actual SSHLaunch while fresh installed clients load saved identity,
+observe P/U/F and exit. Remote named gate paths are created/reset/released explicitly through
+out-of-band fixture control, without shared mounts or runtime command/gate actions. A/prepared
+inputs are offline during execution. Wait timeout retains the execution connection; separate
+observation clients never own it. Public all-typed/all-parent/every-byte oracles compare actual
+remote runtime reads, independent packet stores and offline A. Normal finite computation,
+provisional U/nonzero-after-U failure, repeated matching Qs, receiptless F, coherent selected
+history, independent guards and explicit-ref conflicts remain inspectable.
+
+Normal driver finally releases both gates, **unconditionally** waits/reaps every acquired
+execution owner (including already exited clients), restores A and checks writers even when
+another cleanup fails. Original assertion/transport errors and actual owner are preserved in
+blocker descriptions. Every acquired concurrent observation reader is communicated/reaped on
+errors; uncertain disposition retains actual clients as blocker evidence, never authorizes
+endpoint retirement. Normal finite gates/binding are distinct from the example application's
+potentially indefinite investigation retention after uncertain owner wait.
+
+Normal operations use the actual installed fixed helper and binary SSH stream. The
+synchronous regression gate additionally
 checks source/native/worker/runtime provenance and an independently asserting computational
 child; exact caller Q/only new T, prior real history/composite-only descendants, two matching
 requests, success/nonzero-after-publication evidence/launch failure/separate cleanup, genuine
@@ -88,7 +111,8 @@ and independently validated Q2 packet swaps reject before A writes.
 
 `private_loss.py` is **not installed** or imported by normal runtime. The fixture explicitly
 copies it for finite substituted remote commands at stage acknowledgement, before child
-spawn, after actual child reaping/before F, after closed completion files and during fetch.
+spawn, after actual child reaping/before F, after closed completion files and during fetch/
+observe. Interrupted observe is nonexecuting retrieval, never a computational retry.
 It never sacrifices a live computational child. Gate release/disposition checks run in
 `finally` on every error path. Failure to release/prove stopped writers raises a blocker
 and leaves container/history retained, not a convenient automatic stop/removal. Private
@@ -112,8 +136,8 @@ the coordinator can explicitly restart the same endpoint solely for a separate p
 After all intended history/evidence is retained and owned writers are proved stopped:
 
 ```sh
-bash tests/ssh/fixture.sh stop "$PWD/build/iteration9-owned"
-bash tests/ssh/fixture.sh remove "$PWD/build/iteration9-owned"
+bash tests/ssh/fixture.sh stop "$PWD/build/iteration10-owned"
+bash tests/ssh/fixture.sh remove "$PWD/build/iteration10-owned"
 ```
 
 `stop` verifies fixture label and stops only its named container. Calling it is not itself
@@ -124,6 +148,7 @@ No `--rm`, prune/global deletion, arbitrary PID signaling, volume removal or his
 cleanup. Fixture retirement is separate from recorded B scratch cleanup/outcome.
 
 Exact commands, counts, tested image/closure/wheel provenance, failures and retained/removed
-status belong to [Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md).
+status belong to [Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md)
+and [Iteration 10 results](../../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md).
 No second-machine/cloud, security sandbox, full capture, distributed exactly-once,
 network-namespace isolation, detached supervision or production cleanup guarantee follows.

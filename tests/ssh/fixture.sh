@@ -7,12 +7,12 @@ root="${2:?fixture root under build/ required}"
 root="$(realpath -m "$root")"
 case "$root" in "$repo"/build/*) ;; *) echo 'fixture root must be inside checkout build/' >&2; exit 1;; esac
 case "$root" in "$repo"/build/check|"$repo"/build/check/*|"$repo"/build/coverage|"$repo"/build/coverage/*) exit 1;; esac
-name=dml-iteration9-ssh
-label=dml.fixture=iteration9
+name=dml-iteration10-ssh
+label=dml.fixture=iteration10
 image=dml-ssh-fixture:local
 docker_local() { docker --host unix:///var/run/docker.sock "$@"; }
 owned_container() {
-  test "$(docker_local inspect "$name" --format '{{index .Config.Labels "dml.fixture"}}')" = iteration9
+  test "$(docker_local inspect "$name" --format '{{index .Config.Labels "dml.fixture"}}')" = iteration10
 }
 case "$action" in
   build)

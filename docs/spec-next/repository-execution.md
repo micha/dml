@@ -12,8 +12,9 @@ handles/values, [repository](repository.md) storage and [CLI](cli.md) inspection
 Vocabulary follows the [glossary](glossary.md). The additive
 [asynchronous contract](asynchronous-execution.md) owns saved handles/live worker launch,
 bootstrap readiness and immutable initial/publication/completion observation packets.
-The separate [SSH contract](ssh-execution.md) owns caller-Q-only synchronous network
-transport/fixed invocation; its fetch candidates use this document's unchanged receive.
+The separate [SSH contract](ssh-execution.md) owns caller-Q SSH transport/fixed invocation and foreground asynchronous SSH ownership;
+its fetch candidates use this document's unchanged receive and its P/U/F packets use the
+[owning asynchronous inspector/reception](asynchronous-execution.md).
 Normative sections describe implemented
 behavior; example orchestration is informative. The additive [caller-request contract](caller-requests.md)
 owns explicit Q-only A recording, public imported-Q first registration and the exact

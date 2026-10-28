@@ -28,14 +28,23 @@ def barrier(*args, **kwargs):
 if phase == "stage":
     ssh_worker.serve("stage", workspace, sys.stdin.buffer, io.BytesIO())
     barrier()
-elif phase == "fetch":
+elif phase in ("fetch", "observe"):
     response = io.BytesIO()
-    ssh_worker.serve("fetch", workspace, sys.stdin.buffer, response)
+    ssh_worker.serve(phase, workspace, sys.stdin.buffer, response)
     sys.stdout.buffer.write(response.getvalue()[:10])
     sys.stdout.buffer.flush()
     barrier()
 else:
-    if phase == "pre-child":
+    if phase == "pre-ready":
+        original = exchange._write_document
+
+        def before_ready(path, document):
+            if path.name == "worker-ready.json":
+                barrier()
+            return original(path, document)
+
+        exchange._write_document = before_ready
+    elif phase == "pre-child":
         local._execute = barrier
     elif phase == "reaped-pre-f":
         local._finalize = barrier

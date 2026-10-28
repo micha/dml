@@ -1,7 +1,7 @@
-"""Synchronous caller-Q SSH transport; Docker is not a runtime dependency.
+"""Caller-Q SSH transport with separate saved identity and live foreground owner.
 
-Fetch supplies transport candidates only. Existing exchange.receive_exchange owns
-exact-history validation and atomic publication. See docs/spec-next/ssh-execution.md.
+Fetch supplies transport candidates only; observation validates immutable progress.
+Exchange owns exact-history validation and atomic reception; Docker is fixture-only.
 """
 
 from __future__ import annotations
@@ -24,6 +24,11 @@ __all__ = [
     "SSHRemote",
     "SSHExchange",
     "SSHError",
+    "SSHLaunch",
+    "save_ssh_exchange",
+    "load_ssh_exchange",
+    "start_ssh_exchange",
+    "observe_ssh_exchange",
     "stage_ssh_exchange",
     "execute_ssh_exchange",
     "fetch_ssh_exchange",
@@ -139,6 +144,155 @@ class SSHExchange:
         return str(PurePosixPath(self.remote.workspace_root) / self.expected.token)
 
 
+class SSHLaunch:
+    """Nonserializable application owner of one foreground execution connection.
+
+    Retain and explicitly wait/reap. Timeout and uncertain wait errors keep streams
+    and process; there is no finalizer, implicit cancellation or detached lifetime.
+    """
+
+    def __init__(self, job, stack, stdout):
+        self.job = job
+        self.process = None
+        self._stack = stack
+        self._stdout = stdout
+        self._finished = False
+        self._error = None
+
+    def wait(self, timeout=None):
+        if self._finished:
+            if self._error is not None:
+                raise self._error
+            return self.process.returncode
+        code = self.process.wait(timeout=timeout)
+        # Only known local disposition permits stream disposal/output inspection.
+        try:
+            try:
+                _status(code)
+                self._stdout.seek(0)
+                _eof(self._stdout)
+            finally:
+                self._finished = True
+                self._stack.close()
+        except BaseException as error:
+            self._error = error
+            raise
+        return code
+
+
+def _dispatch(job):
+    try:
+        with open(job.control / "dispatched", "xb"):
+            pass
+    except FileExistsError:
+        raise SSHError(
+            "SSH exchange already dispatched; no automatic relaunch"
+        ) from None
+
+
+def _status(code):
+    if code != 0:
+        raise SSHError(
+            "SSH invocation failed (status {}); remote outcome unknown".format(code)
+        )
+
+
+def start_ssh_exchange(job: SSHExchange, *, connect_timeout_ms: int) -> SSHLaunch:
+    """Spawn the same fixed execute once; return before auth/readiness/computation."""
+    if not isinstance(job, SSHExchange):
+        raise TypeError("job requires SSHExchange")
+    command = _argv(job, "execute", _timeout(connect_timeout_ms))
+    stack = ExitStack()
+    try:
+        stdout, stderr = [
+            stack.enter_context(
+                tempfile.NamedTemporaryFile(
+                    dir=job.control, prefix="execute." + name + ".", delete=False
+                )
+            )
+            for name in ("stdout", "stderr")
+        ]
+        launch = SSHLaunch(job, stack, stdout)
+        _dispatch(job)
+        launch.process = subprocess.Popen(
+            command, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, shell=False
+        )
+    except BaseException:
+        stack.close()
+        raise
+    # No allocation or receipt IO after acquiring Popen is required to return owner.
+    return launch
+
+
+_REMOTE_FIELDS = (
+    "host",
+    "port",
+    "user",
+    "identity_file",
+    "known_hosts_file",
+    "python",
+    "workspace_root",
+)
+SAVED_FORMAT = "daggerml-ssh-exchange-v1"
+
+
+def save_ssh_exchange(directory, job: SSHExchange) -> None:
+    """Save trusted operational identity only, exclusively; metadata last."""
+    if not isinstance(job, SSHExchange):
+        raise TypeError("job requires SSHExchange")
+    directory = _path(directory)
+    document = {"format": SAVED_FORMAT}
+    document.update(
+        (
+            name,
+            (
+                str(getattr(job.remote, name))
+                if name.endswith("_file")
+                else getattr(job.remote, name)
+            ),
+        )
+        for name in _REMOTE_FIELDS
+    )
+    data = json.dumps(document, ensure_ascii=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    if len(data) > exchange.MAX_DESCRIPTOR_BYTES:
+        raise SSHError("saved SSH metadata exceeds profile")
+    directory.mkdir()
+    exchange.save_exchange_handle(
+        directory / "expected.json", exchange.ExchangeHandle(job.control, job.expected)
+    )
+    with open(directory / "ssh.json", "xb") as stream:
+        stream.write(data)
+
+
+def load_ssh_exchange(directory) -> SSHExchange:
+    """Load identity without consulting control/input/B/endpoint or live processes."""
+    directory = _path(directory)
+    handle = exchange.load_exchange_handle(directory / "expected.json")
+    try:
+        document = json.loads(
+            _read_file(directory / "ssh.json", exchange.MAX_DESCRIPTOR_BYTES).decode(
+                "utf-8"
+            ),
+            object_pairs_hook=_pairs,
+            parse_constant=_constant,
+        )
+    except (ValueError, RecursionError):
+        raise SSHError("invalid saved SSH metadata") from None
+    if (
+        type(document) is not dict
+        or set(document) != set(_REMOTE_FIELDS) | {"format"}
+        or document["format"] != SAVED_FORMAT
+    ):
+        raise SSHError("unexpected saved SSH metadata fields/format")
+    for name in ("identity_file", "known_hosts_file"):
+        if type(document[name]) is not str:
+            raise SSHError("saved credential path requires str")
+    remote = SSHRemote(**{name: document[name] for name in _REMOTE_FIELDS})
+    return SSHExchange(remote, handle.expected, handle.workspace)
+
+
 def _argv(job, action, timeout_ms):
     remote = job.remote
     command = " ".join(
@@ -198,12 +352,14 @@ def _argv(job, action, timeout_ms):
 def _limits(action):
     if action == "stage":
         return (exchange.MAX_DESCRIPTOR_BYTES, transfer.MAX_BUNDLE_BYTES)
-    if action == "fetch":
+    if action in ("fetch", "observation"):
         return (
             exchange.MAX_DESCRIPTOR_BYTES,
             exchange.MAX_DESCRIPTOR_BYTES,
             transfer.MAX_BUNDLE_BYTES,
         )
+    if action == "bootstrap":
+        return (exchange.MAX_DESCRIPTOR_BYTES,)
     if action == "ack":
         return ()
     raise SSHError("unsupported frame action")
@@ -249,11 +405,24 @@ def _read_frame(stream, action):
         )
     except (ValueError, RecursionError):
         raise SSHError("invalid SSH frame header") from None
-    limits = _limits(action)
+    if action == "observe":
+        if type(header) is not dict or header.get("format") not in (
+            FRAME_FORMAT.format("bootstrap"),
+            FRAME_FORMAT.format("observation"),
+        ):
+            raise SSHError("unexpected SSH observation format")
+        selected = (
+            "bootstrap"
+            if header["format"] == FRAME_FORMAT.format("bootstrap")
+            else "observation"
+        )
+    else:
+        selected = action
+    limits = _limits(selected)
     if (
         type(header) is not dict
         or set(header) != {"format", "sizes"}
-        or header["format"] != FRAME_FORMAT.format(action)
+        or header["format"] != FRAME_FORMAT.format(selected)
         or type(header["sizes"]) is not list
         or len(header["sizes"]) != len(limits)
     ):
@@ -265,7 +434,7 @@ def _read_frame(stream, action):
         raise SSHError("SSH frame body exceeds profile")
     bodies = tuple(_exact(stream, n) for n in sizes)
     _eof(stream)
-    return bodies
+    return (selected, bodies) if action == "observe" else bodies
 
 
 def _write_frame(stream, action, bodies):
@@ -332,13 +501,7 @@ def _invoke(job, action, timeout_ms, bodies=()):
         stdin.seek(0)
         # This guard survives spawn, authentication, timeout and response loss.
         if action == "execute":
-            try:
-                with open(job.control / "dispatched", "xb"):
-                    pass
-            except FileExistsError:
-                raise SSHError(
-                    "SSH exchange already dispatched; no automatic relaunch"
-                ) from None
+            _dispatch(job)
         process = subprocess.Popen(
             command, stdin=stdin, stdout=stdout, stderr=stderr, shell=False
         )
@@ -353,17 +516,12 @@ def _invoke(job, action, timeout_ms, bodies=()):
                     process=process,
                 ) from cleanup
             raise
-        if status != 0:
-            raise SSHError(
-                "SSH invocation failed (status {}); remote outcome unknown".format(
-                    status
-                )
-            )
+        _status(status)
         stdout.seek(0)
         if action == "execute":
             _eof(stdout)
             return ()
-        return _read_frame(stdout, "ack" if action == "stage" else "fetch")
+        return _read_frame(stdout, "ack" if action == "stage" else action)
 
 
 def stage_ssh_exchange(
@@ -412,3 +570,38 @@ def fetch_ssh_exchange(job: SSHExchange, *, packet, timeout_ms: int) -> Path:
         with open(packet / name, "xb") as stream:
             stream.write(data)
     return packet
+
+
+def observe_ssh_exchange(
+    job: SSHExchange, *, packet, timeout_ms: int
+) -> exchange.ExchangeObservation:
+    """One bounded nonexecuting retrieval, independently validated before packet IO."""
+    if not isinstance(job, SSHExchange):
+        raise TypeError("job requires SSHExchange")
+    packet = _path(packet)
+    action, bodies = _invoke(job, "observe", timeout_ms)
+    descriptor = bodies[0]
+    if _owned_spec(descriptor) != job.expected:
+        raise SSHError("observed job differs from caller expected selection")
+    if action == "bootstrap":
+        return exchange.ExchangeObservation("working", "bootstrap", None, None)
+    descriptor, receipt, bundle = bodies
+    files = (
+        ("snapshot.bundle", bundle),
+        ("job.json", descriptor),
+        ("observation.json", receipt),
+    )
+    with tempfile.TemporaryDirectory(prefix="dml-ssh-observation-") as temporary:
+        scratch = Path(temporary)
+        for name, data in files:
+            (scratch / name).write_bytes(data)
+        snapshot = exchange.read_observation(scratch, expected=job.expected)
+    # All host validation scratch is disposed before final caller packet allocation.
+    observation = exchange.ExchangeObservation(
+        snapshot.lifecycle, snapshot.phase, packet, snapshot
+    )
+    packet.mkdir()
+    for name, data in files:
+        with open(packet / name, "xb") as stream:
+            stream.write(data)
+    return observation

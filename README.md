@@ -94,7 +94,10 @@ then create only T in fresh B while preserving exact Q and caller submission ref
 The separate [SSH contract](docs/spec-next/ssh-execution.md) and
 [endpoint-driven story](examples/ssh_execution.py) add synchronous caller-Q stage/execute/fetch
 through a fixed installed helper, keeping strict host-key checks, unknown outcomes and
-unchanged exact-Q explicit-ref reception. Docker is local acceptance support only.
+unchanged exact-Q explicit-ref reception. [Foreground progress modes](examples/ssh_progress.py)
+separate saved SSH identity/live owner and retrieve validated immutable P/U/F through one fixed
+nonexecuting observe action. Remote gates in this demonstration are controlled externally.
+Docker is local acceptance support only.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

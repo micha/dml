@@ -14,7 +14,10 @@ and atomic create-or-same-target refs. [Python API](python-api.md) owns native h
 [CLI](cli.md) owns inspection. Vocabulary follows the [glossary](glossary.md).
 Normative sections describe implemented behavior; example orchestration is informative.
 [Caller requests](caller-requests.md) owns explicit prelaunch Q, imported-Q first
-registration and exact Cq/Q mode-specific discovery/validation. This document's
+registration and exact Cq/Q mode-specific discovery/validation. The separate
+[SSH contract](ssh-execution.md) owns foreground SSHLaunch/saved SSH identity and fixed
+nonexecuting observe; it composes this document's unchanged P/U/F authority.
+This document's
 ownership, phases/packets, unknown and done boundaries apply unchanged in both modes.
 
 ## Public surface and descriptions
@@ -23,7 +26,7 @@ ownership, phases/packets, unknown and done boundaries apply unchanged in both m
 from daggerml.exchange import (
     ExchangeHandle, WorkerLaunch, ExchangeObservation, ReceivedObservation,
     save_exchange_handle, load_exchange_handle,
-    start_exchange, observe_exchange, receive_observation,
+    start_exchange, observe_exchange, read_observation, receive_observation,
 )
 
 ExchangeHandle(workspace, expected: ExchangeSpec)
@@ -31,6 +34,7 @@ save_exchange_handle(file, handle: ExchangeHandle) -> None
 load_exchange_handle(file) -> ExchangeHandle
 start_exchange(handle: ExchangeHandle) -> WorkerLaunch
 observe_exchange(handle: ExchangeHandle, *, packet) -> ExchangeObservation
+read_observation(packet, *, expected: ExchangeSpec) -> ReceivedObservation
 receive_observation(repository_path, *, packet, expected: ExchangeSpec,
                     ref: str, map_size: int = 0) -> ReceivedObservation
 ```
@@ -154,6 +158,15 @@ and exclusive file creation. Observation receipts have exactly `format`, `token`
 `phase`, `selected_commit`, `pre_dispatch`, `request_id`, `attempt_id`, format
 `daggerml-local-exchange-observation-v1`. No serialized lifecycle/success/PID assertion is
 trusted; lifecycle and outcome are derived from selected history.
+
+`read_observation` publicly owns strict packet/job/receipt parsing, exact expected/root/phase
+and selected-history validation. It imports only into disposable validation storage, closes
+handles and cleans scratch before returning an owned ReceivedObservation with `ref=None`
+and nested completion ref=None. It never opens/writes A, dispatches, recreates refs, follows
+historical paths or executes source. Malformed/profile/history/IO/scratch-cleanup failures
+raise without a successful description. Bootstrap has no packet to inspect. Receive shares
+that same internal owned-bundle validation and then imports those **same owned bytes** into
+A, not a second read of mutable incoming files.
 
 Receive requires independent `expected`, exact job/receipt token/base, IDs/occurrences,
 phase and bundle-root equality. It revalidates full history in disposable storage, closes/

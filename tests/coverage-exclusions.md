@@ -283,6 +283,39 @@ successful packet. Existing native/binding/141 CLI memory workloads and runtime/
 qualifications remain; actual commands/provenance/mutation/profile/platform/trust/fixture
 retention distinctions belong to [Iteration 9 results](../../dml-design/iterations/09-ssh-container-execution/RESULTS.md).
 
+## Iteration 10 foreground SSH/progress population
+
+Public owning read-only observation inspection, saved SSH identity, live nonwaiting SSHLaunch,
+fixed nonexecuting observe and the endpoint progress example remain in the unchanged source
+gate. No new exclusions, source omissions, weakened thresholds, boundary reductions or memory
+suppressions. Host statements are not all Python branches or installed helper/child coverage.
+
+Execution wait timeout/uncertain wait preserves actual Popen and streams; postreap status,
+stdout/seek/read/stack-close errors dispose all streams and repeat the cached error. Owner/log/
+spawn allocation and mixed start/synchronous guards remain tested. Observation-client shutdown
+uncertainty retains its own Popen, distinct from the execution owner and remote descendants.
+Both endpoints clean allocated packet scratch before successful reply/final packet; validation
+and final packet IO failures never report done or write A. The owning inspector shares the
+same owned-bundle authority with receive, without a second role/native/job codec.
+
+Typed-complete exact-Cq/retained-Q but wrong-T-to-matching-Q P/U/F, independently valid second-Q
+swaps, final roles/parents/evidence/cleanup and coherent immutable-pin races reject before A
+writes. Observed packets exercise successful genuinely new actual-A puts/readback before late
+raw/different-ref/substituted consuming-commit failures. Existing genuine small-map/import
+pre/postcommit tests remain enabled; comparable-map exact physical equality and full typed
+oracles are not replaced by hash-only comparisons. Computational retry is never inferred.
+
+Separate [installed gates](ssh/README.md) exercise current cached local SSH runtime, fresh
+clients/out-of-band remote gates, complete typed-byte/all-parent oracles, offline receive and
+actual auth/host-key errors/production-profile overflow. Private readiness/pre-spawn/after-reap/
+post-F and interrupted-observe barriers are explicitly substituted command evidence, not
+installed fault hooks or arbitrary remote-lifetime/power-loss assurance. Fixture cleanup
+regressions exercise unconditional reaping/A restoration/writer checks and ownership of all
+concurrent observation clients on errors; actual unknown disposition retains fixture/B/evidence.
+Existing native/binding/141CLI memory and finalizer/runtime qualifications remain distinct from
+installed-process memory/Python mutation assurance. Commands/provenance/counts and limitations
+belong to [Iteration 10 results](../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

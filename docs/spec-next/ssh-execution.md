@@ -1,4 +1,4 @@
-# Synchronous SSH execution
+# SSH execution and immutable progress
 
 Status: implemented by separately imported `daggerml.ssh` and the fixed installed
 `daggerml.ssh_worker` helper. Docker is local acceptance support, not a runtime backend.
@@ -6,7 +6,9 @@ Status: implemented by separately imported `daggerml.ssh` and the fixed installe
 ## Authority boundary
 
 This document owns SSH endpoint/invocation profiles, binary transport framing, local
-client ownership and stage/execute/fetch boundaries. [Caller requests](caller-requests.md)
+client ownership, saved SSH identity and stage/execute/start/fetch/observe boundaries.
+[Asynchronous exchange](asynchronous-execution.md) owns coherent immutable P/U/F discovery,
+packet validation/read-only inspection and explicit-ref reception. [Caller requests](caller-requests.md)
 owns explicit Q/Cq and imported-Q first registration. [Repository execution](repository-execution.md)
 owns job/completion descriptions and authoritative selected-history reception;
 [local execution](local-execution.md) owns the unchanged computational child, outcomes
@@ -19,8 +21,9 @@ instructions are informative.
 
 ```python
 from daggerml.ssh import (
-    SSHRemote, SSHExchange, SSHError,
+    SSHRemote, SSHExchange, SSHError, SSHLaunch,
     stage_ssh_exchange, execute_ssh_exchange, fetch_ssh_exchange,
+    save_ssh_exchange, load_ssh_exchange, start_ssh_exchange, observe_ssh_exchange,
 )
 from daggerml.exchange import read_exchange_spec, receive_exchange
 
@@ -28,7 +31,13 @@ SSHRemote(host, port, user, identity_file, known_hosts_file, python, workspace_r
 stage_ssh_exchange(remote, *, workspace, expected, control, timeout_ms) -> SSHExchange
 execute_ssh_exchange(job, *, timeout_ms) -> None
 fetch_ssh_exchange(job, *, packet, timeout_ms) -> Path
+save_ssh_exchange(directory, job) -> None
+load_ssh_exchange(directory) -> SSHExchange
+start_ssh_exchange(job, *, connect_timeout_ms) -> SSHLaunch
+observe_ssh_exchange(job, *, packet, timeout_ms) -> ExchangeObservation
 receive_exchange(A, workspace=packet, expected=job.expected, ref=return_ref)
+# Progress reception uses existing exchange.receive_observation:
+receive_observation(A, packet=progress_packet, expected=job.expected, ref=explicit_ref)
 ```
 
 Frozen `SSHRemote` owns operational endpoint/runtime configuration; frozen `SSHExchange`
@@ -40,7 +49,7 @@ They are not computational identities, serialized capabilities or a global dispa
 Creating another explicit control/workspace/repository can attempt copied Q again.
 
 Control is a separate new host directory. It MUST remain available even when A and
-prepared input artifacts are offline. Fetch never reads those input files or A. Independent
+prepared input artifacts are offline. Fetch/observe never read those input files or A. Independent
 expected remains caller-owned; incoming packets cannot select their own expected Q/Cq.
 Original local fresh-Q, synchronous and asynchronous APIs remain unchanged.
 
@@ -53,7 +62,7 @@ caller's OS path parser. Spaces, apostrophes and shell metacharacters are quoted
 `shlex.quote` as individual tokens in one fixed remote command:
 
 ```text
-<configured Python> -m daggerml.ssh_worker <stage|execute|fetch> <configured workspace>
+<configured Python> -m daggerml.ssh_worker <stage|execute|fetch|observe> <configured workspace>
 ```
 
 Host is nonempty `[A-Za-z0-9][A-Za-z0-9.:-]*`; user is
@@ -93,12 +102,79 @@ MUST reject. Startup noise is not a response. Bounded whitespace is accepted in 
 | `daggerml-ssh-stage-v1` | job (8,192), input bundle (`transfer.MAX_BUNDLE_BYTES`) |
 | `daggerml-ssh-ack-v1` | no bodies; acknowledgement only |
 | `daggerml-ssh-fetch-v1` | job (8,192), completion (8,192), output bundle (`transfer.MAX_BUNDLE_BYTES`) |
+| `daggerml-ssh-bootstrap-v1` | job (8,192), only for observe |
+| `daggerml-ssh-observation-v1` | job (8,192), observation receipt (8,192), snapshot bundle (`transfer.MAX_BUNDLE_BYTES`), only for observe |
 
+Observe input MUST be empty and only the two observation reply formats are accepted.
+No transported lifecycle, process state, result or success assertion is accepted.
 Execute input/output MUST be empty. Bundle/descriptors keep their existing owning codecs;
 this framing does not decode native records or assert an outcome. Transfer limits are not
 exact RSS/time/disk quotas. Received bodies are owned bytes before publication. Exchange's
 public job reader parses those exact owned descriptor bytes in helper-owned temporary scratch;
 the SSH layer has no second job/role/native codec. Scratch cleanup errors propagate.
+
+## Saved identity and live foreground launch
+
+`save_ssh_exchange` creates a new directory exclusively. `expected.json` composes public
+`save_exchange_handle(ExchangeHandle(job.control, job.expected))`; its workspace is the host
+control path, **not** remote B. `ssh.json`, written last, has exactly `format` plus the seven
+SSHRemote fields: `host`, `port`, `user`, `identity_file`, `known_hosts_file`, `python`,
+`workspace_root`. Format is `daggerml-ssh-exchange-v1`; both files have the unchanged8,192-byte
+budget and strict JSON/type/profile checks. Credential paths, not contents, are operational
+configuration outside Git/DML records. Save/load never consult control/input/B/A/endpoint,
+connect, signal, dispatch or serialize a PID/process/lifecycle. Partial/colliding directories
+reject without repair; metadata-last is not multi-file/power-loss atomicity. Trusted caller
+configuration and single-owner files remain required. Do not use its local expected handle
+with local exchange start/observe; public load returns the SSHExchange identity instead.
+
+`start_ssh_exchange` prepares fixed **foreground execute** argv, file-backed stdout/stderr
+and SSHLaunch before acquiring the shared local `dispatched` guard and Popen. Stdin is
+DEVNULL. It returns without waiting for authentication/readiness/T/computation; no postspawn
+receipt IO or owner allocation is required. Start and synchronous execute reject each other's
+prior dispatch before another Popen. The existing remote `started` guard remains independent.
+There is no remote background worker, `ssh -f`, nohup, service, ControlMaster or supervisor.
+
+`SSHLaunch` owns `.job`, actual local `.process` and acquired streams. The application MUST
+retain and explicitly reap it. `wait(timeout=None)` uses Python seconds and returns only local
+SSH status0 after empty execute stdout is checked; nonzero status/noise raises SSHError, not a
+computational outcome. Known disposition closes all acquired streams even when status, seek,
+read or close checks fail. A repeated wait returns the cached status or raises the cached
+postreap error. **Timeout/uncertain wait errors retain the process and streams**, permitting
+another wait; they MUST NOT automatically kill/disconnect this execution connection. There
+is no saved live owner, hidden registry/finalizer/context cancellation or implicit wait.
+Normal exit of the sole owner leaving a live unowned connection is unsupported. Hard owner/
+channel loss does not establish remote-child disposition or authorize replacement execution.
+
+## One bounded nonexecuting observation
+
+The installed fixed `observe` calls public `observe_exchange` once, with exact owned job bytes
+and remote ExchangeHandle. It adds no polling, ref discovery, role codec, execution, finalization
+or repair. Its temporary packet is read into bounded owned job/receipt/bundle bytes, exact job
+matched, and all helper scratch disposed **before** successful frame emission. Bootstrap
+carries only the matching job: no retrieved snapshot is reported, not proof of no dispatch or
+liveness. Malformed readiness/history is an error, never a bootstrap fallback.
+
+Host observation owns the full reply frame, matches independent expected, materializes P/U/F
+in disposable scratch and calls public `read_observation`. Scratch cleanup precedes final packet
+allocation. It publishes the same owned `snapshot.bundle`, `job.json`, `observation.json` (last)
+in a new caller packet, then returns ExchangeObservation with validated snapshot/ref=None.
+Bootstrap has no packet/snapshot and does not allocate the caller packet directory. Receipt/
+profile/export/validation/cleanup/IO failure prevents a successful observation; A is unchanged.
+Duplicate remote/host/receive validation and temporary IO are deliberate composition costs,
+not an exact deadline/RSS/disk bound. Hard command loss may leave helper scratch.
+
+P/U stays working/provisional; F is done only after full validated recorded computation and
+separate cleanup have been retrieved. SSH status, elapsed time, stdout or a prior receive do
+not determine lifecycle. F can be observed without original completion/output files; this is
+read-only retrieval, not finalizing unknown T or export repair. Overflowing F remains in B but
+supplies no successful done packet. Old packets remain immutable; concurrent clients use
+separate packet paths, with no monotonic-newest promise. Coherent read followed by pinned
+immutable export remains [exchange-owned](asynchronous-execution.md#coherent-discovery-followed-by-immutable-selection).
+
+Existing authoritative `receive_observation` independently revalidates exact Q/P/U/F before
+atomic explicit-ref A import, with no endpoint/input/B/live owner required. Heads/submission/
+request refs stay unchanged; B refs do not copy. Same-target repeats are nonexecuting; P-to-F
+under an existing P ref conflicts instead of advancing it. Bootstrap cannot be received.
 
 ## Stage, dispatch and fetch
 
@@ -136,7 +212,8 @@ Full recorded F in B can survive a failed export and remain unreturnable here.
 
 ## Local client and remote lifetime
 
-Each invocation uses file-backed stdin/stdout/stderr under control, finite wait and direct
+Synchronous stage/execute/fetch and bounded observe invocations use file-backed
+stdin/stdout/stderr under control, finite wait and direct
 local-client terminate/wait (five seconds), then kill/wait (five seconds) if needed. Streams
 close on catchable errors. This avoids blocking parent pipe writes/unread stderr deadlocks
 and unbounded in-memory diagnostics; retained log files can grow without a hard disk quota.
@@ -147,12 +224,15 @@ messages and no payload/credential excerpts. Argument type errors use TypeError;
 exchange, filesystem and ordinary timeout exceptions retain their types. On failure to
 establish **local** SSH-client disposition, SSHError retains `.process` (the actual Popen)
 for explicit caller ownership/reaping and reports that uncertainty. Other SSHError instances
-have `.process is None`. This rare owner is not a remote PID or saved recovery handle.
+have `.process is None`. This rare **observation/synchronous client** owner is distinct from
+SSHLaunch and never targets the execution connection. It is an acquired local Popen, not a
+remote PID, saved execution identity or remote-process recovery seam.
 
 Closing/reaping SSH does not prove remote command/child termination. Connection loss can
 leave no B/T, unknown P/U, recorded F or complete return files. No automatic relaunch,
-reconnect-and-execute, retry/recovery/cancellation, remote async observation or detached
-supervision is provided. Single trusted cooperative workspace/packet writers are assumed;
+reconnect-and-execute, retry/recovery/cancellation or detached
+supervision is provided. Saved observation identity does not promise remote survival after
+loss of the foreground execution owner. Single trusted cooperative workspace/packet writers are assumed;
 hostile filesystem/symlink/concurrent descriptor replacement is outside this profile.
 
 B's recorded cleanup is the existing computational scratch disposition. Transport-stream
@@ -168,6 +248,14 @@ prior genuine Q/T history, composite-only children and a never-started Q. A/stag
 are offline during execution; control is retained. Explicit packet reception preserves
 independently advanced main and request/submission/sentinel refs. No Docker import is needed.
 
+[The progress application](../../examples/ssh_progress.py) supplies endpoint-driven prepare,
+foreground-own, fresh observe and endpoint-offline receive modes. Its declared **remote**
+finite gates are released out of band by the application/fixture controller, never by observe
+or a runtime arbitrary-command hook. Normal trusted gates/binding are finite; on uncertain
+owner wait the application retains ownership with bounded repeated waits rather than killing
+or exiting. This investigation/blocker retention can be indefinite and is not a detached
+service, hard deadline or normal finite-completion guarantee.
+
 [Owned fixture instructions](../../tests/ssh/README.md) describe the separately mandatory
 installed SSH/container gate. That local fixture uses copied cached Nix runtime/image contents,
 not shared A/source/exchange/socket mounts or downloads. Its approved loopback-only **host
@@ -180,8 +268,15 @@ Evidence: [SSH layer](../../python/daggerml/daggerml/ssh.py),
 [fixed helper](../../python/daggerml/daggerml/ssh_worker.py),
 [host tests](../../tests/python/test_ssh.py), [fault tests](../../tests/python/test_ssh_faults.py),
 [atomic fetched-return tests](../../tests/python/test_ssh_return.py),
-[story tests](../../tests/python/test_ssh_example.py) and
-[installed gate](../../tests/ssh/integration.py). Actual commands/provenance/counts,
+[story tests](../../tests/python/test_ssh_example.py),
+[launch ownership](../../tests/python/test_ssh_launch.py),
+[progress/inspector](../../tests/python/test_ssh_progress.py),
+[progress history/atomicity](../../tests/python/test_ssh_progress_faults.py),
+[progress example](../../tests/python/test_ssh_progress_example.py),
+[fixture ownership regressions](../../tests/python/test_ssh_fixture_ownership.py),
+[synchronous installed gate](../../tests/ssh/integration.py) and
+[progress installed gate](../../tests/ssh/progress_integration.py). Actual commands/provenance/counts,
 real versus substituted faults, retained/cleaned fixture status and coverage/memory/mutation/
 platform/trust/profile limits belong to
-[Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md).
+[Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md) and
+[Iteration 10 results](../../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md).

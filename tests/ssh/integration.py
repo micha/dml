@@ -19,7 +19,7 @@ import daggerml as d
 from daggerml import exchange as ex, local, ssh
 
 ROOT = Path(__file__).resolve().parents[2]
-NAME = "dml-iteration9-ssh"
+NAME = "dml-iteration10-ssh"
 COUNT = 0
 
 
@@ -191,7 +191,7 @@ def main(fixture, story):
     inspect = json.loads(docker("inspect", NAME))[0]
     check(inspect["Mounts"] == [])
     check(inspect["HostConfig"]["NetworkMode"] == "host")
-    check(inspect["Config"]["Labels"]["dml.fixture"] == "iteration9")
+    check(inspect["Config"]["Labels"]["dml.fixture"] == "iteration10")
     check("PYTHONPATH" not in os.environ)
     # Independent installed remote module/core and loader identity, no checkout sys.path.
     provenance = json.loads(
