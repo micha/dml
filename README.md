@@ -6,6 +6,13 @@ its existing draft specifications.
 
 ## Start here
 
+- Iteration 10 [reviewed design](iterations/10-asynchronous-ssh-execution/DESIGN.md),
+  [worked example](iterations/10-asynchronous-ssh-execution/EXAMPLE.md) and
+  [conditional handoff](iterations/10-asynchronous-ssh-execution/HANDOFF.md): nonwaiting
+  foreground SSH launch and bounded validated P/U/F observation, saved identity separate
+  from live execution-client ownership. The user reviewed the plan and requested a local
+  checkpoint. Implementation/delegation/publication GO pending; no detached-lifetime promise.
+
 - Iteration 9 [delivery](iterations/09-ssh-container-execution/RESULTS.md) and
   [independent review](iterations/09-ssh-container-execution/REVIEW.md): synchronous SSH
   stage/execute/fetch is implemented, independently accepted and published through
@@ -111,6 +118,28 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
+Iteration 10's bounded plan is **reviewed and locally checkpointed**:
+[design](iterations/10-asynchronous-ssh-execution/DESIGN.md),
+[worked example](iterations/10-asynchronous-ssh-execution/EXAMPLE.md) and
+[conditional handoff](iterations/10-asynchronous-ssh-execution/HANDOFF.md).
+Nonwaiting foreground execution SSH launch, saved identity/live owner separation and one fixed
+nonexecuting observe action reuse public coherent P/U/F discovery. A narrow owning packet
+inspector validates without writing A; existing exact-Q receive publishes explicit A refs.
+Remote gates are controlled out of band, not shared mounts/runtime command hooks. No detached
+remote survival promise; exact engineering spellings remain refinable.
+
+The requested checkpoint also includes separately authored diagram/test maintenance in DML
+as local **`a94e6f5`**, not pushed: packed byte layouts/hash masking/linked references/datum
+variants and simplified navigation, with six focused tests plus JS syntax/DOM-stub checks
+passing. No runtime change, real-browser audit or new full-suite/CI claim. Future assignment
+must reinspect the clean current DML baseline and account for this ancestor before any push.
+See [checkpoint](discussion.md#iteration-10-plan-review-and-local-checkpoint).
+
+Separate Iteration 10 implementation/delegation/publication GO remains pending. No worker,
+fixture/SSH, runtime/as-built implementation, experiment/build/provisioning or CI started.
+No push in either repository; design has no remote. Earlier candidate/no-checkpoint statements
+preserve provenance, not current status or permission to inherit completed Iteration 9 GO.
+
 Iteration 9 is implemented, independently accepted and published through **`29ed39b`**;
 [final exact-SHA CI](https://github.com/micha/dml/actions/runs/40701925587) passes all six jobs.
 The separate SSH layer/fixed helper stages caller-pinned Cq/Q, executes only new T in B and
@@ -131,8 +160,9 @@ platform/coverage/mutation and real versus substituted faults.
 Reviewed22-file `f63ac75` plus one-file Windows host-model correction `29ed39b` are normally
 pushed, including unchanged prior diagram ancestor `f7113d7`. Initial CI had five jobs green/
 Windows three failures: two confirmed new harness bugs are fixed; unchanged prior caller-story
-early child reason remains unknown despite final Windows pass. Implementation checkout/index
-clean and remote master matches. Owned stopped fixture/B evidence archived before container/
+early child reason remains unknown despite final Windows pass. At that publication checkpoint,
+implementation tree/index was clean and remote master matched `29ed39b`; later local diagram
+maintenance `a94e6f5` is unpushed. Owned stopped fixture/B evidence archived before container/
 private-key retirement; no owned listener remains, nonsensitive image/evidence retained.
 
 This bounded turn is **complete and stopped**; see

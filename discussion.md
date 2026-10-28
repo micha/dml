@@ -1,7 +1,19 @@
 # Agent-first DML design discussion — checkpoint
 
-Latest checkpoint: **Iteration 9 implementation, independent review and final publication/CI
-are complete through `29ed39b`**; all six final exact-SHA jobs pass after a reviewed Windows
+Latest checkpoint: the user **reviewed the Iteration 10 plan and requested a local checkpoint**,
+including separately authored out-of-band entity diagram changes. Read
+[checkpoint](#iteration-10-plan-review-and-local-checkpoint),
+[design](iterations/10-asynchronous-ssh-execution/DESIGN.md),
+[example](iterations/10-asynchronous-ssh-execution/EXAMPLE.md) and
+[conditional handoff](iterations/10-asynchronous-ssh-execution/HANDOFF.md).
+Implementation/delegation/publication GO remains pending. Saved identity/live foreground
+execution-connection ownership is the reviewed boundary; no detached remote lifetime guarantee.
+Diagram/test maintenance is locally committed in DML as `a94e6f5`, not pushed; no runtime change.
+No worker/fixture/SSH/build/CI restart or Iteration 10 implementation. Earlier preparation and
+completed Iteration 9 statements retain their chronological provenance.
+
+Iteration 9 implementation, independent review and final publication/CI
+are complete through `29ed39b`; all six final exact-SHA jobs pass after a reviewed Windows
 test-harness correction. The bounded turn is complete and stopped. See
 [delivery](#iteration-9-delivery-and-final-publication-checkpoint),
 [RESULTS](iterations/09-ssh-container-execution/RESULTS.md),
@@ -1859,7 +1871,110 @@ The design repository has no remote; no push is requested or performed. Implemen
 remains clean at already published `29ed39b`; worker remains stopped. No source/build/fixture/
 CI restart, release/package publication or later feature turn is authorized by this checkpoint.
 
+## Iteration 10 agreed direction: asynchronous SSH execution
+
+After Iteration 9's accepted delivery/local checkpoint, the assistant proposed asynchronous
+SSH execution with inspectable progress. The user instructed “proceed” after the explicit
+recommendation to prepare a worked example/candidate design/handoff, not start implementation.
+This selects direction for planning; exact APIs/format/ownership mechanics still need review.
+
+- A records and stages exact pinned Q/Cq; start one remote attempt without waiting for completion.
+- Fresh clients retrieve immutable initial/publication/completion P/U/F through bounded SSH
+  observations; selected packets are received under explicit A refs, preserving heads/Q refs.
+- Saved observation identity stays separate from a live execution SSH-client/connection owner.
+  An explicit application retains/reaps it while observation clients can exit independently.
+- No promise of detached remote execution after owner disappearance. Connection loss stays
+  uncertain, not computational failure or permission to retry. Polls do not create Q/T.
+- Keep local SSH-container/no-shared-mount fixture and strict host keys, exact-Q validation,
+  separate cleanup, working publication/unknown and validated retrieved-final done boundaries.
+- No remote daemon/supervisor/scheduler, automatic recovery/retry/cancellation, cloud/second
+  host, new native model, resource manager or observer/UI subsystem in this slice.
+
+Learning goal: make remote computation inspectable while it runs without simultaneously
+introducing durable remote supervision. Planning permission does not inherit Iteration 9's
+completed worker/fixture/publication authorization or approve candidate mechanisms below.
+
+### Iteration 10 candidate preparation
+
+Prepared [DESIGN](iterations/10-asynchronous-ssh-execution/DESIGN.md),
+[EXAMPLE](iterations/10-asynchronous-ssh-execution/EXAMPLE.md) and
+[HANDOFF](iterations/10-asynchronous-ssh-execution/HANDOFF.md) for review.
+
+Assistant recommends nonwaiting start of the same fixed foreground remote execute action,
+shared local dispatch guard plus existing remote guard, explicit live SSHLaunch owner with
+wait timeout retaining connection/streams, and no remote backgrounding. Saved directory
+composes public exchange handle serialization with strict SSH metadata; no duplicated spec
+codec, serialized PID or live state. One new fixed nonexecuting observe action uses public
+coherent exchange discovery/pinned export in disposable remote packets. A narrow public
+read-only exchange packet inspector supplies authoritative host validation without writing A;
+bootstrap/progress binary frames carry evidence, never trusted done/success assertions.
+These are candidate engineering choices, not implemented behavior.
+
+The acceptance story uses declared **remote** gate inputs controlled out of band by the finite
+fixture driver, not shared host paths or arbitrary-command/gate-control runtime APIs. Application
+retains execution connection while fresh clients inspect P/U/F, then endpoint-offline receive
+preserves A refs. Safe before-spawn/after-reap loss and retained unknown B, exact-Q typed-complete
+wrong association, coherent immutable pin races, genuine actual-A-new-put rollback and real
+production-profile overflow remain explicit evidence gates. Proposed duplicate remote/host/
+receive validation/temporary IO is deliberate prototype cost, not a performance guarantee.
+
+Read-only preparation inspected clean DML `29ed39be6c1c18e6d57f782dd073acd37939c71c`, clean
+design `f8e70b4c9371327dbaaa28d1d449aa6011c141ac`, current SSH/helper/public async exchange
+sources/contracts and prior delivery/review. Context7 `/python/cpython` and
+`/openssh/openssh-portable` documentation checks informed wait ownership/foreground client
+and exit-status distinctions; no process/SSH/container experiment. Prior fixture/private keys
+are retired; cached artifacts are not live endpoint or current-runtime proof. Proposed fixture
+reuses user-approved loopback-only host-network profile without claiming namespace isolation;
+actual local prerequisites/bare cached closure/current-source provenance require preflight
+only after separate GO, missing downloads/provisioning a scoped decision.
+
+No implementation/as-built/diagram edit by this coordinator, worker restart/assignment,
+tooling/service/container change, SSH connection, build/test/prototype, provisioning, commit/push
+or CI launch. Final status checking found a concurrent diagram edit; the user confirms another
+agent owns that separate work and will commit it in DML. It is not a planning blocker and is
+left untouched; future assignment must reinspect that completed DML HEAD/tree.
+No additional worker/cloud/global tooling/later feature. Planning notes are local/uncommitted;
+no checkpoint requested. Next is candidate review/plan approval, then separate bounded GO.
+
+## Iteration 10 plan review and local checkpoint
+
+The user stated “plan reviewed” and requested a checkpoint commit, explicitly including
+out-of-band entity diagram changes. This records the reviewed bounded design/example/
+conditional handoff: foreground nonwaiting SSH launch, separate saved identity/live owner,
+fixed nonexecuting observe using coherent public exchange discovery, narrow owning read-only
+packet validation and exact-Q explicit-ref P/U/F receive. Exact engineering spellings remain
+refinable; reviewed design is not implemented behavior or implementation/delegation GO.
+
+The user-led diagram/test changes are committed separately in DML as local
+**`a94e6f51bb41ad2cfab4fad1dd2e96c97a3e728d`** (two files, no runtime change), not pushed.
+They add packed byte layouts, typed reference links, datum payload variants and conditional
+hash masking, simplify the header/footer/toolbar and retain keyboard navigation. Field
+widths/offsets/order/hash zeroing reviewed against maintained native record/object/ID sources;
+six focused tests, JavaScript syntax and DOM-stub layouts/masks/links/ten datum variants/
+selection/zoom checks pass. These are not a real-browser visual/pointer audit or a new
+full-suite/CI run. Tested file hashes stayed stable through validation and staging.
+
+This local design checkpoint includes Iteration 10 direction/planning/review and updated
+scope/orientation/resume notes, plus the separate diagram-maintenance record. Earlier
+uncommitted/no-checkpoint/other-agent-ownership statements describe preparation, not this
+explicit inclusion request. DML is clean at local `a94e6f5` over published `29ed39b`; future
+assignment must reinspect it and account for the unpushed maintenance ancestor before any
+separately authorized push. Design has no remote; no push requested/performed in either repo.
+No worker restart/delegation, Iteration 10 source/as-built implementation, fixture/SSH
+operation, experiment/provisioning/build/CI, release/package publication or later turn.
+
 ## Resume point
+
+Iteration 10's **bounded plan is reviewed and checkpointed**, not implementation GO. Read
+[DESIGN](iterations/10-asynchronous-ssh-execution/DESIGN.md),
+[EXAMPLE](iterations/10-asynchronous-ssh-execution/EXAMPLE.md),
+[HANDOFF](iterations/10-asynchronous-ssh-execution/HANDOFF.md) and
+[checkpoint](#iteration-10-plan-review-and-local-checkpoint). Nonwaiting foreground SSH launch,
+saved identity/live owner split, fixed observe/public read-only validation and remote gate
+control are the reviewed plan, with engineering spellings refinable. Separate implementation/
+delegation/publication authorization remains required; no worker/fixture/SSH/build started.
+Local diagram/test maintenance `a94e6f5` is committed/unpushed; recheck that baseline before
+future assignment and account for it before an authorized push.
 
 Iteration 9 is **implemented, independently accepted, published and stopped** through
 **`29ed39b`**; all six final exact-SHA CI jobs pass. Read
@@ -1870,8 +1985,9 @@ Iteration 9 is **implemented, independently accepted, published and stopped** th
 The [design](iterations/09-ssh-container-execution/DESIGN.md),
 [example](iterations/09-ssh-container-execution/EXAMPLE.md) and
 [handoff](iterations/09-ssh-container-execution/HANDOFF.md) preserve approved plan/provenance,
-not permission to restart. Implementation clean/remote master matches; previous diagram commit
-`f7113d7` now published as unchanged ancestor. Fixture retired after stopped-writer evidence
+not permission to restart. At Iteration 9 publication, implementation was clean/remote master
+matched `29ed39b`; the later local diagram checkpoint `a94e6f5` is unpushed. Previous diagram
+commit `f7113d7` was published as unchanged ancestor. Fixture retired after stopped-writer evidence
 archive; host-network/no-shared-mount and trust/profile/process/coverage limits remain explicit.
 Prior unchanged Windows caller-story failure cause remains unknown despite final pass.
 The user accepted the delivery and requested this local design checkpoint; no design push

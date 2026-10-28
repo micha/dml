@@ -87,6 +87,15 @@ and `discussion.md` before continuing the discussion. Read the shared
   succeed after a reviewed test-only Windows harness fix. See
   [review](iterations/09-ssh-container-execution/REVIEW.md). This is not permission to
   restart implementation or begin another turn.
+- Iteration 10's [reviewed plan/handoff](iterations/10-asynchronous-ssh-execution/HANDOFF.md)
+  covers asynchronous SSH launch and bounded immutable P/U/F observation, with saved identity
+  separate from live execution-client ownership. The user reviewed the plan and requested
+  a local checkpoint, including separately authored as-built diagram maintenance in DML.
+  Implementation/delegation/publication GO remains pending. No worker restart/assignment,
+  Iteration 10 implementation/as-built edit, fixture/SSH operation, experiment/build/provisioning
+  or CI; do not inherit Iteration 9's completed authorization. No detached remote lifetime/
+  supervisor, cloud/global tooling or later feature turn. Diagram maintenance is locally
+  committed as `a94e6f5`, not pushed; account for it before any future implementation push.
 - Preserve corrections and uncertainty rather than silently turning proposals
   into decisions.
 - The user permits narrow coverage exclusions when exercising the precise
