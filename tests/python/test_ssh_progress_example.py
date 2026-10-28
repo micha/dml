@@ -25,10 +25,66 @@ def example():
     return module
 
 
+def host_bindings(example, endpoint, monkeypatch):
+    """Private in-process prepare model, not an installed POSIX remote runtime.
+
+    Keep SSHRemote POSIX; translate only the example binding selected for this
+    host substitute. Other explicit interpreter spellings retain their meaning.
+    """
+    original = example.put_local_binding
+
+    def put_host_binding(tx, *, source, interpreter, timeout_ms):
+        if interpreter == endpoint.python:
+            interpreter = sys.executable
+        return original(
+            tx, source=source, interpreter=interpreter, timeout_ms=timeout_ms
+        )
+
+    monkeypatch.setattr(example, "put_local_binding", put_host_binding)
+
+
+@pytest.mark.parametrize(
+    "host_python",
+    ["/usr/bin/python3", "D:/Python/python.exe"],
+    ids=["posix-host", "windows-host"],
+)
+def test_private_prepare_binding_adapter_preserves_posix_endpoint(
+    example, tmp_path, monkeypatch, host_python
+):
+    from dataclasses import replace
+    from daggerml import ssh
+
+    endpoint = remote(tmp_path)
+    captured = []
+
+    def put_binding(tx, **values):
+        captured.append(values["interpreter"])
+        return "private captured binding"
+
+    monkeypatch.setattr(example, "put_local_binding", put_binding)
+    monkeypatch.setattr(sys, "executable", host_python)
+    host_bindings(example, endpoint, monkeypatch)
+    assert (
+        example.put_local_binding(
+            None, source=b"x", interpreter=endpoint.python, timeout_ms=1
+        )
+        == "private captured binding"
+    )
+    assert captured == [host_python] and endpoint.python == "/opt/dml/bin/python"
+    example.put_local_binding(
+        None, source=b"x", interpreter="/explicit/other", timeout_ms=1
+    )
+    assert captured[-1] == "/explicit/other"
+    if host_python.startswith("D:"):
+        with pytest.raises(ssh.SSHError, match="absolute POSIX"):
+            replace(endpoint, python=host_python)
+
+
 def test_example_prepare_real_caller_q_prior_history(
-    example, transport, tmp_path, caller_job, capsys
+    example, transport, tmp_path, caller_job, capsys, monkeypatch
 ):
     endpoint, _ = transport
+    host_bindings(example, endpoint, monkeypatch)
     directory = tmp_path / "story"
     example.main(
         [
