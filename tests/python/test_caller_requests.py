@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager, ExitStack
 import errno
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -263,6 +264,22 @@ def test_record_boundaries_before_batch(caller_job, field, value, error):
     assert (path / "data.mdb").read_bytes() == before
 
 
+def assert_file_unchanged(file, before):
+    """Exact whole-file equality with bounded diagnostics, never hash-only equality."""
+    actual = file.read_bytes()
+    unchanged = actual == before
+    assert unchanged, (
+        "whole file differs: lengths "
+        + str(len(before))
+        + "/"
+        + str(len(actual))
+        + "; SHA256 "
+        + hashlib.sha256(before).hexdigest()
+        + "/"
+        + hashlib.sha256(actual).hexdigest()
+    )
+
+
 @contextmanager
 def track_typed_puts(path, baseline):
     """Successful genuinely new puts/readback in this actual repository only."""
@@ -361,7 +378,14 @@ def test_record_late_q_cq_puts_whole_abort(caller_job, core, monkeypatch, fault)
     assert (
         sum(kind == "commit" for kind, oid in new) == 1
     ), "actual successful new Cq put required"
-    assert (path / "data.mdb").read_bytes() == before
+    # LMDB's Windows open sets physical file extent to the configured map size.
+    # Compare the SAME default-map layout on both sides of the failed small-map
+    # transaction. This opens/closes only, with no research-state writes. Fresh
+    # all-object/absent-batch and raw-corruption oracles below remain unchanged.
+    if fault == "map-full":
+        with d.Repository(path):
+            pass
+    assert_file_unchanged(path / "data.mdb", before)
     _fresh_absence(path, baseline, new)
     assert_recorded(path, recorded)
     assert_main(path, state)
@@ -809,3 +833,50 @@ def test_first_registration_early_raw_or_tree_collision(caller_job, monkeypatch,
         assert "collision limit" in str(error.value)
     assert (worker / "data.mdb").read_bytes() == before
     assert_recorded(path, recorded)
+
+
+@pytest.mark.parametrize("difference", ("same", "raw-byte", "extent"))
+def test_exact_file_comparison_has_compact_failure(difference, tmp_path):
+    file = tmp_path / "raw-bytes"
+    before = b"x" * (2 * 1024 * 1024)
+    actual = (
+        before
+        if difference == "same"
+        else (before[:-1] + b"y" if difference == "raw-byte" else before + b"\0")
+    )
+    file.write_bytes(actual)
+    if difference == "same":
+        assert_file_unchanged(file, before)
+    else:
+        with pytest.raises(AssertionError, match="whole file differs") as error:
+            assert_file_unchanged(file, before)
+        assert len(str(error.value)) < 512
+        assert "x" * 100 not in str(error.value)
+
+
+def test_record_map_full_same_layout_after_windows_extent_change(
+    caller_job, core, monkeypatch
+):
+    path = caller_job[0]
+    original = d.Repository.__init__
+    extents = []
+
+    def windows_extent(self, repository_path, **kwargs):
+        original(self, repository_path, **kwargs)
+        if Path(repository_path).resolve() == path.resolve():
+            size = kwargs.get("map_size", 0) or 64 * 1024 * 1024
+            # Vendored mdb_env_map/_WIN32 uses SetEndOfFile at open. Model only
+            # that file-layout effect over real Linux/native transactions; native
+            # map sizes match, committed data fits the 1 MiB pressure map.
+            # Actual Windows already set this extent while opening the native
+            # mapping; never redundantly truncate its live mapped section.
+            if (path / "data.mdb").stat().st_size != size:
+                with open(path / "data.mdb", "r+b") as stream:
+                    stream.truncate(size)
+            extents.append(size)
+
+    monkeypatch.setattr(d.Repository, "__init__", windows_extent)
+    test_record_late_q_cq_puts_whole_abort(caller_job, core, monkeypatch, "map-full")
+    assert 1048576 in extents
+    small = extents.index(1048576)
+    assert 64 * 1024 * 1024 in extents[small + 1 :]
