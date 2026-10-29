@@ -13,6 +13,7 @@ import daggerml as d
 from daggerml import exchange as ex, local
 import pytest
 
+from story_diagnostics import run_story
 from test_exchange import (
     ROOT,
     job,
@@ -43,7 +44,7 @@ def test_maintained_async_story_host_client_helpers_full_bytes_cli(
 
     monkeypatch.setitem(globals, "client", host_client)
     story = tmp_path / "story"
-    functions["main"]([str(story)])
+    run_story(functions["main"], story)
     manifest = functions["inspect"](story)
     functions["main"](["--inspect", str(story)])
     with pytest.raises(SystemExit):
