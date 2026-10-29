@@ -89,6 +89,42 @@ coverage. No runtime arbitrary command/plugin/fault API is added. Unknown ack re
 guard/Q and blocks stop until explicit out-of-band exact token/manifest/container/job
 correlation and natural reap; no automatic ListJobs repair/resubmit.
 
+## Composed recorded-steps gate
+
+Within separately authorized local scope, [composed_integration.py](composed_integration.py)
+uses the same preverified current installed package/private profile: two same-C0/same-intent/
+binding/inputs producers, then one selected consumer of actual R1/exact earlier T1f/factor2.
+The standalone captured [consumer](../../examples/floci_double.py) computes84. Distinct actual
+producer23-after-U42 and consumer23-after-U84 cases preserve failure/evidence without downstream
+request or successful summary. Public P/U guards, exact association and all typed bytes/every
+parent are checked, not only scalar84/service/digests.
+
+Current cached wheel/host/image/native/module bytes must ALL match before reuse; no image tag
+is current-source proof. Selected consumer final-B retention uses the separately verified cached
+PRIVATE after-reap wrapper/current package; marker/actual NUL-component `/proc` census precedes
+exact repository-only copy. That is not normal ephemeral-B durability. Original census using
+literal backslash-x strings is qualified in results, not retroactively called accurate.
+
+With a started, proved profile, run the composition controller. It establishes known
+terminal jobs/ALL stopped clients/namespace absence, then archives/stops the service.
+Only AFTER that succeeds, run the supplemental offline command:
+
+```sh
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/composed_integration.py \
+  build/new-owned-root build/new-owned-root/new-story
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/composed_offline.py \
+  build/new-owned-root build/new-owned-root/new-story
+```
+
+First command needs a started/proved profile; it stops/archives only after exact writer proofs.
+Second command requires that endpoint ALREADY STOPPED: supplemental copied packets/independent
+saved selections, nine fresh installed receive processes and three native CLI readers preserve
+independently advanced main/fixed refs/all old bytes and complete returned history. It launches
+no computation/resume. Same-process repository wrappers in the main controller are separate
+from these fresh-client checks. Commands are examples, not permission to provision/rerun.
+The maintained [finite application modes](../../docs/composed-recorded-steps.md) expose public
+request/stage/submit/observe/receive/basis/summary sequencing without a hidden test-only API.
+
 ## Disposition, archive and review
 
 Controller records client NAME/create intent before Docker create and job token/intents

@@ -198,7 +198,10 @@ it does not add execution semantics to low-level nodes or lookup. The
 history through the separately imported transfer layer without executing it. The
 [repository execution story](../../examples/repository_execution.py) runs trusted
 captured source in independent local B, then returns selected history under explicit
-A refs without moving A's existing heads.
+A refs without moving A's existing heads. The informative
+[composed recorded-steps example](../composed-recorded-steps.md) uses the same public
+transactions and validated packet descriptions for result-backed consumer inputs and an
+ordinary summary. Its example-local helpers introduce no public framework or native entity.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

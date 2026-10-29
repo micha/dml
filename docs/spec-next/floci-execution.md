@@ -223,6 +223,9 @@ catchable errors and has finite example gate waits. Transport dependencies/envir
 are not completely captured; source trust remains explicit. Preparation's recorded job
 interpreter is POSIX; native-host test binding emulation is separate, not a claim of
 actual Windows-to-container execution or a relaxation of original path profiles.
+The [composed recorded-steps example](../composed-recorded-steps.md) sequences this unchanged
+public adapter twice, retaining actual result sub-DAG/exact selected producer witness and a
+success-only ordinary summary. It does not add adapter lifecycle states or job dependencies.
 
 ## Informative evidence and limits
 

@@ -353,6 +353,29 @@ writers retain fixture/evidence. Source/provenance/counts, original failed archi
 census races, mutation/platform/trust/ephemeral-B/profile/security qualifications
 belong to [Iteration11 results](../../dml-design/iterations/11-floci-batch-execution/RESULTS.md).
 
+## Iteration 12 composed example population
+
+The finite example-local authoring/modes and standalone consumer stay in the unchanged
+root-source gate. No new exclusion/source omission/threshold/suppression/profile change.
+Packet paths plus independent expected Cq/Q enter public validation before A; forgeable
+received dataclasses/flags do not supply authority. Exact I2 result/witness/factor/root/shape/
+basis-history and success-only summary checks are measured separately from installed jobs.
+
+Genuinely NEW A authoring DAG/tree/commit puts/readback precede late raw/different refs,
+private native consuming-commit EIO, meaningful actual small-map pressure and response
+allocation failure for BOTH basis and summary. Comparable-layout whole physical bytes plus
+fresh complete typed/absent-batch oracles retain rollback. Authoring-only processes pause
+pre/post actual storage commit; they have no computational child. These are local store/
+response-loss boundaries, not whole-pipeline/power-loss/exactly-once guarantees.
+
+Direct standalone trusted-source tests measure every retained statement, including numeric/
+link/type/gate/artifact/failure/response ownership; actual installed child executions are NOT
+instrumented by host coverage. Native/binding/141CLI memory authority is unchanged. Explicit
+[installed composition](floci/README.md#composed-recorded-steps-gate) distinguishes normal
+jobs/private final-B hold/corrected real-NUL census/fresh offline clients from host models.
+Original failed census/import-isolation/setup evidence and older UNKNOWN Windows causes are
+preserved in [Iteration12 results](../../dml-design/iterations/12-composed-recorded-steps/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

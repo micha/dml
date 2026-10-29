@@ -107,6 +107,10 @@ saved external identity and bounded fresh immutable S3 observations without a li
 submitting owner. Service status never supplies DML done; existing exact-Q/offline
 explicit-ref return remains authoritative. The [trusted child](examples/floci_add.py)
 uses declared finite S3 gates controlled out of band, not a runtime command hook.
+The [composed recorded-steps example](docs/composed-recorded-steps.md) supplies an actual
+result sub-DAG plus exact selected producer witness to a second separately recorded step,
+then publishes an ordinary success-only summary. Python sequences finite public-API modes;
+there is no native evaluator/scheduler or new LMDB entity.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
