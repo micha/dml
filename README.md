@@ -42,6 +42,9 @@ test, and report-generation failures still fail the job.
 The explicit [installed local SSH/container gate](tests/ssh/README.md) is separately mandatory
 for SSH acceptance; default checks/imports never start Docker or an SSH service. Its approved
 host-network fixture is loopback-only and has no shared project/exchange mounts.
+The explicit [installed local Floci/Batch gate](tests/floci/README.md) separately runs
+current installed DML inside actual jobs through a private internal bridge/no-host-ports
+fixture. Default checks never start it; host mocks/prior packet replay/CI do not replace it.
 
 Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
 targets `build/check/test_version` by default when present.
@@ -98,6 +101,12 @@ unchanged exact-Q explicit-ref reception. [Foreground progress modes](examples/s
 separate saved SSH identity/live owner and retrieve validated immutable P/U/F through one fixed
 nonexecuting observe action. Remote gates in this demonstration are controlled externally.
 Docker is local acceptance support only.
+The explicit [local Floci contract](docs/spec-next/floci-execution.md) and
+[finite modes](examples/floci_execution.py) add caller-Q stage/one-shot Batch submit,
+saved external identity and bounded fresh immutable S3 observations without a live
+submitting owner. Service status never supplies DML done; existing exact-Q/offline
+explicit-ref return remains authoritative. The [trusted child](examples/floci_add.py)
+uses declared finite S3 gates controlled out of band, not a runtime command hook.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

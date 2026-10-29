@@ -48,6 +48,7 @@ flowchart TD
     REQUEST["caller-requests.md<br/>Explicit caller Q and imported-Q first attempt"]
     ASYNC["asynchronous-execution.md<br/>Owned worker launch and immutable progress packets"]
     SSH["ssh-execution.md<br/>Strict SSH stage/start/fetch/observe and foreground ownership"]
+    FLOCI["floci-execution.md<br/>Local Floci Batch and immutable S3 progress"]
     CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
     PACK["../packaging-and-distribution.md<br/>Native artifacts and local builds"]
     CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
@@ -75,6 +76,11 @@ flowchart TD
     SSH --> EXCHANGE
     SSH --> REQUEST
     SSH --> LOCAL
+    README --> FLOCI
+    FLOCI --> EXCHANGE
+    FLOCI --> REQUEST
+    FLOCI --> ASYNC
+    FLOCI --> TRANSFER
     README --> CLI
     README --> PACK
     PY --> REPO
@@ -125,6 +131,7 @@ flowchart TD
 | Explicit caller request recording, imported-Q first registration and exact Cq/Q exchange selection | [caller-requests.md](caller-requests.md) |
 | Saved observation identity, live worker ownership, coherent progress discovery and immutable P/U/F packets | [asynchronous-execution.md](asynchronous-execution.md) |
 | Caller-Q SSH transport, saved identity/foreground launch, fixed helper and immutable progress | [ssh-execution.md](ssh-execution.md) |
+| Floci-only fixed local HTTP/stage/one-shot submit, saved external identity and immutable S3 progress | [floci-execution.md](floci-execution.md) |
 | Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
 | Native linking, packaged executable, build/install and distribution paths | [Packaging and distribution](../packaging-and-distribution.md) |
 
@@ -159,6 +166,11 @@ flowchart TD
   fetch and nonwaiting foreground launch/validated immutable observation, with saved identity
   separate from live SSHLaunch ownership, strict endpoint/host-key configuration and
   unchanged exact-Q atomic explicit-ref reception. Docker remains fixture support.
+- An explicitly imported local Floci layer and fixed installed job program: one caller-Q
+  Batch job, service attempts1, direct bounded unsigned HTTP, create-only manifest-last
+  S3 history exchange and fresh validated P/U/F observations. Saved external identity
+  needs no live caller owner; lost acknowledgements stay uncertain without automatic
+  resubmission. Existing exact-Q/explicit-ref reception remains authoritative.
 - A native inspection CLI and Python console forwarding to the bundled executable,
   with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
   all-parent history traversal.
@@ -193,6 +205,7 @@ and [Iteration 6 results](../../../dml-design/iterations/06-local-repository-exe
 and [Iteration 7 results](../../../dml-design/iterations/07-asynchronous-local-execution/RESULTS.md)
 and [Iteration 8 results](../../../dml-design/iterations/08-caller-recorded-requests/RESULTS.md)
 and [Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md)
-and [Iteration 10 results](../../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md).
+and [Iteration 10 results](../../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md)
+and [Iteration 11 results](../../../dml-design/iterations/11-floci-batch-execution/RESULTS.md).
 If code, tests and this spec disagree, report the
 mismatch rather than silently treating a design proposal as implemented behavior.

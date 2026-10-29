@@ -18,6 +18,9 @@ Its additive [asynchronous contract](asynchronous-execution.md) owns saved handl
 live application-owned worker launch, read-only packet inspection and bounded immutable
 progress observation/reception. The separate [SSH contract](ssh-execution.md) composes these
 public authorities with strict transport, saved SSH identity and a live foreground owner.
+The separately imported [Floci contract](floci-execution.md) owns one-shot local Batch
+submission/saved external identity and immutable S3 progress, reusing the same owning
+exact-Q inspector/explicit-ref return without changing native handles or roles.
 The additive [caller-request contract](caller-requests.md) owns request-only construction,
 explicit atomic A recording and public imported-Q first registration through these APIs.
 

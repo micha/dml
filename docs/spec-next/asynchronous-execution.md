@@ -17,6 +17,9 @@ Normative sections describe implemented behavior; example orchestration is infor
 registration and exact Cq/Q mode-specific discovery/validation. The separate
 [SSH contract](ssh-execution.md) owns foreground SSHLaunch/saved SSH identity and fixed
 nonexecuting observe; it composes this document's unchanged P/U/F authority.
+The separate [Floci contract](floci-execution.md) uses this same public packet authority
+inside a service-owned Batch job and through immutable S3 transport. It owns its job-side
+WorkerLaunch, not a live submitting caller connection; Batch status is not DML lifecycle.
 This document's
 ownership, phases/packets, unknown and done boundaries apply unchanged in both modes.
 

@@ -25,7 +25,8 @@ from that subdirectory. Maintained Python/native binding sources still live ther
 The `python-runtime` Meson install tag selects only:
 
 - `daggerml/__init__.py`, `local.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
-  `ssh.py`, `ssh_worker.py`, `_core.pyi`, `py.typed`;
+  `ssh.py`, `ssh_worker.py`, `floci.py`, `floci_http.py`, `floci_worker.py`,
+  `_core.pyi`, `py.typed`;
 - the linked `_core` extension;
 - the native `daggerml/_bin/dml` (`dml.exe` on Windows).
 
@@ -87,6 +88,13 @@ owns transport/client ownership. The [SSH progress modes](../examples/ssh_progre
 separate saved identity/foreground owner and bounded immutable observation/offline receive.
 Docker/Nix/key/image/private-loss fixture support under
 [tests/ssh](../tests/ssh/README.md) is never packaged or imported by normal runtime/default tests.
+The [Floci modes](../examples/floci_execution.py) use the installed explicitly imported
+[local Floci layer](spec-next/floci-execution.md) for prepare/one-shot submit/fresh bounded
+observe/offline receive. Its [trusted captured source](../examples/floci_add.py) consumes
+explicit local endpoint/bucket/key inputs and finite S3 gates; gate release/provisioning
+remain external application policy. `tests/floci/` fixture/controllers/private ENTRYPOINT/
+response-loss support are never packaged or default-started, and do not add a Docker/SDK
+runtime dependency. Normal installed execution is separate from private fixture evidence.
 Use [scripts/check.sh](../scripts/check.sh) for integration tests against the fresh
 root extension, not a stale installed package. `-v` adds binding and CLI memory
 workloads to the C tests; [coverage/memory accounting](../tests/coverage-exclusions.md)

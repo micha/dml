@@ -316,6 +316,43 @@ Existing native/binding/141CLI memory and finalizer/runtime qualifications remai
 installed-process memory/Python mutation assurance. Commands/provenance/counts and limitations
 belong to [Iteration 10 results](../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md).
 
+## Iteration 11 local Floci population
+
+The explicit Floci runtime/HTTP/fixed job program and finite example/child remain in
+unchanged root-source Python coverage. No exclusions, source omissions, reduced
+original8192/32MiB/4MiB profiles, weakened thresholds or memory suppressions. Host
+statements are not every Python branch or installed Batch/job/child coverage.
+
+Finite loopback wire tests exercise raw EOF past Content-Length, duplicates/incorrect
+counts/encodings, original limits+one, silent/trickled whole-budget errors, direct
+connections and resource disposal. Public-only composition retains exact caller Q,
+manifest-last create-only objects, guard-before-API and retained acknowledged UUID on
+later response/receipt/allocation failures. Uncertain worker wait retains owner across
+wait/diagnostic/write/flush/sleep errors; known postreap close errors do not loop forever.
+Final read-only publication is attempted after reap even on prior errors; service
+status never becomes computation/cleanup/done. Example tests keep POSIX remote config
+separate from private native-host binding emulation, without platform skips/profile changes.
+
+Typed-complete retained-Cq/wrong-T-to-another-matching-Q, phase/root/bytes failures,
+U selection followed by F arrival and immutable old packets reject before success/A
+writes. Successful genuinely new actual-A puts/readback precede late different/raw-ref,
+consuming-commit and real small-map errors; complete typed/compact comparable physical
+oracles prove rollback. Actual receiver pre/post-storage-commit barriers distinguish
+absent batch from complete publication despite missing response; import retry never
+computes again. Native consuming-commit EIO is a private dependency substitution,
+not physical disk/power-loss proof. Existing binding/141CLI memory checks remain enabled.
+
+The separately mandatory [actual installed Floci gate](floci/README.md) uses current
+wheels/cached bare image and actual DML-in-Batch with all-package bytes/full typed
+all-parent history, declared S3 gates and fresh clients/offline receive. Private
+post-reap ENTRYPOINT/response-body/acknowledgement-loss/selection barriers are separately
+labelled, outside the installed package, not normal installed helper branch coverage
+or a guarantee of host/daemon/live-restart survival. Exact job terminal identity,
+all-owner client census and namespace absence precede endpoint stop; uncertain
+writers retain fixture/evidence. Source/provenance/counts, original failed archives/
+census races, mutation/platform/trust/ephemeral-B/profile/security qualifications
+belong to [Iteration11 results](../../dml-design/iterations/11-floci-batch-execution/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

@@ -60,6 +60,17 @@ Its [contract](spec-next/ssh-execution.md) separates local-client reaping from r
 and recorded scratch cleanup from local Docker acceptance-fixture retirement. No Docker
 runtime dependency or native storage entity is added.
 
+The explicitly imported `daggerml.floci` local prototype uses fixed unsigned direct HTTP
+for staging/one-shot Batch submission and bounded fresh observations. Its installed job
+program owns one public WorkerLaunch and publishes closed complete immutable P/U/F packets
+through create-only S3 objects/manifest-last phase slots. No submitting Popen is serialized
+or required; service status is diagnostic, not computational outcome. The
+[owning contract](spec-next/floci-execution.md) preserves exact-Q/explicit-ref exchange
+validation and qualifies service lifetime, acknowledgement loss and ephemeral job-local B.
+The internal HTTP family is Floci-specific, not a generic AWS SDK/resource subsystem.
+Docker remains explicit local test support; no native entity, packaged controller or runtime
+Docker dependency is added.
+
 ## Technical navigation
 
 Start with [spec-next/README.md](spec-next/README.md) for the implemented contract:
@@ -77,6 +88,8 @@ Start with [spec-next/README.md](spec-next/README.md) for the implemented contra
   prepare/execute/receive, selected-history validation and return publication.
 - [SSH execution and progress](spec-next/ssh-execution.md): strict endpoint/transport,
   fixed helper, saved identity/foreground owner and exact-Q immutable packet reception.
+- [Floci Batch execution](spec-next/floci-execution.md): local fixed HTTP/one-shot
+  dispatch, saved external identity, job-side ownership and immutable S3 progress.
 - [Inspection CLI](spec-next/cli.md): grammar, traversal and presentation.
 - [Packaging](packaging-and-distribution.md): shared native builds and installed entry paths.
 - [Glossary](spec-next/glossary.md): shared vocabulary.
