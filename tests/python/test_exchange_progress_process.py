@@ -21,6 +21,7 @@ from test_exchange import (
     tree,
     assert_main,
 )
+from concurrent_reader_diagnostics import after_cleanup
 from test_exchange_launch import wait_file
 from test_exchange_progress import handle, observation, receive
 from test_exchange_process import fresh_state, track_new_puts
@@ -125,6 +126,7 @@ def test_actual_progress_commit_response_loss_full_fresh_oracle(
     fresh_state(path, baseline, returned, True)
 
 
+@after_cleanup
 def test_concurrent_read_only_observers_distinct_immutable_packets(completed):
     path, workspace, spec, state, run = completed
     saved = workspace.parent / "concurrent-handle"
