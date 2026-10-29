@@ -25,7 +25,10 @@ def wire(chunks):
                 connection.settimeout(2)
                 raw = bytearray()
                 while b"\r\n\r\n" not in raw:
-                    raw.extend(connection.recv(1))
+                    chunk = connection.recv(1)
+                    if not chunk:
+                        return  # Peer closed a partial request; finally owns socket close.
+                    raw.extend(chunk)
                 head = bytes(raw).decode("ascii")
                 length = next(
                     int(row.split(":", 1)[1])
@@ -34,7 +37,10 @@ def wire(chunks):
                 )
                 body = bytearray()
                 while len(body) < length:
-                    body.extend(connection.recv(length - len(body)))
+                    chunk = connection.recv(length - len(body))
+                    if not chunk:
+                        return  # Partial body EOF must not spin on empty recv forever.
+                    body.extend(chunk)
                 captured.append((head, bytes(body)))
                 for pause, data in chunks:
                     time.sleep(pause)
@@ -50,12 +56,35 @@ def wire(chunks):
     thread.start()
     try:
         yield SimpleNamespace(
-            endpoint="http://127.0.0.1:" + str(listener.getsockname()[1])
+            endpoint="http://127.0.0.1:" + str(listener.getsockname()[1]),
+            owner_thread=thread,
         ), captured
     finally:
         thread.join(timeout=4)
         assert not thread.is_alive(), "owned fake-service thread must be stopped"
         assert not errors, errors
+
+
+@pytest.mark.parametrize(
+    "partial",
+    [
+        b"POST /v1/describejobs HTTP/1.1\r\nContent-Length: 3\r\n",
+        b"POST /v1/describejobs HTTP/1.1\r\nContent-Length: 3\r\n\r\na",
+    ],
+    ids=["peer-close-partial-header", "peer-close-partial-body"],
+)
+def test_real_peer_close_partial_request_reaps_exact_fake_service_thread(partial):
+    with wire([]) as (remote, captured):
+        host, port = h.endpoint(remote.endpoint)
+        with socket.create_connection((host, port), timeout=1) as peer:
+            peer.sendall(partial)
+        owner = remote.owner_thread
+        owner.join(timeout=1)
+        assert (
+            not owner.is_alive()
+        ), "partial request EOF must not leave a spinning owner"
+        assert captured == []
+    assert not owner.is_alive()
 
 
 def raw(body=b"abc", *, declared=3, headers=b""):
