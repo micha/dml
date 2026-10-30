@@ -247,6 +247,51 @@ normative Q/T fields/public framework/native entities. Actual gate acceptance/fa
 known stopped archival/identity retirement and qualifications belong to
 [Iteration15 RESULTS](../../../dml-design/iterations/15-intent-reuse-defaults/RESULTS.md).
 
+## Versioned implementation-selection gate
+
+Within separately authorized local scope,
+[implementation_integration.py](implementation_integration.py) uses a NEW owned fixture,
+byte-current cached package/wheel/host/image/native source preflight and unchanged exact-four/
+internal/noports/no9169/finite512MiB profile. Initial ordinary definition is recorded OFFLINE.
+Exactly THREE real jobs/NINE P/U/F: add42, multiplication A84, addition B84 with factor2 check.
+The controller captures genuine standalone B source by replacing arithmetic in
+[floci_double.py](../../examples/floci_double.py); both actual binding IDs/code bytes remain
+inspectable. No package change/image rebuild is needed when current installed bytes match.
+
+Known terminal single-attempt jobs/ALLclient/empty namespace proof precedes each stop/archive/
+resume/reset of SAME finite keys. Default-A absence-driven request, explicit A selection,
+offline default-B update and B absence-driven request preserve A's S without cross-binding
+reuse/adoption. Final stop/archive precedes explicit B selection, B-default and explicit-A
+reuse, true sibling A/B defaults and transfer-only fresh readers. These operations add no
+computational job. Native exact roots/fields/typed packed bytes/ordered parents/Q-T populations
+and complete all-status/persisted1/2/3-job census provide evidence, not scalar84/counters alone.
+
+Fresh installed policy/reader processes use the existing active HTTP/SDK/Floci/Docker import
+and process-spawn blockers; pure `urllib`/`urllib.parse` allowance remains parsing-only.
+The separate adapter client dispatches the exact submitted Q. ORIGINAL packet/expected/input/
+B paths become unavailable after capture; ordinary S/V/native history supports readers.
+Normal final B is ephemeral; no private after-reap hold/fourth job/fault-matrix replay.
+Requested implementation override in controller oracles comes from the actual call contract,
+not report flags; readers require every captured claim, not a dictionary intersection.
+
+```sh
+# NEW owned root with verified current cached image/artifacts, service NOT started:
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/implementation_integration.py \
+  init build/new-owned-root build/new-owned-root/new-implementation-story
+# Explicit authorized start/profile proof, then:
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/implementation_integration.py \
+  run build/new-owned-root build/new-owned-root/new-implementation-story
+```
+
+Commands do not authorize provisioning/pulls/installations or runtime recovery.
+[Default-safe new controller tests](../python/test_implementation_selection_fixture.py) never
+start Docker. [Example-local convention](../../docs/versioned-implementation-selection.md)
+owns ordinary Idef/menu/choice/D, not new LMDB entities/native Q/T fields.
+[Iteration16 RESULTS](../../../dml-design/iterations/16-versioned-implementation-selection/RESULTS.md)
+records actual commands/provenance/original oracle qualification/nonexecuting correction,
+full/CI results and archive/identity retirement. Original evidence is retained rather than
+repeating computational jobs just to obtain corrected oracle labels.
+
 ## Disposition, archive and review
 
 Controller records client NAME/create intent before Docker create and job token/intents

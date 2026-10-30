@@ -438,6 +438,35 @@ visible. No global purge/native map shrink/skip/deadline/workflow weakening. Ori
 older Windows UNKNOWN causes are preserved in
 [Iteration14 results](../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md).
 
+## Iteration 16 implementation-selection example population
+
+`examples/implementation_selection.py` remains under unchanged ROOT-source coverage;
+no new exclusion, threshold, suppression, platform skip or profile reduction. Ordinary
+Idef/menu/choice/D readers validate new application metadata; PUBLIC temporary preparation,
+exact submitted Q and persisted S/V inspector retain owning native/role/history authority.
+Focused tests cover both implementation choices and independent reuse table, unselected A
+slot versus forged A-in-selected-B slot, strict shapes/types/captured crosslinks, pinned
+parents/exact own Q/original four-field W, returned-ID substitution and full composite/
+all-parent closure. New actual-A authoring rollback/loss checks prove predicted rows absent
+first and preserve rooted/unrooted old proof rows. No duplicate unchanged Q/W fault matrix.
+
+New `test_implementation_selection{,_edges,_atomicity,_fixture}.py` registrations in
+`reuse_test_cleanup.OWN_TESTS` are limited to synchronous/reaped native fixtures, safe
+**authoring-only** terminated/reaped loss processes and finite waited default-safe clients.
+Existing disposal requires all setup/call/teardown reports PASS AFTER owning teardown;
+failure/skip/unknown evidence remains. No broad purge, live computation signal, historical
+path deletion or Windows native map-size change. Registration regressions verify the
+specific allowed module names. This avoids per-success Windows64MiB LMDB accumulation,
+not an attribution of any older UNKNOWN filesystem failure.
+
+The [installed three-job gate](floci/README.md#versioned-implementation-selection-gate)
+separately proves actual producer42/multiplicationA84/additionB84/S3 P/U/F and stopped-service
+offline policy/branch/readers with transport/spawn blockers and complete native/external
+census. Host source statements are not every branch/installed-child/platform/process-memory/
+full-environment/scientific assurance. Original controller oracle gaps/corrected nonexecuting
+supplement and exact commands/results are in
+[Iteration16 RESULTS](../../dml-design/iterations/16-versioned-implementation-selection/RESULTS.md).
+
 ## Iteration 15 intent-defaults example population
 
 The example-local Idef/D/default/override/pinned readers and finite offline modes remain in

@@ -1,6 +1,8 @@
 # Intent reuse defaults and explicit request overrides
 
-Status: informative, implemented **example-local** convention; acceptance gates are pending.
+Status: informative, implemented **example-local** convention; Iteration15 delivered and accepted.
+See [delivery evidence](../../dml-design/iterations/15-intent-reuse-defaults/RESULTS.md)
+for actual results and original unresolved failure qualifications.
 
 ## Authority boundary
 
@@ -14,6 +16,9 @@ owns consumed binding/input and full native-history validation;
 [transfer](spec-next/transfer.md) owns complete typed all-parent closure/profile.
 [Python API](spec-next/python-api.md) owns native handles/storage boundaries.
 Actual dispatch uses existing explicit [Floci](spec-next/floci-execution.md) operations.
+The separate [implementation-selection convention](versioned-implementation-selection.md)
+adds a new captured menu/default/override before this reuse table; it does not change
+this page's original exact three-field Idef or D records.
 
 ## Captured default, explicit override, distinct request
 

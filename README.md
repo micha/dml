@@ -126,6 +126,10 @@ resolves reuse/execute defaults with explicit request overrides, and retains why
 own Q used a selected old attempt or remained pending fresh work. It never dispatches; selection/
 adoption and existing execution remain separate, with branch-local defaults and no public policy
 framework or new LMDB entity.
+The [versioned implementation-selection example](docs/versioned-implementation-selection.md)
+records two captured bindings and a branch-local default/explicit label before independently
+resolving reuse/fresh policy. Each binding has its own known selection slot; equal results
+never authorize cross-binding reuse, and fresh success does not adopt itself.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

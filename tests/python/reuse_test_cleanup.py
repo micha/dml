@@ -30,6 +30,12 @@ OWN_TESTS = frozenset(
         "test_intent_defaults_modes.py",
         "test_intent_defaults_edges.py",
         "test_intent_defaults_fixture.py",
+        # New implementation-choice modules use only synchronous/reaped native
+        # fixtures, authoring-only loss children or finite default-safe clients.
+        "test_implementation_selection.py",
+        "test_implementation_selection_edges.py",
+        "test_implementation_selection_atomicity.py",
+        "test_implementation_selection_fixture.py",
     }
 )
 OWNED = pytest.StashKey()
