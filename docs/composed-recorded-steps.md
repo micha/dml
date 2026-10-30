@@ -107,6 +107,14 @@ Bounded CLI output is not an exhaustive integrity proof. The computational DAG a
 commit parents remain different graphs. Input/summary/producer roles are ordinary DAGs,
 not additional LMDB entity types.
 
+## Explicitly asking again
+
+The separate [explicit attempt-reuse example](explicit-attempt-reuse.md) can record a new
+request satisfied using a selected old successful double attempt/result, without another
+attempt/job. It compares exact intent/binding/full inputs, including this example's producer
+witness. A deliberate fresh double remains a separate request/dispatch on retained W history;
+these conventions do not alter this page's composition or execution authorities.
+
 ## Evidence and limits
 
 [Focused native tests](../tests/python/test_composed_execution.py),

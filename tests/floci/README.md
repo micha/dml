@@ -125,6 +125,44 @@ from these fresh-client checks. Commands are examples, not permission to provisi
 The maintained [finite application modes](../../docs/composed-recorded-steps.md) expose public
 request/stage/submit/observe/receive/basis/summary sequencing without a hidden test-only API.
 
+## Explicit attempt-reuse gate
+
+Within separately authorized scope, [reuse_integration.py](reuse_integration.py) uses a NEW
+owned root after cached/current source-wheel-host-image artifact preflight. It reuses existing
+finite controller ownership/profiles, executing one add and one original standalone double.
+After exact terminal-job/ALL stopped-client/empty-namespace proof it stops and archives the
+endpoint. A fresh installed process runs the copied standalone
+[reuse application](../../examples/explicit_reuse.py) with independent expected Cq/Q and copied
+F, asserting no HTTP/Floci/Docker runtime import in THAT authoring process. It records new Q/W
+and no new T/job/B/source invocation. A new copy of actual stopped-service `batch-jobs.json`
+must exactly equal the prior independent two-job census; controller counts are supplemental.
+Fresh installed inspection/receive and bounded native CLI readers work offline.
+
+Only after proven stopped disposition does the fixture explicitly resume its owned endpoint
+for a separately recorded fresh double on W history. Reset only the SAME declared finite gate
+keys after known terminal disposition; this preserves full input identity, not a DML workflow
+resume/recovery feature. Fresh B imports W/Qr/old T inertly, creates only Tfresh and preserves
+all old packed bytes/ordered parents. W remains pinned to old T even when both results equal84.
+Expected count is THREE actual jobs/NINE real P/U/F, never a fourth reuse job. Each fresh client
+result/failure/unknown disposition is persisted immediately; original failed evidence is not
+lost if a later controller assertion fails.
+
+```sh
+# Started/proved NEW owned fixture and current installed runtime are prerequisites:
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/reuse_integration.py \
+  build/new-owned-root build/new-owned-root/new-reuse-story
+```
+
+The controller proves/stops/archives after its final job as well. Native typed BFS/every-byte/
+all-parent comparisons cover available gated B, packet validation and A including prior genuine
+Q/T/publication/composite-only children. Normal ephemeral final B is NOT an archived final-B
+claim; no private hold/new image or repeated earlier five-job fault matrix is required here.
+Known-stopped fixture resume is local test policy, not durable live restart or automatic repair.
+[Default-safe controller helpers](../python/test_explicit_reuse_fixture.py) start no Docker.
+See [informative convention](../../docs/explicit-attempt-reuse.md) and
+[Iteration13 RESULTS](../../../dml-design/iterations/13-explicit-attempt-reuse/RESULTS.md)
+for actual commands/provenance/separate Q-W boundaries and remaining assurance limits.
+
 ## Disposition, archive and review
 
 Controller records client NAME/create intent before Docker create and job token/intents

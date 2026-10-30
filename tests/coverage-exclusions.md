@@ -376,6 +376,34 @@ jobs/private final-B hold/corrected real-NUL census/fresh offline clients from h
 Original failed census/import-isolation/setup evidence and older UNKNOWN Windows causes are
 preserved in [Iteration12 results](../../dml-design/iterations/12-composed-recorded-steps/RESULTS.md).
 
+## Iteration 13 explicit reuse example population
+
+The example-local finite offline authoring operation stays in unchanged root-source coverage;
+no new exclusion/source omission/threshold/profile/suppression is introduced. Public historical
+packet inspection against independently supplied Cq/Q owns selected old T/result. Native
+all-parent/bounded complete typed closure and exact intent/binding/full-input matching precede
+new Q. Source/interpreter/timeout, declared input types/values and producer witnesses are
+matching dimensions; containing commits/occurrence/ref/token are not. Forgeable descriptions,
+P/U/failure-evidence/unreturnable F/deep wrong-Q and missing/corrupt composite-only A history
+cannot authorize new Q/W. Cleanup-failed-success is explicit historical application policy.
+
+Actual newly committed Q is retained across separate W rollback. Successful genuinely NEW A
+W/DAG/tree/commit native puts/readback precede late different/raw refs, native allocation and
+consuming-commit substitution, real small-map pressure and response allocation failure. Fresh
+complete typed and comparable-layout compact exact physical-byte oracles require whole W batch
+abort while Q remains. Authoring-only processes pause pre/post actual W store commit with every
+predicted row/ordered parent/ref checked; no computational child/job is sacrificed. These are
+separate Q/W/store-response boundaries, not whole-operation/power-loss/exactly-once guarantees.
+
+The explicit [three-job installed fixture](floci/README.md#explicit-attempt-reuse-gate) distinguishes
+normal original/fresh Batch execution from fresh installed service-OFFLINE authoring/inspection.
+No HTTP/Floci/Docker runtime import, no fourth job and independent actual persisted service census
+are separate oracles. Gated B/full packet/A history is not an archived normal ephemeral final B.
+Host statements do not instrument installed child/platform/branch/memory/security behavior.
+Native/binding/141CLI memory authority is unchanged. Commands/failures/provenance/mutation/trust/
+profile/unknown Windows qualifications belong to
+[Iteration13 results](../../dml-design/iterations/13-explicit-attempt-reuse/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

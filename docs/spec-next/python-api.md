@@ -202,6 +202,10 @@ A refs without moving A's existing heads. The informative
 [composed recorded-steps example](../composed-recorded-steps.md) uses the same public
 transactions and validated packet descriptions for result-backed consumer inputs and an
 ordinary summary. Its example-local helpers introduce no public framework or native entity.
+The informative [explicit historical-attempt reuse example](../explicit-attempt-reuse.md)
+records its own new request and, separately, an ordinary association to a validated old
+successful attempt/result. It uses these unchanged public transactions and exact packet
+inspection, without a public cache API or another native object kind.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

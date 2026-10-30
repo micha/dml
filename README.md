@@ -111,6 +111,10 @@ The [composed recorded-steps example](docs/composed-recorded-steps.md) supplies 
 result sub-DAG plus exact selected producer witness to a second separately recorded step,
 then publishes an ordinary success-only summary. Python sequences finite public-API modes;
 there is no native evaluator/scheduler or new LMDB entity.
+The [explicit attempt-reuse example](docs/explicit-attempt-reuse.md) records a new request
+satisfied with an explicitly selected old successful attempt/result, without new T/job.
+It matches exact intent/binding/full inputs including producer witness; fresh execution
+remains a separate explicit action, not automatic cache discovery or fallback.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
