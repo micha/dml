@@ -8,6 +8,8 @@ import daggerml as d
 from daggerml import exchange as ex
 import pytest
 
+pytest_plugins = ("reuse_test_cleanup",)
+
 from test_caller_requests import assert_file_unchanged, assert_recorded
 from test_composed_execution import producer, basis, execute
 from test_exchange import (

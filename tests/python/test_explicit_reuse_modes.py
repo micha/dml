@@ -13,6 +13,8 @@ from daggerml import exchange as ex
 from hypothesis import HealthCheck, given, settings, strategies as st
 import pytest
 
+pytest_plugins = ("reuse_test_cleanup",)
+
 from test_caller_requests import assert_file_unchanged, assert_recorded
 from test_composed_execution import producer
 from test_exchange import ROOT, exchange_runtime, literal, tree, typed_oracle

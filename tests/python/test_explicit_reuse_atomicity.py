@@ -10,6 +10,8 @@ import daggerml as d
 from daggerml import exchange as ex, transfer
 import pytest
 
+pytest_plugins = ("reuse_test_cleanup",)
+
 from test_binding_failures import core
 from test_caller_requests import (
     assert_file_unchanged,

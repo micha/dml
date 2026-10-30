@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest_plugins = ("reuse_test_cleanup",)
+
 from test_exchange import ROOT
 
 

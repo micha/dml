@@ -10,6 +10,8 @@ import daggerml as d
 from daggerml import exchange as ex, local, transfer
 import pytest
 
+pytest_plugins = ("reuse_test_cleanup",)
+
 from test_caller_requests import assert_file_unchanged
 from test_composed_execution import producer, basis, execute, DOUBLE
 from test_exchange import exchange_runtime, literal, nested, scalar, tree, typed_oracle
