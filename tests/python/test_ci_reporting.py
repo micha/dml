@@ -43,6 +43,34 @@ def isolated_environment():
     return environment
 
 
+def test_supported_arm64_runner_retains_complete_platform_matrix():
+    # Official runner-images issue13518 diagnoses macOS14 brownout/retirement;
+    # this is ONLY the approved arm64 label migration, not a platform/budget cut.
+    source = WORKFLOW.read_text()
+    matrix, strict = source.split("\n  strict-linux-check:", 1)
+    rows = re.findall(
+        r"(?m)^          - name: (.+)\n            runs_on: (.+)\n"
+        r"            platform: (.+)\n            dml_bin: (.+)$",
+        matrix,
+    )
+    assert len(rows) == 5
+    assert {
+        name: (runner, platform, binary) for name, runner, platform, binary in rows
+    } == {
+        "Linux x86_64": ("ubuntu-24.04", "unix", "build/check/dml"),
+        "Linux aarch64": ("ubuntu-24.04-arm", "unix", "build/check/dml"),
+        "macOS x86_64": ("macos-15-intel", "unix", "build/check/dml"),
+        "macOS arm64": ("macos-15", "unix", "build/check/dml"),
+        "Windows AMD64": ("windows-2022", "windows-msys2", "build/check/dml.exe"),
+    }
+    assert re.findall(r"(?m)^    runs-on: (.+)$", strict) == ["ubuntu-24.04"]
+    jobs = source.split("\njobs:\n", 1)[1]
+    assert re.findall(r"(?m)^  ([a-z-]+):$", jobs) == [
+        "build-and-test",
+        "strict-linux-check",
+    ]
+
+
 def test_workflow_reports_are_narrow_always_uploaded_without_masking_status():
     for step_name, artifact_name in (
         ("Upload Python test results", "${{ matrix.name }}-pytest-results"),
