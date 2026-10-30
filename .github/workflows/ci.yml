@@ -11,7 +11,7 @@ concurrency:
 jobs:
   build-and-test:
     name: ${{ matrix.name }}
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.name == 'macOS x86_64' && 20 || 10 }}
     strategy:
       fail-fast: false
       matrix:
