@@ -213,7 +213,12 @@ recording genuinely service-OFFLINE. All stop/resume/reset operations require te
 single attempts/ALL stopped clients/empty computational namespace; SAME finite gate keys
 are reset only after that proof. This is fixture policy, not runtime recovery/live restart.
 Fresh copied policy/read/select/adopt clients actively block broad HTTP/Floci/Docker import
-families and stdlib process-spawn audit events in THAT process. Dispatch is a separate
+families and stdlib process-spawn audit events in THAT process. Exact stdlib `urllib`
+package and `urllib.parse` are allowed ONLY as nontransport path/URI parsing dependencies
+(CPython3.12 pathlib imports the parser); ALL other `urllib.*` remain blocked, alongside
+HTTP/SDK/Docker/Floci transports. A plain `find_spec` finder avoids unnecessary ABC bootstrap;
+no preloaded module is deleted or pretended unloaded. Both initial/final forbidden-transport
+assertions and spawn audit guards remain. Dispatch is a separate
 existing installed adapter client, never the policy helper. Original packet/expected/input/
 B paths become unavailable; public native history alone supports offline readers/transfers.
 

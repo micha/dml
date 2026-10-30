@@ -30,12 +30,16 @@ from selection_integration import (
 
 ROOT = Path(__file__).resolve().parents[2]
 SLOT = "selected-double"
-OFFLINE = """import importlib.abc,runpy,sys
+OFFLINE = """import runpy,sys
 from pathlib import Path
 families=('http','urllib','requests','httpx','aiohttp','boto3','botocore','docker','daggerml.floci')
-def blocked(name):return any(name==family or name.startswith(family+'.') or family=='daggerml.floci' and name.startswith(family) for family in families)
+def blocked(name):
+ # CPython3.12 pathlib needs the pure URL parser, NOT transport authority.
+ # Retain real modules; every OTHER urllib child remains forbidden.
+ if name in ('urllib','urllib.parse'):return False
+ return any(name==family or name.startswith(family+'.') or family=='daggerml.floci' and name.startswith(family) for family in families)
 assert not any(blocked(name) for name in sys.modules)
-class NoService(importlib.abc.MetaPathFinder):
+class NoService:
  def find_spec(self,fullname,path=None,target=None):
   if blocked(fullname):raise AssertionError('offline policy cannot import service runtime')
 sys.meta_path.insert(0,NoService())

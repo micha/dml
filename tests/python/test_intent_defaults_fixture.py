@@ -72,6 +72,9 @@ def test_controller_import_aliases_scoped_no_fixture_start():
         "http.client",
         "http.server",
         "urllib.request",
+        "urllib.error",
+        "urllib.response",
+        "urllib.robotparser",
         "requests",
         "httpx",
         "aiohttp",
@@ -185,3 +188,47 @@ def test_controller_pending_fresh_prepare_is_SEPARATE_from_policy_process(double
         and expected.commit == got.recorded.commit
     )
     assert not (path.parent / "separate-adapter-input/worker.dml").exists()
+
+
+@pytest.mark.parametrize("bootstrap", ["preloaded-parser", "stdlib-path-abc-model"])
+def test_stdlib_only_parser_bootstrap_is_not_transport_authority(tmp_path, bootstrap):
+    controller_app = controller()
+    source = tmp_path / "parser-client.py"
+    source.write_text(
+        "import sys,urllib.parse\nassert 'urllib' in sys.modules and 'urllib.parse' in sys.modules\nassert urllib.parse.quote_from_bytes(b'a b') == 'a%20b'\n"
+    )
+    prelude = "import urllib.parse\n"
+    if bootstrap == "stdlib-path-abc-model":
+        # Actual fresh subprocess dependency model: importing either bootstrap
+        # helper pulls the REAL pure stdlib parser, as pinned3.12 pathlib does.
+        prelude = """import builtins
+original_import=builtins.__import__
+def bootstrap(name,*a,**k):
+ if name in ('importlib.abc','pathlib'):original_import('urllib.parse')
+ return original_import(name,*a,**k)
+builtins.__import__=bootstrap
+"""
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", prelude + controller_app.OFFLINE, str(source)],
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+
+
+@pytest.mark.parametrize("family", ["urllib.request", "http.client"])
+def test_preloaded_transport_family_is_error_not_deleted_or_ignored(tmp_path, family):
+    controller_app = controller()
+    source = tmp_path / "must-not-run.py"
+    marker = tmp_path / "unexpected-client-start"
+    source.write_text(
+        "from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n"
+    )
+    prelude = "import " + family + "\n"
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", prelude + controller_app.OFFLINE, str(source)],
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode != 0 and "AssertionError" in result.stderr.decode()
+    assert not marker.exists()
