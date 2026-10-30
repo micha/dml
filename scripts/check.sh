@@ -48,7 +48,9 @@ run_python_tests_and_coverage_if_present() {
     return 0
   fi
 
-  if ! find "$root/tests" -type f \( -name 'test_*.py' -o -name '*_test.py' \) | grep -q .; then
+  # Drain all paths: grep -q can close early and make find fail with SIGPIPE
+  # under pipefail, falsely skipping pytest. Avoid GNU-only find -quit as well.
+  if ! find "$root/tests" -type f \( -name 'test_*.py' -o -name '*_test.py' \) | grep . >/dev/null; then
     echo "==> No pytest files found under tests/; skipping pytest"
     return 0
   fi

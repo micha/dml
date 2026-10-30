@@ -206,6 +206,10 @@ The informative [explicit historical-attempt reuse example](../explicit-attempt-
 records its own new request and, separately, an ordinary association to a validated old
 successful attempt/result. It uses these unchanged public transactions and exact packet
 inspection, without a public cache API or another native object kind.
+The informative [versioned selection/adoption example](../versioned-reuse-selection.md) records
+ordinary S/V DAGs, reconstructs bounded public validation framing from pinned repository state
+and delegates to the existing Q/W example. It changes no native handle, record kind or public
+repository API; fresh execution does not automatically change the recorded choice.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

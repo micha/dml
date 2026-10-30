@@ -163,6 +163,42 @@ See [informative convention](../../docs/explicit-attempt-reuse.md) and
 [Iteration13 RESULTS](../../../dml-design/iterations/13-explicit-attempt-reuse/RESULTS.md)
 for actual commands/provenance/separate Q-W boundaries and remaining assurance limits.
 
+## Versioned selection and adoption gate
+
+Within separately authorized bounded scope, [selection_integration.py](selection_integration.py)
+uses a NEW owned root/current cached source-wheel-host-image/native preflight and the unchanged
+finite normal installed trial machinery. Exactly THREE actual jobs/NINE real P/U/F: add42, old
+standalone double84, explicitly fresh double84. Effective exact-four/internal/noports/no9169/
+socket/security profiles and known terminal-job/ALLclient/empty namespace proofs remain required.
+No private final-B hold or extra fault-matrix jobs; normal final B is ephemeral.
+
+After the first two terminal jobs, service stop/archive precedes fresh installed copied-example
+selection. Ordinary S/V captures bounded independent expected/job/observation framing. ORIGINAL old
+packet/saved expected/input/B are unavailable before fresh installed repository-only inspection/
+selected reuse and transfer-only readers; active service-import blocker operates in THAT process.
+No new Q/T/job for selection, only new Q/W for reuse. Exact actual persisted two-job census remains
+byte-identical, not just a controller/mock count.
+
+Only proven-stopped endpoint resume/reset of SAME declared finite keys precedes separately
+recorded fresh job; S0/V0/W0 and all old native bytes remain unchanged in available gated B/packets/A.
+Fresh F does not adopt itself. Final all-seven-status external census and stopped-service archive
+prove exactly three jobs. Offline explicit adoption captures fresh framing, then ORIGINAL fresh
+packet/expected disappear; native transfer/fresh installed readers and selected reuse on sibling
+keep-old/adopt-fresh branches prove distinct selected attempts/equalR84/no fourth job. Each immediate
+client exit/failure/unknown is retained. Default-safe tests never start Docker.
+
+```sh
+# NEW started/proved owned fixture + byte-current installed runtime are prerequisites:
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/selection_integration.py \
+  build/new-owned-root build/new-owned-root/new-selection-story
+```
+
+Known-stopped reset is fixture test policy, not DML recovery. Copy both example-local files together;
+no checkout/PYTHONPATH/uninstalled computational helper/private role codec is used inside jobs.
+[Informative convention](../../docs/versioned-reuse-selection.md) owns S/V, not a new native entity.
+[Iteration14 RESULTS](../../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md) owns
+actual commands/provenance/failures/limitations; these commands do not authorize provisioning.
+
 ## Disposition, archive and review
 
 Controller records client NAME/create intent before Docker create and job token/intents

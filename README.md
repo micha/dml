@@ -115,6 +115,10 @@ The [explicit attempt-reuse example](docs/explicit-attempt-reuse.md) records a n
 satisfied with an explicitly selected old successful attempt/result, without new T/job.
 It matches exact intent/binding/full inputs including producer witness; fresh execution
 remains a separate explicit action, not automatic cache discovery or fallback.
+The [versioned selection/adoption example](docs/versioned-reuse-selection.md) records an ordinary
+S/V choice, revalidates it from pinned repository state, delegates explicit reuse to existing Q/W,
+and adopts a fresh matching attempt only when requested. Sibling branches retain different choices;
+no public cache framework/native entity or automatic fresh-to-selection update is introduced.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

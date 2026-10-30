@@ -404,6 +404,40 @@ Native/binding/141CLI memory authority is unchanged. Commands/failures/provenanc
 profile/unknown Windows qualifications belong to
 [Iteration13 results](../../dml-design/iterations/13-explicit-attempt-reuse/RESULTS.md).
 
+## Iteration 14 versioned selection population
+
+The example-local durable S/V/finite modes remain in unchanged root-source coverage; no new
+exclusion/source omission/threshold/profile/suppression change. Same bounded owned expected/job/
+observation headers validate and persist; public loaders/inspector own framing/local roles. Strict
+native shape/root/types and every S claim are compared with owned public fields; pinned C complete
+typed closure/ALL-parent F retention precedes writes/Q. Serialized historical workspace is inert.
+Source/interpreter/timeout/full input/producer-witness matching is exact, not facets/defaults.
+Adoption compares old/new owning public attempt occurrence IDs, not only final description content
+IDs. Two independently public-valid F/T descriptions of the SAME occurrence/both histories retained
+reject before writes despite distinct T/F IDs; an actually distinct fresh occurrence remains eligible.
+The extra owning response field changes no native S/V shape or protocol.
+
+BOTH select/adopt atomicity tests count genuinely NEW actual-A S/V/DAG/tree/commit readbacks;
+independent predicted rows are proven native NotFound BEFORE actual invocation/barrier. Initial
+select has no precreated S/V; adoption old proof is fully retained in fresh F. Actual tracked new
+packed-byte dictionaries equal predicted new rows before late raw/different ref/native allocation/
+consuming-commit/response allocation and REAL small-map pressure. Complete typed/native/raw and
+comparable physical-byte rollback remain, no validation/preexisting puts counted as new evidence.
+Authoring-only pre/post actual store commit loss predicts EVERY new byte/ordered parent/slot/ref;
+validation/projection scratch and computational writers are disposed before authoring barriers.
+No live computational job/child sacrifice or physical-host/power-loss/exactly-once promise.
+
+Selected reuse delegates unchanged separate Q/W. Projection cleanup can fail AFTER complete Q/W;
+regression distinguishes this from prepublication select/adopt cleanup and forbids automatic Q
+repair/fallback. Host statements are not installed child/every branch/process-memory/platform
+proof. [Actual installed gate](floci/README.md#versioned-selection-and-adoption-gate) is separately
+mandatory. Scoped test-only successful-owned-temp disposal is extended ONLY to five exact new
+selection basenames with synchronous children/reaped authoring-process contracts, after ALL phase/
+fixture reports pass. Failed/skipped/no-call/unknown/unrelated artifacts remain; cleanup errors are
+visible. No global purge/native map shrink/skip/deadline/workflow weakening. Original failures/
+older Windows UNKNOWN causes are preserved in
+[Iteration14 results](../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

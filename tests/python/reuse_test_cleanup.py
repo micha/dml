@@ -2,7 +2,7 @@
 
 Windows LMDB opens extend data.mdb to the unchanged 64MiB default map. Retaining
 all successful new repositories until session exit can exhaust runner disk.
-ONLY these five synchronous/authoring-only modules qualify, AFTER all fixtures
+ONLY these explicitly named synchronous/authoring-only modules qualify, AFTER all fixtures
 finish and all three phase reports pass. Failure/skip/unknown artifacts remain.
 No global purge, native profile change, historical-path action or process signal.
 """
@@ -19,6 +19,11 @@ OWN_TESTS = frozenset(
         "test_explicit_reuse_fixture.py",
         "test_explicit_reuse_modes.py",
         "test_explicit_reuse_selection.py",
+        "test_reuse_selection.py",
+        "test_reuse_selection_records.py",
+        "test_reuse_selection_atomicity.py",
+        "test_reuse_selection_modes.py",
+        "test_reuse_selection_fixture.py",
     }
 )
 OWNED = pytest.StashKey()

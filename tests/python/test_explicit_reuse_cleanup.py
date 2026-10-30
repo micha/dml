@@ -29,6 +29,34 @@ def report(when, passed=True):
     )
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "test_reuse_selection.py",
+        "test_reuse_selection_records.py",
+        "test_reuse_selection_atomicity.py",
+        "test_reuse_selection_modes.py",
+        "test_reuse_selection_fixture.py",
+    ],
+)
+def test_exact_new_selection_module_scope_post_report_and_unknown_retention(
+    tmp_path, name
+):
+    assert name in cleanup.OWN_TESTS
+    owned = tmp_path / "owned"
+    owned.mkdir()
+    with d.Repository(owned / "closed.dml", create=True):
+        pass
+    current = item(Path(name), owned)
+    cleanup.finish_report(current, report("setup"))
+    cleanup.finish_report(current, report("teardown"))  # no call => unknown disposition
+    assert owned.exists()
+    cleanup.finish_report(current, report("call"))
+    assert owned.exists()  # never dispose before a fresh passing teardown report
+    cleanup.finish_report(current, report("teardown"))
+    assert not owned.exists()
+
+
 def test_passed_closed_native_windows_extent_model_deletes_only_owned_root(tmp_path):
     owned, neighbor = tmp_path / "owned", tmp_path / "unrelated"
     owned.mkdir()

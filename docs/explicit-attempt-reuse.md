@@ -97,6 +97,14 @@ T2/Tfresh remain distinct; Rfresh may equal R2. W stays pinned to old T2f; no de
 or automatic reuse/fallback occurs. Fixture-only known-stopped service resume/reset of declared
 finite gate keys is test policy, not a DML recovery mechanism.
 
+## Versioning the explicit choice
+
+The separate [selection/adoption example](versioned-reuse-selection.md) persists an ordinary S/V
+choice and publicly revalidates it from pinned native history without ORIGINAL packet files. Its
+selected reuse delegates to this page's unchanged Q/W operation: Cqr parent plus known selection
+slot/exact T/R exposes provenance, not a direct W-to-S edge. Explicit fresh execution leaves the
+old choice; separately requested adoption creates a new snapshot. No public cache API is added.
+
 ## Evidence and limits
 
 [Native selection tests](../tests/python/test_explicit_reuse.py),
