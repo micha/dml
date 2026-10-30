@@ -114,14 +114,22 @@ jobs:
         shell: bash
         env:
           DML_BIN: ${{ matrix.dml_bin }}
-        run: python -m pytest -q
+        run: python -m pytest -q --junitxml=build/test-results/pytest.xml
 
       - name: Run Python tests (Windows)
         if: matrix.platform == 'windows-msys2'
         shell: msys2 {0}
         env:
           DML_BIN: ${{ matrix.dml_bin }}
-        run: python -u -m pytest -vv -o faulthandler_timeout=60
+        run: python -u -m pytest -vv -o faulthandler_timeout=60 --junitxml=build/test-results/pytest.xml
+
+      - name: Upload Python test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}-pytest-results
+          path: build/test-results/pytest.xml
+          if-no-files-found: warn
 
       - name: Upload Meson logs
         if: always()
@@ -160,7 +168,17 @@ jobs:
           python -m pip install meson ninja -r requirements-dev.txt
 
       - name: Run strict validation
+        env:
+          PYTEST_ADDOPTS: --junitxml=build/test-results/pytest.xml
         run: scripts/check.sh -c
+
+      - name: Upload strict Python test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: strict-linux-pytest-results
+          path: build/test-results/pytest.xml
+          if-no-files-found: warn
 
       - name: Upload strict check artifacts
         if: always()

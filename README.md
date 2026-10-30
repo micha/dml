@@ -16,7 +16,9 @@ To enforce commit message body wrapping locally:
 
 ## Build and Test
 
-Use `scripts/check.sh` as the standard validation entrypoint.
+Use `scripts/check.sh` as the standard validation entrypoint. The
+[development validation policy](docs/validation-policy.md) owns proportionate check
+selection, independent acceptance and CI failure/exception reporting.
 
 - `scripts/check.sh` - build, run tests, and enforce 100% coverage
 - `scripts/check.sh -v` - also run C tests, binding ownership and native CLI fault workloads under Valgrind

@@ -70,6 +70,8 @@ formatter or linter, defer to its rules and update this section accordingly.
 
 ### Testing
 
+- Follow the [development validation policy](docs/validation-policy.md) for focused
+  change-validation mapping, independent risk-based review and explicit CI exceptions.
 - Add tests for new behavior or bug fixes.
 - Keep tests deterministic; avoid time-dependent flakiness.
 - Prefer unit tests for pure logic; use integration tests for boundary
