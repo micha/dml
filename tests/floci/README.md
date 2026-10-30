@@ -199,6 +199,49 @@ no checkout/PYTHONPATH/uninstalled computational helper/private role codec is us
 [Iteration14 RESULTS](../../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md) owns
 actual commands/provenance/failures/limitations; these commands do not authorize provisioning.
 
+## Intent-defaults and request-overrides gate
+
+Within separately authorized scope, [intent_integration.py](intent_integration.py) uses a
+NEW owned root, current-source/wheel/installed-host/image preflight, unchanged exact-four/
+private-internal/no-host-port/no9169/security profile and existing finite trial machinery.
+It creates initial Idef while the service is OFFLINE, then actually executes FOUR Batch
+jobs/TWELVE P/U/F phases: add42, absence-driven old double84, explicit-fresh double84 and
+execute-default branch double84. No private final-B hold/fifth job/fault-matrix repetition.
+
+The extra known-stopped archive/resume after add makes even absence-driven pending-Q
+recording genuinely service-OFFLINE. All stop/resume/reset operations require terminal
+single attempts/ALL stopped clients/empty computational namespace; SAME finite gate keys
+are reset only after that proof. This is fixture policy, not runtime recovery/live restart.
+Fresh copied policy/read/select/adopt clients actively block broad HTTP/Floci/Docker import
+families and stdlib process-spawn audit events in THAT process. Dispatch is a separate
+existing installed adapter client, never the policy helper. Original packet/expected/input/
+B paths become unavailable; public native history alone supports offline readers/transfers.
+
+Independent native oracles check exact Idef/D/W field/root/literal/sub-DAG claims, actual
+own Q/selected T/R and preserved-tree/exact parent spines. Available gated B/packets/A retain
+EVERY typed packed byte/ordered parent/composite-only child; normal final B remains ephemeral.
+Full request/attempt occurrence+version populations distinguish one genuine host-prior from
+FOUR actual Batch trials. Complete all-seven-status census/rejected pagination and fresh
+persisted1/2/3/4-job archives corroborate no extra policy/selection/adoption/inspection job.
+Every immediate client success/error/unknown disposition is persisted before later assertions.
+
+```sh
+# NEW owned root with VERIFIED current image/artifact files; service NOT started:
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/intent_integration.py \
+  init build/new-owned-root build/new-owned-root/new-intent-story
+# Explicit reviewed fixture start/profile proof, then:
+env -u PYTHONPATH /current/installed/bin/python -B tests/floci/intent_integration.py \
+  run build/new-owned-root build/new-owned-root/new-intent-story
+```
+
+Commands do not authorize provisioning. Missing downloads/installations require scoped approval;
+new runtime bytes require reviewed offline image rebuilding. Default-safe
+[controller/blocker tests](../python/test_intent_defaults_fixture.py) never start Docker.
+[Informative convention](../../docs/intent-reuse-defaults.md) owns example-local Idef/D, not
+normative Q/T fields/public framework/native entities. Actual gate acceptance/failures/provenance/
+known stopped archival/identity retirement and qualifications belong to
+[Iteration15 RESULTS](../../../dml-design/iterations/15-intent-reuse-defaults/RESULTS.md).
+
 ## Disposition, archive and review
 
 Controller records client NAME/create intent before Docker create and job token/intents

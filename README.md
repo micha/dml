@@ -119,6 +119,11 @@ The [versioned selection/adoption example](docs/versioned-reuse-selection.md) re
 S/V choice, revalidates it from pinned repository state, delegates explicit reuse to existing Q/W,
 and adopts a fresh matching attempt only when requested. Sibling branches retain different choices;
 no public cache framework/native entity or automatic fresh-to-selection update is introduced.
+Its [intent-defaults example](docs/intent-reuse-defaults.md) records ordinary versioned Idef/D,
+resolves reuse/execute defaults with explicit request overrides, and retains why the operation's
+own Q used a selected old attempt or remained pending fresh work. It never dispatches; selection/
+adoption and existing execution remain separate, with branch-local defaults and no public policy
+framework or new LMDB entity.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

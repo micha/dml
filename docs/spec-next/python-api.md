@@ -210,6 +210,11 @@ The informative [versioned selection/adoption example](../versioned-reuse-select
 ordinary S/V DAGs, reconstructs bounded public validation framing from pinned repository state
 and delegates to the existing Q/W example. It changes no native handle, record kind or public
 repository API; fresh execution does not automatically change the recorded choice.
+The informative [intent-defaults example](../intent-reuse-defaults.md) adds ordinary Idef/D
+and a decision-bearing submission parent, using existing public temporary preparation and
+Q/Q-W authority. It changes no public/native API, role or package installation inventory;
+its readers require an explicit Q rather than treating fresh-Q preparation as submitted-Q
+validation.
 
 Evidence: [native binding](../../python/daggerml/src/_core_module.c),
 [Python surface](../../python/daggerml/daggerml/__init__.py),

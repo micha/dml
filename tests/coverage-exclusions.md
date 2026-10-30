@@ -438,6 +438,37 @@ visible. No global purge/native map shrink/skip/deadline/workflow weakening. Ori
 older Windows UNKNOWN causes are preserved in
 [Iteration14 results](../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md).
 
+## Iteration 15 intent-defaults example population
+
+The example-local Idef/D/default/override/pinned readers and finite offline modes remain in
+unchanged ROOT-source coverage. No exclusion/source omission/threshold/profile/suppression
+change. Public temporary preparation owns consumed binding/full inputs/native ALL-parent
+closure; scratch and native handles close before Idef/D authoring. A submitted reader requires
+an exact non-None Q: fresh-Q-in-B preparation is NOT normative Cq/Q validation authority.
+Strict Idef/D/root/types/claim association, explicit default/override matrix, exact full identity
+including producer witness, present-error versus absent-entry and deliberately unused-S framing
+are retained tests. Declared execute/fresh still rejects damaged native/composite/history/profile.
+
+Both Idef/D atomicity tests independently predict exact new native bytes, prove EVERY purported
+new key NotFound in ACTUAL A BEFORE invocation, then require exact successful actual-A readbacks
+before late raw/different ref/native and prebuilt-response allocation/consuming commit/REAL map-full.
+All known old roots plus deliberate UNROOTED fixture proof rows are in baseline unions. Whole
+comparable physical bytes/raw corruption/complete native old records/new-batch absence remain
+oracles. Actual authoring-only pre/post-store-commit loss proves ALL temporary projection paths
+absent at the barrier; no live computational child is sacrificed. D/Q/W remain separate: D can
+survive Q failure, pending Q can survive W failure, complete D/Q/W can survive late projection/
+response errors. No whole-pipeline/power-loss/exactly-once claim.
+
+Scoped successful-owned-temp disposal extends ONLY six exact policy test basenames, after ALL
+setup/call/owning-teardown reports pass, under synchronous-child/reaped-authoring contracts.
+Registration/postteardown/no-call/unknown/failure/skip/unrelated/visible-error regressions remain.
+No global purge/native map shrink/skip/runtime deadline/workflow budget weakening. Host statements
+are not all branches/actual installed children/platform/security/memory proof. Mandatory current
+installed four-job/twelve-phase fixture is separate, with broad active import/spawn blockers in
+THAT offline client, full native bytes/ordered parents/occurrence populations and external all-status/
+persisted census. Original failures and UNKNOWN causes remain in
+[Iteration15 RESULTS](../../dml-design/iterations/15-intent-reuse-defaults/RESULTS.md).
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

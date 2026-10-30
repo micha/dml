@@ -37,6 +37,12 @@ def report(when, passed=True):
         "test_reuse_selection_atomicity.py",
         "test_reuse_selection_modes.py",
         "test_reuse_selection_fixture.py",
+        "test_intent_defaults.py",
+        "test_intent_defaults_records.py",
+        "test_intent_defaults_atomicity.py",
+        "test_intent_defaults_modes.py",
+        "test_intent_defaults_edges.py",
+        "test_intent_defaults_fixture.py",
     ],
 )
 def test_exact_new_selection_module_scope_post_report_and_unknown_retention(
