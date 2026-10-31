@@ -438,6 +438,27 @@ visible. No global purge/native map shrink/skip/deadline/workflow weakening. Ori
 older Windows UNKNOWN causes are preserved in
 [Iteration14 results](../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md).
 
+## Iteration 18 multi-input table example population
+
+`examples/multi_input_reuse.py` stays in unchanged ROOT-source coverage; no new exclusion,
+omission, threshold, suppression, skip or native profile change. Strict ALL-entry PUBLIC S
+revalidation/new Dm/own Q/W controls distinguish malformed nonmatching rows from valid misses,
+unused application framing from required complete native history, and explicit one-key adoption
+from fresh work. Representative NEW insertion/adoption rollback/loss predicts genuinely absent
+actual-A rows before puts (including prior unrooted bytes), preserving old rooted/unrooted proof.
+Existing S/Q/W/exchange fault suites are relied on, not replayed as a new campaign.
+
+ONLY `test_multi_input_reuse.py`, `test_multi_input_atomicity.py` and `test_multi_input_story.py`
+join successful-owned-temp cleanup. Native fixtures close; computational fixtures are synchronous/
+reaped; loss processes author ONLY tables and are terminated/reaped; blocker clients are finite
+and waited. Existing ALL-phase-PASS AFTER owning teardown rule retains failed/skipped/unknown
+artifacts. Three precise registration regressions; no global purge/map shrink/runtime change.
+The explicit installed [SEVEN-Q/THREE-local-attempt story](multi_input/story.py) retains original
+prelaunch controller bytes/hash and fresh blocked nonexecuting readers/complete native census.
+Host coverage is not every platform/process-memory/scientific/environmental assurance. Original
+failures/corrections and actual evidence remain in
+[Iteration18 RESULTS](../../dml-design/iterations/18-multi-input-reuse/RESULTS.md).
+
 ## Iteration 17 advisory supersession example population
 
 `examples/implementation_supersession.py` remains in unchanged ROOT-source coverage; no new

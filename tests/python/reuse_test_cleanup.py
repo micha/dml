@@ -40,6 +40,10 @@ OWN_TESTS = frozenset(
         "test_implementation_supersession.py",
         "test_implementation_supersession_atomicity.py",
         "test_implementation_supersession_fixture.py",
+        # Bounded table fixtures use synchronous/reaped local children or author-only loss.
+        "test_multi_input_reuse.py",
+        "test_multi_input_atomicity.py",
+        "test_multi_input_story.py",
     }
 )
 OWNED = pytest.StashKey()

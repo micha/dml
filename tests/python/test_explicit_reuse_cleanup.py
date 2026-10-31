@@ -50,6 +50,9 @@ def report(when, passed=True):
         "test_implementation_supersession.py",
         "test_implementation_supersession_atomicity.py",
         "test_implementation_supersession_fixture.py",
+        "test_multi_input_reuse.py",
+        "test_multi_input_atomicity.py",
+        "test_multi_input_story.py",
     ],
 )
 def test_exact_new_selection_module_scope_post_report_and_unknown_retention(

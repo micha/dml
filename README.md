@@ -134,6 +134,10 @@ The [advisory supersession example](docs/implementation-supersession.md) records
 fixed-menu A→B declaration with structured reason/evidence, separate explicit default promotion,
 and actual request-basis versus separately selected knowledge views. It preserves predecessor
 reuse/history; no automatic invalidation, new native entity or lifecycle framework is added.
+The [multi-input reuse example](docs/multi-input-reuse.md) composes a bounded explicitly named
+ordinary table of exact intent/full-binding/full-input selections and a new pinned decision
+reader. Several input keys coexist; explicit adoption changes only one row using a NEW immutable
+selection slot, while other rows/old branches remain. Reuse creates own Q/W, not another T/job.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
