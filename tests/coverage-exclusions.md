@@ -438,6 +438,27 @@ visible. No global purge/native map shrink/skip/deadline/workflow weakening. Ori
 older Windows UNKNOWN causes are preserved in
 [Iteration14 results](../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md).
 
+## Iteration 17 advisory supersession example population
+
+`examples/implementation_supersession.py` remains in unchanged ROOT-source coverage; no new
+exclusion/omission/threshold/suppression/skip/profile reduction. Ordinary strict L uses PUBLIC
+definition/request inspectors, actual D.base, separately explicit compatible knowledge and native
+ALL-parent/composite closure even on absent-L paths. New authoring fault/loss tests predict exact
+new actual-A rows, prove all absent BEFORE puts, preserve rooted and unrooted old proof, and
+exercise six late aborts plus safe pre/post authoring-only loss; no old Q/W fault-matrix replay.
+
+ONLY `test_implementation_supersession{,_atomicity,_fixture}.py` join successful-owned-temp
+cleanup: closed native fixtures, terminated/reaped authoring-only loss processes, finite waited
+nonexecuting blocker clients. Existing ALL setup/call/teardown PASS AFTER owning teardown rule
+retains failed/skipped/unknown evidence; no global purge, computational signal or map-size change.
+Exact registration regressions are maintained. The separate explicit installed
+[FOUR-Q/TWO-local-attempt story](supersession/story.py) has actual synchronous child reaping and
+active transport/spawn blockers before original-path-free reuse/transferred inspection. Controller
+AST arithmetic checks compile with the real owning test filename, not a phantom coverage source.
+Host statements are not every branch/platform/process-memory/full-environment/scientific assurance.
+Original test-harness failures, controller correction/nonexecuting supplement and actual results
+are retained in [Iteration17 RESULTS](../../dml-design/iterations/17-implementation-supersession/RESULTS.md).
+
 ## Iteration 16 implementation-selection example population
 
 `examples/implementation_selection.py` remains under unchanged ROOT-source coverage;

@@ -47,6 +47,9 @@ def report(when, passed=True):
         "test_implementation_selection_edges.py",
         "test_implementation_selection_atomicity.py",
         "test_implementation_selection_fixture.py",
+        "test_implementation_supersession.py",
+        "test_implementation_supersession_atomicity.py",
+        "test_implementation_supersession_fixture.py",
     ],
 )
 def test_exact_new_selection_module_scope_post_report_and_unknown_retention(

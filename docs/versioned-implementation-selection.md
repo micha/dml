@@ -80,7 +80,10 @@ existing strict definition and changes ONLY its default label: same URI/reuse po
 choices/bindings/selections/other entries. Each operation atomically publishes ordinary
 records/tree/new commit with exact `(C,)` parent/create-only explicit ref/prebuilt response.
 Restoring A can deduplicate original Idef content while creating a new snapshot. No Q/T/job.
-General menu edits, adding/removing/deprecating implementations and reuse adoption are deferred.
+General menu edits, adding/removing implementations and reuse adoption are deferred here.
+The separate [advisory supersession convention](implementation-supersession.md) adds ordinary
+L and request-context inspection over this unchanged fixed-menu definition/request authority;
+it does not change these exact records or make default resolution interpret L.
 
 ## Ordinary decision and actual submitted Q
 

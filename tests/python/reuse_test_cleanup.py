@@ -36,6 +36,10 @@ OWN_TESTS = frozenset(
         "test_implementation_selection_edges.py",
         "test_implementation_selection_atomicity.py",
         "test_implementation_selection_fixture.py",
+        # Supersession fixtures close native handles; loss children author ONLY L.
+        "test_implementation_supersession.py",
+        "test_implementation_supersession_atomicity.py",
+        "test_implementation_supersession_fixture.py",
     }
 )
 OWNED = pytest.StashKey()

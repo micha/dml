@@ -130,6 +130,10 @@ The [versioned implementation-selection example](docs/versioned-implementation-s
 records two captured bindings and a branch-local default/explicit label before independently
 resolving reuse/fresh policy. Each binding has its own known selection slot; equal results
 never authorize cross-binding reuse, and fresh success does not adopt itself.
+The [advisory supersession example](docs/implementation-supersession.md) records an ordinary
+fixed-menu A→B declaration with structured reason/evidence, separate explicit default promotion,
+and actual request-basis versus separately selected knowledge views. It preserves predecessor
+reuse/history; no automatic invalidation, new native entity or lifecycle framework is added.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
