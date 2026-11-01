@@ -1,5 +1,541 @@
 # Agent-first DML design discussion — checkpoint
 
+Current task: **Design checkpoint requested; Iteration19 feature delivery successful,
+development GHA disabled, native investigation PAUSED**.
+Feature independently accepted/published `a71e89f`; focused/local acceptance and all new CI feature
+checks passed. This does not claim all-green CI or a completed native fix. User requested a local
+checkpoint here of accumulated design notes; no push or implementation restart authorized.
+GitHub workflow CI232868302 verified `disabled_manually`; Release Python233518745 stays active.
+DML remains clean HEAD47131da. No workflow/source/build/test/commit/push changes. Existing worker
+explicitly PAUSED ALL/no further tools; BOTH builds/source coordinator-owned, private native harness
+incomplete/unexecuted. No reserved fixCI will launch. Local validation/release controls unchanged;
+rawfail/cancels/originalUNKNOWN/VP001 retained, no nativefix or finaldelivery claim. Read
+[GHA decision/state](iterations/19-intent-scoped-reuse/GHA-DISABLED.md).
+Earlier current-task blocks below are historical and superseded where inconsistent.
+
+Current task: **Iteration19 feature `a71e89f` accepted/published; native-CI investigation ongoing**.
+Diagnosticbeafc0ee rawCI41294882995 CANCELLED (4pass/Macx neworacleFAIL/Windows10capCANCEL);
+actual Macarm nativeSEM legal last-close/new-shared ENOENT mechanism established, original
+historical attribution still UNKNOWN. User sayscontinue/explicitlyapproves ONLY Windows outer20
+and ONE extra diagnosticround2. Reviewed pure epochcorrection/budgetselector normallypublished
+`47131da927d76b190bb37f4384d887f2edcb65f5`; actualCI41299279030 attempt1 running. Read
+[CI investigation](iterations/19-intent-scoped-reuse/CI-INVESTIGATION.md)/review/coordination.
+No production/nativefix implemented or green/exception/oldcause diagnosis; VP001/openuncertainty
+and raw outcomes retained. Final deliverypending/no laterturn/designpublication. Earlier states historical.
+
+Current task: **Iteration19 published `a71e89f`; separately authorized bounded investigation**.
+The user chose Authorize a bounded investigation after seeing both UNKNOWN old asyncCI failures.
+Read [CI investigation](iterations/19-intent-scoped-reuse/CI-INVESTIGATION.md) and coordination:
+existing worker/current session concrete plan/coordinator review FIRST, finite relevant probes/
+diagnostics/causal fixes/regressions, no retryuntilgreen/timeout/skip/budget/threshold weakening.
+RawCI41269736666 FAILED4pass2fail and all164new+4cleanup pass each retained, VP-001OPEN UNKNOWN/
+no standing waiver. BOTH builds worker-owned until targeted freeze/release. No exception/diagnosis/
+new feature/extra agent/cloud/global/later turn/design publication; specific plan review pending.
+Earlier pause/disposition-choice states below historical.
+
+Current task: **Iteration19 published `a71e89f`; CI FAILED, delivery disposition BLOCKED**.
+ActualCI41269736666 attempt1 FOUR jobs pass/Windows+Macx86 fail ONLY old async host-client
+story completion15s/native publication/owner rc1-reaped/truncated LocalExecutionError LMDB-open
+ENOENT; root causes/attribution UNKNOWN. ALL164 new+4cleanup pass EACH platform/shared6XML/
+primary/digests independently verified. Read [CI blockers](iterations/19-intent-scoped-reuse/CI-BLOCKERS.md),
+[REVIEW](iterations/19-intent-scoped-reuse/REVIEW.md) and
+[COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md). Worker PAUSED ALL/no further
+ tools pending scoped decision; no exception/investigation/rerun authorized, NOT finalSTOP/green/
+fix/inherited. User scoped investigation versus documented risk-acceptance choice pending;
+VP-001 OPEN UNKNOWN/no standing waiver/original retrieval+attribution corrections retained.
+Earlier states below historical.
+
+Current task: **Iteration19 independently ACCEPTED exact frozen TWELVE; publication/final-SHA CI pending**.
+Independent48 focused/1384 installed NONEXECUTING pass; reviewed worker209/solefull2657/actual
+SIX-Q/FOUR-local26phase. IS-001 resolved; BOTH builds/source/stopped evidence returned for accepted
+focused worker commit/normal push/actualCI/fresh triage and reviewed fixes. Read
+[REVIEW](iterations/19-intent-scoped-reuse/REVIEW.md) and
+[COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md). Original failures/early91
+nonsnapshot qualification/VP-001 OPEN UNKNOWN retained. No extra full/computation/fixture/later
+turn/design publication. Final publication/CI/disposition/STOP pending; earlier states historical.
+
+Current task: **Iteration19 GO; existing window-2 agent restarted in a verified NEW Pi session**.
+The user authorized bounded implementation, coordinator monitoring/independent review/feedback
+until satisfactory, then accepted worker focused commit/normal push and exact-SHA CI/fixes.
+Read [authorization](#iteration19-implementation-and-publication-authorization) and
+[COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md). BOTH builds worker-owned
+until changed-surface/HEAD freeze/explicit release. SIX-Q/FOUR synchronous LOCAL-attempt story
+and published proportionate validation policy apply. VP-001 OPEN UNKNOWN/no standing waiver;
+no extra worker/cloud/global/release/package/later turn/design publication. Outcomes pending.
+Earlier pending-GO states below are historical, superseded only for this bounded scope.
+
+Current task: **Iteration19 bounded DESIGN/EXAMPLE/HANDOFF reviewed; implementation GO pending**.
+The user stated **“reviewed”**, recording review of the prepared plan, not implementation/
+delegation/publication GO or as-built behavior. Exact engineering spellings remain refinable.
+Read [plan review](#iteration19-plan-review) and the three documents below. DML stays clean
+published3b2b370/completed18 stopped; no worker/source/build/story/CI restart or commit/push.
+
+Current task: **Iteration19 candidate DESIGN/EXAMPLE/HANDOFF prepared for review; GO pending**.
+The user requested preparation after agreeing intent-scoped cross-implementation reuse and
+explicit removal of selected entries, deferring persistent restrictions and separating
+implementation deprecation. Read [preparation](#iteration19-candidate-preparation),
+[DESIGN](iterations/19-intent-scoped-reuse/DESIGN.md),
+[EXAMPLE](iterations/19-intent-scoped-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/19-intent-scoped-reuse/HANDOFF.md). NEW Mi/Di/public S+ownQ/direct W/six-Q-
+four-local story are candidate mechanics, not schema/API approval/as-built/implementation GO.
+DML remains clean3b2b370/completed18 stopped. No worker/source/spec/diagram/build/story/image/CI/
+experiment/provisioning/commit/push or extra agent/cloud/global/release/package/later turn/design
+checkpoint. VP-001 OPEN UNKNOWN/no standing waiver/investigation. Review then separate GO.
+
+Current task: **Iteration 18 COMPLETE AND STOPPED through `3b2b370f4f275d324d9c8cbc93e5a915b9c59149`;
+ALL SIX final-SHA CI41182904065 jobs successful, attempt1**. The user subsequently stated
+**“reviewed”**, recording review of the completed delivery; work remains stopped, with no
+next-turn or checkpoint-publication authorization. Read
+[RESULTS](iterations/18-multi-input-reuse/RESULTS.md),
+[REVIEW](iterations/18-multi-input-reuse/REVIEW.md) and
+[COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md). Exact multi-input ordinary M/
+new Dm/ownQ-W/explicit one-key adoption/true old-choice siblings delivered. Independent38
+focused/1179 installed NONEXECUTING distinct from worker163/sole full2489/actual SEVEN-Q/
+THREE-local story/25phases. Final shared six XML/primary/digests/exact11 clean source+remote
+verified, MI-001 hosted Windows resolved. Local children reaped/evidence retained/no external
+fixture. Original failed probes/private-mutant-driver qualification/coordinator oracle corrections/
+VP-001 OPEN UNKNOWN retained, final pass not old diagnosis/waiver. No worker/source/build/CI/
+story/computation/investigation restart/extra agent/cloud/global/release/package/later turn/
+design checkpoint publication. Earlier states historical.
+
+Current task: **Iteration 18 independently ACCEPTED exact frozen ELEVEN; publication/final-SHA CI pending**.
+Independent38 focused/installed1179 NONEXECUTING pass; worker sole full2489/focused163 and actual
+SEVEN-Q/THREE-local-attempt story reviewed. MI-001 resolved; original failed probes/private
+mutation-driver provenance qualifications/coordinator oracle corrections retained. BOTH builds/
+source/stopped evidence returned for focused worker commit/normal push/actual final-SHA CI fresh
+triage. See [REVIEW](iterations/18-multi-input-reuse/REVIEW.md) and
+[COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md). VP-001 OPEN UNKNOWN/no standing
+waiver, final publication/CI/disposition/STOP pending. No extra full/computation/fixture/later
+turn/design publication. Earlier GO state is historical.
+
+Current task: **Iteration 18 GO; assigned to the existing window-2 agent in a verified NEW Pi session**.
+The user authorized bounded implementation, coordinator monitoring/independent review/feedback
+until satisfactory, then focused worker commit/normal push and actual final-SHA CI verification/
+fixes. Read [COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md), the three approved
+plan documents and [authorization](#iteration-18-implementation-and-publication-authorization).
+Exact spellings remain refinable; no acceptance/as-built result claimed. BOTH builds worker-owned
+until changed-surface/HEAD freeze and explicit release. Small current-installed SEVEN-Q/THREE-local-
+attempt story authorized; proportionate validation applies. VP-001 OPEN/UNKNOWN/no standing waiver;
+related changes or recurrence need fresh scope/triage. No extra agent/cloud/global/release/package/
+later turn or design checkpoint publication. Prior candidate state below is historical.
+
+Current task: **Iteration 18 direction agreed; candidate design/example/handoff prepared for review**.
+Read [planning](#iteration-18-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/18-multi-input-reuse/DESIGN.md),
+[EXAMPLE](iterations/18-multi-input-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/18-multi-input-reuse/HANDOFF.md). Multiple exact URI/full-binding/full-input
+selections coexist, new Q on reuse/fresh, explicit one-key adoption and old branches preserved.
+Ordinary bounded M/entry/uniquely named S/public slot validation/new Dm/seven-Q-three-local story
+are assistant-origin candidates, not schema/API approval/as-built or implementation GO.
+DML clean published9f182be/Iteration17 accepted complete-stopped; no worker/source/spec/diagram/
+build/story/image/CI/experiment/provisioning/commit/push restart. VP-001 OPEN UNKNOWN/no standing
+waiver or investigation. No extra agent/cloud/global/release/package/later turn/design publication.
+Review then separate GO. The completed17 state below is historical, not planning permission.
+
+Current task: **Iteration 17 COMPLETE AND STOPPED through `9f182be635207e03c8cb1cc4f58973632dfe97c9`;
+ALL SIX final-SHA CI41172108791 jobs successful, attempt1**. The user subsequently
+accepted the completed delivery: **“accepted”**. Work remains stopped; this is not a
+new-turn or checkpoint-publication authorization. Read
+[RESULTS](iterations/17-implementation-supersession/RESULTS.md),
+[REVIEW](iterations/17-implementation-supersession/REVIEW.md) and
+[COORDINATION](iterations/17-implementation-supersession/COORDINATION.md). Advisory ordinary L/
+separate default promotion/preserved predecessor/new-Q-old-T reuse/actual D.base versus explicit
+knowledge delivered. Independent37 focused/installed712 NONEXECUTING pass; reviewed worker
+129/27/sole full2364/unchanged gates/actual FOUR-Q-TWO-local-attempt story distinct. Exact12
+normal publication/six small XML+primary counts/digests/clean tree+remote verified. Local children
+reaped/evidence retained/no external fixture. SS-001 resolved, original failed probes/qualified
+original measured controller/corrected nonexecuting supplement preserved; VP-001 OPEN UNKNOWN,
+final pass not older diagnosis. Completed GO authorizes no restart/later turn/extra worker/
+cloud/global/release/package/design checkpoint publication. Earlier pending states are historical.
+
+Current task: **Iteration 17 independently ACCEPTED exact frozen12; publication/final-SHA CI pending**.
+Independent37 focused and separately authored installed712 NONEXECUTING checks pass; worker
+sole stable full2364/unweakened gates and actual FOUR-Q/TWO-local-attempt story reviewed.
+SS-001 independently resolved. BOTH builds/source/stopped story returned for accepted focused
+worker commit/normal push/actual final-SHA CI triage. Read
+[REVIEW](iterations/17-implementation-supersession/REVIEW.md) and
+[COORDINATION](iterations/17-implementation-supersession/COORDINATION.md). Original failed
+probes/qualified original controller/corrected nonexecuting readers preserved; VP-001 OPEN
+UNKNOWN/no standing waiver. No extra full/fixture/later turn/design publication. Final
+publication/CI/disposition/STOP pending. GO assignment below is historical.
+
+Current task: **Iteration 17 GO; assigned to the existing window-2 agent in a verified NEW Pi session**.
+The user authorized bounded implementation, coordinator monitoring/independent review/feedback
+until satisfactory, then focused worker commit/normal push and exact-SHA CI verification/fixes.
+Read [COORDINATION](iterations/17-implementation-supersession/COORDINATION.md) and the approved
+[DESIGN](iterations/17-implementation-supersession/DESIGN.md),
+[EXAMPLE](iterations/17-implementation-supersession/EXAMPLE.md) and
+[HANDOFF](iterations/17-implementation-supersession/HANDOFF.md). Exact spellings refinable;
+not as-built behavior or acceptance yet. BOTH builds worker-owned until changed-surface/HEAD
+freeze and explicit release. Bounded current-installed FOUR-Q/TWO-local-attempt story authorized;
+proportionate validation applies. VP-001 remains OPEN/UNKNOWN/no standing waiver; related changes
+or recurrence need fresh scope. No extra agent/cloud/global/release/package/later turn or design
+checkpoint publication. Prior candidate state below is historical, superseded by GO.
+
+Current task: **Iteration 17 direction agreed; candidate design/example/handoff ready for review**.
+Read [planning](#iteration-17-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/17-implementation-supersession/DESIGN.md),
+[EXAMPLE](iterations/17-implementation-supersession/EXAMPLE.md) and
+[HANDOFF](iterations/17-implementation-supersession/HANDOFF.md).
+Advisory implementation supersession/correctness versus operational reason/evidence, explicit
+successor default promotion, preserved predecessor/history/branches and actual as-known-then
+versus explicit knowledge views. Known-slot ordinary L/captured basis/public readers/four-Q/
+two-local-attempt mechanics are assistant candidates, not schema/API approval or as-built.
+Separate implementation/delegation/publication GO required. DML clean published e0089323/
+Iteration16 stopped/all6 finalCI successful; no worker/source/spec/diagram/build/fixture/image/
+CI/experiment/provisioning/commit/push or extra agent/cloud/global/release/package/design
+publication. VP-001 planning revisit OPEN/UNKNOWN/no standing waiver or investigation;
+Mac15 finalpass not prior runtime diagnosis. Proportionate validation applies.
+
+The following accepted completed Iteration16 delivery state is historical.
+
+Current task: **Iteration 16 COMPLETE AND STOPPED through `e008932`; all six final-SHA CI jobs successful**.
+The user reviewed and accepted the completed delivery: **“reviewed, looks good.”** See
+[user acceptance](#iteration-16-user-acceptance). No restart or next turn is authorized.
+Worker RESULTS-only finalization complete; explicit STOP ALL/no further tools acknowledged. Final CI41123236764
+attempt1/job metadata/six smallXML+primary counts/digests/sourceRemote/actualMac15arm64
+execution/safe archived retirement independently verified. Independent32/54/24 pass;
+worker real3-job/9-phase+8readers and correctedfull2263/unchanged gates reviewed separately.
+Read [delivery](#iteration-16-final-publication-and-ci-verification),
+[RESULTS](iterations/16-versioned-implementation-selection/RESULTS.md) and
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md). Original failures/
+reconstructed provenance/falsemetadata correction/initialbrownoutCANCELLED preserved,
+VP001OPEN UNKNOWN not diagnosed by finalpass. No later turn/design publication.
+Prior pending state below is historical.
+
+Current task: **Iteration 16 published through `e008932`; final-SHA CI41123236764 pending**.
+Initial accepted14 `7de65ae` plus user-approved exact2 supportedmacos15arm runner migration,
+normalpush/cleanremote/source stability verified. All6 final jobs running, not green yet.
+Original run rawCANCELLED/fivepasses/Macarm scheduledbrownout/no runner orXML preserved;
+false migration receipt/regex failure corrected and independently24pass, bad receipt only
+reconstructed not original snapshot. Owned fixtures archived/identity-retired; images retained.
+Read [publication](#iteration-16-publication-and-runner-migration),
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+No final CI/STOP/later feature/design publication claim. Prior acceptance state is historical.
+
+Current task: **Iteration 16 independently ACCEPTED; focused publication/final-SHA CI pending**.
+Read [acceptance](#iteration-16-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+Independent32 focused tests/54 separately authored installed nonexecuting checks pass;
+reviewed worker correctedfull2263/4683/C7/unchanged gates and real3-job/9-phase+8readers.
+Exact14/BOTH builds/source/stopped fixture returned to worker for focused commit/normal
+push/actual CI+JUnit/fresh triage. Original failed AST coverage run/controller reconstructed
+provenance/other qualifications/VP-001 OPEN UNKNOWN preserved. No final publication/CI success,
+extra full/fixture/later feature/design publication. Prior assignment state is historical.
+
+Current task: **Iteration 16 GO; assigned to the existing window-2 agent in a verified NEW Pi session**.
+The user authorized coordinator monitoring/independent review/feedback until satisfactory,
+then focused worker commit/normal push and CI fixes. Read
+[authorization](#iteration-16-implementation-and-publication-authorization) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+The bounded design/example/handoff are authorized; exact engineering spellings refinable.
+BOTH builds worker-owned until changed-surface freeze/explicit release. Published validation
+policy applies; VP-001 OPEN/UNKNOWN/no standing waiver. No extra agent/cloud/global/generic
+framework/release/package/later turn or design checkpoint publication. Prior notes preserved.
+
+The following candidate preparation state is historical, superseded by GO above.
+
+Current task: **Iteration 16 direction agreed; candidate design/example/handoff ready for review**.
+Read [planning](#iteration-16-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/16-versioned-implementation-selection/DESIGN.md),
+[EXAMPLE](iterations/16-versioned-implementation-selection/EXAMPLE.md) and
+[HANDOFF](iterations/16-versioned-implementation-selection/HANDOFF.md).
+One intent/two captured implementation bindings, versioned default/explicit choice BEFORE reuse/
+fresh, own Q/exact full inputs/per-binding known slots/no cross-implementation reuse/adoption.
+Ordinary Idef/menu/choice/D/captured tree-crosslinks/default-update/three-job story are assistant
+candidates for review, not approved exact schema/API/as-built. Separate implementation GO required.
+DML clean4a053340 unchanged; no source/spec/diagram/worker/build/fixture/image/CI restart or
+experiment/provisioning/commit/push. Proportionate validation applies. VP-001 planning revisit
+remains OPEN/UNKNOWN/maintenance-only exception; no new standing waiver/investigation GO.
+No extra agent/cloud/global/release/package/later turn/design checkpoint requested.
+
+The following completed maintenance task state is historical.
+
+Current task: **validation-policy maintenance COMPLETE AND STOPPED through `4a053340`,
+accepted WITH EXCEPTION VP-001**. Raw CI41098299553 attempt1 FAILED: five successful jobs,
+one macOS arm64 oldasync-story ENOENT failure, cause/attribution UNKNOWN. All15 new reporting
+checks pass all6, six uploadedXML reports preserve actual outcomes/counts/digests. Worker
+onefull2082/sevenC/4301/unweakened gates and coordinator focused23 pass. Read
+[delivery](#validation-policy-maintenance-delivery-and-exception),
+[RESULTS](maintenance/validation-policy/RESULTS.md), [REVIEW](maintenance/validation-policy/REVIEW.md)
+and [VP-001](maintenance/validation-policy/EXCEPTION-VP-001.md).
+User-delegated boundedrisk judgment applied toTHISmaintenanceSHA/job/test only, not green/fixed/
+diagnosedinherited or blanketwaiver. Coordinator ownsOPENfollowup/revisit before relatedchanges,
+recurrence/nextplanning; investigation separately authorized. Worker explicit STOP ALL, no
+newCI/full/fixture/runtime/cloud/global/release/package/design publication or inheritedrestart.
+
+The following independent acceptance state is historical.
+
+Current task: **validation-policy maintenance independently accepted; publication/final-SHA CI evidence pending**.
+One worker final full-v2082/4301/sevenC/unweakened gates and independent focused23 checks pass.
+Changed5/HEAD/diff frozen/targeted identity verified; BOTH builds/source returned for accepted
+focused commit/normal push/CI job and report evidence/explicit triage. No exception approved or
+needed yet. Read [REVIEW](maintenance/validation-policy/REVIEW.md) and
+[COORDINATION](maintenance/validation-policy/COORDINATION.md). No duplicate full/fixture/large
+inventory; user-delegated evidence-based revisions remain available within maintenance scope.
+
+The following assignment state is historical.
+
+Current task: **validation-policy maintenance GO; assigned to the existing window-2 agent in a verified fresh Pi session**.
+The user agreed that focused behavioral checks/concrete acceptance should be primary and CI
+complementary, and authorized the existing worker/new session/coordinator review/focused
+commit/normal push/CI fixes. Coordinator may revise the bounded plan using CI evidence.
+Read [authorization](#proportionate-validation-maintenance-authorization),
+[PLAN](maintenance/validation-policy/PLAN.md), [HANDOFF](maintenance/validation-policy/HANDOFF.md)
+and [COORDINATION](maintenance/validation-policy/COORDINATION.md).
+No runtime feature/Iteration16/extra agent/cloud/global tooling/retired fixture or image restart/
+release/package/design checkpoint publication. Earlier Iteration15 status below is completed
+history, not current maintenance authorization.
+
+Current task: **Iteration 15 implemented, independently accepted, published and STOPPED** through
+**`664a87085961b5e24d2b709e057e4a28fe724088`**, all six final exact-SHA CI41090059076 jobs successful,
+attempt1. Worker RESULTS finalized and explicit ALL-activity STOP observed. Read
+[delivery](#iteration-15-delivery-final-publication-and-stop),
+[RESULTS](iterations/15-intent-reuse-defaults/RESULTS.md),
+[REVIEW](iterations/15-intent-reuse-defaults/REVIEW.md) and
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md).
+Independent full2060/sevenC/4301/unweakened gates+780installed four-job/twelve-phase probe/
+233correctionpostfix/ninecopiedpolicy-parser clients, worker correction2067. ALL248/exact16+3/
+remote/primaryCI/105worker120own archived-identity-retirement verified. Initial Unix19 bootstrap
+cause corrected, WindowsoldcallerENOENT underlyingUNKNOWN despite finalpass/olderUNKNOWN retained.
+No completed-GO worker/source/build/fixture/CI restart/design commit/push/extra worker/cloud/global/
+release/package/later turn. The user reviewed and accepted the delivery; see
+[user acceptance](#iteration-15-user-acceptance). Prior notes preserved; work remains stopped.
+
+The following independent acceptance task state is historical.
+
+Current task: **Iteration 15 independently accepted; focused publication/exact-SHA CI pending**.
+Read [acceptance](#iteration-15-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/15-intent-reuse-defaults/REVIEW.md) and
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md). Independent full2060/
+4301/sevenC/unchanged gates and separate actual installed780-check four-job/twelve-phase
+policy/default/reason/branch probe pass. ALL248/exact16 stable; BOTH builds/source/stopped
+worker fixture returned for focused worker commit/normal push/final exact-SHA all-six CI/fixes.
+No final publication success claimed. Prior failures/UNKNOWN preserved, no design publication/
+extra worker/cloud/global tooling/release/package/later turn.
+
+The following GO assignment task state is historical.
+
+Current task: **Iteration 15 GO; assigned to the existing window-2 agent in a verified fresh Pi session**.
+Read [authorization](#iteration-15-implementation-and-publication-authorization) and
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md). Coordinator monitors,
+independently reviews and provides feedback until satisfactory, then directs focused worker
+commit/normal push and exact-SHA CI verification/fixes. BOTH builds remain worker-owned until
+ALL-source freeze/explicit release. Approved bounded scope unchanged; no extra workers/cloud/
+global tooling/generic framework/release/package/later turn/design checkpoint commit/push.
+Prior notes preserved; the pending-GO task state below is historical.
+
+Current task: **Iteration 15 bounded example/design/handoff approved; implementation GO pending**.
+Read [approval](#iteration-15-plan-approval),
+[DESIGN](iterations/15-intent-reuse-defaults/DESIGN.md),
+[EXAMPLE](iterations/15-intent-reuse-defaults/EXAMPLE.md) and
+[HANDOFF](iterations/15-intent-reuse-defaults/HANDOFF.md).
+The user approved the assistant-origin bounded plan, not as-built behavior or implementation/
+delegation/publication permission. Exact engineering spellings remain refinable. No worker/source/
+spec/diagram/build/fixture/image/CI restart/experiment/provisioning/commit/push; completed14 permission
+not inherited, no design checkpoint requested. DML remains clean8393a82, prior notes preserved.
+
+The following preparation task state is historical, superseded by plan approval above.
+
+Current task: **Iteration 15 direction agreed; candidate example/design/handoff ready for review**.
+Read [planning](#iteration-15-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/15-intent-reuse-defaults/DESIGN.md),
+[EXAMPLE](iterations/15-intent-reuse-defaults/EXAMPLE.md) and
+[HANDOFF](iterations/15-intent-reuse-defaults/HANDOFF.md).
+Versioned intent reuse/execute defaults, explicit request overrides, new Q either way/no T-job on
+reuse, no automatic adoption, true branch-local defaults. One known selection slot/exact URI-
+binding-full inputs including producer witness. Agreement authorizes planning, not exact Idef/D/
+public-preparation/decision-parent/naming/unused-S mechanics or implementation/delegation/publication.
+No worker/source/spec/diagram/build/fixture/image/CI restart/experiment/provisioning/commit/push;
+DML clean8393a82/Iteration14 complete-stopped, prior notes preserved/no checkpoint requested.
+
+The following Iteration14 delivery/review task state is historical; it remains the latest
+completed implementation, not permission to restart.
+
+Current task: **Iteration 14 implemented, independently accepted, published and STOPPED** through
+**`8393a82a14df0e5ac7e9af21e4466d9829f9808d`**, all six final exact-SHA CI41025016866 jobs successful,
+attempt1. The user has reviewed this completed delivery; no restart or later turn is authorized.
+Read [delivery](#iteration-14-delivery-final-publication-and-stop),
+[RESULTS](iterations/14-versioned-reuse-selection/RESULTS.md),
+[REVIEW](iterations/14-versioned-reuse-selection/REVIEW.md) and
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md).
+Worker final1867/sevenC/4030/unchanged gates; coordinator independent corrected1863 full/final242
+postfix/separate actual installed773-check three-job durable selection/adoption/branch probe and
+read-only roots/occurrence supplement pass. ALL238/initial18+correction2/remote/primaryCI/disposition
+verified; worker explicitly STOPPED ALL activity. User-approved ONLYMacx86 outer20min cap, every
+runtime/test/threshold/skip unchanged. InitialMac10cap/UNKNOWNslowdown/WindowsWSLprimary/latentCRLF/
+olderUNKNOWN/originalfailures retained. Owned fixtures archived/retired/images retained. No worker/
+source/build/fixture/CI restart/design commit/push/extra worker/cloud/global/release/package/later turn.
+
+The following independent acceptance task state is historical.
+
+Current task: **Iteration 14 independently accepted; focused worker publication/exact-SHA CI pending**.
+Final corrected independent full1863/sevenC/4030/unchanged gates and separate actual installed
+773-check three-job durable selection/adoption/branch probe plus read-only roots/occurrence
+supplement pass. ALL238/exact18/source/worker-stopped-fixture independently verified; BOTH builds/
+source returned for focused worker commit/normal push/final exact-SHA all-six CI/reviewed fixes.
+Read [acceptance](#iteration-14-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/14-versioned-reuse-selection/REVIEW.md) and
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md).
+No final publication success claimed; no design commit/push/extra worker/cloud/global/release/
+package/later turn. Prior failures/Windows UNKNOWN retained.
+
+The following GO assignment task state is historical.
+
+Current task: **Iteration 14 GO; assigned to the existing window-2 agent in a verified fresh Pi session**.
+Coordinator monitors/independently reviews/provides feedback until satisfactory, then focused
+worker commit/normal push and exact-SHA CI verification/fixes. Read
+[authorization](#iteration-14-implementation-and-publication-authorization) and
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md).
+BOTH builds worker-owned until ALL-source freeze/explicit release. Bounded local current-installed
+selection/adoption/branch validation authorized; missing downloads/installations need scoped approval.
+No extra worker/cloud/global tooling/generic framework/release/package/later turn/design commit/push.
+
+The following review task state is historical, superseded by GO above.
+
+Current task: **Iteration 14 bounded example/design/handoff reviewed; implementation GO pending**.
+Read [review checkpoint](#iteration-14-plan-review-checkpoint),
+[DESIGN](iterations/14-versioned-reuse-selection/DESIGN.md),
+[EXAMPLE](iterations/14-versioned-reuse-selection/EXAMPLE.md) and
+[HANDOFF](iterations/14-versioned-reuse-selection/HANDOFF.md).
+User “reviewed” records bounded plan review, not implementation/delegation/publication GO or
+as-built behavior. Exact engineering spellings remain refinable. No worker/build/fixture/image/
+CI/source/spec/diagram restart/experiment/provisioning/commit/push; completed Iteration13
+permissions not inherited, no design checkpoint requested.
+
+The following preparation task state is historical, superseded by the review checkpoint.
+
+Current task: **Iteration 14 direction agreed; candidate example/design/handoff ready for review**.
+Read [planning](#iteration-14-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/14-versioned-reuse-selection/DESIGN.md),
+[EXAMPLE](iterations/14-versioned-reuse-selection/EXAMPLE.md) and
+[HANDOFF](iterations/14-versioned-reuse-selection/HANDOFF.md).
+Record a versioned selected reusable attempt; explicitly reuse the recorded choice; fresh execution
+leaves selection unchanged; explicit adoption/new snapshot and two branches retain different choices.
+Exact intent/binding/full inputs/producer witness matching persists, no default/cache index/facets.
+User “agreed” authorizes planning, not exact S/V/validation-basis/slot/helper choices or implementation/
+delegation/publication GO. No worker/build/fixture/image/CI/source/spec/diagram restart/experiment/
+provisioning/commit/push; completed Iteration13 permissions not inherited, no checkpoint requested.
+
+Latest completed turn: **Iteration 13 implemented, independently accepted, published and STOPPED** through
+**`b296fdb5acad4b8b1c7608aea3b1c5d0af6bd79c`**, all six final exact-SHA CI41006689070 jobs successful,
+attempt1. Read [delivery](#iteration-13-delivery-final-publication-and-stop),
+[REVIEW](iterations/13-explicit-attempt-reuse/REVIEW.md),
+[RESULTS](iterations/13-explicit-attempt-reuse/RESULTS.md) and
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md).
+Worker final1706/seven C/3841/unchanged gates; coordinator independent full1692/126 correction
+postfix/separate actual installed466-check three-job offline-reuse/fresh-control pass. New Q/W
+uses old exact T/result without another attempt/job; explicit fresh control preserves old W choice.
+Initial Windows confirmed native112 disk-full failure/reviewed scoped test-only cleanup/original
+missing disk census/older UNKNOWN causes retained. ALL228/commit surfaces/remote/CI/disposition
+verified, owned fixtures archived/retired/images retained; worker explicitly STOPPED ALL activity.
+No worker/build/fixture/CI restart/design checkpoint commit/push/extra workers/cloud/global tooling/
+release/package publication/later turn; completed GO does not authorize restart.
+
+The following independent acceptance task state is historical.
+
+Current task: **Iteration 13 independently accepted; focused publication/exact-SHA CI pending**.
+Read [acceptance](#iteration-13-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/13-explicit-attempt-reuse/REVIEW.md) and
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md).
+Independent full1692/seven C/3841 statements/unchanged gates and separate actual installed466-check
+three-job offline-reuse/fresh-control pass. Frozen14-file implementation accepted, BOTH builds/
+source/stopped worker fixture returned for focused commit/normal push/final exact-SHA all-six
+CI/fixes. No final publication success claimed yet; prior failures/UNKNOWN causes retained.
+No design commit/push/extra workers/cloud/global tooling/release/package/later turn.
+
+The following GO assignment task state is historical.
+
+Current task: **Iteration 13 GO and assigned in a verified fresh window-2 session**.
+Read [authorization](#iteration-13-implementation-and-publication-authorization),
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md) and reviewed
+[HANDOFF](iterations/13-explicit-attempt-reuse/HANDOFF.md). Coordinator monitors/independently
+reviews/feedback until satisfactory, then focused worker commit/normal push/exact-SHA CI/fixes.
+Worker owns BOTH builds until ALL-source freeze/explicit release. Bounded current-installed local
+reuse/fresh-control validation authorized; missing downloads/installations need scoped approval.
+No extra workers/cloud/global tooling/generic cache/facets/adoption/resources/release/package/later
+turn or design checkpoint commit/push. Prior notes preserved; Iteration12 remains completed.
+
+The following plan-review task state is historical, superseded by GO above.
+
+Current task: **Iteration 13 bounded example/design/handoff reviewed; implementation GO pending**.
+Read [review checkpoint](#iteration-13-plan-review-checkpoint),
+[DESIGN](iterations/13-explicit-attempt-reuse/DESIGN.md),
+[EXAMPLE](iterations/13-explicit-attempt-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/13-explicit-attempt-reuse/HANDOFF.md).
+The user's “reviewed” records bounded plan review, not implementation/delegation/publication GO.
+Exact engineering spellings remain refinable. New request explicitly reuses old selected successful
+attempt/result without new T/job; separate fresh control. No worker/build/fixture/CI restart/DML/
+spec edit/commit/push. Completed Iteration12 GO not inherited; no design checkpoint requested.
+
+Previous completed turn: **Iteration 12 implemented, independently accepted, published and STOPPED** through
+**`66311fcc1a2c652b5e2526c5de78a3cf781e67d6`**. All six final exact-SHA CI40954598093 jobs successful,
+attempt1. Read [delivery](#iteration-12-delivery-final-publication-and-stop),
+[REVIEW](iterations/12-composed-recorded-steps/REVIEW.md),
+[RESULTS](iterations/12-composed-recorded-steps/RESULTS.md) and
+[COORDINATION](iterations/12-composed-recorded-steps/COORDINATION.md).
+Exact selected producer result/witness composition/ordinary success-only summary implemented;
+coordinator independent full1647/3783/seven C and separate actual installed293-check chain pass.
+Source/remote/CI and archive/retirement verified; worker explicitly stopped. Original failures/
+qualifications and earlier Windows UNKNOWN causes retained. No worker/build/fixture/CI restart,
+extra workers/cloud/global tooling/release/package/later turn or design checkpoint commit/push.
+
+Previous completed implementation: **Iteration 11 implemented, independently accepted, published and stopped**
+through **`640cabb05dd9426323069e816621dcbc0c829ae0`**, all six final exact-SHA CI jobs successful.
+Read [delivery](#iteration-11-delivery-final-publication-and-stop),
+[REVIEW](iterations/11-floci-batch-execution/REVIEW.md),
+[RESULTS](iterations/11-floci-batch-execution/RESULTS.md) and
+[COORDINATION](iterations/11-floci-batch-execution/COORDINATION.md).
+Initial Windows unchanged old-reader rc1 cause remains UNKNOWN; final pass/diagnostics are not
+its diagnosis/fix. Owned fixtures archived/retired, images/evidence retained. No source/build/
+fixture/CI/worker restart, extra workers/cloud/global tooling/release/package publication/later
+turn or design checkpoint commit/push authorized. Earlier pending/GO states preserve provenance.
+
+Acceptance status (historical): **Iteration 11 implemented and independently accepted; publication/CI pending**.
+Coordinator full1575/seven C/3536 retained statements/unchanged native-memory gates and separate
+current installed17+25 Batch380-check probe pass. Reviewed33-file frozen slice accepted; worker
+now authorized focused commit/normal push/exact-SHA CI/fixes. Read
+[review](iterations/11-floci-batch-execution/REVIEW.md),
+[results](iterations/11-floci-batch-execution/RESULTS.md) and
+[coordination](iterations/11-floci-batch-execution/COORDINATION.md).
+No final publication/CI success claimed yet; no later feature/design commit/push authorization.
+
+Assignment status (historical): **Iteration 11 GO**, authorized for the existing window-2 agent in a fresh Pi
+session, with coordinator monitoring/independent review/fixes until satisfactory, then focused
+worker commit/normal push and exact-SHA CI verification/fixes. Read
+[authorization](#iteration-11-implementation-and-publication-authorization),
+[coordination](iterations/11-floci-batch-execution/COORDINATION.md) and the approved
+[handoff](iterations/11-floci-batch-execution/HANDOFF.md). Bounded local offline image/private
+fixture/combined installed gate are authorized; missing downloads/installations need scoped
+approval. No extra workers/cloud/global tooling/release/package publication/later turn or design
+checkpoint commit/push. Earlier pending-GO statements preserve chronological provenance.
+
+Current status at plan approval: **Iteration11 bounded design/example/handoff accepted by the user**. Read
+[approval](#iteration-11-plan-approval), [design](iterations/11-floci-batch-execution/DESIGN.md),
+[example](iterations/11-floci-batch-execution/EXAMPLE.md) and
+[handoff](iterations/11-floci-batch-execution/HANDOFF.md). Implementation/delegation/publication GO
+remains pending; plan approval is not as-built behavior. No worker/fixture/image/build/CI/experiment
+restart or commit/push. Completed study permissions are not inherited.
+
+Current result: **Floci feasibility complete/stopped, viable with constraints**. See
+[report](feasibility/floci/REPORT.md), [review](feasibility/floci/REVIEW.md) and
+[checkpoint](#floci-feasibility-completion). Real Batch jobs/fresh polling/S3 and separate prior
+synthetic DML packet replay pass; **combined DML-in-Batch adapter execution remains untested**.
+No Iteration11 plan/implementation GO/further fixture/pull/production work/commit/push.
+
+Latest status: **Iteration 10 implementation, independent review and publication/CI are
+complete and stopped through `099d156`**; all six final exact-SHA jobs succeed. Read
+[delivery](#iteration-10-delivery-and-final-publication-checkpoint),
+[RESULTS](iterations/10-asynchronous-ssh-execution/RESULTS.md),
+[REVIEW](iterations/10-asynchronous-ssh-execution/REVIEW.md) and
+[coordination](iterations/10-asynchronous-ssh-execution/COORDINATION.md).
+Two earlier unchanged Windows story failure causes remain unknown; final pass is not their
+fix/diagnosis. Saved identity/live foreground connection boundary remains; no detached remote
+survival, extra workers/release/package/cloud/global/later turn. Earlier GO and plan/diagram
+checkpoint statements below preserve chronological provenance, not restart permission.
+
 Latest checkpoint: the user **reviewed the Iteration 10 plan and requested a local checkpoint**,
 including separately authored out-of-band entity diagram changes. Read
 [checkpoint](#iteration-10-plan-review-and-local-checkpoint),
@@ -1963,7 +2499,2119 @@ separately authorized push. Design has no remote; no push requested/performed in
 No worker restart/delegation, Iteration 10 source/as-built implementation, fixture/SSH
 operation, experiment/provisioning/build/CI, release/package publication or later turn.
 
+## Iteration 10 implementation and publication authorization
+
+The user declared Iteration 10 GO and authorized the existing window-2 agent in a new Pi
+session to implement the reviewed bounded plan. Coordinator monitors, independently reviews
+and provides feedback/fixes until satisfactory, then directs focused worker commit/push and
+verifies final exact-SHA CI/fixes. This supersedes earlier pending authorization statements,
+not the scope/stop line. No extra workers, detached remote supervisor/lifetime promise,
+cloud/second-host/remote-daemon experiments, global tooling/services, release/package
+publication or later feature turn. Missing downloads/installations need scoped approval.
+
+[COORDINATION](iterations/10-asynchronous-ssh-execution/COORDINATION.md) records `/new` and
+empty-context verification and assignment to existing worker `%215`; coordinator `%197`.
+Both checkouts initially clean: DML `a94e6f5`, design `28cbff2`. Existing unpushed diagram/test
+maintenance `a94e6f5` is preserved/accounted for as an unchanged ancestor of the eventual
+accepted normal push. Worker owns runtime/tests/as-built docs/example/fixture/RESULTS and
+exclusive both shared builds through fresh baseline/implementation; coordinator owns review
+and design status. Explicit source freeze/build release precedes independent validation.
+Commit/push awaits coordinator acceptance; actual installed SSH/container evidence and final
+exact-SHA CI success are mandatory. No design checkpoint commit/push requested.
+
+## Iteration 10 delivery and final publication checkpoint
+
+The fresh-session existing window-2 agent implements fixed foreground nonwaiting SSH start,
+separate saved SSH identity/live application-owned SSHLaunch, bounded fixed nonexecuting observe
+and a public owning read-only exchange packet inspector. Immutable validated exact-Q P/U/F
+packets use unchanged authoritative explicit-ref A receive, preserving caller heads/request refs,
+unknown versus failure/provisional publication/separate cleanup. Timeout retains execution
+connection ownership, not automatic kill; no detached remote survival/supervisor promise.
+
+Coordinator required meaningful ownership/error tests, found fixture finally/concurrent-reader
+ownership gaps and reviewed regressions. Worker's precommit audit finds malformed changed-host
+fixture (literal backslash-n); original393 progress gate is qualified, not genuine changed-key
+proof. Two-support-file fix/parser/fingerprint/Windows-LF regressions and actual rerun396 prove
+real changed-key rejection. Worker final stable `-v`1372/seven C,2828/2828/unchanged retained
+native1681/132/1562 and binding/141CLI memory gates. Coordinator independently runs full1357,
+postfix168/33/44, plus separate installed178-check custom actual SSH workflow (13+29=42).
+All13 wheel/independent host/fixture host/remote artifact bytes match. Worker synchronous271
+and final progress396 installed gates remain separately attributed evidence. Limits in RESULTS/
+REVIEW distinguish host statements/installed processes, exact exclusions/runtime suppressions,
+selected mutation probes, physical-host/platform/process/profile/trust/capture guarantees.
+
+Reviewed24-file implementation `fdba76e` normally pushed with unchanged user-authorized local
+diagram/test ancestor `a94e6f5`. Initial exact-SHA CI has five successful jobs/Windows one confirmed
+new private prepare harness defect: POSIX interpreter passed to native host binding validation.
+Reviewed one-test host adapter +57/-1 preserves public endpoint POSIX/runtime/profile and is
+published `6f063d9`. Its CI attempt1 fails unchanged old async story at pinned B export reopen
+ENOENT2; one authorized failed-job-only same-SHA rerun instead fails unchanged old caller story
+at outer-worker status after P/U/F. Original worker/B diagnostics absent; both causes UNKNOWN,
+not gate-expiry/native-regression diagnoses. No speculative production fix or gate weakening.
+
+Reviewed3-test-file bounded failure diagnostics preserve/rethrow original without dispatch/retry/
+repair/signal; nine regressions. Initial synthetic relative compile filenames cause coverage
+phantom-source error after1372 tests, recorded failed gate; absolute owned temporary filenames
+fix only measurement harness without maintained-source aliases/omit changes. Stable full checks
+and independent44-test postfix pass; diagnostic enrichment published `099d156`, not claimed
+as an established fix of either unknown old Windows failure.
+
+[Final exact-SHA CI40791372333](https://github.com/micha/dml/actions/runs/40791372333) succeeds
+**all six jobs**, attempt1, for **`099d156fb49f81a7da0683898189a85c1172988c`**. Coordinator verifies
+full logs/completedJSON/sole automatic push workflow/direct finite watch exit0, clean implementation
+tree/index and matching remote master. Windows1366/five existing skips explicitly passes oldasync/
+caller/newprepare, Linux1372/mac1368+four skips, seven C everywhere. Final pass is not the old
+failures' diagnosis/fix; informational CI `-c` does not replace local `-v`/actual installed evidence.
+
+Original/fresh owned stopped fixture/B histories archived before only labelled container/private
+key retirement; no owned container/32769 listener remains, image/nonsensitive evidence retained,
+no global prune. Fixture retirement is separate from recorded computational cleanup. Worker
+finalizes RESULTS only then stops all implementation/build/test/commit/push/CI/rerun/fixture activity.
+Turn complete and stopped for user review. No design checkpoint commit/push, extra workers,
+cloud/global tooling, release/tag/package publication or later feature turn authorized.
+
+## Floci feasibility delegation
+
+The user asked whether Floci could provide execution mechanics. Current documentation advertises
+AWS Batch SubmitJob/DescribeJobs plus immediate simulation and real Docker runner modes. The
+assistant suggests evaluating a Batch-style adapter locally rather than selecting custom remote
+supervision. Actual released support/nonwaiting submission/exchange/lifetime behavior remain
+unverified; no implementation direction or API is approved.
+
+The user tasked the existing window-2 agent to establish feasibility, preserving coordinator
+context. Verified existing `%215` empty new Pi session and submitted the bounded
+[handoff](feasibility/floci/HANDOFF.md); worker began machine/preflight reading. Worker owns
+report/narrow probes under `feasibility/floci/`, coordinator retains status notes. Read-only
+primary-source investigation/cached bounded local probes allowed, missing pulls/downloads/
+installations require scoped proposal before realization. No additional agents/production DML/
+spec edits/shared builds/CI/cloud/global changes/commit/push or Iteration11 GO. Adapter owns
+submission/polling/retrieval/cleanup; service status alone never establishes DML done. Await
+concise evidence-backed verdict/prerequisites; simulation or missing runtime is not a pass.
+
+## Floci feasibility completion
+
+Window-2 agent completes the bounded [report](feasibility/floci/REPORT.md), isolated reproducible
+probes and archival/identity-checked retirement. Verdict **viable with constraints**, not combined
+DML adapter pass. ReleasedFloci2.3.0/tag ee15f502 and approved linux/amd64 image digest/source
+revision match; one user-approved pull (~83MiB compressed/DockerSize345463540B), image retained.
+Coordinator accepts narrowed private internal bridge/no host ports, explicit trusted socket
+authority/no sensitive/shared mounts. No inherited SSH host-network workaround.
+
+Final exact-profile runtime exit0: robust enumeration128 enable keys/effective exactly Batch/S3/
+CloudWatchLogs/IAM BEFORE submission and namespace9169 absence; two actual gated Node jobs
+compute13+29=42/S3-fetched4096-byte hash, submit clients exit before gates, fresh clients poll same
+job/single child. Natural exit0 or23 after publication preserves bytes/attempt identity. Clean
+AFTER-REAP restart preserves records/results, not live-job/emulator/host-loss survival. Floci
+cleanup remains best-effort; service status alone never establishes DML done/cleanup. No idempotent
+submit token/source-established retries can multiply computations; initial candidate must use1.
+
+Separate real S3 transport replays27 original synthetic DML P/U/F files/115022 bytes for9 packets;
+13 reviewed wheel artifacts match, fresh installed public inspector/explicit-ref receive compares
+all typed packed objects/all parents603 rows (not603 unique objects), preserving new-A refs/bytes.
+This is replay of prior execution, not DML executing/publishing concurrently inside Batch. Original
+wrong-matching-Q negative oracle expected ExchangeError but got native NotFoundError for absent
+independent Cq; fresh-sandbox oracle correction passes, not deep T-to-Q association evidence.
+Initial real job/S3 fixtures additionally enabled private EC2/9169 IMDS due regex harness defect,
+no EC2 calls/children/public ports; qualification retained. Final exact-profile run corrects that
+harness and provides explicit service/binding proof, not retroactive exact-profile claims.
+
+Coordinator reads report and independently audits recorded hashes/exits/final profile/retirement
+summary, live owned-resource absence, clean DML099d156, ignored raw artifacts/links/whitespace.
+No separate fresh coordinator runtime probe/full primary-source audit claimed; [review](feasibility/floci/REVIEW.md)
+distinguishes worker evidence from artifact checks. Four owned fixtures archived/retired, original
+three unrelated services unchanged, image/nonsensitive evidence retained. Worker stopped/no commits.
+
+Recommended next direction: separately plan one trusted installed DML Batch child, immutable S3
+manifest-last P/U/F packets, saved external job+independent exact-Q identity and unchanged-head
+explicit-ref receive; require combined actual execution/ambiguity/failure/ownership acceptance.
+No scheduler/retry/cancellation/resource/AWS-cloud/durable restart or new DML supervisor selected.
+No Iteration11 plan/implementation GO or further experiments/pulls/production/spec/build/CI/commit/
+push authorized. User review/next-direction decision remains.
+
+## Iteration 11 candidate planning and handoff
+
+After discussing the feasibility report and clarifying P/U/F test history, exact caller request
+identity and explicit-ref return, the user requested the plan/handoff. Prepared
+[DESIGN](iterations/11-floci-batch-execution/DESIGN.md),
+[EXAMPLE](iterations/11-floci-batch-execution/EXAMPLE.md) and
+[HANDOFF](iterations/11-floci-batch-execution/HANDOFF.md) for review. This is planning permission,
+not approval of detailed engineering choices or implementation/delegation/publication GO.
+
+Goal: actually execute installed DML inside a real Floci Batch job after submission client exits;
+fresh bounded adapter invocations retrieve newly produced immutable P/U/F through S3; reuse
+exact caller Q/only-new-T/public inspector/unchanged-head explicit-ref receive. The execution
+adapter owns submission/observation/retrieval; Floci provides external job mechanics. No extra
+DML supervisor subsystem or live submitting connection required.
+
+Assistant recommends a narrow explicitly imported local Floci-specific layer with fixed stdlib
+HTTP Batch/S3 operations, synthetic unsigned local identity/no SDK dependency or production AWS
+parity claim; preconfigured single-container definition/immutable current installed image, service
+attempts1, pre-call local dispatch guard and saved acknowledged job UUID plus independent expected.
+Stage uploads input without computation; lost ack/save remains uncertain/no automatic submit or
+ListJobs repair. Job-side program owns one existing public WorkerLaunch inside Batch, polls local
+recorded history and publishes closed packets through create-only immutable objects/manifest-last
+P/U/F phase slots. External fresh clients do bounded selection/retrieval, never execute/poll inside
+an invocation until completion. Service status never becomes DML computational outcome/cleanup/done.
+External job metadata is saved/immutable transport association, not a new local role/native entity.
+
+The candidate acceptance story requires real combined DML-in-Batch execution, fresh clients,
+declared S3 gates, two same-C requests/distinct Q/T/equal result, nonzero23-after-U evidence,
+coherent pinned manifest selection, all typed packed/all-parent bytes, offline explicit-ref receive,
+strong wrong-Q association rejection, actual-new-A-put rollback and safe before-submit/after-reap
+acknowledgement/publication loss. Node feasibility/prior packet replay alone cannot satisfy it.
+Object conditional writes, new installed DML image/provenance and complete combined workflow
+remain untested; exact APIs/manifests/image/client recipes refinable.
+
+Fixture proposal reuses pinned cached2.3.0 private internal bridge/no host ports/exact four services/
+actual no9169 and trusted local socket, but needs separate GO for new offline current DML image
+and finite multi-process jobs (candidate512MiB vs study Node128). Floci lacks enforced job CPU/PID
+limits; service security settings do not automatically transfer to jobs. Ephemeral B/container
+removal, best-effort cleanup/no idempotent submission/live-restart guarantee and local unsigned
+trust/profile limits stay explicit. No cloud/global changes/new downloads without scoped decision,
+automatic retry/cancellation/recovery/scheduler, native/resource/cache/UI feature or extra worker.
+
+Planning inspects clean DML099d156, current maintained packaging/public seams, study probes/replay
+and pinned primary Batch/S3 source. Context7 moving-main guidance is corroborated against pinned
+release; source conditional-S3 support is not runtime evidence. No production/spec/diagram edits,
+worker assignment, fixture/image/build/provisioning/CI/experiment restart or commit/push performed.
+Design HEAD28cbff2 retains uncommitted Iteration10 delivery/study/status work; preserve it. Next:
+user review/plan approval, then separately bounded GO if desired. No design commit/push requested.
+
+## Iteration 11 plan approval
+
+The user checked their understanding and then stated **“good. plan accepted.”** This approves
+[DESIGN](iterations/11-floci-batch-execution/DESIGN.md),
+[EXAMPLE](iterations/11-floci-batch-execution/EXAMPLE.md) and
+[conditional HANDOFF](iterations/11-floci-batch-execution/HANDOFF.md) as the bounded plan, not
+implemented functionality. Exact engineering spellings remain refinable.
+
+Clarified scope: fixture/controller provisions existing Floci bucket/queue/definition/image
+outside DML. URI datums can record resource references without lifecycle/ownership semantics;
+operational adapter configuration remains separate. Current Python orchestration records an
+intent URI, captured Python implementation binding and named input DAG, not general intent/
+closure registration/resolution or a generic executable-DAG evaluator. Adapter submits one job;
+Python driver makes bounded observations until validated final result/failure and separate local
+cleanup history are retrieved. Batch status is diagnostic, never DML working/done authority;
+recorded failure can be done, successful service status without valid F cannot. All endpoints
+remain local Floci, not AWS/cloud operations. Accepted stdlib-HTTP/synthetic local profile is not
+a production AWS SDK/authentication adapter.
+
+Approval does **not** authorize worker restart/assignment, runtime/spec edits, fixture/image/
+build/provisioning/CI operations, commit/push/release or a later turn. Separate bounded
+implementation/delegation/publication GO remains required; do not inherit completed Iteration10/
+Floci study permission. No design checkpoint commit/push requested or performed. DML remains
+clean099d156; design notes/approved planning documents remain local/uncommitted.
+
+## Iteration 11 implementation and publication authorization
+
+The user declared **“iteration 11 is GO”** and directed the existing window-2 agent to
+implement in a new Pi session. Coordinator monitors, independently reviews and provides
+feedback/fixes until satisfactory, then has the worker commit/push and fix exact-SHA CI
+issues. This supersedes earlier implementation/delegation/publication-pending statements,
+not the approved bounded plan or stop line.
+
+[COORDINATION](iterations/11-floci-batch-execution/COORDINATION.md) records live preflight,
+verified `/new`/empty-context at worker `%215` and ownership; coordinator `%197`. DML starts
+clean at `099d156`; design HEAD `28cbff2` retains accumulated unrelated/historical notes.
+Worker owns runtime/tests/as-built/example/fixture/RESULTS and exclusive **both shared builds**
+through fresh pre-edit baseline and implementation. ALL-source freeze and explicit release
+precede independent coordinator builds/review. Commit/push waits for coordinator acceptance.
+
+Approved bounded offline current-installed-DML image/private internal-bridge Floci fixture
+and actual combined installed gate are within this turn. Missing downloads/installations need
+scoped approval. No extra workers/cloud/global tooling/automatic retry-recovery-cancellation,
+release/tag/package publication/later feature turn or design checkpoint commit/push requested.
+Feasibility and Iteration10 remain completed; their earlier permissions are not inherited.
+
+## Iteration 11 independent acceptance and publication gate
+
+Coordinator completes read-only review/feedback regressions, fresh unchanged full standard `-v`
+(**1575 Python/seven C/3536 retained statements/unchanged native1681/132/1562/binding141CLI gates**)
+and separately authored actual current-installed normal Batch workflow **380 checks**, 17+25=42.
+ALL204 source hashes/33 changed files/exact source set/281 Markdown targets/16 artifact inventory/
+unchanged native diagram reviewed. [REVIEW](iterations/11-floci-batch-execution/REVIEW.md) owns
+independent evidence and distinct worker normal/private/loss/bootstrap/strong atomicity evidence.
+
+Accepted bounded runtime composes public caller-Q/exchange/local/transfer authority with explicit
+local Floci HTTP stage/guarded single submit/saved external identity/create-only immutable S3
+P/U/F retrieval. Service status never infers DML outcome; retrieved validated history/separate
+cleanup owns done. Existing caller heads/Q refs stay unchanged. No new native entity/role codec/
+SDK/cloud/supervisor/resource/cache/UI or later feature. As-built authority:
+[Floci contract](../dml/docs/spec-next/floci-execution.md).
+
+Original private archive/census/coverage/count corrections remain qualified; original4MiB+1
+BYTES payload plus40-byte prefix exceeds packed-record profile, unreturnable F is not claimed as
+B/packet/A comparison. Actual child no CPU/PID ceilings/inherited service-security and substantial
+socket trust/ephemeral-B/ack/cleanup/full-capture/platform/mutation limitations remain explicit.
+Prior old Windows causes remain UNKNOWN. No outstanding within-scope finding.
+
+Coordinator proves original/current/independent exact stopped job/client/namespace ownership;
+archives/retires only fresh own stopped fixture, evidence/images retained/no prune. Returns both
+shared builds/stopped worker fixtures and directs reviewed33-file focused worker commit/normal
+push/final exact-SHA CI/fixes. **Publication/CI pending**, no final success or later turn claimed.
+No design checkpoint commit/push requested; uncommitted prior notes preserved.
+
+## Iteration 11 delivery, final publication and stop
+
+The existing fresh-session window-2 agent implements the bounded Floci-specific local prototype:
+fixed stdlib HTTP/S3/Batch stage/guarded one-shot submit/saved external job identity/bounded
+immutable P/U/F observation and installed job-side ownership/public history publication. Existing
+caller Q/Cq/public exchange inspector/local/transfer/atomic explicit-ref return stay authoritative;
+no new native entity/role codec/SDK/cloud/supervisor/resource/cache/UI or later feature. The
+[as-built Floci contract](../dml/docs/spec-next/floci-execution.md) owns actual API/behavior.
+
+Coordinator independently passes full standard1575 Python/seven C/3536 retained statements/
+unchanged native1681/132/1562/binding141CLI gates, separate actual current-installed17+25 normal
+Batch **380 checks** and independent225 postfix tests. Worker final stable1585/seven C/unchanged
+coverage-memory gates; actual current normal3 jobs/9P-U-F/16 artifacts, qualified private postreap/
+cleanup/profile overflow/loss/bootstrap and strong exact-Q/real actual-A atomicity/pin evidence
+reviewed separately. [REVIEW](iterations/11-floci-batch-execution/REVIEW.md) preserves commands,
+source/image/hashes, real/private/host versus installed/statement versus branch and trust/auth/
+ephemeral-B/full-capture/mutation/platform/process/security/profile qualifications.
+
+Initial accepted33-file `9ed2270` normally published. Initial exact-SHA CI5green/Windows sole
+unchanged caller-prior/concurrent-reader rc1 after both B read barriers, missing stderr, cause
+**UNKNOWN**. Coordinator postpublication audit finds separate fake-wire empty-EOF busy-loop
+ownership defect; one-test real partial header/body regressions fix it. Separate3-test diagnostic
+helper attaches bounded exact-owned cached returncodes/stderr/ready-release only AFTER unchanged
+cleanup, bare-raises original/no process operations/retry/gate change; future evidence, not
+established old-reader diagnosis/fix. Reviewed EOF `4bb0bfa` then diagnostic **`640cabb`** normally
+pushed once. No same-SHA rerun or speculative runtime/deadline/skip/workflow change.
+
+[Final exact-SHA CI40913866835](https://github.com/micha/dml/actions/runs/40913866835) attempt1
+succeeds **all six jobs** for **`640cabb05dd9426323069e816621dcbc0c829ae0`**. Seven C everywhere;
+Linux/strict1585, mac1581/four existing skips, Windows1579/five existing skips/old POSIX parameter
+inapplicable. Windows explicitly passes old caller-prior/concurrent-reader and old async/caller
+stories, NOT their cause diagnosis. Coordinator independently verifies completed JSON/full logs/
+sole automatic exact-SHA workflow/direct finite watch0, accepted206 hashes, separate33/1/3 commit
+surfaces, clean implementation tree/index and matching remote master. CI informational `-c`
+remains distinct from local `-v`/mandatory actual installed fixture evidence.
+
+Original/current/independent exact stopped fixture jobs/clients/namespace proof precedes archive/
+identity-checked retirement. Worker retirement tool120s timeout/partial record retained, no live
+CLI before bounded exact stopped-ID continuation; no computation targeted, no prune. All owned
+Iteration11 containers/networks/volumes absent, images/nonsensitive B/object/log evidence retained.
+Worker directed RESULTS-only finalization then STOP all source/build/test/stage/commit/push/CI/
+rerun/fixture work. Bounded turn complete/stopped for user review; no extra workers/cloud/global
+changes/release/tag/package publication/later feature or design checkpoint commit/push requested.
+Earlier pending/GO/acceptance statements remain chronological, not restart permission.
+
+## Iteration 12 agreed direction and candidate planning
+
+After inspecting the actual recorded Iteration11 graph and caller Python authoring code, the
+user asked for the next proposal. The assistant recommends **compose two recorded steps**:
+add13+29 -> result sub-DAG42, then double consumes that result plus factor2 -> result sub-DAG84.
+The user stated **“agreed. prepare the example and handoff”**. This selects bounded direction
+and authorizes planning, not detailed engineering choices or implementation/delegation/publication.
+
+Agreed direction: Python controls sequencing; ordinary DML request/attempt/input/result/history
+records retain an explicit selected producer occurrence, not only copied numeric42. Matching
+first attempts with identical result content stay distinguishable. Provisional or failed producer
+publication does not silently authorize the consumer. Each step returns under explicit refs,
+existing heads/history remain preserved; observations/imports do not recompute. An ordinary
+summary DAG links selected attempts and final successful result. Existing local Floci/public
+repository/exchange/local/transfer APIs, small justified authoring helpers, no generic DAG
+executor/scheduler/native arithmetic/cache/recovery/resources/cloud/UI or later feature.
+
+Prepared [candidate DESIGN](iterations/12-composed-recorded-steps/DESIGN.md),
+[worked EXAMPLE](iterations/12-composed-recorded-steps/EXAMPLE.md) and
+[conditional HANDOFF](iterations/12-composed-recorded-steps/HANDOFF.md) for review. Assistant
+recommendations distinguish R1 and final producer T1f via ordinary sub-DAG input bindings,
+C2 parented by selected F1/preserving tree plus new I2, separate existing Q2/Cq2 publication,
+second actual Batch job/full producer history, success-only summary E/S parented by F2 and
+create-only explicit refs. Prefer example-local helpers before selecting a public module.
+Root/value/producer names, I64 contract, success-with-recorded-cleanup-failure eligibility,
+helper/controller placement and precise publication checks remain candidate choices.
+
+Acceptance story includes two same-C producers/equal R1/different T1f and selecting the earlier
+one despite later/convenience-ref movement; actual double84; P/U/unknown/producer-failure blocks;
+consumer failure/evidence retention; whole typed bytes/all parents/offline source inspection and
+meaningful new A basis/summary atomicity/response-loss. Producer witness changes full-record
+input identity, not a new reuse facet/mask or proof of scientific causality/full capture.
+
+Read-only preparation reinspects clean DML `640cabb05dd9426323069e816621dcbc0c829ae0`, current
+public descriptors/request builder/DAG/tree/CLI contracts and captured finite Floci source.
+No missing C seam indicated. Design HEAD28cbff2 keeps accumulated prior uncommitted notes.
+No runtime/as-built/diagram source changes, agent restart/assignment, image/fixture/provisioning/
+build/test/experiment/CI/commit/push. Candidate Markdown/link validation only; previous turn
+permission remains complete/stopped, not inherited. Next candidate review, then separate GO.
+
+## Iteration 12 plan review checkpoint
+
+The user stated **“reviewed.”** This records review of the bounded
+[DESIGN](iterations/12-composed-recorded-steps/DESIGN.md),
+[EXAMPLE](iterations/12-composed-recorded-steps/EXAMPLE.md) and
+[HANDOFF](iterations/12-composed-recorded-steps/HANDOFF.md), separately from implementation,
+delegation or publication permission. Exact engineering spellings remain refinable; review does
+not turn the plan into an as-built contract or authorize a generic workflow engine.
+
+No worker assignment/restart, DML/spec/diagram edits, fixture/image/provisioning/build/test/
+experiment/CI/commit/push. DML remains clean640cabb, prior uncommitted design notes preserved.
+No local checkpoint commit/push requested. Next is separate bounded implementation/delegation/
+publication GO; completed Iteration11 permission cannot be inherited.
+
+## Iteration 12 implementation and publication authorization
+
+The user declared **“iteration 12 is GO”** and directed the existing window-2 agent to implement
+in a new Pi session. Coordinator monitors, independently reviews and provides feedback/fixes
+until satisfactory, then has the worker commit/normal push and fix exact-SHA CI issues. This
+supersedes earlier pending-GO status, not the reviewed bounded scope or stop line.
+
+[COORDINATION](iterations/12-composed-recorded-steps/COORDINATION.md) records clean DML640cabb,
+preserved design changes, verified `/new`/empty context in `%215`, worker exclusive BOTH builds
+through unchanged pre-edit baseline/implementation, and ALL-source freeze/explicit release
+before independent coordinator builds. Worker owns implementation/examples/tests/as-built/
+fixture/RESULTS; coordinator owns REVIEW/COORDINATION/design status. Commit/push waits for
+independent acceptance; final exact-SHA all-six CI and known fixture disposition are required.
+
+Bounded actual installed local two-step Floci validation is authorized. Missing downloads/
+installations need scoped approval; no extra workers/cloud/global tooling/generic scheduler/
+reuse/resource feature/release/package publication/later turn or design checkpoint commit/push.
+Completed Iteration11 authorization is not inherited; this is a separately authorized turn.
+
+## Iteration 12 independent acceptance and publication gate
+
+Coordinator independently passes unchanged full standard1647 Python/seven C/3783 retained
+statements/unchanged native-binding141CLI gates and separately authored actual installed
+17+25->42->84 normal3-job/9-phase293-check chain. ALL217/source set/changed16 hashes, informative
+docs/links, unchanged diagram/runtime/package and qualified worker failure/private final-B/
+meaningful new-A-put atomicity/loss gates reviewed. No outstanding within-scope finding.
+[REVIEW](iterations/12-composed-recorded-steps/REVIEW.md) owns distinct evidence and limits;
+[COORDINATION](iterations/12-composed-recorded-steps/COORDINATION.md) owns feedback/ownership.
+
+Original ineffective literal-NUL census qualified and renewed; test alias isolation13setup
+failures diagnosed/fixed separately from old Windows UNKNOWN causes; same-process versus fresh
+installed offline receiver evidence distinct. Exact stopped own3jobs42clients archived/identity-
+retired; worker10terminal208stoppedclients/namespace independently audited and returned intact.
+Images/evidence retained/no prune. Coordinator accepts frozen16-file slice, returns BOTH builds/
+source/stopped worker fixture, directs focused worker commit/normal push/final exact-SHA all-six
+CI/focused fixes. **Publication success pending**, no design commit/push/later turn permission.
+
+## Iteration 12 delivery, final publication and stop
+
+Existing fresh-session window-2 worker implements bounded example-local public-API composition:
+actual result sub-DAG plus exact selected final producer attempt forms consumer inputs, separate
+caller Q2 publication/unchanged Floci execution, ordinary successful summary links both selected
+attempts/final result. No private role codec/new native entity/public generic framework/scheduler/
+reuse/resource/cloud feature. Owning informative [example docs](../dml/docs/composed-recorded-steps.md)
+link unchanged runtime authorities.
+
+Worker and coordinator full standard1647 Python/seven C/3783 statements/unchanged native-binding
+141CLI gates pass. Coordinator separate normal installed17+25->42->84 three-job/nine-phase293-check
+probe passes; worker corrected five-job/15-phase actual13+29->42->84 plus producer23/consumer23,
+private post-reap177-row final-B and supplemental9fresh offline receive/3CLI/218 old-object oracles
+remain distinct evidence. [REVIEW](iterations/12-composed-recorded-steps/REVIEW.md) records commands,
+source/image/provenance/all typed packed bytes/all ordered parents/native new-A-put atomicity/
+authoring-only pre-post-store commit loss and trust/profile/coverage/platform/mutation limitations.
+
+Initial literal-NUL process census qualified and renewed; default test alias leakage13setup errors
+fixed narrowly; setup failures preserved. Approved final COMMENT-ONLY same-process/fresh-receiver
+qualification changes no behavior. Original ALL217/16 inventories retained; renewed accepted source
+bytes match published16-file **`66311fcc1a2c652b5e2526c5de78a3cf781e67d6`** (+2815/-1).
+Unpushed message formatting corrected before first normal push, no published rewrite/force.
+
+Sole automatic [CI40954598093](https://github.com/micha/dml/actions/runs/40954598093) **attempt1/all6
+success**, exact66311fc. Coordinator completedJSON/sole runlist/full primary logs/direct finitewatch0/
+ALL217 hashes/exact source set/clean tree-index/matching remote verified. Seven C everywhere,
+Linux/strict1647/mac1643+4existing skips/Windows1641+5existing skips+old POSIX inapplicable, two
+warnings. No CI fix/rerun needed; informational `-c` not local `-v`/actual installed assurance.
+Worker gh cached-zip primary retrieval fails1; initial mistaken logexit0 explicitly corrected,
+fresh exact API archive0/79 validCRC entries/full joined logs completes evidence separately from
+coordinator primary0/empty stderr. No global cache change/CI rerun; old Windows causes UNKNOWN.
+
+Exact own3terminal42stoppedclient and worker10terminal208stoppedclient namespaces independently
+proved stopped, evidence archived before identity-checked containers/network/volume retirement.
+No owned resource remains, images/nonsensitive B/object/packet/source/log evidence retained/no prune.
+Worker RESULTS finalized and explicitly STOPPED ALL source/build/test/stage/commit/push/CI/rerun/
+fixture activity. Bounded turn complete for user review; no design checkpoint commit/push/extra
+worker/cloud/global tooling/release/package publication/later turn or restart permission.
+
+## Iteration 13 agreed direction and candidate planning
+
+After accepting Iteration12, the user asked for the next proposal. Assistant proposed explicit
+successful-attempt reuse with a new request but no new attempt/job, then separately requested
+fresh execution. User stated **“agreed”**. This selects bounded direction and authorizes preparing
+the offered worked example/design/handoff, not implementation or exact candidate choices.
+
+Agreed direction: preserve new request versus original producing request/selected old attempt/
+actual result sub-DAG; reuse is not another empirical trial. Initially require intent URI/binding
+DAG ID/full input DAG ID equality, including selected producer witness; different containing
+snapshot/request occurrence does not disqualify matching. Different producer with equal42 changes
+I2 and rejects under this bounded rule, not a final facet/cross-implementation equivalence policy.
+Fresh execution remains an explicit new Q/T, potentially equal R84; no automatic discovery/cache
+selection/default/facet/mask/adoption/registry/scheduler/resource/cloud feature.
+
+Prepared candidate [DESIGN](iterations/13-explicit-attempt-reuse/DESIGN.md),
+[EXAMPLE](iterations/13-explicit-attempt-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/13-explicit-attempt-reuse/HANDOFF.md). Recommendations: public historical
+packet validation against independent old Cq/Q; native immutable basis/dimension/full-history
+checks BEFORE new Q; existing public request helper creates its own Qr/Cqr; SEPARATE write records
+ordinary W linking NEW Qr/OLD final attempt/actual R, Cr parented by Cqr/create-only explicit ref.
+Do not reparent old T to new Q or fabricate fresh outcome/attempt. Example-local helper avoids
+trusting supplied dataclasses/private codecs; arbitrary pending-Q resume/public reuse engine is
+not presumed. Q can remain pending if later W write fails; no whole-operation rollback/fallback.
+
+Candidate installed story: actual add/original double, stopped-service fresh installed explicit
+reuse with no job, then deliberate fresh double on retained W history. Three actual jobs/nine
+phases, no fourth reuse job. Known-stopped fixture service resume is test policy, not application
+recovery/live-job restart. Exact W shape/helper/cleanup policy/fixture recipe remain for review.
+
+Read-only planning inspects clean DML `66311fcc1a2c652b5e2526c5de78a3cf781e67d6`, current public
+request/packet/composition/native transaction seams and owning contracts. No public general reuse
+record exists; no missing native operation indicated. No DML/as-built/diagram edit, worker restart/
+assignment, fixture/image/build/provisioning/test/experiment/CI/commit/push; local Markdown validation
+only. Prior uncommitted design notes preserved, no design checkpoint requested. Next candidate-plan
+review and separate bounded GO; completed Iteration12 permissions cannot restart its worker.
+
+## Iteration 13 plan review checkpoint
+
+The user stated **“reviewed.”** This records review of the bounded
+[DESIGN](iterations/13-explicit-attempt-reuse/DESIGN.md),
+[EXAMPLE](iterations/13-explicit-attempt-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/13-explicit-attempt-reuse/HANDOFF.md), separately from implementation,
+delegation or publication permission. Exact engineering spellings remain refinable; review
+does not turn the plan into an as-built contract or authorize a generic reuse/cache engine.
+
+No worker assignment/restart, DML/spec/diagram edits, fixture/image/provisioning/build/test/
+experiment/CI/commit/push. DML remains clean66311fc, prior uncommitted design notes preserved.
+No local checkpoint commit/push requested. Next is separate bounded implementation/delegation/
+publication GO; completed Iteration12 permission cannot be inherited.
+
+## Iteration 13 implementation and publication authorization
+
+The user declared **Iteration 13 GO** and directed the existing window-2 agent to implement
+in a new Pi session. Coordinator monitors, independently reviews and provides feedback/fixes
+until satisfactory, then has the worker commit/normal push and fix exact-SHA CI issues.
+This supersedes earlier pending-GO status, not the reviewed bounded scope or stop line.
+
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md) records clean DML66311fc,
+preserved design changes, verified `/new`/empty context in `%215` and worker-confirmed fresh
+session `01a18aef-3029-766c-90ee-c5c4a086d653`. Worker exclusively owns BOTH shared builds
+through unchanged pre-edit baseline/implementation; ALL-source freeze/explicit release precedes
+independent coordinator builds. Worker owns implementation/examples/tests/as-built/fixture/RESULTS;
+coordinator owns REVIEW/COORDINATION/design status. Commit/push waits for independent acceptance;
+final exact-SHA all-six CI and known fixture disposition remain completion gates.
+
+Bounded actual current-installed local reuse/fresh-control fixture/build validation is authorized.
+Missing downloads/installations need scoped approval; no extra workers/cloud/global tooling,
+generic cache/facets/adoption/scheduler/resources, release/package publication/later turn or
+design checkpoint commit/push. Completed Iteration12 permissions are not inherited; this is
+separate authorization. No implementation acceptance or publication success claimed yet.
+
+## Iteration 13 independent acceptance and publication gate
+
+Coordinator independently passes unchanged full standard1692 Python/seven C/3841 retained
+statements/unchanged native-binding141CLI gates and separately authored actual installed
+17+25->42->84 offline-reuse/fresh-control466-check probe. ALL226/exact frozen14-file set/current
+runtime-wheel-image/unchanged diagram/links/native byte-history/rollback-loss and known writer
+disposition reviewed; no outstanding within-scope finding. [REVIEW](iterations/13-explicit-attempt-reuse/REVIEW.md)
+owns commands/probe hashes/distinct worker-versus-independent evidence and limits.
+
+New Q/ordinary W references old selected successful T/result/original Q, no extra attempt/job,
+exact intent/binding/full inputs/producer witness; explicit fresh Q/T/job may return equalR84
+without adopting/changing W. Separate Q/W boundaries/pending satisfaction/unknown return retained.
+Independent blocked-service-import fresh offline authoring/external all-status census/full native
+history checks pass. Own3terminal64stoppedclients/ALLcensus/namespace archived then exact65 stopped
+containers/network/volume retired; worker3terminal55stoppedclients independently audited intact.
+Images/evidence retained/no prune. Source hashes stable; original coverage/mutation-loader and own
+checker schema/directory false positives preserved, not runtime failure diagnoses. Old Windows
+causes UNKNOWN.
+
+Coordinator ACCEPTS frozen14-file slice, returns BOTH builds/source/stopped worker fixture,
+directs focused worker commit/normal push/final exact-SHA all-six CI and reviewed fixes.
+**Publication success pending**. No design checkpoint commit/push/extra worker/cloud/global
+tooling/release/package publication/later turn or restart authorization inferred from passing gates.
+
+## Iteration 13 delivery, final publication and stop
+
+Existing window-2 worker in a verified fresh session implements example-local explicit successful
+historical-attempt reuse through unchanged PUBLIC packet/request/native/transfer APIs. Historical
+packet validated against independent old Cq/Q owns selected old final T/result; intent/binding/full
+inputs including producer witness match BEFORE new Q. ALL-parent basis history/full typed native
+closure validated, including nonfirst-parent retention/composite-only descendants. Existing request
+helper creates own actual Q/Cqr; SEPARATE W write links new Q/old T/actual result, exact parent/tree/
+create-only ref/prebuilt response, old T-to-old Q unchanged. W failure can retain pending Q; no
+fallback/new attempt/job/adoption/cache discovery/private role codec/public framework/native entity.
+
+Worker final full1706 Python/seven C/3841 statements/unchanged native-binding141CLI gates passes.
+Coordinator independently passes full1692/3841/seven C, separate actual installed17+25->42->84
+466-check three-Batch-job/nine-phase probe and correction126-test postfix. Worker actual13+29 chain/
+stopped-service fresh installed copied-example reuse/no HTTP-Floci-Docker import/newQ+W/no job/
+independent persisted two-job census/explicit fresh double/W stilloldT and native seven-new-row
+W rollback/authoring-only pre-post-store commit loss remain distinct attributed evidence.
+Normal ephemeral F is not archived final-B proof; no test-only correction Batch/image/fixture rerun.
+[REVIEW](iterations/13-explicit-attempt-reuse/REVIEW.md) owns commands/probe hashes/qualifications.
+
+Initial accepted14-file `ce3caf5` normally published. Initial CI41004013451 completes5green/
+Windows16 final unchanged transfer failures; ALL45 new tests pass. Independent primary log confirms
+native storage_error112/ERROR_DISK_FULL opening LMDB. Exact original full disk/file census is absent;
+added retained default64MiB Windows environments are plausible pressure, not captured complete
+original attribution. Reviewed7-test-file scoped cleanup waits for ALL setup/call/owning fixture
+teardown reports passed, deletes ONLY owned new reuse tmp_path, retains failed/skipped/no-call/
+unknown/unrelated artifacts and visibly fails cleanup errors. Public pytest/real subprocess/native
+closed-extent regressions and renewed full1706/independent126 pass; runtime/map/workflow/skips/
+deadlines unchanged. Older Windows causes remain UNKNOWN, not diagnosed by this correction/pass.
+Original coverage-source syntax/mutation-loader/escape-capture/own checker setup failures retained.
+
+Correction **`b296fdb5acad4b8b1c7608aea3b1c5d0af6bd79c`** normally published,+203; initial14-file
+ancestor unchanged. Sole automatic NEW exact-b296fdb [CI41006689070](https://github.com/micha/dml/actions/runs/41006689070)
+**attempt1/all6 SUCCESS**, not initial-SHA blind rerun. Seven C everywhere; Linux1706/mac1702+4
+existing skips/Windows1700+5existing skips/old POSIX applicability; initial16 disk-full cases explicitly
+pass final Windows primary logs. Coordinator completedJSON/sole exactSHA runlist/directfinitewatch0/
+fresh APIZIP0/79validCRC entries/full1244555-byte primary logs/ALL228 hashes/exact committed surfaces/
+clean tree-index/matching remote independently verified AFTER CI. Informational `-c` is distinct
+from local `-v`/installed evidence, statements not every branch/platform/security guarantee.
+
+Exact worker3terminal55stoppedclient56containers and coordinator3terminal64stoppedclient65containers/
+ALL census/empty namespaces proved; fresh service-data/logs archived before identity-checked owned
+containers/network/volume retirement. Both namespaces independently absent after CI, images/
+nonsensitive failed+passing/source/B/packet/history/service evidence retained/no prune. Computational
+cleanup remains distinct from fixture retirement. Worker RESULTS finalized and explicitly
+acknowledges STOP ALL source/runtime/build/test/staging/commit/push/CI/polling/rerun/fixture activity.
+Bounded turn complete for user review. No design checkpoint commit/push/extra worker/cloud/global
+tooling/release/package publication/later turn or restart permission inherited from completed GO.
+
+## Iteration 13 user acceptance
+
+The user stated **“looks good”** after the completed delivery, then asked for the next proposal.
+This accepts Iteration13's implemented/independently reviewed/published/stopped turn through
+b296fdb. It does not restart worker/build/fixture/CI work or request a design checkpoint commit/push.
+
+## Iteration 14 agreed direction and candidate planning
+
+Assistant proposed **versioned reuse selection and explicit reuse adoption**. The user stated
+**“agreed.”** This selects the bounded direction and authorizes the offered worked example/design/
+handoff preparation, not exact candidate details, implementation/delegation or publication.
+
+Agreed direction: record a selected successful reusable attempt in immutable repository state;
+later requests explicitly use that recorded choice; separately execute fresh without changing
+selection; explicitly adopt fresh successful matching attempt in a new snapshot; demonstrate two
+branches retaining different choices despite equal84. Selection/adoption create no computational
+Q/T/job; reuse creates only new Q/W. Exact intent/binding/full-input identity including producer
+witness persists. No transparent default/cache discovery/history search/global index/registry,
+facets/masks/equivalence/scheduler/resources/cloud feature or new native entity.
+
+Prepared candidate [DESIGN](iterations/14-versioned-reuse-selection/DESIGN.md),
+[EXAMPLE](iterations/14-versioned-reuse-selection/EXAMPLE.md) and
+[HANDOFF](iterations/14-versioned-reuse-selection/HANDOFF.md). Concrete read-only friction: public
+historical inspector currently takes packet files plus independent expected Cq/Q, not a native
+attempt ID. Recording only T/R flags or old file paths would bypass validation or leave selection
+external-file dependent. Recommended example-local ordinary S pins full computation/original Q/
+selected final T/result/supporting F metadata, with V capturing bounded public expected-HANDLE/
+job/observation framing bytes. Native all-parent history, NOT the literal F-ID datum, retains F.
+Later pinned native S/V reads/export F/materialized owned packet/public loader-inspector validation
+avoid private role codecs, external ORIGINAL packet dependencies or a new public framework.
+
+S/V shape, single named-slot convention, capsule/projection mechanics, same-attempt adoption
+rejection and helper placement are **assistant recommendations for review**, not additional user
+agreements or as-built claims. Prefer unchanged Iteration13 Q/W authoring: its pinned submission
+parent/known slot/T-R association exposes the selected choice, no claimed direct W-to-S edge.
+Selection/adoption are individually atomic; Q/W/files/service stay separate, including possible
+post-publication projection cleanup/response loss. No fallback/repair/automatic new Q/adoption.
+
+Recommended actual installed story remains three jobs/nine phases: add, old double, explicit
+fresh double. Initial S0/selected reuse and later S1 adoption/two-branch selected reuse work with
+service/ORIGINAL packet/expected/input/B offline; selection/adoption/reuse add no fourth job.
+Known-stopped fixture resume is conditional test policy, not runtime recovery/live-job restart.
+Fresh test budgeting follows reviewed successful-owned-temp post-report policy, not native map
+shrink/global purge/skips/deadline weakening. Original native112/no original disk census/older
+UNKNOWN causes persist. These are planned gates, not newly demonstrated capabilities.
+
+Read-only planning reinspects clean published DML b296fdb and current public framing/inspection/
+transfer/native transaction/example seams. No native operation gap indicated; metadata-based
+projection feasibility is recommended from source inspection, NOT experimentally demonstrated.
+No DML/as-built/diagram edit, worker assignment/restart, test/build/fixture/image/provisioning/
+experiment/CI/commit/push. Accumulated design notes preserved, local Markdown checks only; no
+checkpoint requested. Next: candidate-plan review, then separate bounded GO if desired.
+
+## Iteration 14 plan review checkpoint
+
+The user stated **“reviewed.”** This records review of the bounded
+[DESIGN](iterations/14-versioned-reuse-selection/DESIGN.md),
+[EXAMPLE](iterations/14-versioned-reuse-selection/EXAMPLE.md) and
+[HANDOFF](iterations/14-versioned-reuse-selection/HANDOFF.md), separately from implementation,
+delegation or publication permission. Exact engineering spellings remain refinable; reviewed
+ordinary S/V/durable public validation framing/explicit slot/adoption mechanics are the bounded
+plan, not implemented behavior or approval of a generic cache/selection framework.
+
+No worker assignment/restart, DML/spec/diagram edits, fixture/image/provisioning/build/test/
+experiment/CI/commit/push. DML remains cleanb296fdb, accumulated design notes preserved; no
+local checkpoint commit/push requested. Next is separate bounded implementation/delegation/
+publication GO; completed Iteration13 permissions cannot be inherited.
+
+## Iteration 14 implementation and publication authorization
+
+The user declared **Iteration 14 GO** and directed the existing window-2 agent to implement
+in a new Pi session. Coordinator monitors, independently reviews and provides feedback until
+satisfactory, then directs focused worker commit/normal push and exact-SHA CI verification/fixes.
+This supersedes pending-GO restrictions, not the reviewed bounded scope or stop line.
+
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md) records mounted `/work`,
+clean DML b296fdb, preserved accumulated design notes, verified `/new`/empty context in `%215`,
+coordinator `%197` and exclusive worker ownership of BOTH builds through unchanged baseline/
+implementation. ALL-source freeze/explicit release precedes independent coordinator tests.
+Worker owns implementation/examples/tests/as-built/fixture/RESULTS; coordinator REVIEW/
+COORDINATION/design status. Commit/push waits for independent acceptance.
+
+Bounded local actual current-installed selection/adoption/branch validation is authorized.
+Missing downloads/installations need scoped approval. No extra workers/cloud/global tooling,
+generic cache/facets/default/discovery/framework/resources/scheduler, release/package/later turn
+or design checkpoint commit/push. Completed Iteration13 permission is not inherited.
+
+## Iteration 14 independent acceptance and publication gate
+
+Coordinator independently passes final corrected full1863 Python/sevenC/4030 statements/
+unweakened native-binding141CLI gates, separately authored actual installed773-check17+25→42→84
+three-job/nine-phase durable selection/adoption/branch probe and fresh read-only scalar/occurrence
+supplement. ALL238/exact18/source sets/every hash/empty index/diagram/package/links reviewed;
+no outstanding within-scope finding. [REVIEW](iterations/14-versioned-reuse-selection/REVIEW.md)
+owns exact commands/source/probe hashes and worker-versus-independent evidence.
+
+Versioned ordinary S/V/public revalidation/selected newQ-W/no extra job, explicit fresh unchanged
+selection, adoption/new snapshot/true siblings/equalR84/distinct selected occurrences are accepted.
+Confirmed validation presence-pipeline defect fixed with portable draining grep/owning regressions;
+original skipped standard1 is exit1, not a Python pass. Adoption occurrence (not merely finalT content)
+policy gap corrected using owning public attempt_id/before-fail/no-write/fresh-positive regression.
+No private role codec/native entity/framework/default/cache discovery/facets/resources/scheduler/cloud.
+Original formatter/oracle/census-copy/classifier/checker failures/older Windows UNKNOWN preserved.
+
+Own3terminal64client65containers archived/identity-retired, worker3terminal69client70containers
+independently reaudited stopped/intact, images/evidence retained/no prune. Coordinator ACCEPTS final
+frozen18-file slice and returns BOTH builds/source/stopped worker fixture for focused commit/normal
+push/final exact-SHA all-six CI/reviewed fixes. **Publication success pending**, no design publication/
+extra worker/global tooling/release/package/later turn. Prior notes preserved.
+
+## Iteration 14 delivery, final publication and stop
+
+Existing window-2 agent in verified fresh session implements bounded example-local public-API
+versioned selection/explicit selected reuse/fresh control/no auto-adoption/explicit reuse adoption/
+true branch-local choices. Ordinary S/V retain bounded public expected/job/observation framing
+plus native all-parent F history; literal F ID is metadata, not retention edge. Pinned revalidation
+needs no original packet/expected/B/service. Existing Q/W delegation preserves original producing
+Q/exact selected final T/R, no extra attempt/job; exact intent/binding/full inputs/producer witness.
+No private role codec/new native entity/public cache/default/discovery/facet/framework/resources/
+scheduler/cloud feature. Owning informative [example docs](../dml/docs/versioned-reuse-selection.md).
+
+Worker final standard1867/sevenC/4030/unchanged native-binding141CLI gates passes. Coordinator
+independent initial1862/corrected1863 full/final242 postfix and separately authored actual installed
+17+25→42→84 three-job/nine-phase773-check probe plus read-only roots/occurrence supplement pass.
+Worker earlier13+29 installed gate and host native16selection/14adoption-row late rollback/real
+map-full/authoring-only loss remain separately attributed evidence. [REVIEW](iterations/14-versioned-reuse-selection/REVIEW.md)
+owns commands/hashes/complete native bytes/all ordered parents/process/trust/profile/mutation/
+coverage/platform/cleanup/response/global-exclusivity limits. Normal final B remains ephemeral.
+
+Confirmed presence-pipeline findSIGPIPE/early grep defect fixed with portable draining grep/owning
+regressions; original skipped standard1 is exit1, not Python success. Adoption no-op now compares
+owning public attempt occurrence, not only finalT content; before-fail/both-public-valid descriptions/
+no-write/fresh-positive regression preserves native S/V shape. Initial18-file6e74385 normally pushed.
+Initial CI4Unixgreen/Windows4new-harness failures/macx86cancel: primary Windows barebash launches
+WSL, distinct latentCRLF model; primary Mac annotation confirms outer10min cap, underlying slowdown
+UNKNOWN. Reviewed2file8393a82 fixes required MSYS/Unix absolute shell/LF fixture and ONLYuser-approved
+Macx86 outer20cap, others10/strict existing budget and ALL runtime/test/threshold/skip unchanged.
+No initialSHA rerun/amend/speculative runtime/retired fixture restart. Original failures preserved.
+
+Sole automatic [CI41025016866](https://github.com/micha/dml/actions/runs/41025016866), **attempt1/ALL6
+SUCCESS**, exact8393a82. Coordinator fresh completedJSON/sole runlist/direct1500watch0/API ZIP0/
+79validCRC/1294983joined primary characters/each7C/WindowsALL8owningcases verified; Linux+strict1867,
+Mac1863+4existing skips, Win1861+5existing skips/oldPOSIXinapplicable,2warnings. MacPython596.69s
+under approved20cap is NOT underlying initial slowdown diagnosis. Informational CI-c is distinct
+from local-v/memory/actual installed assurance. Exact18+2 surfaces/parents/ALL238 source AND committed
+bytes/exactsource set/clean DML treeindex/matching remote AFTERCI verified. Diagram/runtime/package
+unchanged. Discovery --limit20 invocation/empty JSON error separate from corrected read-only query,
+not push failure/workflow rerun; original formatter/oracle/classifier/copy/checker errors retained.
+
+Worker3terminal69client70containers and coordinator3terminal64client65containers archived BEFORE
+identity-checked owned container/network/volume retirement. BOTH owner/job namespaces independently
+absent AFTERCI, images/nonsensitive evidence retained/no prune/unrelated/live-writer action. Worker
+RESULTS finalized and explicitly ACKNOWLEDGES STOP ALL source/runtime/build/test/staging/commit/
+push/CIpolling/rerun/fixture activity. Bounded turn complete for user review; no design checkpoint
+commit/push/extra worker/cloud/global tooling/release/package/later turn or inherited restart.
+
+## Iteration 14 user review
+
+The user stated **“reviewed”** after the completed Iteration14 delivery. This records review
+of the implemented, independently accepted, published and stopped turn through8393a82,
+not approval of another iteration or permission to restart source/build/worker/fixture/CI.
+No design checkpoint commit/push requested; accumulated notes remain local and preserved.
+
+## Iteration 15 agreed direction and candidate planning
+
+Assistant proposed **versioned intent-level reuse defaults with explicit request overrides**.
+The user stated **“agreed.”** This accepts the bounded direction and offered worked example/design/
+handoff preparation, not the exact candidate schema/API/transaction/validation choices or permission
+to implement/delegate/publish. Completed Iteration14 GO is not inherited.
+
+Direction: record reuse-by-default or execute-by-default on a versioned intent definition; each
+request either follows that captured default or explicitly chooses fresh/selected reuse. New Q
+is retained either way, selected reuse adds no T/job/empirical observation. Record the policy/
+override explaining the decision. Fresh execution, including default reuse with no recorded
+selection, does not automatically install/adopt a choice. A present invalid/mismatched selected
+choice on a reuse path errors, never silently becomes fresh fallback. Two branches can retain
+different defaults. One intent/known selection slot/caller-selected binding/full inputs; exact URI/
+binding/full-input/producer-witness matching. No purity/registry/cache discovery/index/facets/
+masks/equivalence/public framework/scheduler/resources/cloud feature.
+
+Prepared [DESIGN](iterations/15-intent-reuse-defaults/DESIGN.md),
+[EXAMPLE](iterations/15-intent-reuse-defaults/EXAMPLE.md) and
+[HANDOFF](iterations/15-intent-reuse-defaults/HANDOFF.md). Concrete source-inspected friction:
+existing Q consumes exact role fields; public submission Cq adds only Q. Recommended ordinary
+Idef captures only stable URI/default mode; ordinary D captures exact Idef/override/resolved
+reason/action/dimensions/known names and S only when reused. Separate Cdec preserves C/adds D,
+then existing own-Q builder or selected-reuse Q/W delegation preserves native Q/T/W protocol.
+Definition-only control versions do not enter initial computation matching; no claim about future
+intent definitions with computational dependencies. Public temporary preparation can validate
+binding/inputs/full context or exact Cq/Q without a private local-role reader or dispatch.
+
+Idef/D shapes/roots/names, decision parent/transaction separation, temporary validation IO and
+unused-S clarification are **assistant recommendations for review**, not added user decisions or
+as-built claims. Recommend deliberate fresh/execute-default ignore unused S application framing
+while preserving complete native history; they never repair/promote it. This is explicit execution,
+not fallback after failed reuse. Reuse paths remain strict. D/Q/W/files/service are separate and
+failures can retain a decision without Q, pending Q or complete W; no automatic duplicate/repair.
+
+Recommended actual installed acceptance: FOUR Batch jobs/TWELVE phases, add42 then initial
+absence-driven double84; offline select/default hit; explicit fresh override double84/no adoption;
+offline explicit adopt/default hit; sibling execute-default branch double84 and selected-reuse
+override still picks retained choice. Initial definition/policy changes/selection/reuse/adoption/
+readers add no job. Exact all-status/persisted census/native typed bytes/all ordered parents and
+owned terminal/client/namespace disposition remain planned evidence, NOT demonstrated here.
+
+Planning reinspects clean published8393a82/public preparation/request/selection/composition seams/
+owning contracts and completed14 handoff/results/review. No missing native operation indicated;
+public temporary-projection feasibility is source-inspected recommendation, not a prototype run.
+No DML/source/spec/diagram edit, worker assignment/restart, build/test/fixture/image/provisioning/
+experiment/CI/commit/push. Existing uncommitted design notes preserved, Markdown validation only.
+Existing user-approved Macx86 outer20/other matrix10/strict budget and all runtime/test/threshold
+policies stay as-built, no new budget permission. Older Windows/initial Mac slowdown UNKNOWN
+qualifications persist. Next: candidate-plan review, then separate bounded GO if requested.
+
+## Iteration 15 plan approval
+
+The user stated **“approved.”** This approves the bounded
+[DESIGN](iterations/15-intent-reuse-defaults/DESIGN.md),
+[EXAMPLE](iterations/15-intent-reuse-defaults/EXAMPLE.md) and
+[HANDOFF](iterations/15-intent-reuse-defaults/HANDOFF.md) as the plan. Assistant-origin ordinary
+Idef/D, public temporary validation, separate decision-bearing Q parent, explicit known slots,
+unused-selection execution distinction and four-job acceptance story are accepted bounded
+planning choices, not implemented behavior or a native/public schema. Exact engineering spellings
+remain refinable. Fresh/execute-default does not validate unused selection application framing;
+reuse paths remain strict, native reached history always complete. D/Q/W/files/service boundaries
+stay separate; no silent fallback/adoption/repair or generic framework is approved.
+
+Plan approval does NOT authorize worker assignment/restart, DML/source/spec/diagram edits,
+fixture/image/provisioning/build/test/experiment/CI operations, commit/push/release or a later turn.
+Separate bounded implementation/delegation/publication GO remains required; do not inherit
+completed Iteration14 permissions. No design checkpoint commit/push requested. DML remains clean
+8393a82; accumulated local design notes preserved. Next is separate GO if requested.
+
+## Iteration 15 implementation and publication authorization
+
+The user declared **Iteration 15 GO** and directed the existing window-2 agent to implement
+in a new Pi session. Coordinator monitors, independently reviews and provides feedback until
+satisfactory, then directs focused worker commit/normal push and exact-SHA CI verification/fixes.
+This supersedes pending-GO statements, not the approved bounded DESIGN/EXAMPLE/HANDOFF or stop line.
+
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md) records mounted `/work`,
+clean DML8393a82/tree/index, preserved design notes, verified `/new`/empty context in existing
+worker `%215`, coordinator `%197` and exclusive worker BOTH-build ownership through unchanged
+baseline/implementation. ALL-source freeze/explicit release precedes independent coordinator
+tests. Worker owns implementation/examples/tests/as-built/fixture/RESULTS; coordinator REVIEW/
+COORDINATION/design status. Commit/push waits for independent acceptance; all-six final exact-SHA
+CI and known owned-fixture disposition remain completion gates.
+
+Bounded local actual current-installed defaults/overrides/branch fixture/build validation is
+authorized. Missing downloads/installations need scoped approval. No extra workers/cloud/global
+tooling/generic framework/resources/scheduler/release/package publication/later turn or design
+checkpoint commit/push. Completed Iteration14 permission is not inherited. No acceptance or
+publication success claimed yet.
+
+## Iteration 15 independent acceptance and publication gate
+
+Coordinator independently passes full2060 Python/sevenC/4301 retained ROOT statements/
+unchanged native-binding141CLI gates and separately authored actual installed780-check
+own17+25→42→84 four-job/twelve-phase policy/default-reason/override/adoption/branch probe.
+ALL248/exact16 source sets/every sizehash/empty index stable after both; links/unchanged
+native-package-diagram and current runtime provenance reviewed. [REVIEW](iterations/15-intent-reuse-defaults/REVIEW.md)
+owns exact commands/hash/distinct worker evidence and limits. Draft NoneQ reader defect
+reproduced and corrected with exactQ/public authority/regressions, no unresolved in-scope finding.
+
+Ordinary Idef/D/versioned defaults/explicit overrides/exact full matching/newQ either path/
+noT-job on reuse/no automatic adoption/pinned reason reader are accepted. No native entity/
+private role codec/public policy framework/cache discovery/facets/scheduler/resources/cloud.
+Own4terminal119clients120stopped resources archived/identity-retired, worker4terminal104clients/
+105stopped retained and independently audited; images/evidence retained/no prune. Worker host
+prior-inclusive9Q5T10versions distinct from own native4T8versions/union8Q. Original failures/
+olderWindows/initialMacslowdown UNKNOWN preserved.
+
+Coordinator ACCEPTS frozen16 and returns BOTH builds/source/known-stopped worker fixture for
+focused staged-diff/indexhash/secret audit/worker commit/normal push/final exact-SHA all-six CI/
+primary evidence and reviewed fixes. **Publication success pending**. No design commit/push/
+extra workers/cloud/global tooling/release/package/later turn. Prior notes preserved.
+
+## Iteration 15 delivery, final publication and stop
+
+Existing window-2 agent in a verified fresh session implements approved example-local ordinary
+Idef/D intent defaults/explicit request overrides/pinned action-reason inspection, public temporary
+preparation and existing own-Q/QW/selected S-V authority. New Q either path; reuse creates no T/job,
+absence-driven/declared fresh never automatically adopts; present bad selection errors rather than
+fresh fallback. Full native reached history always validates, unused S application framing alone
+is bypassed on declared execute. Exact intent/binding/full inputs including producer witness;
+true branch-local defaults preserved. No native entity/private role codec/public policy framework/
+registry/cache discovery/facets/resources/scheduler/cloud. [Informative owning example](../dml/docs/intent-reuse-defaults.md).
+
+Worker baseline1867, initial/final2060 and correction2067/sevenC/4301new271/unweakened native-binding
+141CLI gates pass. Coordinator independent full2060/464.68s, separate actual current installed780-check
+four-job/twelve-phase17+25→42→84/default/miss/hit/fresh/adoption/sibling/override probe and correction
+233postfix/98.02s/nine REALcopied-policy urllib.parse-bootstrap clients pass. Worker actual13+29 story
+29latercommands/native host-prior-inclusive9Q5T10versions distinct own4T8versions/union8Q. Normal F B
+remains ephemeral; gatedB/packetA typedbytes/allparents evidence not held-finalB assurance.
+[REVIEW](iterations/15-intent-reuse-defaults/REVIEW.md) owns exact commands/hashes/evidence limits.
+
+Initial16-file075b87 normally published after unpublished messageLF correction (no source/published
+rewrite). Initial all6CI fails: fiveUnix ONLY19 blocker startup cases, pinned3.12 source/cached3.12
+confirm pathlib→pure urllib.parse misclassified as transport; Windows different oldcaller publication
+timeout/diagnostic LMDBENOENT/finalunknown, underlying cause UNKNOWN. Reviewed3file664a870 plain
+finder/exacturllib-package-parser allowance retains ALLother transport/HTTP/SDK/Floci/Docker/spawn/
+initial-final assertions, adds bootstrap/preloadedtransport/transportchildren regressions. No skip/
+moduledeletion/runtime/native/package/budget change or initialSHA rerun. Unsupported manualcp313
+native-on312 ID-parser smoke fails despite import/version; corrected cached312stdlib19 and freshly
+compiled final312nativeCI positive are distinct. Original oracle/alias/probe/retrieval errors retained.
+
+Sole automatic [CI41090059076](https://github.com/micha/dml/actions/runs/41090059076), **attempt1/ALL6
+SUCCESS**, exact**664a87085961b5e24d2b709e057e4a28fe724088**. Coordinator fresh runlist/completedJSON/
+direct1500watch0/rawAPI ZIP0/79validCRC/1333359joined primary characters independently verified;
+sevenC everywhere, Linux+strict2067/Mac2063+4existing skips/Win2061+5existing skips+oldPOSIX applicability.
+Macx86Python823.26s within unchanged user-approved outer20/others10/strict budget; no new deadline
+permission, every runtime/test/threshold/profile unchanged. FinalWindowsoldcaller pass NOT its
+initialENOENT diagnosis/fix, olderWindows/initialMacslowdown UNKNOWN preserved. CI informational-c
+distinct local-v/memory/installed/branch/security assurance. Exact16+3 surfaces/parents/EVERYALL248
+COMMITTED+source/cleanDMLtreeindex/matching remote verified AFTERCI.
+
+Worker4terminal104clients105containers and own4terminal119clients120containers archived BEFORE exact
+identity-only container/private network/volume retirement, BOTH owner/job namespaces absent AFTERCI.
+Images/nonsensitive failed+passing/native/source/packet/history/service evidence retained/no prune/
+unrelated/livewriter signals/retiredfixture restart. Worker finalizes RESULTS ONLY and explicitly
+STOPPED ALL source/runtime/build/test/stage/commit/push/CIpoll/rerun/fixture activity. Bounded turn
+complete for user review; no design checkpoint commit/push/extra worker/cloud/global tooling/release/
+package/later turn or inherited completed-GO restart permission. Prior chronology remains preserved.
+
+## Iteration 15 user acceptance
+
+The user stated **“reviewed: looks good.”** This accepts the completed Iteration15
+implementation, independent review and publication/CI through `664a870`. The bounded
+turn remains complete and stopped. No worker/source/build/fixture/CI restart, design
+checkpoint commit/push or later feature turn was requested or authorized. Original
+failure evidence and remaining UNKNOWN causes stay preserved.
+
+## Proportionate validation maintenance authorization
+
+The user asked whether CI provides value for design-spiral work. Assistant assessment: CI adds
+fresh-source/platform portability/regression evidence, but recent findings often concern harnesses
+and repeated full-suite/hash/log/fixture gates impose disproportionate cost. Focused meaningful
+behavior and independently inspected concrete acceptance remain stronger evidence for the new
+capability. Later green runs do not diagnose unexplained earlier failures; Iteration15 Windows
+failure did not recur on a different SHA, not a proven same-SHA rerun fix.
+
+The user **agreed** and explicitly authorized planning plus implementation by the existing
+window-2 agent in a NEW Pi session, coordinator monitoring/review/feedback until satisfactory,
+then focused worker commit/normal push and CI fixes. They separately authorize coordinator
+judgment to revise the plan based on CI evidence. This is a bounded maintenance turn, not a
+runtime feature/Iteration16 or inherited permission to revive completed fixtures.
+
+[PLAN](maintenance/validation-policy/PLAN.md) selects one owning development validation policy,
+focused change-validation mapping, one worker final full-v where useful rather than repetitive
+baselines/independent full reruns, retained five-platform full matrix+LinuxCI-c, useful pytest
+JUnit artifacts/status regressions and explicit exception/follow-up records for inherited failures.
+No CI-green masking/retry-until-green/automatic exemptions; unchanged tests can expose regressions.
+Raw statuses and UNKNOWN causes preserved, final accepted-with-exception distinct all-green/fixed.
+Current thresholds/skips/coverage/memory/runtime/outer budgets/platforms/release controls unchanged.
+Coordinator may record scoped evidence-based revisions, not silently reinterpret failures.
+
+[HANDOFF](maintenance/validation-policy/HANDOFF.md) and [COORDINATION](maintenance/validation-policy/COORDINATION.md)
+own worker/coordinator/changed-surface freeze/BOTH-build ownership and publication gates.
+DML clean664a870/remote matches; prior uncommitted design notes preserved. No extra agent/cloud/
+global tooling/services/download/install/release/package/design checkpoint commit/push or retired
+Floci/SSH/image/job restart. Planning ready; fresh-session assignment follows, no implementation
+acceptance/publication/CI outcome claimed yet.
+
+## Validation-policy maintenance independent acceptance
+
+Coordinator reads five-file owning docs/pointers/minimal workflowJUnit/status tests and worker
+single full-v2082/4301/sevenC/unweakenednative-memory/470.48s evidence. Independent focused
+23pass/6.70s with realXML23-0-0-0/status/strictfunction/parentenv isolation and unchangedbudget/
+MSYSLF controls, changed5/HEAD/targetedhash/diff/indexempty stability and8doc48link checks pass.
+No second full/installed fixture/whole-source census. Exact five changes independently accepted;
+BOTH builds/source returned for focused stageddiff/secret audit/worker commit/normalpush and actual
+final-SHA CI/job+sixsmallXML report review. No exception yet; rawfailures/newregressions/UNKNOWN
+will be triaged explicitly, coordinator may revise bounded plan using actual CI evidence.
+See [REVIEW](maintenance/validation-policy/REVIEW.md)/[COORDINATION](maintenance/validation-policy/COORDINATION.md).
+No runtime/native/fixture/image/release/global/design publication or next feature permission.
+
+## Validation-policy maintenance delivery and exception
+
+Existing window2/fresh session implements one owning [development validation policy](../dml/docs/validation-policy.md)
+plus AGENTS/README pointers, minimal workflowJUnit flags/strict step-local PYTEST_ADDOPTS/two
+XML-only always-upload steps and real status/report tests. Five platforms/full tests/CI-c/
+coverage-memory criteria/skips/exclusions/dependency declarations/runtime/outer budgets/release
+controls retained. Focused behavior/concrete acceptance primary, one worker final-v/risk-based
+independent checks; no ritual baseline/whole-source census/duplicatefull/fixtures/retry-untilgreen.
+Explicit scoped exception records preserve failed rawCI/unknownrisk/attribution/followup, unchanged
+test alone not inheritance. No automatic classifier/quarantine/continue-on-error/skip or corefeature.
+
+Worker final2082Python/sevenC/4301/unweakenednative-memory/470.48s gate, coordinator independent
+focused23/6.70s/reportXML23-0-0-0/status/isolation/unchangedbudgetMSYSLF/doc/source checks pass.
+Focused5 normal commit/push **4a05334058a77e78c8ad9c512726123fc347e352**, parent664a870/+338-3,
+accepted5 COMMITTED+source hashes/surface/cleanDMLtreeindex/matchingremote independentlyverified.
+[RESULTS](maintenance/validation-policy/RESULTS.md) and [REVIEW](maintenance/validation-policy/REVIEW.md)
+own worker versus independent evidence; no second full or SSH/Floci/image job.
+
+Actual sole automatic [CI41098299553](https://github.com/micha/dml/actions/runs/41098299553), attempt1,
+**completed FAILURE: five jobs successful, macOS arm64 failed**. One finitewatch exit1/zeroCIreruns.
+Sharedsix smallXML ZIPs eachvalidCRC/exactpytest.xml/sourceSHA+serverdigest matches; all15 newcases
+pass allsix/native7pass each. Primarycounts matchreports: Linux+strict2082pass; Macx862078pass4skip;
+Macarm2077pass1fail4skip; Windows2076pass5skip/2081XMLtotal+existingplatformparameterdifference.
+Actual failed-job XML uploaded with failure, not greenwashing; no unnecessary duplicate largeZIPs.
+
+Macarm job124209695675 old async-story fails native2/ENOENT opening workspace-1/worker.dml during
+publication observation. Later diagnostics Bexists/complete successfulF/bundle/cleanupok/worker0
+reaped do not explain earliererror. Oldsource bytes/packageversions matchparent/priorpass; failure
+firsttestcase before newchildprobes, but globalJUnit/runner timing stillcouldmatter. Readiness AFTER
+B creation/import and no demonstrated prematuredeletion; no precise rootcause/identicalpriorMac
+failure established. Distinct priorWindowschild1/noF ENOENT not samecause. Attribution UNKNOWN.
+No speculative runtimefix/retries/timeoutbump/blanketMac exemption.
+
+User-delegated coordinator judgment approves **[exception VP-001](maintenance/validation-policy/EXCEPTION-VP-001.md)**:
+THISmaintenanceSHA/run/job/node only, accepted WITHexception despite UNKNOWN attribution/residual
+runtime-or-JUnit timingrisk. RawCI staysFAILED, not allgreen/fixed/diagnosedinherited. Primary
+maintenanceevidence credible including realnegative hostedreport; question is process/reporting,
+not healthyMacasync or release assurance. Namedowner coordinator%197 carriesOPENfollowup/revisit
+atnextplanningcheckpoint/before relatedasync/LMDB/handle/story/reporttiming/release changes or
+recurrence/crediblecauseevidence. No standingfuturewaiver or automaticallystartedinvestigation;
+freshfailure requires freshreview, broader investigation separatelyauthorized. PLAN records this
+evidence-based application, no anothercommit/run justforgreen.
+
+Final source/remote/reportidentity verified AFTERCI; no newfixtures/services/runtime experiments.
+Worker RESULTS finalized and explicitly STOPPED ALL source/build/test/stage/commit/push/CIpoll/
+rerun/fixture activity. Bounded maintenance COMPLETE AND STOPPED for user review; VP-001 remains
+OPEN. No designcheckpoint commit/push/extraagents/cloud/globaltooling/release/package/laterfeature
+or inheritedcompleted-GO restart. Prior failures/UNKNOWN and frozen historical records preserved.
+
+## Iteration 16 agreed direction and candidate planning
+
+After asking whether more CI work was needed, the user requested the next proposal. Assistant
+proposed **versioned implementation selection for one intent**: two captured bindings available
+side by side, a versioned default, explicit caller label override BEFORE the existing reuse/fresh
+policy, own Q/preserved actual selection/reasons, per-binding selected historical attempts and
+true branch-local defaults. Equal84 does not authorize cross-implementation reuse; explicit
+implementation choice is independent of fresh execution/adoption. The user stated **“agreed.”**
+This selects direction and authorizes offered worked-example/design/handoff preparation, not
+exact schema/API/transaction/validation choices or implementation/delegation/publication GO.
+
+Prepared [DESIGN](iterations/16-versioned-implementation-selection/DESIGN.md),
+[EXAMPLE](iterations/16-versioned-implementation-selection/EXAMPLE.md) and
+[HANDOFF](iterations/16-versioned-implementation-selection/HANDOFF.md). Read-only inspection:
+current minimal Idef reader accepts EXACT role/intent/default, caller passes binding/slot names;
+public preparation consumes selected tree names, existing Q/T/W roles have exact constraints.
+Recommend NEW example-local ordinary Idef/menu/choice/D conventions instead of silently appending
+fields/calling private local readers/public framework. Candidate choice captures binding ID/tree
+name/known slot; captured-tree drift errors, default-only update preserves URI/menu/policy/choices.
+D captures implementation default-versus-explicit reason separately from reuse override/action/
+reason and links S only on reuse. Existing public prepare/request/persisted S-V/Q-W remains authority.
+These are assistant candidates, NOT separately user-approved mechanics or experimentally proved.
+
+Recommend normal THREE real Batch jobs/NINE phases: actual producer42/A84/B84 with distinct captured
+code/bindings and attempts, then offline explicit selections/defaultB+explicitA reuse/true sibling
+defaults/fresh transfer readers no extra job. Menu/default control context not universal intent-
+dependency identity/mask rule; matching actual selectedfullB/fullI includesproducer witness.
+No generic URI registry/installation/resource/deprecation/cache discovery/index/facets/equivalence/
+scheduler/native entity/cloud feature. Definition/default/D atomic, Q/W/files/service separate;
+unknown/default errors never fallback/repair/adopt/duplicate. Exact engineering spellings refinable.
+
+[VP-001](maintenance/validation-policy/EXCEPTION-VP-001.md) revisited at planning checkpoint: root
+cause/attribution remain UNKNOWN, approval only maintenance4a053340. Proposed slice changes authoring/
+selection conventions, NOT async/LMDB handles/affected story mechanics; broader investigation not
+automatically started or resolved. If implementation needs those changes, pause/separately scope
+investigation before accepting related changes. New CI failure needs fresh evidence/decision,
+not copying exception. Apply [validation policy](../dml/docs/validation-policy.md): focused/concrete
+primary, one worker stable full/risk-based independent, no duplicatefull/everyfileinventory/fixtures/
+all-green rituals. Conditional new installed fixture only AFTER reviewed plan/separate GO.
+
+Read-only planning verifies clean published DML4a053340; no implementation/as-built/diagram changes,
+worker restart/assignment, tests/build/fixture/image/provisioning/experiment/CI/commit/push. Noted
+old informative intent-defaults document acceptance-pending header is stale versus completed15
+source/results, not a new testing gate; refresh during future authorized touched-doc maintenance,
+not mutate DML now. Existing local design notes preserved, no checkpoint requested. Next candidate
+review then separate bounded GO; completed maintenance/Iteration15 authorization not inherited.
+
+## Iteration 16 implementation and publication authorization
+
+On 2026-10-30 the user stated this iteration is **GO**, requesting the existing window-2
+agent implement it in a NEW Pi session, coordinator monitoring/independent review/feedback
+until satisfactory, then worker commit, push and CI fixes. This approves the bounded
+[DESIGN](iterations/16-versioned-implementation-selection/DESIGN.md),
+[EXAMPLE](iterations/16-versioned-implementation-selection/EXAMPLE.md) and
+[HANDOFF](iterations/16-versioned-implementation-selection/HANDOFF.md) for this turn,
+superseding pending-review/GO wording, not scope or as-built status. Exact spellings remain
+refinable; no extra worker/cloud/global service/generic framework/later feature/release/package/
+design checkpoint commit/push. Bounded cached/offline local installed validation authorized;
+missing downloads/installations need scoped approval.
+
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md) records
+preflight/fresh-session assignment and ownership: `%215` UUID
+`01a18e36-8ae0-766c-90ee-c5cc52cf7362`, independent worker acknowledgment and verified
+empty `/new` session before assignment. Worker owns BOTH builds until changed-surface
+freeze and explicit release. Proportionate validation policy governs focused checks/concrete
+three-job story/one worker full/risk-based independent review/exact-SHA CI and failure triage.
+VP-001 remains OPEN/UNKNOWN, maintenance-only exception does not carry forward; related async/
+LMDB/story changes need separately scoped investigation. No acceptance/publication result yet.
+
+## Iteration 16 independent acceptance and publication gate
+
+The verified fresh existing window-2 worker implements bounded example-local captured
+Idef/menu/two choices/default-only update/D/independent implementation/reuse decisions,
+exact own-Q/W public validation and pinned readers. No old convention/private role codec/
+native/async/LMDB/package/framework/cache/resource feature change. Coordinator early IS-001
+returned-Q authority and IS-002 expected-override/complete-reader oracle findings corrected;
+IS-003 invented AST filename failed first full coverage despite2263test/C7 passes, fixed
+narrowly under existing test omission, targeted3proof and explicitly reviewed one corrected
+full needed fresh coverage and unfinished gates. All original failures/qualifications retained.
+
+Worker corrected stable full-v exit0:2263 Python/4683ROOT/new382/C7Valgrind/native1681-132-1562/
+unchanged binding0-existing624/141CLI. Actual installed3 jobs/9 P-U-F with true multiplicationA/
+additionB full-I2/captured producer, offline defaults/selections/reuse/siblings/replicas and
+complete census;8 corrected nonexecuting readers supplement original weaker oracle run.
+Original controller hash reconstructed, NO prelaunch measured hash captured. No job replay.
+
+Coordinator independently verifies frozen14/HEAD/index/diff before/after, executes32focused
+pass/19.43s plus separately authored fresh-installed54 NONEXECUTING checks on saved history/
+coordinator-owned transfer scratch (no new Batch attempt). Own Q/W, oldT producingQ, distinct
+A/B selections/equalR/sameI, actual sibling defaults, old/NoneQ and A-in-B negatives, actual
+B absence pendingQ/no adoption; original caller physical bytes unchanged. Readonly live
+Docker stopped service/ALL77clients/exact78owner/zerochildren/3terminal proofs,16wheel-installed-
+current artifact rows/immutable image and122doclinks verified. No duplicatefull/fixture.
+
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md) independently ACCEPTS
+exact14; BOTH builds/source/stopped-owned fixture returned for focused worker staged diff/
+secret audit/commit/normal existing master-origin push/actual final-SHA CI+JUnit triage.
+Findings resolved, no within-scope blocker; VP-001 remains OPEN/UNKNOWN/no inherited waiver.
+Fresh CI failures need fresh attribution/review. Archive before exact owned retirement,
+images/evidence retained; final sourceRemote/CI/disposition/RESULTS/STOP pending. No extra
+worker/cloud/global/release/package/later turn/design publication.
+
+## Iteration 16 publication and runner migration
+
+Accepted14 normally published `7de65aec2e973d0fe8ce671e815d9c12ca48823c`. Actual original
+CI41120062048 attempt1 raw CANCELLED:5 provisioned jobs SUCCESS/C7/new177 cases pass each;
+Macarm no runner/steps/XML, primary annotation+official issue13518 scheduledmacos14brownout/
+Nov2retirement, NOT DML/VP001. Coordinator independently checks5smallXML/ZIP CRC/serverdigest/
+sourceSHA/counts/primary logs. CLI readiness/ANSI retrieval failures retained, file-only
+capture resumed missing evidence without workflow rerun/duplicateZIP.
+
+The user separately approves ONLYMacarm labelmacos14→macos15, officialarm64 maintained,
+all6platforms/tests/thresholds/budgets unchanged. Worker2-file config regression initially
+fails with jobregex scanning on.push; claimed24pass/JSON0 was hardcoded false-success,
+promptly withdrawn, coordinator independently reproduces1fail23pass. Corrected jobs-block
+scope24actualpass/0failure-error-skip independently verified. Original bad receipt already
+overwritten before retention instruction; emittedmetadata reconstructed, NOT measuredold
+snapshot; rawfailedlogs preserved/audit13+3finds nootherfalsepass. No native/runtime changes.
+
+After all original jobs completed+triage (no cancellation by nextpush), acceptedexact2
+normally published `e0089323cac3bc29b4301b4d3e7340d345d20d7a`, parent7de65aec.
+Coordinator verifies original14+correction2 committed/source hashes/exact2surface/cleantree/
+matchingremote. Actual final CI41123236764 attempt1/all6running inclsupportedMac15, pending
+not green/exception. Onefinitewatch/sharedsmallreports/primaryfreshtriage, no workflowrerun.
+Owned78containers/77clients/3jobs freshly archived/identityretired; coordinator independently
+checkszeroowner/namespace/exactnetwork-volumeabsent/78logs/image-caller-evidenceretained.
+No extra full/fixture/job/worker/cloud/global/release/package/later turn/designpublication.
+
+## Iteration 16 final publication and CI verification
+
+Exact published `e0089323cac3bc29b4301b4d3e7340d345d20d7a`, initial14 `7de65ae` plus user-
+approved2 supportedMac15arm runner correction, normal push/accepted16 source+committed hashes/
+clean tree-index/actualremote verified AFTERCI. Actual final CI41123236764 attempt1 COMPLETE
+SUCCESS/all6 jobs SUCCESS, eachC7/new177 implementation+1migration cases pass. Independent
+shared6smallZIP/XML CRC/serverdigest/sourceSHA/fullcounts/primary reconciliation: Linux+strict
+2264pass/no skip; Macs2260pass/4existing skip each; Windows2258pass/5existing skip. No workflow
+rerun/final CI exception; finalwatch0/naturalexit. Same Macarm jobactualrunner/imageMac15arm/
+MesonhostCPUfamily+CPUaarch64 proves real retainedarchitecture, not labelonly inference.
+
+Independent32focused/54separately authored installed NONEXECUTING/24CIconfig correction checks
+remain distinct from worker original3realjobs/9P-U-F/8correctedreaders/correctedfull2263/gates.
+No coordinator secondfull/fixture. Exact78container/77client/3job fixture retired after fresh
+archive/identity/terminal proof, image/native history/archives/evidence retained, zeroowned/
+namespace child/exactnetwork-volumeabsent independently verified. No restart/prune/unrelated
+signal. Source/package/native/diagram model unchanged beyond acceptedexample-local+CI scope.
+
+Original weaker-oracle run/controllerhash reconstruction (no prelaunch snapshot), failed
+coverage probes/noops/confoundedmutant/AST firstfull1/correctedfull0, falsemigration24pass/
+failedregex/correctedproof and reconstructed overwrittenbadreceipt, initialCIrawCANCELLED/
+5pass/Macarm brownout noXML, typedhashPID errors/retrievalfailures all retained with limitations.
+Final pass is NOT prior UNKNOWN Windows/Mac runtime diagnosis or VP001 closure; coordinator
+follow-up remains OPEN with conditions, no standingwaiver/newinvestigationpermission.
+
+Coordinator delivery satisfactory; worker completed RESULTS-only finalization and explicitly
+acknowledged STOP ALL/no further tools. Coordinator report/status reconciliation is complete.
+Bounded Iteration16 COMPLETE AND STOPPED; no worker/source/build/test/CI/fixture/image/job restart,
+extra worker/cloud/global/release/package/later feature/design checkpoint commit/push authorized.
+
+## Iteration 16 user acceptance
+
+After the final delivery report, the user stated **“reviewed, looks good.”** This records
+review and acceptance of the completed Iteration16 delivery at published
+`e0089323cac3bc29b4301b4d3e7340d345d20d7a`, with all six final-SHA CI jobs successful.
+Original evidence/provenance limitations and VP-001 OPEN/UNKNOWN remain unchanged;
+acceptance does not diagnose prior failures. Work remains COMPLETE AND STOPPED.
+No worker/source/build/fixture/CI restart, later feature or design checkpoint commit/push
+was requested or authorized.
+
+## Iteration 17 agreed direction and candidate planning
+
+After reviewing completed Iteration16, the user asked for the next proposal. Assistant proposed
+**versioned implementation supersession and deprecation**: one intent/two captured bindings,
+record B supersedes A with structured correctness-fix versus operational-replacement reason and
+ordinary evidence, explicitly promote B's default, retain A/history/choices/old branches and
+explicit predecessor selection. Distinguish actual historical request knowledge from a separately
+selected later knowledge context. Initially advisory, not automatic invalidation/deletion/
+cross-implementation reuse/fresh work. Proposed intentionally buggy NEW A(-3)->0/corrected
+B(-3)->-6 example, not a defect allegation about actual Iteration16 A, plus offline operational
+control. The user stated **“agreed.”** This selects direction and authorizes offered planning,
+not exact schema/API/transaction/backend/count choices or implementation/delegation/publication GO.
+
+Prepared [DESIGN](iterations/17-implementation-supersession/DESIGN.md),
+[EXAMPLE](iterations/17-implementation-supersession/EXAMPLE.md) and
+[HANDOFF](iterations/17-implementation-supersession/HANDOFF.md). Read-only inspected current
+implementation definition/default/request reader and owning caller/exchange/selection APIs:
+exact old Idef/menu/choice/D shapes cannot simply acquire lifecycle fields; D.base already pins
+whole request basis. Recommend a separate known-slot ordinary L capturing basis/definition/
+distinct predecessor-successor choices/reason/evidence, retaining basis through ALL-parent
+history and public definition inspection. Reason/evidence is a recorded assessment, NOT
+scientific certification or automatic impact calculation. Publish L without default/selection
+change, then separate existing default-only promotion. Old exact Q/T/W/D roles remain.
+
+Recommend read-only context composition through PUBLIC exact-Q/request reader, as-known-then
+from ACTUAL D.base, explicit immutable knowledge_commit as separately labelled snapshot, not
+latest/global time inference. This labels advisory state available in the pinned basis, not
+proof a caller consulted or understood it; unchanged request resolution does not interpret L.
+Known-slot absence is not health certification; malformed/present
+L fails, matched successor is not deprecated. Compatible fixed captured menu/intent scope,
+no registry/search/chain/menu installation/resource/cache-facet/equivalence framework. Recommend
+FOUR Q/TWO real local attempts and offline predecessor reuse/true branches/operational reason/
+transfer-only readers, using existing synchronous execute then public completion inspection
+AFTER child reaping rather than another Batch/SSH/Docker fixture. These exact L/reader/local-
+workflow mechanics are assistant candidates for review; no implementation or experiment occurred.
+
+[VP-001](maintenance/validation-policy/EXCEPTION-VP-001.md) planning checkpoint revisited:
+OPEN/UNKNOWN, maintenance-only exception not extended; current actual Mac15 pass not old ENOENT
+diagnosis. No async observer/LMDB handle lifetime/affected old-story source changes presumed;
+pause/separately scope investigation if needed or signature recurs. Apply owning validation
+policy: focused new invariants/local real work/one worker final full/risk-based independent
+review/actual CI triage, no automatic duplicated full/Batch fixture. Accurate primary-derived
+exit/report counts; original false receipt/reconstruction lessons retained, no presumed pass.
+
+DML clean published e0089323 unchanged; completed16 permission not inherited. No worker/source/
+spec/diagram/build/fixture/image/CI/provisioning/experiment/commit/push started. No extra agent/
+cloud/global/release/package/design checkpoint requested. Next candidate review then separate GO.
+
+## Iteration 18 agreed direction and candidate planning
+
+After accepting completed Iteration17, the user asked for a next proposal. Assistant proposed
+versioned multi-input reuse selection: keep several exact computation tuples rather than one
+selection slot per implementation/input tuple, reuse through own new Q/no new T, absence-driven
+fresh work, separate fresh/adoption, update only one matching entry and retain branch choices.
+The user questioned full binding in the key. Clarified that intent URI denotes purpose, not
+interchangeability: Iteration17 A(-3)->0/B(-3)->-6 must not cross-reuse. Table scope may hold URI/
+binding once, but effective matching still includes both plus full I. Full-binding equality is
+current conservative policy, not a rejection of previously agreed future identity facets.
+The user stated **“no, what you have is good, i get it now”**, confirming the original proposal,
+then **“prepare iteration for handoff”**. This authorizes planning, not exact candidate details,
+implementation/delegation/publication or a checkpoint commit/push.
+
+Prepared [DESIGN](iterations/18-multi-input-reuse/DESIGN.md),
+[EXAMPLE](iterations/18-multi-input-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/18-multi-input-reuse/HANDOFF.md). Read-only inspected public selection/
+explicit reuse and definition/request seams: S inspection/reuse is by TREE SLOT, not S ID;
+old choice.selection-slot and old exact D cannot silently become table semantics. Recommend
+ordinary bounded M/entries scoped to full URI/binding, input-ID-rendered keys, captured S+known
+S slot/current cross-links/public successful-history revalidation. Sixteen-entry/all-entry
+validation is candidate finite example profile, not user-selected global cache limit. Fresh
+ignores unused table application framing but still validates all native reached history.
+
+Recommend uniquely named immutable S captures; table insertion and adoption are separate
+batches. Capture fresh F via public select at NEW S slot, then explicitly replace only I2 row:
+old table remains coherent before adoption, unindexed new S may survive an update error. New
+Dm/helper/public exact-Q/W reader records actual parent/table/entry/reasons, not reinterpretation
+of old D/Idef/S/W. Explicit implementation resolution before table matching, no A table for B;
+general reader/lifecycle integration deferred. Candidate normal acceptance SEVEN Q/THREE LOCAL
+attempts: double2->4/double3->6/freshdouble2->4, repeat both via reuse, one-key adoption/true keep
+sibling/adopted-old reuse/transferred offline reads, no extra producer/Batch/SSH/Docker/image.
+
+Candidate mechanics remain for review, exact engineering spellings refinable. No generic cache/
+global history discovery/eviction/masks/facets/equivalence/framework/resources/scheduler/native
+entity assumed. Published proportionate validation policy applies, focused changed invariants/
+small actual local story after future GO/one worker full/risk-based independent/exactCI; no
+automatic duplicated full/story or whole-source ritual. VP-001 revisited remains OPEN/UNKNOWN;
+Iteration17 green not old diagnosis, no standing waiver/related investigation permission.
+DML clean9f182be unchanged; no worker/source/spec/diagram/build/story/image/CI/experiment/
+provisioning/commit/push started; no checkpoint requested. Review then separate GO.
+
+## Iteration 18 implementation and publication authorization
+
+The user stated **“iteration is GO”** and directed the existing window-2 agent to implement in
+a new session, with coordinator monitoring, review and feedback until satisfactory, then worker
+commit/push/CI fixes. This approves the bounded [DESIGN](iterations/18-multi-input-reuse/DESIGN.md),
+[EXAMPLE](iterations/18-multi-input-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/18-multi-input-reuse/HANDOFF.md), superseding their pending-review/GO wording,
+not scope. Exact engineering spellings remain refinable. Coordinator verified NEW session/empty
+context in existing `%215` before assignment; worker ACK confirms fresh UUID
+`01a190df-22cc-766c-90ee-c5d04612152c`, actual `%215`, clean HEAD/tree/index/actual origin/master,
+required reading/no selected validation-story process/exclusive BOTH-build ownership. See
+[COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md).
+
+BOTH shared builds remain worker-owned until changed-surface/HEAD freeze and explicit release;
+independent acceptance precedes focused worker publication. Published validation policy applies,
+focused changed-invariant evidence/small SEVEN-Q/THREE-local story/one worker final full/risk-based
+independent checks/actual final-SHA CI and fresh triage. VP-001 remains OPEN/UNKNOWN/no standing
+waiver; related investigation or recurrence requires separate scope. No extra workers/cloud/
+global tooling/generic cache/framework/native entity/resources/scheduler/release/package/later
+turn or design checkpoint commit/push. DML starts clean9f182be/matching actual origin/master;
+accumulated design notes preserved. Acceptance/publication/CI outcomes pending.
+
+## Iteration 18 final delivery and STOP
+
+Bounded exact multi-input reuse implemented/independently accepted/normally published through
+`3b2b370f4f275d324d9c8cbc93e5a915b9c59149`, parent9f182be, accepted ELEVEN maintained paths.
+New ordinary M/entries/immutable S slots/new Dm/public composition preserve exact URI/full
+binding/full input keys, strict consumed ALL-entry validation, own new Q/W on reuse, separate
+fresh/capture/explicit one-row adoption, true keep/adopt siblings and other I3 selection.
+Old Idef/menu/choice/D/Q/T/W/S/V/native/storage/runtime unchanged; no generic cache/lifecycle/
+framework or new native entity. Informative [implemented example](../dml/docs/multi-input-reuse.md).
+
+Independent38 focused tests and1179 separately authored installed NONEXECUTING checks on SAME
+caller/replica history pass. Reviewed worker163 focused/helper339 statements/sole full2489/
+ROOT5168/native100%-memory gates/actual SEVEN-Q/THREE-local-attempt25phase story remain distinct.
+Original installed controller copy/hash measured BEFORE phases/current-identical; three children
+completed/reaped, original paths unavailable/bytes retained. Coordinator original cleanup-node
+and Tree iteration oracle errors corrected only NONEXECUTING SAME history; originals retained.
+Worker original fixture/oracle/mutation loader/pattern failures/private-driver lack-of-original-
+disk-snapshot qualification retained, no greenwashing or old-runtime diagnosis.
+
+Actual [CI41182904065](https://github.com/micha/dml/actions/runs/41182904065), exactSHA/attempt1:
+ALL SIX SUCCESS. Shared six small XML/serverdigests/sourceSHA/CRC/oneXML/primary counts/C7/
+new122+cleanup3 each pass independently verified without duplicate downloads. Linux+strict2489pass,
+Macs2489total2485pass4existing each, Windows2488total2483pass5existing. Hosted Windows MI-001
+resolved/no new skips; Macx86837.87s within unchanged20min cap is not older slowdown diagnosis.
+No CI fix/rerun/exception/budget/runner/threshold/source changes. VP-001 remains OPEN UNKNOWN/
+no standing waiver/final green not its diagnosis or fix. Final current+committed exact11/clean
+index-tree/actualremote verified AFTERCI, watcher/retrieval exit0/no active selected processes.
+No external fixture/service/image created or needing retirement; local evidence retained/no
+prune/global signal. See RESULTS/REVIEW/COORDINATION for limits and stop ACK. Only RESULTS
+finalization then explicit worker STOP ALL/no further tools; no completed-GO restart/later
+turn/extra agent/cloud/global/release/package/design checkpoint commit/push requested.
+
+## Post-Iteration18 discussion: intent equivalence and current storage
+
+The user clarified that intent separates computational purpose from implementation specifically
+so the user can declare multiple implementations equivalent with respect to results. Local
+Docker and AWS Batch implementations of the same intent should be able to reuse each other's
+results for matching inputs; deliberately materially different result semantics belong to a
+different intent. An accidental implementation defect is a violation of that intent, not a
+new intended meaning. Assistant accepted the correction: requiring a separate equivalence
+declaration would duplicate what membership in the intent already expresses. This is a
+user-declared promise, not DML proof of scientific correctness or implementation equivalence.
+
+Assistant proposed intent plus computational inputs as the natural reuse identity, retaining
+actual implementation/adapter/full binding as provenance rather than automatic reuse partitions.
+This proposed matching formulation and precise eligibility policy are NOT implemented or a new
+handoff/GO. Correctness-related deprecation/eligibility remains to be worked through; operational
+supersession need not imply invalid results. Explicit independent trial/adapter validation can
+still require fresh work. Current Iteration18 exact URI/full-binding/full-input matching remains
+as-built; the earlier conservative full-binding agreement is revisited by this clarification,
+not silently rewritten in historical plans or frozen evidence.
+
+Explained the actual bounded ordinary M/entries/S representation: intent/full binding at table
+scope, input-DAG-ID-rendered row names, selected successful Q/T/R/history; caller supplies known
+table name. Helper validates ALL entries/history then linearly scans input IDs, not a native
+cache index/global lookup. Tables/selections/decisions/requests/attempt/publication/reuse records
+share the snapshot tree with user DAGs; nested table entries are sub-DAGs, not another metadata
+namespace. No new native entity is involved.
+
+The user stated this shared-tree arrangement is **“alright for now”**, because the work is still
+exploring design feasibility and **UX concerns come later**. Do not turn namespace cleanup or
+UX refinement into a prerequisite for the next feasibility discussion. This accepts the current
+arrangement provisionally, not permanently selecting a UX. No source/schema/diagram/build/
+worker/story/CI/experiment/publication restart, next iteration or checkpoint commit/push follows.
+
+## Proposed Iteration19: intent-scoped reuse and result restrictions
+
+Assistant proposed the next bounded turn to test reuse across different captured implementations
+of the same intent for exact matching full input DAGs, preserving requested binding separately
+from actual producing binding/attempt/result. Ordinary table scope would become intent-only;
+existing successful-history/public Q/W validation needs explicit review, not merely removing a
+binding check. Proposed small story uses two local implementations/two real attempts/four requests,
+separate fresh/adoption and preserved old-choice sibling. This is a proposal, not candidate-schema
+approval, handoff preparation or implementation/delegation/publication GO. Different execution
+adapters are the conceptual capability, not actual Docker/Batch evidence from two local bindings.
+
+The user agreed with this direction, then clarified: **all previous results associated with an
+intent are eligible for reuse unless the result itself is explicitly marked not reusable**.
+Implementation deprecation is separate, not an automatic restriction on previously produced
+results. Eligibility and selected reuse remain distinct; eligibility alone does not choose,
+adopt or execute. Assistant's proposed producer-deprecation gate is superseded by this result-
+restriction direction. Exact eligibility declaration schema, knowledge snapshot selection,
+publication and reader APIs remain unsettled; current Iteration18 behavior is unchanged.
+
+Assistant initially recommended attempt/result-occurrence-specific restriction. The user rejected
+that recommendation: for the same intent and inputs, identical results are either both correct or
+both incorrect; excluding one while permitting another contradicts result-based eligibility.
+Assistant accepted the correction, distinguishing result correctness from concerns about attempt
+methodology. The user then stated **“agreed”** to the clarified policy:
+
+```text
+same intent + same full inputs + same result DAG identity
+    -> same reuse eligibility, regardless of producing attempt or implementation
+```
+
+A nonreuse declaration applies to the result within that intent/input scope, excluding EVERY
+producing attempt with that same result, not merely the current selection. A new attempt producing
+the same restricted result cannot bypass the restriction by being fresh; its execution remains
+recorded, but reuse adoption would reject. Different result content is independently eligible.
+The scope is not a global ban on shared scalar/result content:4 may be correct for double(2) and
+incorrect for double(3). Later restrictions preserve earlier requests/reuse/history as recorded;
+they do not erase or rewrite earlier selections. Exact historical-versus-current-knowledge reader
+mechanics remain to be designed. Result content identity is not itself DML certification that the
+user's correctness/equivalence assessment is true.
+
+Agreed conceptual direction authorizes discussion/planning, not schema/API approval, a new
+worker/build/story/fixture/CI/source/spec/diagram/experiment/provisioning/commit/push restart or
+Iteration19 implementation GO. UX/shared namespace is still deferred; completed18 remains
+stopped. VP-001 OPEN UNKNOWN/no standing waiver/investigation permission remains separate.
+
+## Iteration19 simplification: remove selection, defer restrictions
+
+The user questioned whether persistent result restrictions are needed, suggesting simply removing
+an entry from the cache. Assistant distinguished removal of the selected intent/input entry from
+a prohibition on selecting equal result content again. Current policy has no automatic history
+search/adoption, so removal does not silently rediscover an old result. Explicit reselection or
+adoption of fresh equal content remains possible; old branches retain their choices.
+
+Assistant recommended simplifying Iteration19 to intent-scoped cross-implementation reuse plus
+explicit versioned removal of a selected entry, then default-miss fresh work without automatic
+adoption, preserving other entries/old history/branches. Persistent result prohibitions are deferred
+until a concrete workflow needs stronger guarantees. Implementation deprecation remains separate.
+The user stated **“agreed”**, agreeing to this simplification. This SUPERSEDES the earlier proposed
+Iteration19 restriction mechanism/mandatory prohibition rejection cases, not the recorded history
+of that discussion. No persistent restriction schema/reader/knowledge-view feature is now assumed.
+If reconsidered later, prior equal-result consistency discussion remains context, not authorization
+to implement it in this turn.
+
+Next candidate story should include cross-implementation reuse, explicit one-entry removal,
+subsequent absence-driven fresh work/no automatic adoption, and preserved unrelated entries/old
+choices. Exact story counts, removal API/schema and validation details need candidate planning;
+the earlier four-request/two-attempt story is not automatically sufficient for the new removal/
+fresh path. No global history search, automatic fallback/reselection, cross-branch deletion or
+result-content ban is implied. Agreement is conceptual planning direction, NOT implementation/
+delegation/publication GO, worker/source/build/story/CI/experiment restart or checkpoint commit/
+push. Completed18 stays stopped; feasibility first, UX later.
+
+## Iteration19 candidate preparation
+
+The user asked whether Iteration19 was prepped. Coordinator confirmed only discussion existed,
+not the three candidate documents. User asked whether further decisions were needed; coordinator
+said none needed to prepare bounded engineering candidates, with review then separate GO. User
+then stated **“go ahead and prep the iteration”**, authorizing this preparation only.
+
+Prepared [DESIGN](iterations/19-intent-scoped-reuse/DESIGN.md),
+[EXAMPLE](iterations/19-intent-scoped-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/19-intent-scoped-reuse/HANDOFF.md). Read-only source inspection confirms old
+`reuse_attempt` checks full binding before/after Q, and `reuse_selected` delegates through private
+projection/exact matching. They cannot support cross-binding reuse unchanged. Recommend NEW
+example-local Mi/Di roles/helper/pinned reader using PUBLIC successful S inspection, exact own-Q
+preparation/recording and public ordinary W transaction. No private role decoder/forged historical
+expected binding/global check relaxation/native mechanism has been established as necessary.
+Old helpers/old roles retain exact-binding behavior. New W links requested-binding ownQ to exact
+old producing-binding T/R; original T still owns its producing Q. Producer may be historical/not
+in current menu; declared same URI/full inputs supplies matching, not current-label membership.
+
+Recommend intent-root/table without binding field, bounded16 ALL-entry public validation/exact
+input-ID keys/immutable S slots; separate capture/cross-binding distinct-occurrence adoption;
+explicit present-key removal leaves valid empty table/oldS/other rows/refs/history untouched.
+Default removed-key miss pending fresh Q followed by separate adapter work, no rediscovery or
+automatic adoption. Existing result restrictions/prohibition proposal remains deferred, separate
+advisory deprecation has no eligibility gate. These schema/API/policy-detail recommendations are
+assistant candidates, not additional user decisions or current behavior. No UX namespace changes.
+
+Recommended concrete story SIX Q/FOUR actual synchronous LOCAL attempts: A2->4, A3->6, B-request
+reuses A2, freshB2->4, A-request reuses adoptedB2, removeI2 then defaultB2 actually executes fresh4
+without adoption. I3 unchanged/true keep-adopt siblings/offline transferred pinned reads. Fourth
+attempt specifically proves removal-driven fresh execution; second-input actual attempt makes
+other-row preservation real. Superseded fourQ/twoattempt draft insufficient for this expanded
+story. No fifth attempt/producer/Batch/SSH/Docker/image/service. Two local bindings prove declared
+identity/provenance policy, NOT actual cross-adapter runtime/transport evidence.
+
+Published proportionate validation policy, focused changed-invariant map/new removal-directW
+representative atomicity/loss/one stable worker full/risk-based independent/exactCI apply. Preserve
+controller/mutation source versions before runs and failures; corrected NONEXECUTING same-history
+oracles preferred, not duplicate computation rituals. Diagram review only actual technical model,
+ordinary roles add no native boxes. VP-001 revisited OPEN UNKNOWN/no standing waiver/related
+investigation permission. Actual current DML HEAD3b2b370/tree-index clean; implementation unchanged.
+No worker/build/story/CI/source/spec/diagram/experiment/provisioning/commit/push started. Candidate
+review then separate GO; no checkpoint requested or inherited completed18 permissions.
+
+## Iteration19 plan review
+
+The user stated **“reviewed”** after preparation of
+[DESIGN](iterations/19-intent-scoped-reuse/DESIGN.md),
+[EXAMPLE](iterations/19-intent-scoped-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/19-intent-scoped-reuse/HANDOFF.md). This records bounded plan review,
+not implementation/delegation/publication GO or as-built behavior. Exact engineering spellings
+remain refinable. Separate GO is still required; no worker/source/spec/diagram/build/story/
+image/CI/experiment/provisioning/commit/push starts. DML remains clean3b2b370/completed18 stopped;
+no extra agent/cloud/global/release/package/later turn/design checkpoint publication. VP-001
+OPEN UNKNOWN/no standing waiver/investigation remains. Earlier candidate-review-pending states
+are historical, superseded only by this review acknowledgment.
+
+## Iteration19 implementation and publication authorization
+
+The user stated **“iteration is GO”**, asking the existing window-2 agent to implement in a
+NEW session, with coordinator monitoring/review/feedback until satisfactory, then worker
+commit/push/CI fixes. This approves the bounded [DESIGN](iterations/19-intent-scoped-reuse/DESIGN.md),
+[EXAMPLE](iterations/19-intent-scoped-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/19-intent-scoped-reuse/HANDOFF.md) for implementation, superseding pending19
+wording, not scope. Exact spellings remain refinable; no as-built or acceptance claim yet.
+See [COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md) for verified fresh-session
+assignment/ownership/evidence. BOTH shared builds remain worker-owned until targeted changed-
+surface/HEAD freeze and explicit release; no publication before independent acceptance.
+
+SIX own Q/FOUR real synchronous LOCAL attempts/zero support occurrences IN acceptance history;
+no fifth computation/Batch/SSH/Docker/image/service/retired fixture. Public producer S success
+and exact requested own-Q authority stay distinct, old exact-binding APIs unchanged. Intent/full
+input reuse/new ordinary W and explicit one-key removal are bounded; persistent restrictions/
+deprecation gates deferred. Published proportionate validation policy applies; one worker final
+full-v/risk-based independent same-history nonexecuting review/actual final-SHA CI/fresh triage.
+VP-001 revisited OPEN UNKNOWN/no standing waiver; related changes/recurrence need fresh scope.
+Missing downloads/installations require scoped approval. No extra workers/cloud/global tooling/
+native entity/generic framework/resources/scheduler/release/package/later turn/design checkpoint
+commit/push; accumulated unrelated design changes preserved. Outcomes pending.
+
 ## Resume point
+
+Iteration19 **accepted feature `a71e89f`; investigation continues through diagnosticround2 `47131da`**.
+ActualCI41299279030 attempt1 running; no production/nativefix or finalgreen/disposition/STOP.
+Read [CI-INVESTIGATION](iterations/19-intent-scoped-reuse/CI-INVESTIGATION.md), review/coordination.
+Priorbeafc rawCANCEL4pass/Macx wrongepochoracle/Windows10cap-noXML/oldcallerUNKNOWN retained;
+actualMacarm SEM mechanism established, not originalhistorical/VP001diagnosis. User narrowapproval
+Windowsouter20 ONLY and extra diagnosticround2, otherbudgets/tests unchanged. Pure sameMacxread/
+10regressions pass; source/publication verified. No further full/nativeprobe/installedstory/CIrerun
+or unreviewednativefix, no extraagent/cloud/global/release/laterturn/designpublication. Earlier states historical.
+
+Iteration19 **published `a71e89f`; user separately authorized bounded investigation of two
+UNKNOWN CI failures**. Read [CI investigation](iterations/19-intent-scoped-reuse/CI-INVESTIGATION.md),
+[blockers](iterations/19-intent-scoped-reuse/CI-BLOCKERS.md) and coordination. Existing worker/
+current session prepares concrete plan for coordinator review FIRST, then finite diagnostic probes/
+causal fixes/meaningful regressions/accepted normal publication+exactCI. BOTH builds worker-owned
+until targeted freeze/release; no retryuntilgreen/timeout/skip/budget/threshold/runner weakening.
+RawCI41269736666 FAILED4pass2fail retained, all164new+4cleanup pass each, VP001OPEN UNKNOWN;
+no exception/diagnosis/new feature/extra agent/cloud/global/later turn/design publication. Plan
+review/outcomes pending. Earlier pause/disposition-choice states historical.
+
+Iteration19 **published `a71e89f`; actual CI41269736666 FAILED (four pass/two fail), delivery
+BLOCKED pending scoped decision**. Read [CI blockers](iterations/19-intent-scoped-reuse/CI-BLOCKERS.md),
+[REVIEW](iterations/19-intent-scoped-reuse/REVIEW.md) and
+[COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md). Windows/Macx86 old async
+host-client story failure causes/attribution UNKNOWN, all164new+4cleanup pass every platform,
+shared6XML/primary/digests verified. Independent48/1384 versus worker209/full2657/actual6Q4T
+26phase stay distinct. Worker PAUSED ALL/no further tools until direction, no approved exception/
+runtime investigation/CI rerun or green/fix/inheritance. Scoped investigation versus documented
+risk acceptance decision pending, VP-001 OPEN UNKNOWN/no standing waiver. Earlier states historical.
+
+Iteration19 **independently ACCEPTED exact frozen TWELVE; publication/final-SHA CI pending**.
+Read [REVIEW](iterations/19-intent-scoped-reuse/REVIEW.md) and
+[COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md). Independent48/1384 installed
+NONEXECUTING distinct from worker209/solefull2657/actual6Q4T26phase. IS-001 resolved; BOTH builds/
+source/stopped evidence returned for accepted focused worker normal commit/push/actualCI/fresh
+triage/reviewed fixes. Original failures/early91 nonsnapshot/VP-001 OPEN UNKNOWN retained.
+No extra full/computation/fixture/later turn/design publication. Final outcome/STOP pending.
+Earlier GO/pending states below are historical.
+
+Iteration19 **GO; existing window-2 agent restarted in a verified NEW Pi session**. Read
+[authorization](#iteration19-implementation-and-publication-authorization),
+[COORDINATION](iterations/19-intent-scoped-reuse/COORDINATION.md) and all three approved plan docs.
+Coordinator monitors/independently reviews/feedback until satisfactory, then accepted worker
+focused commit/normal push/actual final-SHA CI/fixes. BOTH builds worker-owned until targeted
+freeze/release; SIX-Q/FOUR synchronous LOCAL-attempt story/proportionate validation apply.
+VP-001 OPEN UNKNOWN/no standing waiver, no extra worker/cloud/global/release/package/later turn/
+design publication. Acceptance/publication/CI outcomes pending; earlier pending states historical.
+
+Iteration19 **bounded design/example/handoff reviewed; implementation GO pending**. Read
+[plan review](#iteration19-plan-review) and the three documents below. Separate GO required;
+no worker/source/build/story/CI restart or commit/push. Exact spellings remain refinable,
+DML3b2b370 unchanged/completed18 stopped, VP-001 OPEN UNKNOWN/no waiver/investigation.
+No extra agent/cloud/global/release/package/later turn/design publication. Earlier preparation
+resume point is historical.
+
+Iteration19 **candidate design/example/handoff prepared for review; implementation GO pending**.
+Read [DESIGN](iterations/19-intent-scoped-reuse/DESIGN.md),
+[EXAMPLE](iterations/19-intent-scoped-reuse/EXAMPLE.md),
+[HANDOFF](iterations/19-intent-scoped-reuse/HANDOFF.md) and
+[preparation](#iteration19-candidate-preparation). Agreed intent-scoped cross-binding reuse/exact
+inputs/explicit selected-entry removal/no automatic adoption/deprecation separate; persistent
+result restrictions deferred. Recommended NEW Mi/Di/public S+ownQ/direct W/sixQ-fourlocal mechanics
+remain candidates/not as-built/schema/API approval. DML clean3b2b370/completed18 reviewed stopped;
+no implementation/delegation/publication GO/restart/checkpoint or extra agent/cloud/global/release/
+package/later turn. VP-001 OPEN UNKNOWN/no waiver/investigation; feasibility first/UX later.
+Review then separate GO. Earlier direction-only resume is historical.
+
+Next direction agreed and SIMPLIFIED: intent-scoped cross-implementation reuse for exact inputs,
+plus explicit versioned removal of a selected intent/input entry. Default miss leads to fresh
+work without automatic adoption; other entries/old branches/history remain. Persistent result
+restrictions/prohibitions are deferred; implementation deprecation is separate. Read
+[simplification](#iteration19-simplification-remove-selection-defer-restrictions).
+Exact design/example/handoff/counts remain unprepared/unapproved; no implementation/delegation/
+publication GO or worker/source/build/story/CI restart. Feasibility first/UX later; current
+Iteration18 stays complete-stopped at3b2b370. Earlier restriction proposal below is superseded.
+
+Next design direction agreed: intent-scoped cross-implementation reuse for exact inputs, with
+result-based exclusions scoped to intent+inputs+result DAG identity, affecting all equal-result
+attempts. Implementation deprecation is separate. Read
+[proposal and corrections](#proposed-iteration19-intent-scoped-reuse-and-result-restrictions).
+Exact schema/APIs/knowledge-view mechanics and handoff remain unprepared/unapproved; no
+implementation/delegation/publication GO or source/worker/build/story/CI restart. Feasibility
+first/UX later; current Iteration18 stays complete-stopped at3b2b370.
+
+Post-delivery discussion: prioritize design feasibility, not UX/namespace refinement. User
+clarification makes same-intent implementations a declared result-equivalence boundary; current
+Iteration18 still enforces full-binding matching. Read
+[discussion](#post-iteration18-discussion-intent-equivalence-and-current-storage). Exact future
+reuse identity/eligibility remains design work, no implementation/next-turn GO. Shared user/
+bookkeeping tree is acceptable for now; UX later. Completed implementation remains stopped.
+
+Iteration 18 **COMPLETE AND STOPPED through `3b2b370`; all SIX final-SHA CI41182904065 jobs
+successful**, attempt1. Read [RESULTS](iterations/18-multi-input-reuse/RESULTS.md),
+[REVIEW](iterations/18-multi-input-reuse/REVIEW.md),
+[COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md) and
+[delivery](#iteration-18-final-delivery-and-stop). Independent38/installed1179 NONEXECUTING
+pass distinct from worker163/sole full2489/actual SEVEN-Q/THREE-local story/25phases. Final
+six shared XML/primary/digests/exact11 clean source+remote verified, MI-001 hosted Windows
+resolved. Local children reaped/native evidence retained/no external fixture. Original failed
+probes/private-driver qualifications/coordinator oracle corrections/VP-001 OPEN UNKNOWN
+retained, final pass not earlier diagnosis/waiver. No restart/extra worker/cloud/global/release/
+package/later feature/design checkpoint publication. Earlier states are historical; stop for review.
+
+The user subsequently stated **“reviewed”**, recording review of completed Iteration18.
+Work remains COMPLETE AND STOPPED; no restart, later turn or design checkpoint commit/push
+was requested or authorized.
+
+Iteration 18 **independently ACCEPTED exact frozen ELEVEN; publication/final-SHA CI pending**.
+Read [REVIEW](iterations/18-multi-input-reuse/REVIEW.md) and
+[COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md). Independent38/installed1179
+NONEXECUTING pass, reviewed worker sole full2489/focused163/actual SEVEN-Q/THREE-local story.
+BOTH builds/source/evidence returned for accepted focused worker commit/normal push/actualCI/
+fresh triage. Original failed probes/qualifications/coordinator oracle corrections retained,
+VP-001 OPEN UNKNOWN/no waiver. No extra full/computation/fixture/later turn/design publication;
+final outcome/STOP pending. Earlier GO resume is historical.
+
+Iteration 18 **GO; assigned in a verified fresh window-2 Pi session**. Read
+[COORDINATION](iterations/18-multi-input-reuse/COORDINATION.md), the three approved plan documents
+and [authorization](#iteration-18-implementation-and-publication-authorization). Coordinator
+monitors/independently reviews/feedback until satisfactory, then accepted worker commit/normal
+push/actual final-SHA CI and fixes. BOTH builds worker-owned until changed-surface/HEAD freeze/
+explicit release. Small SEVEN-Q/THREE-local story/proportionate validation; VP-001 OPEN UNKNOWN/
+no standing waiver. No extra agent/cloud/global/release/package/later turn/design publication.
+Acceptance/outcomes pending. Earlier candidate resume point below is historical, superseded by GO.
+
+Iteration 18 **direction agreed; candidate design/example/handoff prepared for review**.
+Read [planning](#iteration-18-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/18-multi-input-reuse/DESIGN.md),
+[EXAMPLE](iterations/18-multi-input-reuse/EXAMPLE.md),
+[HANDOFF](iterations/18-multi-input-reuse/HANDOFF.md). Exact URI/full binding/full input tuple
+lookup, separate one-key adoption/true branches. Ordinary M/entries/new S captures/new Dm/
+finite profile/seven-Q-three-local mechanics are candidates, not as-built or exact schema/API
+approval. No implementation/delegation/publication GO/restart/checkpoint; DML9f182be clean,
+completed17 stopped. VP-001 OPEN UNKNOWN/no standing waiver or investigation. No extra agent/
+cloud/global/release/package/later feature. Review then separate GO. Prior resume is historical.
+
+The user accepted the completed Iteration17 delivery: **“accepted”**. No next turn,
+restart or design checkpoint commit/push is authorized; work remains stopped.
+
+Iteration 17 **COMPLETE AND STOPPED through `9f182be`; all SIX final-SHA CI41172108791
+jobs successful, attempt1**. Read [RESULTS](iterations/17-implementation-supersession/RESULTS.md),
+[REVIEW](iterations/17-implementation-supersession/REVIEW.md) and
+[COORDINATION](iterations/17-implementation-supersession/COORDINATION.md). Independent37/
+installed712 NONEXECUTING pass; worker129/27/full2364/actual FOUR-Q-TWO-local story reviewed.
+Final six XML/primary/digests/clean exact12 source+remote verified. SS-001 resolved, local
+children reaped/evidence retained/no external fixture. Original failures/qualified original
+measured controller/corrected same-history readers retained; VP-001 OPEN UNKNOWN, pass not
+prior diagnosis or standing waiver. No completed-GO restart/later turn/design publication/
+extra worker/cloud/global/release/package. Stop for user review; earlier states are historical.
+
+Iteration 17 **independently ACCEPTED exact frozen12; publication/final-SHA CI pending**.
+Read [REVIEW](iterations/17-implementation-supersession/REVIEW.md) and
+[COORDINATION](iterations/17-implementation-supersession/COORDINATION.md). Independent37
+focused/installed712 NONEXECUTING pass, reviewed worker sole full2364 and actual FOUR-Q/
+TWO-local-attempt story; source/BOTH builds/evidence returned for focused worker commit/
+normal push and actual CI+JUnit triage. SS-001 resolved, original failures/qualifications/
+VP-001 OPEN UNKNOWN retained. Final disposition/STOP pending; no extra full/fixture/later
+turn/design publication. Earlier GO assignment is historical.
+
+Iteration 17 **GO; assigned in a verified fresh window-2 session**. Read
+[COORDINATION](iterations/17-implementation-supersession/COORDINATION.md) and the three bounded
+plan documents below. Coordinator monitors/independently reviews/feedback until satisfactory,
+then accepted worker commit/normal push/actual final-SHA CI evidence and fixes. BOTH builds
+worker-owned until changed-surface/HEAD freeze and explicit release. Small current-installed
+FOUR-Q/TWO-local-attempt story authorized; published proportionate validation policy applies.
+VP-001 OPEN/UNKNOWN/no standing waiver or async/LMDB investigation permission. No extra agent/
+cloud/global/release/package/later turn or design checkpoint publication. Worker ACK fresh UUID
+`01a1904f-9a2e-766c-90ee-c5cee54c471c`, actual `%215`, clean e0089323/origin, exclusive ownership.
+No as-built/acceptance/publication outcome claimed yet. Earlier candidate state is historical.
+
+Iteration 17 **direction agreed; candidate design/example/handoff ready for review**. Read
+[planning](#iteration-17-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/17-implementation-supersession/DESIGN.md),
+[EXAMPLE](iterations/17-implementation-supersession/EXAMPLE.md) and
+[HANDOFF](iterations/17-implementation-supersession/HANDOFF.md).
+Review assistant-origin ordinary L/captured-basis/advisory/promotion/public-reader/two-local-
+attempt mechanics. Separate implementation/delegation/publication GO still required; no worker/
+source/build/fixture/image/CI/experiment/provisioning/commit/push restart or design publication.
+DML clean e0089323/Iteration16 complete-stopped; VP-001 OPEN UNKNOWN/no standing waiver or
+new investigation permission. No extra agent/cloud/global/release/package/later feature.
+The following user-accepted completed16 resume point is historical.
+
+The user has reviewed and accepted Iteration16; no next turn is selected or authorized.
+
+Iteration 16 **COMPLETE AND STOPPED through `e008932`; ALL SIX final-SHA CI41123236764 jobs successful**.
+Read [delivery](#iteration-16-final-publication-and-ci-verification),
+[RESULTS](iterations/16-versioned-implementation-selection/RESULTS.md),
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+Final counts/digests/actualMac15arm/sourceRemote/disposition independently verified;
+worker RESULTS finalized and explicit STOP ALL acknowledged. Preserve original failures/provenance/
+falsemetadata correction/VP001OPEN UNKNOWN, no finalpass=olddiagnosis. No laterturn/design
+publication or restart authorization. Prior CI-pending state below is historical.
+
+Iteration 16 **published through `e008932`; final-SHA CI41123236764 pending**. Read
+[publication](#iteration-16-publication-and-runner-migration),
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+Verify actualall6 finaljobs/sixsmallXML/primary outcomes+freshtriage, not automaticallgreen.
+OriginalbrownoutCANCELLED5pass/falsemetadata-regexfailures/reconstruction/UNKNOWN retained;
+VP001OPEN/no standingwaiver. Ownedfixturesretired/imagesretained. FinalRESULTS/sourceRemote/
+CIoutcome/explicitSTOP pending; no extra full/fixture/later feature/designpublication.
+Earlier independent acceptance is historical.
+
+Iteration 16 **independently ACCEPTED; focused publication/final-SHA CI pending**. Read
+[acceptance](#iteration-16-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/16-versioned-implementation-selection/REVIEW.md) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+Exact14/BOTH builds/source/stopped-owned fixture returned for worker focused commit/normal
+push/actual finalSHA CI+JUnit/fresh failure triage. Independent32/54 pass; worker corrected
+full2263/unchanged gates and real3-job/9-phase+8readers reviewed. Original failed AST run/
+reconstructed provenance/UNKNOWN preserved; no standing VP-001 waiver/extra full or fixture/
+worker/cloud/global/release/package/later turn/design publication. Final outcome/STOP pending.
+The following GO assignment is historical.
+
+Iteration 16 **GO; assigned to the existing window-2 agent in a verified NEW Pi session**. Read
+[authorization](#iteration-16-implementation-and-publication-authorization) and
+[COORDINATION](iterations/16-versioned-implementation-selection/COORDINATION.md).
+Monitor/independently review/feedback until satisfactory, then focused worker commit/normal
+push/exact-SHA CI evidence and fixes under the published validation policy. BOTH builds
+worker-owned until changed-surface freeze/explicit release; no duplicate-full/fixture rituals.
+VP-001 OPEN/UNKNOWN/no standing waiver; no extra workers/cloud/global/release/package/later
+turn or design checkpoint publication. Prior candidate status below is historical.
+
+Iteration 16 **direction agreed; candidate design/example/handoff ready for review**. Read
+[planning](#iteration-16-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/16-versioned-implementation-selection/DESIGN.md),
+[EXAMPLE](iterations/16-versioned-implementation-selection/EXAMPLE.md) and
+[HANDOFF](iterations/16-versioned-implementation-selection/HANDOFF.md).
+Review assistant-origin ordinary Idef/menu/choice/D/default-update/public-validation mechanics;
+separate implementation/delegation/publication GO required. No worker/source/spec/diagram/build/
+fixture/image/CI restart/experiment/provisioning/commit/push. DML clean4a053340 unchanged, prior
+notes preserved/no checkpoint. Proportionate validation applies; VP-001 revisited OPEN/UNKNOWN,
+maintenance-only approval not extended, investigation separately scoped if related changes needed.
+No extra agent/cloud/global/release/package/later turn or completed-GO permissions inherited.
+
+The following maintenance delivery resume is historical, latest published work.
+
+**Validation-policy maintenance COMPLETE AND STOPPED at `4a053340`, accepted WITH VP-001.**
+Read [delivery](#validation-policy-maintenance-delivery-and-exception),
+[REVIEW](maintenance/validation-policy/REVIEW.md), [RESULTS](maintenance/validation-policy/RESULTS.md)
+and [OPEN follow-up](maintenance/validation-policy/EXCEPTION-VP-001.md).
+RawCI41098299553 FAILED/fivegreens/oneMacarm oldasync ENOENT UNKNOWN; reportingfeature15passallsix/
+sixreportartifact audit, worker2082-v/independent23focused/source-remote identity pass. Stop for
+review, no repeatedCI/full/fixture/run justgreen. Coordinator must carry VP-001 into nextplanning/
+relatedasync-LMDB-reporttiming-story-release change or recurrence; no standingwaiver/investigation
+start without separateauthorization. No runtimefeature/Iteration16/extraagent/global/cloud/release/
+package/design publication/worker-build-fixture-CIrestart permitted by completed GO.
+
+The following independent acceptance resume is historical.
+
+**Validation-policy maintenance independently accepted; publication/final-SHA CI evidence pending.**
+Read [REVIEW](maintenance/validation-policy/REVIEW.md),
+[COORDINATION](maintenance/validation-policy/COORDINATION.md) and [PLAN](maintenance/validation-policy/PLAN.md).
+Verify focused5 worker commit/normalpush/source identity/remote/actualfinalSHA jobs and six small
+JUnit reports; new regressions block, evidenced explicit exceptions/UNKNOWN retain original
+outcomes/follow-up. No all-green ritual/duplicatefull/fixtures. Coordinator user-delegated judgment
+may revise bounded plan from evidence. No extra worker/runtime/global/cloud/release/package/design
+publication/later feature. Final outcome/STOP pending.
+
+The following assignment resume is historical.
+
+**Validation-policy maintenance GO.** Read
+[authorization](#proportionate-validation-maintenance-authorization),
+[PLAN](maintenance/validation-policy/PLAN.md), [HANDOFF](maintenance/validation-policy/HANDOFF.md)
+and [COORDINATION](maintenance/validation-policy/COORDINATION.md).
+Existing window2 is assigned in a verified NEW Pi session; monitor/independently review focused risk-based
+validation, then accepted focused commit/normal push/final-SHA CI/explicit triage and reviewed fixes.
+Coordinator may revise bounded plan from evidence. No unconditional all-six-green/repeated full/
+fixture gate; preserve raw failures/new regression blocking/evidenced exceptions/UNKNOWN and
+unchanged coverage/memory/security budgets. No extra worker/runtime feature/cloud/global/release/
+package/design publication/retired fixture restart. Iteration15 remains completed/accepted/stopped.
+
+The following Iteration15 resume is historical.
+
+Iteration 15 **implemented, independently accepted, published and STOPPED through `664a870`**;
+all six final exact-SHA CI41090059076 jobs successful, attempt1. The user has
+[reviewed and accepted the delivery](#iteration-15-user-acceptance); no next turn is authorized. Read
+[delivery](#iteration-15-delivery-final-publication-and-stop),
+[RESULTS](iterations/15-intent-reuse-defaults/RESULTS.md),
+[REVIEW](iterations/15-intent-reuse-defaults/REVIEW.md) and
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md).
+Worker explicit ALL-activity STOP/source-remote-CI-retirement verified; independent2060 full/
+233postfix/780installed four-job probe/nineparser-bootstrap clients and worker correction2067
+remain distinct evidence. Ordinary Idef/D/versioned defaults/request overrides/pinned reasons,
+exact full matching/no automatic adoption. Original Unix19 diagnosis/controller correction/
+WindowsENOENT underlyingUNKNOWN/olderUNKNOWN preserved. Images/evidence retained; completed GO
+permits no worker/source/build/fixture/CI restart/design commit/push/extra workers/global/cloud/
+release/package/later turn. Stop for user review.
+
+The following independent acceptance resume is historical.
+
+Iteration 15 **independently accepted; focused publication/exact-SHA CI pending**. Read
+[acceptance](#iteration-15-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/15-intent-reuse-defaults/REVIEW.md) and
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md).
+Verify focused16 worker commit/normal push/clean source/matching remote/final exact-SHA all-six
+CI; primary failure evidence/reviewed fixes if needed. Independent full2060/4301/sevenC+
+separate actual installed780 four-job probe pass; ALL248 stable. BOTH builds/source/stopped
+fixture returned; archive before exact owned retirement. No design publication/later turn.
+
+The following GO assignment resume is historical.
+
+Iteration 15 **GO and assigned in a verified fresh window-2 Pi session**. Read
+[authorization](#iteration-15-implementation-and-publication-authorization) and
+[COORDINATION](iterations/15-intent-reuse-defaults/COORDINATION.md).
+Monitor/independently review/feedback until satisfactory, then focused worker commit/normal push/
+final exact-SHA CI/fixes. BOTH builds remain worker-owned until ALL-source freeze/explicit release.
+Mandatory current-installed four-job/twelve-phase defaults/overrides/branch and native/history/
+atomicity/loss gates remain; no private role codec/new native entity/public policy framework.
+No extra worker/cloud/global tooling/release/package/later turn/design checkpoint commit/push.
+
+The following approval resume is historical, superseded by GO above.
+
+Iteration 15 **bounded example/design/handoff approved; implementation GO pending**. Read
+[approval](#iteration-15-plan-approval),
+[DESIGN](iterations/15-intent-reuse-defaults/DESIGN.md),
+[EXAMPLE](iterations/15-intent-reuse-defaults/EXAMPLE.md) and
+[HANDOFF](iterations/15-intent-reuse-defaults/HANDOFF.md).
+The approved bounded plan is not as-built behavior; exact engineering spellings remain refinable.
+No implementation/delegation/publication GO or worker/source/spec/diagram/build/fixture/image/CI/
+restart/experiment/provisioning/commit/push. DML8393a82 clean, prior notes preserved/no checkpoint
+requested; completed14 GO not inherited. Next is separately authorized implementation if desired.
+
+The following preparation resume is historical, superseded by approval above.
+
+Iteration 15 **direction agreed; candidate example/design/handoff ready for review**. Read
+[planning](#iteration-15-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/15-intent-reuse-defaults/DESIGN.md),
+[EXAMPLE](iterations/15-intent-reuse-defaults/EXAMPLE.md) and
+[HANDOFF](iterations/15-intent-reuse-defaults/HANDOFF.md).
+Versioned intent defaults/request overrides, new Q on either path/no new T-job on reuse,
+absence-driven fresh/no automatic adoption/branch-local defaults; initial exact full matching.
+Ordinary Idef/D/public preparation/decision-parent/unused-S/naming are candidate mechanisms,
+not implemented/approved detail. No implementation/delegation/publication GO or worker/source/
+spec/diagram/build/fixture/image/CI restart/experiment/provisioning/commit/push. DML8393a82 clean,
+prior notes preserved/no design checkpoint requested. Review candidate, then separately authorize.
+
+The following Iteration14 delivery/review resume is historical; it remains the latest completed
+implementation, not permission to inherit its completed GO.
+
+Iteration 14 **implemented, independently accepted, published and STOPPED through `8393a82`**;
+all six final exact-SHA CI41025016866 jobs successful, attempt1. The user has reviewed the
+completed delivery; no next turn is selected or authorized. Read
+[delivery](#iteration-14-delivery-final-publication-and-stop),
+[RESULTS](iterations/14-versioned-reuse-selection/RESULTS.md),
+[REVIEW](iterations/14-versioned-reuse-selection/REVIEW.md) and
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md).
+Versioned ordinary selection/public persisted revalidation/explicit selected reuse/fresh without
+adoption/explicit occurrence-based adoption/true sibling choices delivered. Source/remote/CI/
+disposition verified; independent1863 full/242postfix/773installed distinct worker evidence.
+Original failures/initialMac10cap/UNKNOWNslowdown/WindowsWSL vslatentCRLF/olderUNKNOWN retained.
+Stop for user review: completed GO permits no worker/source/build/fixture/CI restart/design commit/
+push/extra worker/cloud/global tooling/release/package/later feature. Images/evidence retained.
+
+The following independent acceptance resume is historical.
+
+Iteration 14 **independently accepted; focused publication/exact-SHA CI pending**. Read
+[acceptance](#iteration-14-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/14-versioned-reuse-selection/REVIEW.md) and
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md).
+Verify focused18-file worker commit/normal push/source/clean tree/matching remote/final exact-SHA
+all-six CI; primary failure evidence/reviewed fixes if needed. BOTH builds/source/stopped fixture
+returned. Final independent1863/4030/sevenC+actual installed773 three-job/branch evidence pass.
+Preserve original failures/Windows UNKNOWN; no design commit/push/later feature permission.
+
+The following GO assignment resume is historical.
+
+Iteration 14 **GO and assigned in a verified fresh window-2 Pi session**. Read
+[authorization](#iteration-14-implementation-and-publication-authorization) and
+[COORDINATION](iterations/14-versioned-reuse-selection/COORDINATION.md).
+Monitor/independently review/feedback until satisfactory, then focused worker commit/normal push/
+final exact-SHA CI/fixes. BOTH builds remain worker-owned until ALL-source freeze/explicit release.
+Mandatory actual current-installed durable selection/selected reuse/fresh control/adoption/branch
+and native byte/history/atomicity/loss gates remain; no private codec/new native entity/framework.
+No extra workers/cloud/global tooling/release/package/later turn/design checkpoint commit/push.
+
+The following plan-review resume is historical, superseded by GO above.
+
+Iteration 14 **bounded example/design/handoff reviewed; implementation GO pending**. Read
+[review checkpoint](#iteration-14-plan-review-checkpoint),
+[DESIGN](iterations/14-versioned-reuse-selection/DESIGN.md),
+[EXAMPLE](iterations/14-versioned-reuse-selection/EXAMPLE.md) and
+[HANDOFF](iterations/14-versioned-reuse-selection/HANDOFF.md).
+Versioned selection/explicit selected reuse/fresh control without auto-adoption/explicit adoption/
+two branches; exact intent/binding/full inputs including witness. Ordinary S/V/durable public
+validation basis is reviewed planning, not as-built/experimental proof; exact spellings refinable.
+Separate implementation/delegation/publication GO required. No worker/build/fixture/image/CI/
+source/spec/diagram restart/experiment/provisioning/commit/push. DML cleanb296fdb/Iteration13
+complete-stopped, prior notes preserved/no design checkpoint requested.
+
+The following preparation resume is historical, superseded by the review checkpoint.
+
+Iteration 14 **direction agreed; candidate design/example/handoff ready for review**. Read
+[planning](#iteration-14-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/14-versioned-reuse-selection/DESIGN.md),
+[EXAMPLE](iterations/14-versioned-reuse-selection/EXAMPLE.md) and
+[HANDOFF](iterations/14-versioned-reuse-selection/HANDOFF.md).
+Versioned selection/explicit selected reuse/fresh control without auto-adoption/explicit adoption/
+two branches. Exact intent/binding/full inputs including witness retained; no generic cache/facets/
+framework presumed. Recommended ordinary S/V durable validation basis and public packet projection
+need review; not as-built/experimental proof. No implementation/delegation/publication GO, worker/
+build/fixture/image/CI/source/spec/diagram restart/experiment/provisioning/commit/push. DML remains
+cleanb296fdb/Iteration13 complete-stopped; prior notes preserved/no design checkpoint requested.
+
+The following Iteration13 delivery remains the latest completed implementation.
+
+Iteration 13 **implemented, independently accepted, published and STOPPED through `b296fdb`**;
+all six final exact-SHA CI41006689070 jobs successful, attempt1. Read
+[delivery](#iteration-13-delivery-final-publication-and-stop),
+[REVIEW](iterations/13-explicit-attempt-reuse/REVIEW.md),
+[RESULTS](iterations/13-explicit-attempt-reuse/RESULTS.md) and
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md).
+New Q/W uses exact old selected successful T/result with no new attempt/job; explicit fresh control
+preserves W's old choice despite equalR84. Worker final1706/3841/seven C and coordinator1692 full/
+126 correction/separate installed466 checks pass. Initial native112 disk-full cause/test-only
+successful-owned-temp cleanup/original missing disk census/older UNKNOWN causes retained.
+Source/remote/CI/identity-retirement verified, images/evidence retained; worker STOPPED ALL activity.
+No further worker/build/fixture/CI/source restart/design checkpoint commit/push/extra worker/cloud/
+global tooling/release/package/later turn. Completed GO is not restart permission; stop for user review.
+
+The following independent acceptance resume is historical.
+
+Iteration 13 **independently accepted; focused publication/exact-SHA CI pending**. Read
+[acceptance](#iteration-13-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/13-explicit-attempt-reuse/REVIEW.md) and
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md).
+Verify focused14-file worker commit/normal push/clean tree/matching remote and final exact-SHA
+all-six CI, primary failures/reviewed fixes if necessary. Independent full1692/3841/seven C and
+separate actual installed466checks pass. BOTH builds/source/stopped worker fixture returned;
+archive before exact stopped-resource retirement. No design publication/later turn.
+
+The following GO assignment resume is historical.
+
+Iteration 13 **GO and assigned in a verified fresh window-2 session**. Read
+[authorization](#iteration-13-implementation-and-publication-authorization) and
+[COORDINATION](iterations/13-explicit-attempt-reuse/COORDINATION.md).
+Monitor/independently review/feedback until satisfactory, then focused worker commit/normal push/
+final exact-SHA CI/fixes. BOTH builds remain worker-owned until ALL-source freeze/explicit release.
+Mandatory current-installed original chain/offline new-Q old-T reuse/no-job/fresh-control plus
+native history/byte/atomicity/loss gates remain. No generic cache/private codec/new native entity
+presumed; no extra workers/cloud/global tooling/release/package/later turn/design commit/push.
+
+The following plan-review resume is historical, superseded by GO above.
+
+Iteration 13 **bounded example/design/handoff reviewed; implementation GO pending**. Read
+[review checkpoint](#iteration-13-plan-review-checkpoint),
+[DESIGN](iterations/13-explicit-attempt-reuse/DESIGN.md),
+[EXAMPLE](iterations/13-explicit-attempt-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/13-explicit-attempt-reuse/HANDOFF.md).
+Explicit new Q/old selected T/result reuse, initially exact intent/binding/full inputs including
+producer witness; separate fresh execution. No generic cache/facet/adoption/framework presumed.
+Separate implementation/delegation/publication GO required, exact engineering spellings refinable.
+No worker/build/fixture/image/CI/source/spec/diagram restart/experiment/checkpoint requested.
+DML66311fc clean; completed Iteration12 stays stopped, prior notes preserved.
+
+The following preparation resume is historical, superseded by the review checkpoint.
+
+Iteration 13 **direction agreed; candidate design/example/handoff ready for review**. Read
+[planning](#iteration-13-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/13-explicit-attempt-reuse/DESIGN.md),
+[EXAMPLE](iterations/13-explicit-attempt-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/13-explicit-attempt-reuse/HANDOFF.md).
+Explicit new Q/old selected T/result reuse, no new trial/job; initially exact intent/binding/full
+input including witness; separate fresh execution. Candidate helper/Q-W atomicity/cleanup/fixture
+choices need review, not as-built claims. No implementation/delegation/publication GO, worker/
+build/fixture/image/CI restart/source/spec/diagram edit/experiment/commit/push. DML66311fc clean;
+Iteration12 stays complete/stopped, prior notes preserved/no design checkpoint requested.
+
+The following Iteration12 delivery resume remains the latest completed implementation.
+
+Iteration 12 **implemented, independently accepted, published and STOPPED through `66311fc`**;
+all six final exact-SHA CI40954598093 jobs successful, attempt1. Read
+[delivery](#iteration-12-delivery-final-publication-and-stop),
+[REVIEW](iterations/12-composed-recorded-steps/REVIEW.md),
+[RESULTS](iterations/12-composed-recorded-steps/RESULTS.md) and
+[COORDINATION](iterations/12-composed-recorded-steps/COORDINATION.md).
+Actual result-backed selected producer composition42->84/ordinary summary, source/remote/CI and
+archive/retirement verified; coordinator1647/3783/seven C + separate installed293 evidence distinct.
+Original census/import/setup/gh-log correction and old Windows UNKNOWN qualifications retained.
+Stop for user review; completed GO authorizes no worker/build/fixture/CI restart/design commit/
+push/extra workers/cloud/global tooling/release/package publication/later turn.
+
+The following independent acceptance resume is historical, superseded by delivery above.
+
+Iteration 12 **independently accepted; focused publication/exact-SHA CI pending**. Read
+[acceptance](#iteration-12-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/12-composed-recorded-steps/REVIEW.md) and
+[COORDINATION](iterations/12-composed-recorded-steps/COORDINATION.md).
+Verify focused reviewed16-file worker commit/push/clean tree/remote and final exact-SHA all-six CI;
+primary evidence/review/focused fixes if needed. Independent full1647/3783/seven C plus separate
+installed293-check actual chain pass; private/failure/source/byte/atomicity qualifications retained.
+BOTH builds/source/stopped fixture returned; archive before exact known-stopped worker retirement.
+No extra worker/cloud/global tooling/release/package publication/later turn/design commit.
+
+The following GO assignment resume is historical, superseded by acceptance above.
+
+Iteration 12 **GO and assigned in a verified fresh window-2 session**. Read
+[authorization](#iteration-12-implementation-and-publication-authorization) and
+[COORDINATION](iterations/12-composed-recorded-steps/COORDINATION.md).
+Monitor/independently review/feedback until satisfactory, then focused worker commit/normal
+push/final exact-SHA CI verification and fixes. Both builds remain worker-owned until ALL-source
+freeze/explicit release. Mandatory actual installed two-step/selected producer/history/atomicity/
+failure gates remain; no generic evaluator/private codec/new native mechanism presumed.
+No extra worker/cloud/global tooling/release/package publication/later turn/design commit.
+
+The following plan-review resume is historical, superseded by GO above.
+
+Iteration 12 **bounded example/design/handoff reviewed; implementation GO pending**. Read
+[review checkpoint](#iteration-12-plan-review-checkpoint),
+[DESIGN](iterations/12-composed-recorded-steps/DESIGN.md),
+[EXAMPLE](iterations/12-composed-recorded-steps/EXAMPLE.md) and
+[HANDOFF](iterations/12-composed-recorded-steps/HANDOFF.md).
+Two-step public-API composition/selected producer witness/ordinary summary; no generic executor
+or new native/role/adapter mechanism presumed. Separate implementation/delegation/publication GO
+required, exact engineering spellings refinable. No worker/fixture/image/build/CI/experiment/source/
+spec/diagram restart or checkpoint requested. DML640cabb clean; prior notes preserved.
+
+The following preparation resume is historical, superseded by the review checkpoint.
+
+Iteration 12 **direction agreed, candidate example/design/handoff ready for review**. Read
+[planning](#iteration-12-agreed-direction-and-candidate-planning),
+[DESIGN](iterations/12-composed-recorded-steps/DESIGN.md),
+[EXAMPLE](iterations/12-composed-recorded-steps/EXAMPLE.md) and
+[HANDOFF](iterations/12-composed-recorded-steps/HANDOFF.md).
+Proposed two-step public-API composition/selected producer witness/ordinary summary; no generic
+executor or new native/role/adapter mechanism presumed. Detailed candidate choices remain for
+review; implementation/delegation/publication GO pending. No worker/fixture/image/build/CI/
+experiment/source/spec/diagram restart or design checkpoint requested. DML640cabb clean, prior
+notes preserved. Completed Iteration11 GO does not authorize implementation of Iteration12.
+
+Iteration 11 **implemented, independently accepted, published and stopped through `640cabb`**;
+all six final exact-SHA CI40913866835 jobs successful. Read
+[delivery](#iteration-11-delivery-final-publication-and-stop),
+[REVIEW](iterations/11-floci-batch-execution/REVIEW.md),
+[RESULTS](iterations/11-floci-batch-execution/RESULTS.md),
+[COORDINATION](iterations/11-floci-batch-execution/COORDINATION.md) and
+[as-built contract](../dml/docs/spec-next/floci-execution.md).
+Source/remote/CI/retirement verified; current runtime/16 artifacts unchanged across test-only
+follow-ups. Initial Windows old-reader cause remains UNKNOWN despite final pass. No restart/
+extra worker/release/package/cloud/global/later turn or design checkpoint permission. Stop for
+user review; completed GO does not authorize another iteration.
+
+The following acceptance/assignment/plan resume states are historical.
+
+Iteration 11 **implemented, independently accepted; focused worker publication/exact-SHA CI pending**.
+Read [acceptance](#iteration-11-independent-acceptance-and-publication-gate),
+[REVIEW](iterations/11-floci-batch-execution/REVIEW.md),
+[RESULTS](iterations/11-floci-batch-execution/RESULTS.md) and
+[COORDINATION](iterations/11-floci-batch-execution/COORDINATION.md).
+Coordinator independently passes full1575/3536/7C/unchanged gates and separate installed380 checks;
+worker frozen33-file slice accepted, both builds/stopped fixtures returned. Next verify focused
+commit/push surface/clean tree/matching remote and all final exact-SHA CI jobs; review/fix issues
+with qualified evidence, never speculative runtime changes/gate weakening or blind reruns.
+No extra workers/cloud/global tooling/release/package publication/later turn/design checkpoint.
+
+The following GO assignment resume is historical, superseded by acceptance above.
+
+Iteration 11 **GO and assigned in a verified fresh session** to the existing window-2 agent.
+Monitor/independently review/fix until satisfactory, then direct focused worker commit/normal
+push and verify final exact-SHA CI/fixes. Read
+[authorization](#iteration-11-implementation-and-publication-authorization),
+[COORDINATION](iterations/11-floci-batch-execution/COORDINATION.md) and the approved handoff.
+Worker owns both builds until explicit ALL-source freeze/release. Mandatory actual installed
+DML-in-Batch acceptance, exact-Q/history/atomicity/safe ownership and fixture profile remain.
+No extra workers/cloud/global tooling/release/package publication/later turn or design commit.
+
+The following plan-approval resume paragraph is historical, superseded by GO above.
+
+Iteration11 **bounded plan/example/handoff accepted**, implementation GO pending. Read
+[approval](#iteration-11-plan-approval),
+[DESIGN](iterations/11-floci-batch-execution/DESIGN.md),
+[EXAMPLE](iterations/11-floci-batch-execution/EXAMPLE.md) and
+[HANDOFF](iterations/11-floci-batch-execution/HANDOFF.md). Local Floci/HTTP/manifest/image choices
+are accepted as the bounded plan, not implemented behavior; exact spellings remain refinable.
+Actual combined installed DML execution is the acceptance target, not yet proven by feasibility.
+No worker/fixture/build/CI/provisioning restart, implementation/delegation/publication GO or design
+commit/push. DML099d156 remains clean. Earlier candidate/pending-approval statements preserve
+chronological provenance, not current plan status or permission to inherit completed studies.
+
+**Floci feasibility is complete/stopped, viable with constraints**; read
+
+**Floci feasibility is complete/stopped, viable with constraints**; read
+[completion](#floci-feasibility-completion), [report](feasibility/floci/REPORT.md) and
+[review](feasibility/floci/REVIEW.md). Real jobs/polling/S3 and prior DML packet replay pass;
+combined DML Batch execution remains untested. Discuss whether to plan that smallest bounded
+Iteration11 before any implementation/fixture/pull work. DML remains clean/read-only099d156,
+owned resources retired/evidence retained, no extra workers/cloud/global changes/commit/push.
+Earlier assignment paragraph below preserves provenance, not restart permission.
+
+Current task: **Floci feasibility delegated to the existing window-2 agent**, not Iteration11 GO.
+Read [handoff](feasibility/floci/HANDOFF.md), receive compact source/prerequisite/evidence-backed
+report, decide whether a Batch-style local execution slice is viable before planning another
+implementation turn. DML stays read-only; no extra workers/cloud/global services/commit/push.
+
+Iteration 10 is **implemented, independently accepted, published and stopped** through
+**`099d156`**, all six final exact-SHA CI jobs successful. Read
+[delivery](#iteration-10-delivery-and-final-publication-checkpoint),
+[RESULTS](iterations/10-asynchronous-ssh-execution/RESULTS.md),
+[REVIEW](iterations/10-asynchronous-ssh-execution/REVIEW.md),
+[COORDINATION](iterations/10-asynchronous-ssh-execution/COORDINATION.md) and
+[as-built SSH contract](../dml/docs/spec-next/ssh-execution.md).
+Initial malformed changed-key/test-host/synthetic-coverage corrections and two prior unchanged
+Windows story UNKNOWN causes stay recorded; final pass is not their diagnosis/fix. Current
+implementation clean/remote master matches at checkpoint; unchanged diagram ancestor `a94e6f5`
+is normally published. Fixtures retired after writer proof/archive; no further worker/build/CI/
+fixture activity or later turn authorized. No design commit/push requested. Earlier GO/checkpoint
+states below are historical, not restart permission.
+
+Iteration 10 is **GO and assigned in a fresh session** to the existing window-2 worker.
+Monitor/review/fix to independent acceptance, then direct focused worker commit/normal push
+and verify final exact-SHA CI/fixes. See
+[authorization](#iteration-10-implementation-and-publication-authorization) and
+[COORDINATION](iterations/10-asynchronous-ssh-execution/COORDINATION.md).
+Worker owns both shared builds until explicit freeze/release. No detached remote lifetime,
+extra workers, cloud/global tooling, release/package publication or later turn. Preserve and
+account for existing local diagram ancestor `a94e6f5`. The preceding reviewed plan checkpoint
+and its then-pending status remain historical below.
 
 Iteration 10's **bounded plan is reviewed and checkpointed**, not implementation GO. Read
 [DESIGN](iterations/10-asynchronous-ssh-execution/DESIGN.md),

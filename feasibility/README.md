@@ -1,5 +1,11 @@
 # Feasibility study
 
+Separate later study: [Floci report](floci/REPORT.md), [coordinator review](floci/REVIEW.md) and
+[bounded handoff](floci/HANDOFF.md). **Complete/stopped, viable with constraints**: real local
+Batch Docker jobs/fresh polling/S3 plus prior DML packet replay, not combined DML-in-Batch adapter
+execution. Its scoped image pull/private fixture authorization does not alter the historical
+study's safety rules below or authorize more runs/Iteration11 implementation.
+
 Status: the first study and candidate-design iteration are complete. The result is
 a qualified feasibility pass for narrow cooperative local mechanisms, not approval
 for automatic real-resource management. The user authorized autonomous delegated

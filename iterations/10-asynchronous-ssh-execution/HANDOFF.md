@@ -1,5 +1,16 @@
 # Iteration 10 conditional handoff: asynchronous SSH execution and progress
 
+**Current delivery: complete and stopped through published `099d156`, all six final exact-SHA
+CI jobs successful.** [RESULTS](RESULTS.md)/[REVIEW](REVIEW.md)/[COORDINATION](COORDINATION.md)
+own delivery/evidence and qualifications. Earlier GO/pending/checkpoint text below preserves
+provenance, not permission to restart or begin another turn.
+
+**Current authorization: Iteration 10 GO.** The user authorized the existing window-2 agent
+in a new Pi session, coordinator monitoring/independent review and fixes until satisfactory,
+then focused worker commit/push and exact-SHA CI/fixes. See [COORDINATION.md](COORDINATION.md).
+Earlier pending-GO text below preserves the reviewed checkpoint's provenance and is superseded
+by this authorization; all bounded scope, safety, validation and acceptance gates still apply.
+
 Status: **reviewed bounded plan; local checkpoint requested**. The user reviewed
 [DESIGN.md](DESIGN.md)/[EXAMPLE.md](EXAMPLE.md)/this handoff and requested checkpoint commits,
 including separately authored diagram maintenance. Iteration 10 implementation/delegation/

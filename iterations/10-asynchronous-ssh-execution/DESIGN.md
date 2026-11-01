@@ -1,5 +1,10 @@
 # Iteration 10 candidate design: asynchronous SSH execution and progress
 
+Current delivery: **implemented, independently accepted, published and stopped through
+`099d156`**; all six final exact-SHA jobs succeed. See [RESULTS](RESULTS.md), [REVIEW](REVIEW.md)
+and [COORDINATION](COORDINATION.md); as-built behavior belongs to the implementation contracts.
+The reviewed plan/checkpoint below preserves provenance, not restart authorization.
+
 Status: **reviewed bounded plan; local checkpoint requested**. The user reviewed the plan
 and requested a checkpoint, including separate out-of-band diagram maintenance. This is not
 Iteration 10 implementation/delegation/publication GO. Candidate/proposed language below

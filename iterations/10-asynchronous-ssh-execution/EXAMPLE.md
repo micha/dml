@@ -1,5 +1,10 @@
 # Iteration 10 worked example: inspect one SSH attempt while it runs
 
+Current delivery: **implemented, independently accepted, published and stopped through
+`099d156`**; all six final exact-SHA jobs succeed. [RESULTS](RESULTS.md)/[REVIEW](REVIEW.md)
+own executed evidence/qualifications; the reviewed acceptance plan below preserves provenance,
+not a current unexecuted status or permission to restart. See [COORDINATION](COORDINATION.md).
+
 Status: **reviewed acceptance plan, not executed**. The user reviewed the bounded plan and
 requested a local checkpoint. Separate Iteration 10 implementation/delegation/publication GO
 remains pending. [DESIGN.md](DESIGN.md) owns proposed mechanics; [HANDOFF.md](HANDOFF.md) owns
