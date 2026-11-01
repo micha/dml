@@ -103,7 +103,7 @@ def test_production_presence_function_drains_many_paths_and_preserves_no_files(
         ) in output
 
 
-def test_only_macOS_x86_outer_CI_budget_is_twenty_minutes():
+def test_only_macOS_x86_and_Windows_AMD64_outer_CI_budgets_are_twenty_minutes():
     # Read the owning workflow scalar, without adding a YAML dependency or
     # changing any test/runtime timeout. GitHub evaluates this simple selector.
     workflow = (ROOT / ".github/workflows/ci.yml").read_text()
@@ -111,10 +111,11 @@ def test_only_macOS_x86_outer_CI_budget_is_twenty_minutes():
     timeout = re.findall(r"(?m)^    timeout-minutes: (.+)$", matrix_job)
     assert len(timeout) == 1
     choice = re.fullmatch(
-        r"\$\{\{ matrix\.name == '([^']+)' && ([0-9]+) \|\| ([0-9]+) \}\}", timeout[0]
+        r"\$\{\{ \(matrix\.name == '([^']+)' \|\| matrix\.name == '([^']+)'\) && ([0-9]+) \|\| ([0-9]+) \}\}", timeout[0]
     )
-    assert choice is not None, "expected bounded single-platform CI selector"
-    selected, raised, ordinary = choice.groups()
+    assert choice is not None, "expected parenthesized bounded two-platform CI selector"
+    first, second, raised, ordinary = choice.groups()
+    selected = {first, second}
     names = re.findall(r"(?m)^          - name: (.+)$", matrix_job)
     assert set(names) == {
         "Linux x86_64",
@@ -123,10 +124,11 @@ def test_only_macOS_x86_outer_CI_budget_is_twenty_minutes():
         "macOS arm64",
         "Windows AMD64",
     }
-    assert selected == "macOS x86_64"
+    assert selected == {"macOS x86_64", "Windows AMD64"}
+    assert (int(raised), int(ordinary)) == (20, 10)
     for name in names:
-        budget = int(raised) if name == selected else int(ordinary)
-        assert budget == (20 if name == "macOS x86_64" else 10)
+        budget = int(raised) if name in selected else int(ordinary)
+        assert budget == (20 if name in {"macOS x86_64", "Windows AMD64"} else 10)
     assert "timeout-minutes:" not in strict_job  # existing separate budget unchanged
 
 

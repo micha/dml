@@ -308,6 +308,94 @@ def actors(binary: Path, provenance: dict, root: Path, case: str):
         for stream in streams: stream.close()
 
 
+def namespace_event(rows: list[dict], label: str) -> tuple[int, dict]:
+    matches = [(index, row) for index, row in enumerate(rows) if row["event"] == label]
+    assert len(matches) == 1, f"missing/duplicate native namespace operation: {label}"
+    return matches[0]
+
+
+def namespace_epochs(a: list[dict], b: list[dict], *, case: str, platform: str) -> dict:
+    """PURE reader: owned epoch membership, never cross-epoch name stability.
+
+    POSIX original sem_close/unlink success proves each epoch's retirement;
+    Windows original last-handle closes prove natural retirement under the
+    no-other-retained-handles control. A also records its post-close absence
+    observation. This reader adds no handles or inferred kernel-blocked events.
+    """
+    assert case in ("baseline", "interleaved")
+    for actor, rows in ((1, a), (2, b)):
+        assert rows and all(row["actor"] == actor for row in rows), "foreign actor"
+        assert len({row["pid"] for row in rows}) == 1, "foreign actor PID"
+    assert a[0]["pid"] != b[0]["pid"], "actors must be distinct owners"
+    if platform == "linux":
+        assert all(not row["name"] for row in a + b), "unexpected named Linux resource"
+        return dict(epochs=[], named_names=[])
+    assert platform in ("darwin", "win32")
+    sem = platform == "darwin"
+    kind = "sem" if sem else "mutex"
+    prefix = ("/MDBr", "/MDBw") if sem else ("Global\\MDBr", "Global\\MDBw")
+    epochs = []
+    union = set()
+    active_pair = None
+    for actor, rows in ((1, a), (2, b)):
+        peer_failure = case == "interleaved" and actor == 2
+        if peer_failure:
+            assert active_pair is not None
+            assert not any(row["event"].endswith("-create-return") for row in rows), "peer must not initialize a new epoch"
+            label = "reader-sem-open0-return" if sem else "reader-mutex-open-return"
+            _, lookup = namespace_event(rows, label)
+            assert lookup["name"] == active_pair[0], "lookup must address exact producing epoch"
+            assert lookup["result"] == -1 and lookup["os_error"] == 2, "original reader lookup must fail not-found"
+            allowed = {label: active_pair[0]}
+            epoch = None
+        else:
+            ri, reader = namespace_event(rows, f"reader-{kind}-create-return")
+            wi, writer = namespace_event(rows, f"writer-{kind}-create-return")
+            pair = (reader["name"], writer["name"])
+            assert all(name.startswith(p) and len(name) == len(p) + 10 for name, p in zip(pair, prefix)), "invalid native pair"
+            assert pair[0][len(prefix[0]):] == pair[1][len(prefix[1]):], "reader/writer must belong to ONE epoch"
+            assert reader["result"] == writer["result"] == 0
+            rci, rc = namespace_event(rows, f"reader-{kind}-close-return")
+            wci, wc = namespace_event(rows, f"writer-{kind}-close-return")
+            assert (rc["name"], wc["name"]) == pair, "unmatched original close pair"
+            assert rc["result"] == wc["result"] == 0
+            oi, opened = namespace_event(rows, "mdb-env-open-return")
+            ei, _ = namespace_event(rows, "env-close-enter")
+            fi, _ = namespace_event(rows, "env-close-return")
+            assert opened["result"] == 0 and ri < wi < oi < ei < rci < wci < fi
+            allowed = {f"reader-{kind}-create-return": pair[0], f"writer-{kind}-create-return": pair[1],
+                       f"reader-{kind}-close-return": pair[0], f"writer-{kind}-close-return": pair[1]}
+            if sem:
+                uri, ur = namespace_event(rows, "close-reader-unlink-return")
+                uwi, uw = namespace_event(rows, "close-writer-unlink-return")
+                assert (ur["name"], uw["name"]) == pair, "unmatched original unlink pair"
+                assert ur["result"] == uw["result"] == 0, "missing successful epoch retirement"
+                assert wci < uri < uwi < fi
+                for part, name in zip(("reader", "writer"), pair):
+                    ii, init = namespace_event(rows, f"init-{part}-unlink-return")
+                    assert ii < ri and init["name"] == name and init["result"] == -1 and init["os_error"] == 2
+                    allowed[f"init-{part}-unlink-return"] = name
+                    allowed[f"close-{part}-unlink-return"] = name
+                assert sum(row["event"] == "unlink-enter" for row in rows) == 4
+            epoch = dict(actor=actor, pid=rows[0]["pid"], created_pair=list(pair), closed_pair=[rc["name"], wc["name"]],
+                         retirement="original sem_close+sem_unlink success" if sem else "original last CloseHandle success")
+            epochs.append(epoch)
+            if actor == 1: active_pair = pair
+        for row in rows:
+            name = row["name"]
+            if not name: continue
+            if row["event"] == "namespace-safety-before-originals" and name in ("init", "close"): continue
+            if row["event"] == "unlink-enter":
+                assert sem and not peer_failure and name in pair, "unexplained unlink target"
+            else:
+                assert row["event"] in allowed and allowed[row["event"]] == name, "extra unexplained native name"
+            union.add(name)
+    _, retired = namespace_event(a, "owned-names-retired")
+    assert retired["result"] == 0, "missing post-close absence observation"
+    assert len(epochs) == (2 if case == "baseline" else 1)
+    return dict(epochs=epochs, named_names=sorted(union))
+
+
 def evidence(root: Path, case: str, pids: list[int]) -> dict:
     rows = []
     for role, pid in zip(("A", "B"), pids):
@@ -385,16 +473,74 @@ def evidence(root: Path, case: str, pids: list[int]) -> dict:
         # 0==0 is NOT native identity proof when fstat/GetFileInformation failed.
         assert all(x["ino"] > 0 for x in identity_events)
         assert len({(x["dev"], x["ino"]) for x in identity_events}) == 1
-    if sys.platform != "linux":
-        find(a, "owned-names-retired")
-        names = {x["name"] for x in a + b if x["name"].startswith(("/MDB", "Global\\MDB"))}
-        assert len(names) == 2
-    else:
-        names = set()
+    namespace = namespace_epochs(a, b, case=case, platform=sys.platform)
     return dict(case=case, actual_compiled_backend=compiled, native_open_rc=opened_b["result"],
-                pids=pids, reaped=True, named_names=sorted(names), namespace_retired=True,
+                pids=pids, reaped=True, named_names=namespace["named_names"], named_epochs=namespace["epochs"], namespace_retired=True,
                 native_identity_positive=True, timing=timing, Q=0, T=0, computations=0,
                 historical_hosted_attribution="UNKNOWN", VP001="OPEN UNKNOWN")
+
+
+def synthetic_sem_epoch(actor: int, suffix: str, *, retired: bool = False) -> list[dict]:
+    """Known synthetic parser records only: no fixture/compiler/native calls."""
+    reader, writer = "/MDBr" + suffix, "/MDBw" + suffix
+    rows = []
+    def add(event, name="", result=0, os_error=0):
+        rows.append(dict(actor=actor, pid=100 + actor, event=event, name=name, result=result, os_error=os_error))
+    add("namespace-safety-before-originals", "init")
+    for part, name in (("reader", reader), ("writer", writer)):
+        add("unlink-enter", name)
+        add("init-" + part + "-unlink-return", name, -1, 2)
+    add("reader-sem-create-return", reader); add("writer-sem-create-return", writer)
+    add("mdb-env-open-return"); add("env-close-enter")
+    add("reader-sem-close-return", reader); add("writer-sem-close-return", writer)
+    add("namespace-safety-before-originals", "close")
+    for part, name in (("reader", reader), ("writer", writer)):
+        add("unlink-enter", name); add("close-" + part + "-unlink-return", name)
+    add("env-close-return")
+    if retired: add("owned-names-retired")
+    return rows
+
+
+@pytest.mark.parametrize("second_suffix", ("aaaaaaaaaa", "bbbbbbbbbb"))
+def test_namespace_epochs_baseline_owns_each_epoch_not_hash_stability(second_suffix):
+    a = synthetic_sem_epoch(1, "aaaaaaaaaa", retired=True)
+    b = synthetic_sem_epoch(2, second_suffix)
+    report = namespace_epochs(a, b, case="baseline", platform="darwin")
+    assert len(report["epochs"]) == 2
+    assert report["epochs"][0]["created_pair"] == report["epochs"][0]["closed_pair"]
+    assert report["epochs"][1]["created_pair"] == report["epochs"][1]["closed_pair"]
+    assert len(report["named_names"]) == (2 if second_suffix == "aaaaaaaaaa" else 4)
+
+
+@pytest.mark.parametrize("mutation", ("unmatched-pair", "missing-retirement", "foreign-actor", "extra-unexplained-name", "missing-B-unlink"))
+def test_namespace_epochs_reject_bad_ownership_retirement_and_unexplained_names(mutation):
+    a = synthetic_sem_epoch(1, "aaaaaaaaaa", retired=True)
+    b = synthetic_sem_epoch(2, "bbbbbbbbbb")
+    if mutation == "unmatched-pair":
+        next(x for x in b if x["event"] == "writer-sem-close-return")["name"] = "/MDBwcccccccccc"
+    elif mutation == "missing-retirement":
+        a = [x for x in a if x["event"] != "owned-names-retired"]
+    elif mutation == "foreign-actor":
+        b[0]["actor"] = 1
+    elif mutation == "extra-unexplained-name":
+        a.append(dict(actor=1, pid=101, event="unexplained-resource", name="/MDBrcccccccccc", result=0, os_error=0))
+    else:
+        b = [x for x in b if x["event"] != "close-reader-unlink-return"]
+    with pytest.raises(AssertionError):
+        namespace_epochs(a, b, case="baseline", platform="darwin")
+
+
+@pytest.mark.parametrize("foreign_lookup", (False, True))
+def test_namespace_epochs_interleaved_requires_exact_producing_pair(foreign_lookup):
+    a = synthetic_sem_epoch(1, "aaaaaaaaaa", retired=True)
+    b = [dict(actor=2, pid=102, event="reader-sem-open0-return",
+              name="/MDBr" + ("bbbbbbbbbb" if foreign_lookup else "aaaaaaaaaa"), result=-1, os_error=2)]
+    if foreign_lookup:
+        with pytest.raises(AssertionError, match="exact producing epoch"):
+            namespace_epochs(a, b, case="interleaved", platform="darwin")
+    else:
+        report = namespace_epochs(a, b, case="interleaved", platform="darwin")
+        assert len(report["epochs"]) == 1 and len(report["named_names"]) == 2
 
 
 @pytest.mark.parametrize("case", ("baseline", "interleaved"))
