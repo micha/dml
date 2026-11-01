@@ -438,6 +438,33 @@ visible. No global purge/native map shrink/skip/deadline/workflow weakening. Ori
 older Windows UNKNOWN causes are preserved in
 [Iteration14 results](../../dml-design/iterations/14-versioned-reuse-selection/RESULTS.md).
 
+## Iteration 19 intent-scoped example population
+
+`examples/intent_scoped_reuse.py` stays in unchanged ROOT-source coverage, with no new
+exclusion/suppression/threshold/skip/budget/runner change. Mi/Di and original ordinary W
+are application conventions; existing native/S/Q/exchange fault suites remain owners.
+New tests cover cross-binding requested ownQ versus publicly validated historical producer,
+actual authored-Di parent before W, exact full-input/intent identity, explicit one-key removal,
+other-row/old-history preservation and representative NEW W/removal authoring rollback/loss.
+Last-row removal can deduplicate retained empty table bytes; predictions check ACTUAL absent
+rows, never invent a new DAG when its bytes already exist. Host statement coverage is not all
+branches/platforms/installed-child/process-memory/scientific/environmental assurance.
+
+ONLY `test_intent_scoped_reuse.py`, `test_intent_scoped_edges.py`,
+`test_intent_scoped_atomicity.py` and `test_intent_scoped_story.py` join the existing exact-name
+successful-owned-temp cleanup population. Their native fixtures close handles, computational
+children are synchronous/reaped, loss children author ONLY metadata, and finite offline clients
+finish before teardown. ALL-three-phase-PASS rule remains unchanged; failed/skipped/unknown
+artifacts stay retained. No historical path deletion, global purge or process signal is added.
+Registration/safety regressions are in `test_explicit_reuse_cleanup.py`.
+
+The explicit installed [SIX-Q/FOUR-local-attempt story](intent_scoped/story.py) retains original
+prelaunch controller/policy copies and hashes, copied blocked nonexecuting clients, native
+history/census/true branches and unavailable-path evidence. Focused fixture computations are
+separate from zero support occurrences IN acceptance history. No fifth installed computation
+or Batch/SSH/Docker/image/service is needed. Actual results/failures/limits belong to
+[Iteration19 RESULTS](../../dml-design/iterations/19-intent-scoped-reuse/RESULTS.md).
+
 ## Iteration 18 multi-input table example population
 
 `examples/multi_input_reuse.py` stays in unchanged ROOT-source coverage; no new exclusion,

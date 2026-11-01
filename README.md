@@ -138,6 +138,11 @@ The [multi-input reuse example](docs/multi-input-reuse.md) composes a bounded ex
 ordinary table of exact intent/full-binding/full-input selections and a new pinned decision
 reader. Several input keys coexist; explicit adoption changes only one row using a NEW immutable
 selection slot, while other rows/old branches remain. Reuse creates own Q/W, not another T/job.
+The [intent-scoped reuse example](docs/intent-scoped-reuse.md) separately permits same-intent/
+exact-full-input reuse across requested/producing bindings, preserving own Q versus historical
+producer S/Q/T/R authority. NEW ordinary table/decision roles and explicit one-key removal retain
+other entries/history/branches; default miss is fresh without automatic adoption or rediscovery.
+Old exact-binding APIs remain unchanged; no native entity, result ban or cache framework is added.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

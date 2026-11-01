@@ -53,6 +53,10 @@ def report(when, passed=True):
         "test_multi_input_reuse.py",
         "test_multi_input_atomicity.py",
         "test_multi_input_story.py",
+        "test_intent_scoped_reuse.py",
+        "test_intent_scoped_edges.py",
+        "test_intent_scoped_atomicity.py",
+        "test_intent_scoped_story.py",
     ],
 )
 def test_exact_new_selection_module_scope_post_report_and_unknown_retention(

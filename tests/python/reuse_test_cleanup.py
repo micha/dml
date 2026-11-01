@@ -44,6 +44,11 @@ OWN_TESTS = frozenset(
         "test_multi_input_reuse.py",
         "test_multi_input_atomicity.py",
         "test_multi_input_story.py",
+        # Intent-scope fixtures are synchronous/reaped or authoring-only, never services.
+        "test_intent_scoped_reuse.py",
+        "test_intent_scoped_edges.py",
+        "test_intent_scoped_atomicity.py",
+        "test_intent_scoped_story.py",
     }
 )
 OWNED = pytest.StashKey()
