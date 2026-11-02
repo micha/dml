@@ -161,6 +161,11 @@ steps through existing normal-return nodes, matches downstream reuse by full arg
 and separately captures requested producer S/T/R versus OLD double's original executed chain.
 [Explicit installed acceptance](tests/composed_nodes/README.md) has eight Q/six synchronous LOCAL
 attempts/ten child getters and SAME-history nonexecuting readers; no generic evaluator is added.
+The [closure-bound-dependency example](docs/closure-bound-dependencies.md) captures fixed internal
+getter bindings and an I64 scale source at closure creation, separately from invocation arguments.
+Its new capture-aware key preserves requested versus OLD executed capture; default changes never
+retarget immutable closures. [Explicit installed acceptance](tests/closures/README.md) has six Q/
+four synchronous LOCAL attempts/eight child getters, not nested ordinary calls or a general evaluator.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
