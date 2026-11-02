@@ -9,23 +9,6 @@
 #include "dml/record.h"
 #include "error_internal.h"
 
-static int ascii_equal_ci(const char *first, const char *last, const char *text) {
-  size_t len = (size_t)(last - first);
-  if (strlen(text) != len) {
-    return 0;
-  }
-  for (size_t i = 0; i < len; i++) {
-    unsigned char value = (unsigned char)first[i];
-    if (value >= 'A' && value <= 'Z') {
-      value = (unsigned char)(value + ('a' - 'A'));
-    }
-    if (value != (unsigned char)text[i]) {
-      return 0;
-    }
-  }
-  return 1;
-}
-
 static int hex_value(uint8_t value) {
   if (value >= '0' && /* LCOV_EXCL_BR_LINE: validated hex is never below '0'. */
       value <= '9') return value - '0';
@@ -124,11 +107,6 @@ dml_status dml_uri_canonicalize(const uint8_t *data, size_t len, dml_buffer *out
     uriFreeUriMembersA(&uri);
     return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
                          "record_type=datum;detail=uri_not_absolute");
-  }
-  if (ascii_equal_ci(uri.scheme.first, uri.scheme.afterLast, "dml")) {
-    uriFreeUriMembersA(&uri);
-    return dml_set_error(error, DML_INVALID_PAYLOAD, 0,
-                         "record_type=datum;detail=uri_reserved_scheme");
   }
   uriFreeUriMembersA(&uri);
   dml_result = normalize_escapes(data, len, &normalized_input, &normalized_len,

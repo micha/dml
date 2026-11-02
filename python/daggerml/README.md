@@ -40,6 +40,11 @@ caller-Q jobs through a fixed installed helper, then use unchanged exact-Q recei
 owner while fresh saved-identity clients retrieve validated immutable P/U/F without execution.
 Docker is separate local test support, never a package/runtime dependency.
 
+The separately imported [internal builtin surface](../../docs/internal-builtins.md) supplies
+fixed URI/versioned NULL bindings, argument-map node/result-node calls and nested map/list
+getters with copied values and separate source relationships. Ordinary semantic profiles use
+existing native storage; no general evaluator, plugin registry or sandbox is introduced.
+
 ## Local build
 
 Build **from the repository root**, not this source directory:

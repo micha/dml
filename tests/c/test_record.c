@@ -86,8 +86,15 @@ static int test_text_and_uri(void) {
   CHECK(dml_record_validate(record.data, record.len, &error) == DML_OK);
   dml_buffer_free(&record);
   dml_buffer_free(&normalized);
-  CHECK(dml_uri_canonicalize((const uint8_t *)"DML:x", 5, &normalized, &error) ==
-        DML_INVALID_PAYLOAD);
+  CHECK(dml_uri_canonicalize((const uint8_t *)"DML:x", 5, &normalized, &error) == DML_OK);
+  CHECK(normalized.len == 5 && memcmp(normalized.data, "dml:x", 5) == 0);
+  dml_buffer_free(&normalized);
+  input.value.bytes = (dml_bytes){(const uint8_t *)"dml://builtin/map/get", 21};
+  CHECK(dml_datum_encode(&input, &record, &error) == DML_OK);
+  CHECK(dml_record_validate(record.data, record.len, &error) == DML_OK);
+  record.data[40] = 'D';
+  CHECK(dml_record_validate(record.data, record.len, &error) == DML_INVALID_PAYLOAD);
+  dml_buffer_free(&record);
   CHECK(dml_uri_canonicalize((const uint8_t *)"urn:a/%7e/../b", 14, &normalized,
                              &error) == DML_OK);
   CHECK(normalized.len == 12 && memcmp(normalized.data, "urn:a/~/../b", 12) == 0);
@@ -102,6 +109,8 @@ static int test_uri_syntax_before_normalization(void) {
       "http://[::%31]/",
   };
   static const char *const valid[][2] = {
+      {"DML://BUILTIN/map/%67et", "dml://builtin/map/get"},
+      {"dml://source/builtin/map/get/v99", "dml://source/builtin/map/get/v99"},
       {"http://example.com/a/%2e%2E/b", "http://example.com/b"},
       {"urn:a/%2e%2e/b", "urn:a/../b"},
       {"http://%65XAMPLE.com:80/%7e?q=%2f#", "http://example.com:80/~?q=%2F#"},

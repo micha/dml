@@ -125,6 +125,7 @@ flowchart TD
 | Literal/sub-DAG-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
 | Repository initialization, storage keys, transactions, direct reference checks, refs and handle ownership | [repository.md](repository.md) |
 | Python conversions, owned descriptions, exceptions, thread/finalizer policy and contexts | [python-api.md](python-api.md) |
+| Fixed internal builtin dispatch, versioned NULL bindings, common value-node calls and ordinary semantic profiles | [Internal builtins](../internal-builtins.md) |
 | Trusted local Python execution, record conventions, publication and capture limits | [local-execution.md](local-execution.md) |
 | Pinned commit bundles, supported profile, complete typed reachability and atomic optional-ref import | [transfer.md](transfer.md) |
 | One pinned step across local repositories, retained workspaces and selected-completion return validation | [repository-execution.md](repository-execution.md) |
@@ -171,6 +172,11 @@ flowchart TD
   S3 history exchange and fresh validated P/U/F observations. Saved external identity
   needs no live caller owner; lost acknowledgements stay uncertain without automatic
   resubmission. Existing exact-Q/explicit-ref reception remains authoritative.
+- An explicitly imported installed Python builtin surface with closed URI/version routing,
+  strict internal NULL bindings and recorder-owned argument-map NODE -> NODE calls. Nested
+  map/list getters retain actual sources separately from datum values through ordinary DAG
+  profiles, with bounded trace positions and explicit normal result-node publication. Native
+  C/CLI invocation/general evaluation is not introduced; `dml:` references are valid data.
 - A native inspection CLI and Python console forwarding to the bundled executable,
   with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
   all-parent history traversal.

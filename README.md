@@ -149,6 +149,13 @@ relationships in ordinary DAGs. Its NEW datum-keyed table/decision and own-Q/old
 separate requested from historical executed provenance; no general evaluator, automatic cache or
 security sandbox is introduced. [Explicit installed acceptance](tests/argument_maps/README.md)
 uses synchronous local attempts and SAME-history blocked nonexecuting readers.
+The additive installed [internal builtin surface](docs/internal-builtins.md) supplies fixed
+URI/versioned NULL bindings and argument-map NODE -> NODE calls, with nested map/list getters,
+copied-value callable access and separately retained actual sources. Ordinary semantic profiles
+use existing native storage; no general evaluator/native opcode is added. Its bounded one-S
+example preserves own Q versus historical T/result and exact retained v1/v2 implementations.
+[Installed acceptance](tests/builtins/README.md) uses two synchronous local attempts and SAME-history
+blocker-FIRST readers; development GHA remains intentionally disabled.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

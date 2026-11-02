@@ -81,8 +81,10 @@ plus a u32 schema version, currently 1.
   STRING MUST reject non-NFC text rather than silently changing its record.
 - F64 encoding normalizes negative zero to positive zero and all NaNs to bits
   `0x7ff8000000000000`. Packed validation MUST reject noncanonical forms.
-- URI input MUST be absolute RFC 3986 syntax, ASCII, free of NUL and not use the
-  reserved `dml` scheme. Raw non-ASCII input and relative references are rejected.
+- URI input MUST be absolute RFC 3986 syntax, ASCII and free of NUL. Raw non-ASCII
+  input and relative references are rejected. `dml:` references are valid data; storing
+  a URI does not grant execution permission. [Internal builtins](../internal-builtins.md)
+  own closed executable definitions, while external Python drivers reject `dml:` intents.
 - `dml_uri_canonicalize()` provides canonicalization. It lowercases scheme/host,
   normalizes percent escapes and hierarchical dot segments, while preserving
   significant delimiters, query order, fragments and explicit ports. It does not

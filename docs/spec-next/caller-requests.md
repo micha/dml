@@ -37,6 +37,9 @@ The local builder requires the existing `q-` lowercase 32-hex occurrence profile
 exact intent string and ObjectId binding/inputs, validated consumed binding fields
 and typed input DAG. Native URI validation requires canonical absolute intent.
 It inserts only the existing ordinary request shape through the supplied transaction.
+`dml:` intents reject before Q construction and on persisted local request consumption;
+[internal builtins](../internal-builtins.md) own that executable namespace. URI references
+in unrelated value graphs remain valid data; the external Python binding profile is unchanged.
 It MUST NOT generate refs, allocate scratch, launch or commit the transaction.
 It does not enforce global or repository-wide occurrence uniqueness; re-building
 identical content can deduplicate. The transaction caller owns publication/abort.

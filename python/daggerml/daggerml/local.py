@@ -183,10 +183,17 @@ def _binding(tx: Transaction, binding: ObjectId) -> Tuple[bytes, str, int]:
     return values
 
 
+def _external_intent(intent_uri: str) -> None:
+    if type(intent_uri) is not str:
+        raise TypeError("intent_uri requires str")
+    if intent_uri.split(":", 1)[0].lower() == "dml":
+        raise ProtocolError("dml: intents are reserved for internal builtins")
+
+
 def _request(tx: Transaction, request: ObjectId):
     dag = _fields(tx, request, ("role", "intent", "binding", "inputs"), "local-request-v1")
     occurrence = _occurrence(_scalar(tx, dag.root, "string"), "q")
-    _scalar(tx, dag.bindings["intent"], "uri")
+    _external_intent(_scalar(tx, dag.bindings["intent"], "uri"))
     binding = _subdag(tx, dag.bindings["binding"])
     _binding(tx, binding)
     inputs = _subdag(tx, dag.bindings["inputs"])
@@ -203,8 +210,7 @@ def put_local_request(
 ) -> ObjectId:
     """Build ordinary Q only; caller owns uniqueness, refs and transaction commit."""
     _occurrence(request_id, "q")
-    if type(intent_uri) is not str:
-        raise TypeError("intent_uri requires str")
+    _external_intent(intent_uri)
     if not isinstance(binding, ObjectId) or not isinstance(inputs, ObjectId):
         raise TypeError("binding and inputs require ObjectId")
     _binding(tx, binding)
@@ -571,8 +577,7 @@ def _run(repository_path, head_ref: str, scratch_dir, **request_args) -> LocalRu
 def run_step(repository_path, *, head_ref: str, intent_uri: str, binding: ObjectId,
              inputs: ObjectId, scratch_dir=None) -> LocalRun:
     """Create a fresh request/attempt and execute once; no implicit reuse or retry."""
-    if type(intent_uri) is not str:
-        raise TypeError("intent_uri requires str")
+    _external_intent(intent_uri)
     if not isinstance(binding, ObjectId) or not isinstance(inputs, ObjectId):
         raise TypeError("binding and inputs require ObjectId")
     return _run(repository_path, head_ref, scratch_dir, intent_uri=intent_uri, binding=binding, inputs=inputs)

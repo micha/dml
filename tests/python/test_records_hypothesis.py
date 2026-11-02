@@ -79,6 +79,11 @@ def test_uri_profile_and_malformed_record_rejection() -> None:
     b"http://example.com/b/~?q=%2F"
   )
   assert run_driver("normalize-uri", data=b"urn:a/%7e/../b").stdout == b"urn:a/~/../b"
+  assert run_driver("normalize-uri", data=b"DML://SOURCE/builtin/map/%67et/v99").stdout == b"dml://source/builtin/map/get/v99"
+  reference = b"dml://source/builtin/map/get/v99"
+  assert run_driver("encode", "7", data=reference).stdout == record(7, reference)
+  assert run_driver("validate", data=record(7, reference)).returncode == 0
+  assert run_driver("validate", data=record(7, b"DML:x"), check=False).returncode != 0
   malformed = record(1, b"")[:-1]
   result = run_driver("validate", data=malformed, check=False)
   assert result.returncode != 0
@@ -86,7 +91,7 @@ def test_uri_profile_and_malformed_record_rejection() -> None:
 
 
 @given(
-  scheme=st.sampled_from(["http", "https", "urn"]),
+  scheme=st.sampled_from(["http", "https", "urn", "dml"]),
   escape_index=st.integers(min_value=0, max_value=2),
   port=st.integers(min_value=0, max_value=65535),
 )

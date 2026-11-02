@@ -82,6 +82,8 @@ def _uri(value):
         raise TypeError("intent_uri requires str")
     if canonicalize_uri(value) != value:
         raise ExchangeError("intent URI must already be canonical")
+    if value.split(":", 1)[0] == "dml":
+        raise ExchangeError("dml: intents are reserved for internal builtins")
     return value
 
 

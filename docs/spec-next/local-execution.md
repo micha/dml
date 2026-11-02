@@ -42,7 +42,11 @@ recorded outcomes. URI datums use the existing native validation, not normalizat
 
 `run_step` requires an existing repository and explicitly supplied coordination head.
 Binding/inputs require `ObjectId`; inputs are a supplied named DAG, not converted
-Python values. The layer validates its own consumed fields and types, not a generic
+Python values. `dml:` intent identities MUST reject before request authoring/dispatch,
+including persisted Q read/first-registration/retry paths: they are reserved for
+[internal builtins](../internal-builtins.md), not external Python bindings. The old
+Python binding profile remains unchanged and rejects NULL adapter/source/interpreter/timeout.
+The layer validates its own consumed fields and types, not a generic
 argument schema. Repository/scratch paths accept filesystem path-like values, become
 absolute UTF-8 paths and reject empty/NUL/unencodable paths. `scratch_dir` selects an
 existing parent for newly allocated scratch; default is the stdlib temporary location.

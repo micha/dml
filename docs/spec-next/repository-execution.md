@@ -53,7 +53,10 @@ No new native operation, execution CLI command or process supervisor is involved
 Frozen `ExchangeSpec` owns `token`, `commit`, `binding_name`, `inputs_name`, `binding`,
 `inputs`, `intent_uri`, `worker_ref` and optional pinned `request`. It requires `ObjectId` IDs, exact strings,
 the existing ASCII name profile and an already canonical absolute intent URI accepted
-by the native URI helper. `token` is fresh UUID4 lowercase hex, a **transport-only
+by the native URI helper. Canonical `dml:` intents MUST reject in exchange selection/framing
+before request creation or dispatch; [internal builtins](../internal-builtins.md) own their
+executable definitions. This does not forbid storing URI references as data or relax old
+external Python binding requirements. `token` is fresh UUID4 lowercase hex, a **transport-only
 correlation token**, not a DML request/attempt occurrence or authentication. Expected
 selection is caller-owned and MUST be passed independently to receive, not inferred
 from a worker receipt. The workspace path is out-of-band, not a computational identity.

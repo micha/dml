@@ -21,6 +21,9 @@ public authorities with strict transport, saved SSH identity and a live foregrou
 The separately imported [Floci contract](floci-execution.md) owns one-shot local Batch
 submission/saved external identity and immutable S3 progress, reusing the same owning
 exact-Q inspector/explicit-ref return without changing native handles or roles.
+The explicitly imported [internal builtin surface](../internal-builtins.md) owns fixed
+URI/version dispatch, recorder-owned value-node calls and ordinary semantic profiles over
+these unchanged native storage descriptions; it is not a generic native evaluator.
 The additive [caller-request contract](caller-requests.md) owns request-only construction,
 explicit atomic A recording and public imported-Q first registration through these APIs.
 

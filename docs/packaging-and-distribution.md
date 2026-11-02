@@ -24,7 +24,7 @@ from that subdirectory. Maintained Python/native binding sources still live ther
 
 The `python-runtime` Meson install tag selects only:
 
-- `daggerml/__init__.py`, `local.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
+- `daggerml/__init__.py`, `local.py`, `builtin.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
   `ssh.py`, `ssh_worker.py`, `floci.py`, `floci_http.py`, `floci_worker.py`,
   `_core.pyi`, `py.typed`;
 - the linked `_core` extension;
