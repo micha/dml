@@ -156,6 +156,11 @@ use existing native storage; no general evaluator/native opcode is added. Its bo
 example preserves own Q versus historical T/result and exact retained v1/v2 implementations.
 [Installed acceptance](tests/builtins/README.md) uses two synchronous local attempts and SAME-history
 blocker-FIRST readers; development GHA remains intentionally disabled.
+The [composed ordinary-node-call example](docs/composed-node-calls.md) connects successful add/double
+steps through existing normal-return nodes, matches downstream reuse by full argument MAP value,
+and separately captures requested producer S/T/R versus OLD double's original executed chain.
+[Explicit installed acceptance](tests/composed_nodes/README.md) has eight Q/six synchronous LOCAL
+attempts/ten child getters and SAME-history nonexecuting readers; no generic evaluator is added.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 
