@@ -143,6 +143,12 @@ exact-full-input reuse across requested/producing bindings, preserving own Q ver
 producer S/Q/T/R authority. NEW ordinary table/decision roles and explicit one-key removal retain
 other entries/history/branches; default miss is fresh without automatic adoption or rediscovery.
 Old exact-binding APIs remain unchanged; no native entity, result ban or cache framework is added.
+The [recorded argument-map prototype](docs/recorded-argument-maps.md) separately supplies logical
+callables with typed MAP datums and bound datum-only getters while preserving construction/source
+relationships in ordinary DAGs. Its NEW datum-keyed table/decision and own-Q/old-T satisfaction
+separate requested from historical executed provenance; no general evaluator, automatic cache or
+security sandbox is introduced. [Explicit installed acceptance](tests/argument_maps/README.md)
+uses synchronous local attempts and SAME-history blocked nonexecuting readers.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

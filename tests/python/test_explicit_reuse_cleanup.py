@@ -57,6 +57,9 @@ def report(when, passed=True):
         "test_intent_scoped_edges.py",
         "test_intent_scoped_atomicity.py",
         "test_intent_scoped_story.py",
+        "test_recorded_maps.py",
+        "test_datum_reuse.py",
+        "test_recorded_map_atomicity.py",
     ],
 )
 def test_exact_new_selection_module_scope_post_report_and_unknown_retention(
