@@ -1,0 +1,22 @@
+{
+  "independent_STATIC_audit": "PASS",
+  "changed_paths": 31,
+  "causal_delta": [
+    "tests/captured_calls/README.md",
+    "tests/captured_calls/installed_story.py",
+    "tests/python/test_captured_call_tooling.py"
+  ],
+  "current_copy_sources": 10,
+  "helper_bytes_unchanged": true,
+  "worker_regression_cases": 29,
+  "metadata_trueexits": [
+    0,
+    0,
+    0
+  ],
+  "failed_context_all_recorded_files_exact_in_place_and_archive": true,
+  "failed_event_log_preserved": true,
+  "fresh_root_absent": true,
+  "independently_executed_native_tests_builds_readers_computations": 0,
+  "not_implementation_acceptance": true
+}

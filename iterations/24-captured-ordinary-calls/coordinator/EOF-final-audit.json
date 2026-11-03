@@ -1,0 +1,18 @@
+{
+  "final": "59b38303fe2f4c89d6fce3b01933f7260eb28320",
+  "parent_initial": "291d9a5aa3e997a4807297a8c58a3574c0a77b42",
+  "parent_feature": "965cec450356e5f776b68bc311fa4d7eaf690519",
+  "exact_accepted_paths": 33,
+  "only_EOF_suffix_removals": {
+    "examples/captured_calls.py": 1,
+    "tests/python/test_captured_call_edges.py": 3,
+    "tests/python/test_captured_call_profiles.py": 1,
+    "tests/python/test_captured_call_tooling.py": 1
+  },
+  "AST_with_locations_equal": true,
+  "current_committed_clean": true,
+  "cumulative_whitespace_pass": true,
+  "old_source_B_identity_qualified": true,
+  "no_test_or_computation_rerun": true,
+  "independent_audit": "PASS"
+}

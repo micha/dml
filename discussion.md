@@ -1,5 +1,262 @@
 # Agent-first DML design discussion — checkpoint
 
+Current discussion: **User-requested checkpoint and retrospective through Iteration24**.
+Read [what we have learned](checkpoints/24-lessons.md) for demonstrated capabilities, conceptual
+corrections, remaining uncertainty and assistant-origin review questions. Local design checkpoint
+only; no push, implementation restart or next-turn GO. Completed24 remains stopped at59b3830,
+development GHA disabled/native19 PAUSED/VP-001 OPEN UNKNOWN. Older status blocks retain history.
+
+Current task: **Iteration24 COMPLETE AND STOPPED**, independently accepted and normally published
+**`59b38303fe2f4c89d6fce3b01933f7260eb28320`**, initial291d9a5/feature-parent965cec/exact cumulative33/
+currentcommittedaccepted EOF-equivalence/clean source-index/live originmaster/workflows verified.
+See [final delivery](#iteration24-final-delivery-and-stop),
+[review](iterations/24-captured-ordinary-calls/REVIEW.md) and
+[results](iterations/24-captured-ordinary-calls/RESULTS.md). Independent2052 SAME-history NONEXECUTING+
+reporter3 distinct from worker actual10Q8T5LOCAL14getter/3354 pytest/native7/original rawfull1 + approved
+reporter3/resumedPython8962/native100. Userapproved EXACT3 generated-label reporting exclusions, prior
+ONEp124 raise and EOF/AST/source-B qualification; no second47min suite or relabelled originalpass.
+Worker STOP ALL/BOTH returned, original failures/oracles/warnings/UNKNOWN preserved. GHA disabled/
+NOTRUN/native19PAUSED/VP001OPENUNKNOWN; no restart/later turn/design checkpoint publication.
+Older task stages below historical where superseded.
+
+Current task: **Iteration24 GO; existing window-2 agent started in a verified NEW Pi session**.
+Bounded [DESIGN](iterations/24-captured-ordinary-calls/DESIGN.md),
+[EXAMPLE](iterations/24-captured-ordinary-calls/EXAMPLE.md) and
+[HANDOFF](iterations/24-captured-ordinary-calls/HANDOFF.md) approved for implementation,
+coordinator monitoring/independent review/feedback, then accepted focused worker NORMAL commit/push.
+See [authorization](#iteration24-implementation-and-publication-authorization) and
+[coordination](iterations/24-captured-ordinary-calls/COORDINATION.md). Mandatory concrete pre-edit
+review BEFORE coding/build/run and installed readiness review BEFORE sole10Q8T5LOCAL14getter story.
+Pre-edit gate now accepted [source-sharing B ONLY](iterations/24-captured-ordinary-calls/PRE-EDIT.md):
+outer getters validate a,b I64; add consumes ORIGINAL exact map NODE; double map retains exact addR
+DIRECT. TWO maps/14 actual positions, no source projection/cap increase; actual prospective union
+before launch. FINAL readiness now independently STATIC accepted exact31/TENcopies/installed15/
+metadata controls/coverage1144+ONEexcluded/sourcequalifications; ONE bounded installed10Q8T5LOCAL14getter
+story and successful-stage SAME blocked readers/final unchanged full-v authorized. FIRST activation
+RAW FAILED controller event-kind collision after durableget-a/zero leaflaunch. SAME read-only triage
+confirms partialUNKNOWN/zerochildren; ONLY controller correction+blockedmetadata regression approved,
+new readiness/explicit freshactivation REQUIRED, no story/full/publication now. Failure/uncertainty
+STOP/no automatic replay; independent implementation acceptance/publication still pending.
+BOTH builds/source worker-owned until targeted freeze/release. GHA disabled/native19 PAUSED/VP001
+OPEN UNKNOWN; no extra worker/later turn/design checkpoint publication. Outcomes pending; older
+states below historical where superseded.
+
+Current discussion: **Iteration24 captured-ordinary-call candidates prepared for review; separate GO pending**.
+Read ALL THREE [DESIGN](iterations/24-captured-ordinary-calls/DESIGN.md),
+[EXAMPLE](iterations/24-captured-ordinary-calls/EXAMPLE.md) and
+[HANDOFF](iterations/24-captured-ordinary-calls/HANDOFF.md), plus
+[agreement/preparation](#iteration24-agreed-direction-and-candidate-preparation).
+Agreed: captured ordinary funcs, node-to-node calls, separate outer/inner reuse and actual producer
+provenance/default pinning. NEW example-local in-process outer adapter/short-scope node bridge/
+new outer roles/conservative B-E identity/FOUR-outer-Q-SIX-leaf-Q/FIVE-local launches are assistant
+candidates, NOT as-built behavior or an approved implementation arrangement. DML clean965cec4;
+completed23 stopped/BOTH coordinator-owned/GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN.
+Preparation only; review then separate GO, no worker/source/build/test/story/reader/CI/investigation/
+commit/push restart or design checkpoint publication. Older task stages below historical.
+
+Current task: **Iteration23 COMPLETE AND STOPPED**, independently accepted and normally published
+**`965cec450356e5f776b68bc311fa4d7eaf690519`**, parenta57125c/exact13/current+committed+frozen/
+clean source-index/live originmaster/workflow states independently verified. See
+[delivery](#iteration23-final-publication-and-stop), [review](iterations/23-closure-bound-dependencies/REVIEW.md)
+and [results](iterations/23-closure-bound-dependencies/RESULTS.md). Independent44/1066 installed
+SAME464 NONEXECUTING distinct from worker78+9/authorizedcompletefull3108/sole6Q4LOCAL8getter.
+InitialRAWtool1000sTIMEOUT/noXML/noexit/groupUNKNOWN/raw63possiblylost/2warnings/EOF+mutant qualifiers
+retained. Worker finalSTOP/BOTH returned; GHA disabled/NOTRUN/native19 PAUSED/VP001 OPEN UNKNOWN.
+No restart/laterturn/design checkpoint permission; older task stages below historical.
+
+Current task: **Iteration23 GO; existing window-2 agent started in a verified NEW Pi session**.
+Bounded [DESIGN](iterations/23-closure-bound-dependencies/DESIGN.md),
+[EXAMPLE](iterations/23-closure-bound-dependencies/EXAMPLE.md) and
+[HANDOFF](iterations/23-closure-bound-dependencies/HANDOFF.md) approved for implementation,
+coordinator monitoring/independent review/feedback, then accepted focused worker NORMAL commit/push.
+See [authorization](#iteration23-implementation-and-publication-authorization) and
+[coordination](iterations/23-closure-bound-dependencies/COORDINATION.md). BOTH builds/source handed
+to worker until targeted freeze/release; installed6Q4T8getter/ONE final unchanged full-v/SAME-history
+NONEXECUTING review. GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN; no extra worker/later turn/
+design checkpoint publication. Implementation/acceptance/publication pending. Older states historical.
+
+Current task: **Iteration23 closure-bound-dependency candidates prepared for review; separate GO pending**.
+Read ALL THREE [design](iterations/23-closure-bound-dependencies/DESIGN.md),
+[example](iterations/23-closure-bound-dependencies/EXAMPLE.md) and
+[handoff](iterations/23-closure-bound-dependencies/HANDOFF.md), plus
+[preparation and scope recommendation](#iteration23-candidate-preparation).
+Agreed: any dependencies captured at closure creation, invocation arguments supplied later.
+Recommended first slice: fixed scaled-sum/internal getter bindings/constant source, ordinary C/E/K/D,
+capture-aware value reuse/SIX-Q-FOUR-local-EIGHT-getter; nested ordinary outer/inner requests DEFERRED
+as an assistant scope recommendation requiring review, not an agreed engineering plan/as-built claim.
+DML verified clean publisheda57125c/completed22 stopped/GHA disabled/native19 PAUSED/VP001 OPEN
+UNKNOWN/BOTH coordinator-owned. No worker/source/build/story/reader/CI/investigation/commit/push
+restart or design checkpoint publication. Older task blocks below remain historical.
+
+
+Current task: **Iteration22 COMPLETE AND STOPPED**, independently accepted and normally published
+**`a57125cdf735310f2330226ce6272b3a67e53f62`**, parenta523b0b/exact13/current+committed+accepted/
+clean source-index/live originmaster/workflow states independently verified. See
+[delivery](#iteration22-final-publication-and-stop),
+[review](iterations/22-composed-node-calls/REVIEW.md) and
+[results](iterations/22-composed-node-calls/RESULTS.md). Independent41/1607 SAME641 NONEXECUTING
+versus worker87+5/solefull3021/actual8Q6T10getter; original executed source bytes current/failures/
+EOF-only test qualifications/reader-oracle corrections/SHA typo correction retained. Worker final
+STOP ALL/no further tools/BOTH returned. GHA disabled/NOTRUN/notpass/native19 PAUSED/VP001 OPEN
+UNKNOWN; no newturn/restart/design checkpoint permission. Older states historical where superseded.
+
+Current task: **Iteration22 INDEPENDENTLY ACCEPTED exact frozen13; focused worker publication pending**.
+See [acceptance](#iteration22-independent-acceptance-and-publication-gate),
+[review](iterations/22-composed-node-calls/REVIEW.md) and
+[coordination](iterations/22-composed-node-calls/COORDINATION.md). Independent41focused/1607installed
+SAME641 NONEXECUTING pass, reviewed worker87+5/full3021/actual8Q6T10getter remain distinct. Exact
+current/frozen13/source/evidence/index accepted; original failures/test-only EOF and independent
+oracle corrections retained. BOTH/source/stopped evidence returned ONLY for focused stagedaudit/
+worker commit/NORMAL existingpush/exactidentity/workflowGET/RESULTS/STOP. GHA disabled/NOTRUN/
+native19 PAUSED/VP001 OPEN UNKNOWN; final publication/STOP pending, no extra computation/laterturn/
+design publication. Older current-task blocks historical where superseded.
+
+Current task: **Iteration22 GO; existing window-2 agent assigned in a verified NEW Pi session**.
+The user authorizes bounded composed-node-call implementation, coordinator monitoring/independent
+review/feedback until satisfactory, then accepted focused worker commit/NORMAL existing push. See
+[authorization](#iteration22-implementation-and-publication-authorization) and
+[coordination](iterations/22-composed-node-calls/COORDINATION.md). BOTH builds/source worker-owned
+until targeted freeze/release; fresh isolated installed8Q6T10getter story/focused checks/ONE final
+unchanged worker full-v/SAME-history NONEXECUTING review. GHA disabled/NOTRUN/native19 PAUSED/
+VP001 OPEN UNKNOWN/no standing waiver; no extra worker/cloud/global/later turn/design checkpoint.
+Implementation/acceptance/publication outcomes pending. Older task blocks historical where superseded.
+
+Current task: **Iteration22 composed-node-call candidates prepared for review; separate GO pending**.
+Read ALL THREE [design](iterations/22-composed-node-calls/DESIGN.md),
+[example](iterations/22-composed-node-calls/EXAMPLE.md) and
+[handoff](iterations/22-composed-node-calls/HANDOFF.md), plus
+[preparation/corrections](#iteration22-composed-node-calls-candidate-preparation).
+Existing return-node loading already supports computed arguments; the candidate composes actual
+successful ordinary add/double steps with separate selected producer witnesses/value-based reuse.
+Recommended new example-local C/decision/reader/EIGHT-Q-SIX-local-TEN-getter mechanics need review,
+not as-built/implementation permission. DML clean published a523b0b (see checkpoint below), completed21
+stopped/GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN/BOTH coordinator-owned. No worker/source/
+build/story/CI/native investigation/commit/push restart or design checkpoint requested.
+Earlier task blocks below historical where superseded.
+
+Current task: **Iteration21 COMPLETE AND STOPPED**, independently accepted and normally published
+**`a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3`**. See
+[delivery](#iteration21-final-publication-and-stop),
+[RESULTS](iterations/21-internal-builtins/RESULTS.md) and
+[REVIEW](iterations/21-internal-builtins/REVIEW.md). Independent48 focused/FINAL-installed1424
+NONEXECUTING distinct from workerfull2929/original3Q2T16/SAME467/final-nojobNaN95. Exact29/current/
+committed/parent/clean source+remote/workflow state verified; worker finalSTOP/BOTH returned.
+Original7aab versus final60679 qualification/rawerrors retained; GHA disabled/NOTRUN/notpass/
+native19 PAUSED/VP001 OPEN UNKNOWN. No restart/later turn/design checkpoint permission.
+Earlier task blocks below historical where superseded.
+
+Current task: **Iteration21 independently ACCEPTED exact frozen29; publication/final STOP pending**.
+See [acceptance](#iteration21-independent-acceptance-and-publication-gate) and
+[review](iterations/21-internal-builtins/REVIEW.md). Independent48focused/FINAL-installed1424
+NONEXECUTING pass; reviewed worker full2929/original-installed3Q2T16/SAME467/final-nojobNaN95,
+source/runtime qualification and raw errors retained. BOTH/source/stopped evidence returned only
+for accepted focused worker commit/normalpush/exactidentity/workflow-state/RESULTS/STOP. No extra
+full/story/GHA/native19/later turn/design checkpoint; VP001 OPEN UNKNOWN. Older task blocks historical.
+
+Current task: **Iteration21 GO; existing window-2 agent assigned in a NEW Pi session**.
+The user authorizes bounded internal-builtins implementation, coordinator monitoring/independent
+review/feedback until satisfactory, then accepted focused worker commit/normal push. See
+[authorization](#iteration21-implementation-and-publication-authorization) and
+[coordination](iterations/21-internal-builtins/COORDINATION.md). BOTH builds/source worker-owned
+until targeted freeze/release; fresh isolated install/THREE-Q-TWO-local/SIXTEEN builtin-position
+story/ONE final unchanged full-v. GHA stays disabled/native investigation PAUSED/VP-001 OPEN
+UNKNOWN; no extra agent/cloud/global/later turn/design checkpoint publication. Outcomes pending.
+Earlier current-task blocks below historical where superseded.
+
+Current task: **Iteration21 bounded DESIGN/EXAMPLE/HANDOFF reviewed; implementation GO pending**.
+The user stated “reviewed”; see [review checkpoint](#iteration21-plan-review). This records bounded
+plan review, not implementation/delegation/publication permission or as-built behavior. Exact
+engineering spellings remain refinable. No worker/source/build/install/story/CI/native investigation/
+commit/push restart; DML7e9bf13/completed20 stopped/GHA disabled/VP-001 OPEN UNKNOWN remain.
+Earlier current-task blocks below historical where superseded.
+
+Current task: **Iteration21 internal-builtins candidate DESIGN/EXAMPLE/HANDOFF prepared for review**.
+The user requested “good. prep the iteration”; preparation only, not exact engineering-plan
+approval or implementation/delegation/publication GO. Read
+[design](iterations/21-internal-builtins/DESIGN.md),
+[example](iterations/21-internal-builtins/EXAMPLE.md) and
+[handoff](iterations/21-internal-builtins/HANDOFF.md), plus
+[preparation checkpoint](#iteration21-candidate-preparation).
+Standard argument-map-node calls/internal NULL bindings are agreed direction; installed Python
+module/ordinary semantic-node profiles/narrow native URI reference and external-intent guards/
+handler-v1-v2/THREE-Q-TWO-local-sixteen-builtin-position story are assistant candidates.
+DML stays clean7e9bf13/completed20 stopped/GHA disabled/native investigation PAUSED/VP-001 OPEN
+UNKNOWN/BOTH coordinator-owned. No source/build/install/story/worker/CI/commit/push restart.
+Earlier current-task blocks below historical where superseded.
+
+Current discussion: **next-iteration built-in func direction agreed; no implementation GO**.
+The user proposed URI-addressed built-ins with internal DML execution and a NULL adapter binding,
+then stated “sounds good” and requested a summary. See
+[built-in direction](#next-iteration-built-in-funcs-and-internal-versioned-bindings).
+Exact profiles/APIs/function set and a reviewed engineering handoff remain to be prepared;
+no worker/source/build/story/CI/native investigation/commit/push restart. Iteration20 remains
+accepted complete-stopped/GHA disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN.
+Earlier current-task blocks below remain historical where superseded.
+
+Current task: **Iteration20 COMPLETE AND STOPPED**, independently accepted and normally published
+**`7e9bf133d5d175a492fb1e9d651e91a476358604`**. See
+[delivery](#iteration20-delivery-publication-and-stop),
+[RESULTS](iterations/20-recorded-argument-maps/RESULTS.md) and
+[REVIEW](iterations/20-recorded-argument-maps/REVIEW.md). Independent37 focused/2424 installed
+NONEXECUTING, reviewed worker full2798/sole actual FIVE-Q-FOUR-local-SIX-getter history491rows.
+Exact15 current+committed/live remote clean verified; worker STOP ALL/BOTH coordinator-owned.
+Development GHA disabled/NOT RUN, not pass/native investigation PAUSED/VP-001 OPEN UNKNOWN;
+original failures/qualifications retained. No restart/next turn/design checkpoint publication.
+Earlier current-task blocks below historical where superseded.
+
+Current task: **Iteration20 GO; existing window-2 agent assigned in a NEW Pi session**.
+The user authorizes reviewed replacement implementation, coordinator monitoring/independent
+review/feedback until satisfactory, then accepted focused worker commit/normal push and CI fixes.
+See [authorization](#iteration20-implementation-and-publication-authorization) and
+[coordination](iterations/20-recorded-argument-maps/COORDINATION.md). BOTH builds/source handed
+to worker until targeted freeze/release; FIVE-Q/FOUR synchronous LOCAL story and proportionate
+validation. Development GHA stays disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN;
+no extra workers/cloud/global/later turn/design checkpoint publication. Outcomes pending.
+Earlier current-task blocks below are historical where superseded.
+
+Current task: **Iteration20 bounded replacement design/example/handoff reviewed; GO pending**.
+The user stated “reviewed”; this records bounded plan review, not implementation/delegation/
+publication permission or as-built behavior. Exact engineering spellings remain refinable. Read
+[review checkpoint](#iteration20-replacement-plan-review); prior projection-policy candidate remains
+deferred. GHA disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned.
+No source/build/story/worker/CI/investigation/commit/push restart or new checkpoint authorization.
+Earlier current-task blocks below preserve historical direction/status where superseded.
+
+Current task: **Iteration20 replacement recorded-argument-map candidates prepared for review**.
+Read [design](iterations/20-recorded-argument-maps/DESIGN.md),
+[worked example](iterations/20-recorded-argument-maps/EXAMPLE.md) and
+[conditional handoff](iterations/20-recorded-argument-maps/HANDOFF.md).
+The user's “proceed” authorized replacement preparation after the prototype agreement, not
+implementation/delegation/publication GO. Recommended ordinary primitive/source/input/return/
+trace/table/decision roles, datum-only facade and FIVE-Q/FOUR-local story are candidates for
+review; not as-built behavior. Prior projection-policy candidate remains deferred. DML verified
+clean47131da; GHA disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned.
+No source/build/story/worker/CI/native-investigation/commit/push restart; no checkpoint requested.
+Earlier current-task blocks below preserve historical direction/status where superseded.
+
+Current task: **Iteration20 redirected to value arguments and separately recorded provenance**.
+The user agreed to trying this new callable boundary; the prior projection-policy candidate is
+DEFERRED, not an active implementation handoff. Func means DML callable/logical intent; caching
+may mean reuse in conversation. Funcs receive computational values, not implicit argument-source
+provenance; DML retains source references separately. Intended caching matches func and typed
+argument values rather than derivation history. Exact value representation, invocation/access
+boundary and bounded acceptance still need design; no implementation/delegation/publication GO.
+Read [new direction](#iteration20-redirection-value-arguments-and-separate-provenance).
+GHA stays disabled/native investigation paused/VP-001 OPEN UNKNOWN; no implementation restart.
+Earlier current-task blocks below are historical where superseded.
+
+Current task: **Iteration20 candidate preparation complete; review then separate implementation GO**.
+The user agreed to explicit exact-input versus result-based downstream reuse matching, preserving
+full actual upstream provenance, then requested preparation. Read
+[design](iterations/20-result-based-input-reuse/DESIGN.md),
+[worked example](iterations/20-result-based-input-reuse/EXAMPLE.md) and
+[conditional handoff](iterations/20-result-based-input-reuse/HANDOFF.md).
+Exact fixed-profile/P/Mp/Dp/projection/public-authority/story mechanics are assistant candidates,
+not as-built behavior or implementation/delegation/publication approval. DML verified clean
+HEAD47131da; development GHA stays disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN.
+No worker/source/build/story/CI/investigation/commit/push restart; no new checkpoint requested.
+Older current-task blocks below preserve historical requests, not current authorization.
+
 Current task: **Design checkpoint requested; Iteration19 feature delivery successful,
 development GHA disabled, native investigation PAUSED**.
 Feature independently accepted/published `a71e89f`; focused/local acceptance and all new CI feature
@@ -3993,7 +4250,1224 @@ Missing downloads/installations require scoped approval. No extra workers/cloud/
 native entity/generic framework/resources/scheduler/release/package/later turn/design checkpoint
 commit/push; accumulated unrelated design changes preserved. Outcomes pending.
 
+## Iteration20 agreed direction and candidate preparation
+
+Assistant proposed downstream reuse across a fresh upstream attempt producing the same full result
+sub-DAG. Explained document-local “producer witness” as the recorded reference to the particular
+upstream final attempt whose result was supplied, not a new native entity. Same result content
+can coexist with different producer occurrences/full input DAG IDs. User stated **“yes that makes
+sense”**; assistant clarified preservation of full provenance and explicit versioned exact-input
+versus result-based matching, with old snapshots/requests unchanged. User then requested
+**“prep the iteration”**, authorizing candidate preparation, not implementation/delegation/
+publication GO or resumption of the paused native investigation.
+
+Prepared [DESIGN](iterations/20-result-based-input-reuse/DESIGN.md),
+[EXAMPLE](iterations/20-result-based-input-reuse/EXAMPLE.md) and
+[HANDOFF](iterations/20-result-based-input-reuse/HANDOFF.md). Read-only current source inspection
+confirms composed inputs link full result R and final attempt T, with separate Floci operational
+fields; current Mi/Di keys/reader compare exact full inputs. Merely dropping an equality check or
+all producer-looking fields would not establish a safe policy projection. Existing public S
+capture/inspect and full requested Q preparation/recording supply reusable authority; old private
+role decoders and historical expected-Q relabelling are not required by this candidate.
+
+Recommend NEW minimal witnessed-input role/value/producer/factor profile, with public upstream S
+success/R/T association on both requested and historical inputs. Result projection retains full
+result DAG and typed factor, excludes ONLY producer; exact mode retains full input ID. Ordinary
+versioned P, intent+P bounded16 Mp and Dp, explicit known policy/table names, original full inputs
+and upstream/downstream S slots retained per row/decision. Public S validation plus own full Q/
+ordinary W associates new requested upstream witness with reuse of an OLD downstream attempt
+whose original upstream witness stays unchanged. New pinned reader exposes both chains; summary
+must not falsely claim old downstream T executed with the new producer. Separate tables/policy
+snapshots, no automatic rekey/adoption/discovery, strict extra fields rejected. Inspection should
+not write target storage merely to recompute projected IDs. These mechanisms are assistant-origin
+candidates for review, not additional user decisions/schema approval/as-built behavior.
+
+Candidate story SEVEN Q/SIX synchronous LOCAL attempts: producer42/double84; fresh producer42;
+new result-policy downstream Q reuses old double; exact-policy sibling misses and actually
+executes fresh84; main fresh producer43 then result-policy miss actually executes86. Count union
+of retained true sibling refs; no extra support computation or Batch/SSH/Docker/service. Focused
+metadata/projection/provenance negatives and SAME-history nonexecuting independent readers,
+one final worker full after future GO, no duplicated installed/full ritual. Owning validation
+policy applies with development-GHA launch wording superseded by explicit disabled decision.
+
+Implementation Git HEAD verified47131da927d76b190bb37f4384d887f2edcb65f5, clean. No implementation
+file edits/build/test/story/worker/investigation restart/commit/push during preparation. GHA stays
+disabled (no new API-state verification needed/performed), native private candidate incomplete/
+unexecuted retained, original CI rawfail/cancellations/attribution UNKNOWN and VP-001 OPEN UNKNOWN
+preserved. Proposed local acceptance is not a diagnosis/standing waiver or platform-green claim.
+Generic masks/native facets/framework/resources/scheduler/UX/restrictions/runtime fix remain out
+of scope. Read all three candidates for review, then separate GO; no design checkpoint requested.
+
+## Iteration20 redirection: value arguments and separate provenance
+
+After candidate preparation, the user raised terminology and argument/caching concerns, noting
+Iteration20 might instead implement changes discussed here. Agreed conversational vocabulary:
+**func** means a DML callable, the logical function/intent such as double in double(R42), not a
+particular implementation/request/attempt. **Caching** may mean reuse, not only lookup/storage
+machinery. These clarify conversation; no shared glossary/spec edit is authorized by discussion.
+
+Assistant explained current full input DAG identity: a SubDAG argument link identifies the FULL
+result DAG, not merely its root's scalar; the current composed input also records a separate
+upstream final-attempt witness. Thus differently structured result DAGs with equal root42, or
+identical result DAGs with different recorded witnesses, can prevent exact-input reuse. The
+prepared projection candidate only excludes witness; it still distinguishes differently
+structured full result DAGs. Being computed does NOT itself change result identity if execution
+returns the same literal-result DAG. Origin and returned structure remain distinct facts.
+
+The user called this suboptimal and also objected that letting a func see argument provenance
+makes its computation implicitly depend on provenance. Assistant proposed a cleaner callable
+boundary: computational values are supplied to the func; DML records their source references
+separately, outside ordinary argument access. Typed value42 supplied literally, by add(13,29),
+or by reuse should permit the same double caching identity while retaining different derivation
+history. If methodology/provenance is genuinely needed by a computation, supply that information
+as an explicit computational argument and include it in caching, rather than implicitly expose it.
+The user stated **“yes, let's try this new direction for iteration 20”**.
+
+This agrees the conceptual direction and redirects Iteration20. The prior
+[projection design/example/handoff](iterations/20-result-based-input-reuse/HANDOFF.md) is
+DEFERRED and retained as historical candidate material, not an active handoff/schema approval.
+No implementation GO or worker delegation follows. Exact typed-value model (including structured
+values), extracting/returning values from result DAGs, callable-visible access, provenance record
+shape, public API composition and bounded story remain to be designed. An I64-root projection
+for arbitrary DAGs is NOT assumed; a convention hiding arguments is not automatically a security
+sandbox preventing deliberate repository/global/environment access. No generic purity or full
+capture guarantee is established. The capability goal is an explicit computational boundary,
+not pretending hidden dependencies are impossible.
+
+No DML/spec/glossary/diagram/source/build/story/native-investigation/CI changes or publication
+were performed for this redirection. Development GHA stays disabled, existing worker PAUSED,
+BOTH builds/source coordinator-owned, native candidate retained incomplete/unexecuted, original
+raw outcomes and VP-001 OPEN UNKNOWN preserved. Future plan review and separate GO are required.
+No design checkpoint commit/push requested. Earlier direction/preparation remains historical.
+
+## Iteration20 argument maps: value structure versus construction provenance
+
+The user proposed using map construction/insertion to obtain a node whose value is the map of
+named argument datums, with map access inside the func/sub-DAG to read arguments. Assistant agreed
+with the distinction between recorded computational operations and mere storage writes, and the
+user stated **“agreed”**. This extends the agreed Iteration20 direction: a recorded argument-map
+construction links source nodes and preserves their derivation, while its resulting map datum
+contains only named argument values. Callable map access reads those datums, not source-node or
+producer references. Literal42 and add(13,29) can therefore yield the same argument-map datum/
+caching identity while their construction graphs/provenance remain different.
+
+Current `put_datum(Datum.map(...))` constructs/stores value structure from datum IDs; it does not
+record computational construction/insertion edges. Computational map construction/insertion/access
+primitives are not currently implemented. Their exact representation, invocation/evaluation/public
+API boundary and bounded implementation plan remain to be designed; no new native operation-node
+schema or generic evaluator is selected by agreement. Need to preserve actual source associations,
+not claim a map of datum IDs alone proves derivation. Datum-only collection access must not implicitly
+supply general provenance/repository navigation. This is an interface boundary, not a security sandbox.
+
+Conceptual agreement only: no revised candidate handoff or implementation/delegation/publication GO,
+source/spec/diagram/build/story/native investigation/CI/worker restart or commit/push. Prior projection
+candidate remains deferred; GHA disabled and VP-001 OPEN UNKNOWN remain unchanged.
+
+## Iteration20 agreed prototype: recorded map operations and datum-only callable access
+
+The user stated **“agreed”** to the assistant's proposed bounded prototype: three recorded
+operations, `map_empty`, immutable `map_insert`, and `map_get`, with ordinary DAG conventions
+and a small fixed Python implementation before selecting native operation-node layouts or a
+general evaluator. This approves the proposed conceptual prototype direction, not an exact
+record schema/API/engineering handoff or implementation/delegation/publication GO.
+
+Proposed behavior accepted for planning: map_empty returns an empty map datum; map_insert returns
+a new map datum and records the prior map plus inserted value's source relationship; map_get
+returns the selected datum and records the map/name relationship. Named arguments use string
+datums; missing access keys and duplicate insertion keys error. Replacement remains deferred.
+Map datum identity depends on entries, not construction history. Caller recording retains
+source nodes outside datums. Computed arguments require an explicit returned-datum contract;
+no arbitrary DAG-root extraction is assumed.
+
+Illustrative callable interface: double receives an argument-map datum and a datum-only operation
+interface, obtains x with map_get, and computes I64(x.value * 2) in Python. The operation interface
+has no repository/graph navigation. Recorder machinery behind it associates map access with THIS
+invocation's actual argument-map source, not an inferred global origin based on datum identity.
+Identical datums may have many different sources. Ordinary multiplication can remain internal
+to the recorded double boundary; this turn need not record every arithmetic operation. Exact
+source bookkeeping and how primitive result records expose datums remain engineering questions.
+
+Intended caching identity is func/logical intent plus argument-map datum identity, with requested
+construction/provenance retained separately from the selected historical attempt's original
+construction/provenance. Proposed acceptance: literal42 -> map -> fresh double84; computed
+13+29 -> same map datum -> new request reuses old double; computed43 -> different map datum ->
+fresh double86. Exact occurrence counts, typed negatives, storage/loss boundaries and current
+public API composition still need the replacement candidate design/example/handoff. This is
+not a security sandbox, purity certification, complete environmental capture, native entity,
+generic evaluator/scheduler or automatic cache-discovery decision.
+
+No implementation/delegation/build/story/CI/native-investigation/commit/push restart. Development
+GHA stays disabled, native investigation PAUSED, BOTH builds/source coordinator-owned, VP-001
+OPEN UNKNOWN, original outcomes retained. Prior projection candidate remains DEFERRED/historical.
+Prepare/review a replacement handoff and obtain separate GO before implementation; no new design
+checkpoint commit/push requested.
+
+## Iteration20 replacement candidate preparation
+
+After the recorded-map prototype agreement, assistant said the next step was replacement
+DESIGN/EXAMPLE/HANDOFF preparation and that implementation GO remained separate. User said
+**“proceed”**. Coordinator explicitly treated this as preparation only, then prepared
+[DESIGN](iterations/20-recorded-argument-maps/DESIGN.md),
+[EXAMPLE](iterations/20-recorded-argument-maps/EXAMPLE.md) and
+[HANDOFF](iterations/20-recorded-argument-maps/HANDOFF.md). The prior projection-policy documents
+remain DEFERRED historical material with links to this replacement, not combined implementation
+scope. No revised-schema approval/delegation/implementation/publication GO or checkpoint requested.
+
+Read-only primary source review: native MAP children are datum IDs, not node references; collection
+reads return IDs, not implicit materialization. Literal/SubDAG native nodes suffice for ordinary
+operation/source/result DAG conventions. Existing LocalContext grants trusted wrapper graph access;
+new logical func interface can receive only Datum and a bound datum-only getter facade without
+changing adapter authority or claiming malicious-Python isolation. Current Mi/Di/full-input keys
+cannot implement datum matching by delegation unchanged. Public successful S and exact full-Q
+preparation/recording/native W composition remain available, with no private role codec/nativefix
+need established. Existing old APIs/roles retain behavior.
+
+Recommend explicit pinned literal sources and public S-backed returned sources with a strict
+returned-datum profile, not arbitrary root extraction. Primitive DAGs record actual map_empty/
+map_insert/map_get operands and literal result datums. Native MAP identity carries values only;
+construction DAG retains actual sources. Full input I records argument-map literal and construction.
+Trusted standalone captured wrapper gives logical callable map datum+bound getter, records actual
+access trace pinned to own Q and returned datum, then uses unchanged publication. Primitive
+construction/control records introduce no Q/T. Table Md keys canonical URI/profile+argument-map
+datum; row/public S retains original full I. New Dd/full own Q/W reader separates new requested
+construction from historical executed construction/access trace. No getter runs on cached new Q.
+These source/profile/trace/row/schema/facade/16-argument/16-access/64-source-operation-limit mechanics
+are assistant-origin candidates, exact spellings refinable, not additional user decisions/as-built.
+
+Proposed acceptance FIVE Q/FOUR synchronous LOCAL attempts: literal-source double84; add13+29
+returns42; computed-source same-map double newQ/oldT reuse; add13+30 returns43; changed-map double
+fresh86 after explicit pending miss. Six successful getter trace positions in fresh calls; no
+support Q/T or getter on reuse. Counterparts include same structured datum/different source,
+canonical names/types/composites, forged source associations/failed evidence, facade/source mixing,
+poisoned nonmatching row/full-Q/W and representative rollback/loss. Current installed child
+source includes captured trusted support, no uninstalled example imports; prefer ordinary public
+API helper composition. SAME-history transferred nonexecuting coordinator readers, one final worker
+full after future GO, not duplicated computational/full rituals. Development GHA remains disabled;
+no platform-all-green claim from local evidence.
+
+VP-001 planning revisit remains OPEN UNKNOWN with original owner/conditions; prepared slice uses
+unchanged synchronous local adapter, not async/LMDB/old-story repair. Paused native candidate remains
+incomplete/unexecuted; any related recurrence/source need requires fresh scope/triage, no standing
+waiver or inherited investigation permission. Native records, shared glossary/spec/diagram and
+runtime source untouched. Actual DML HEAD47131da927d76b190bb37f4384d887f2edcb65f5 clean verified.
+No builds/tests/story/services/worker/native investigation/CI/commit/push run during preparation.
+Read all three replacement candidates for review, then separate GO.
+
+## Iteration20 replacement plan review
+
+The user stated **“reviewed”** after preparation of the replacement
+[DESIGN](iterations/20-recorded-argument-maps/DESIGN.md),
+[EXAMPLE](iterations/20-recorded-argument-maps/EXAMPLE.md) and
+[HANDOFF](iterations/20-recorded-argument-maps/HANDOFF.md). This records bounded plan review,
+not implementation/delegation/publication GO or as-built behavior. Exact engineering spellings
+remain refinable. Prior projection-policy plan remains deferred; no source/glossary/spec/diagram/
+worker/build/story/CI/native investigation/experiment/commit/push restart. Development GHA remains
+disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned; earlier completed
+permissions are not inherited. Separate GO required; no design checkpoint commit/push requested.
+
+## Iteration20 implementation and publication authorization
+
+On2026-11-02 the user declared **“iteration is GO”** and requested the existing window-2 agent
+implement in a NEW session, coordinator monitoring/review/feedback until satisfactory, then
+worker commit/push/fix CI issues. This approves the reviewed bounded replacement
+[DESIGN](iterations/20-recorded-argument-maps/DESIGN.md),
+[EXAMPLE](iterations/20-recorded-argument-maps/EXAMPLE.md) and
+[HANDOFF](iterations/20-recorded-argument-maps/HANDOFF.md) for implementation, superseding their
+pending-GO wording, not scope. Exact engineering spellings remain refinable; no as-built claim.
+The projection-policy candidate stays deferred. See [coordination](iterations/20-recorded-argument-maps/COORDINATION.md)
+for live preflight/new-session verification/build ownership and publication gate.
+
+Explicitly hand BOTH shared builds/source to the existing worker%215 until targeted changed-
+surface/HEAD freeze and release. Worker pre-edit validation map/focused meaningful checks,
+current-installed FIVE-Q/FOUR synchronous LOCAL attempts/SIX getter trace positions, ONE final
+unchanged full-v, independent risk-based focused checks/SAME-history nonexecuting readers;
+no duplicate computation/full ritual. Independent acceptance precedes focused normal publication.
+No extra worker/cloud/global/service/image/evaluator/framework/native entity/resources/scheduler/
+release/package/later turn or design checkpoint commit/push; missing downloads need scoped approval.
+
+Development GHA remains disabled under the user's earlier explicit decision. Coordinator live GET
+verifies CI232868302 disabled_manually and release233518745 active; this GO does not enable/launch
+CI or alter workflows/budgets/runners/release controls/repository settings. Accepted normal push
+will verify exact source/remote identity; CI intentionally NOT RUN is not a pass. Native investigation
+PAUSED/private candidate incomplete-unexecuted retained; VP-001 OPEN UNKNOWN/no standing waiver.
+Fresh related recurrence/source needs require scoped triage. Outcomes/acceptance/publication pending.
+
+## Iteration20 delivery: publication and STOP
+
+Existing window-2 worker implemented the reviewed bounded replacement recorded-argument-map
+prototype, coordinator independently reviewed/feedback/validated until satisfactory, then authorized
+exact15 focused normal publication. Actual final **`7e9bf133d5d175a492fb1e9d651e91a476358604`**,
+parent47131da; exact accepted current+committed hashes/pathset/clean source-index/live origin/master
+independently verified AFTER normal push. See [REVIEW](iterations/20-recorded-argument-maps/REVIEW.md),
+[RESULTS](iterations/20-recorded-argument-maps/RESULTS.md) and
+[COORDINATION](iterations/20-recorded-argument-maps/COORDINATION.md) for primary evidence/provenance.
+
+As built: NEW fixed Python/ordinary-DAG map_empty/map_insert/map_get, pinned literal/public
+successful returned sources and explicit returned-datum trace profile. Trusted captured wrapper
+keeps logical callable arguments/access datum-only; not a security sandbox/purity proof. NEW Md/Dd
+match canonical func+argument-map datum while FULL own Q and historical OLD Q/T/R retain separate
+construction/access provenance. Public S/native history remain authority; old helpers unchanged,
+no native entity/general evaluator/cache discovery/framework/resource/scheduler. The informative
+[owner](../dml/docs/recorded-argument-maps.md) documents actual interfaces/limits; diagram's native
+claims unchanged. Deferred projection-policy plan not implemented.
+
+Independent **37 focused pass/24.29s/XML37clean** and separately authored/measured **2424 installed
+NONEXECUTING assertions** on SAME stopped caller/replica491row final196486c27313d2910e54592a81c400e7.
+Actual native FIVE requests/FOUR attempts/no newT or getter for reused Q3, SIX successful getter
+positions/results84,42,43,86/two provenance chains/full source+ordered native parents/tree deltas/
+closure/immutable refs/store bytes/known reaped child custody checked. No duplicate computational
+story/full. Distinct worker v6 167/v7 8/v8 1 focused invocations, sole unchanged full-v **2798pass**/
+Python6253includingNEW716100%/C7/native1681-132-1562all100%/CLI141, actual installed5Q4T6getter,
+blocked readers and worker135 native cross-checks reviewed. Binding0unsuppressed624suppressed PLUS
+**65bytes possiblylost1block**, not zeroallleaks/diagnosis. Four actual children known0/reaped/absent,
+only original owned paths made unavailable, local source/history retained, no external fixture.
+
+Two extra untracked EOF LFs caught independently and removed ONLY one each in two test files;
+ASTs including locations identical, other13/helpers/story/stores exact. Original full/focused/
+independent test byte hashes retained/qualified, not rewritten. Original ineffective identical-
+input mutants/prediction/signature/controller failures/weak alternate-Dd mutation and corrected
+same-name actual-before-W controls preserved. Missing original actor stderr stays UNKNOWN.
+Coordinator inline primary-spelling/EOF/path audit failures retained; final measured SAME audit
+passes, no false receipt. Initial unpublishedcfb81f5 message-body escaping corrected by message-
+only amend BEFORE normal push, identical tree/parent/no source or remote history rewrite.
+
+Development GHA intentionally **disabled/NOT RUN, not pass**, independently live GET verified
+CI232868302 disabled_manually/release233518745 active; no enable/run/workflow/budget/control change.
+Missing fresh cross-platform assurance explicit; local success not nativefix/older CI attribution/
+VP-001 waiver. Native investigation PAUSED/private candidate incomplete-unexecuted retained;
+historical failed/cancelled rawCI/UNKNOWN/VP-001 OPEN UNKNOWN remain. No new exception inferred.
+
+Worker finalized RESULTS, corrected coordinator-versus-user hygiene attribution only and explicitly
+**STOPPED ALL activity/no further tools**. BOTH builds/source/stopped evidence coordinator-owned.
+Bounded Iteration20 satisfactory and complete; stop for user review, no next turn/source/build/
+story/CI/native investigation/image/service/worker/extra agent/cloud/global/release/package or
+new design checkpoint commit/push permission follows completion.
+
+## Iteration20 user review
+
+The user stated **“good work! reviewed”** after the completed delivery report. This records
+review and acceptance of bounded Iteration20 at published
+`7e9bf133d5d175a492fb1e9d651e91a476358604`. Work remains COMPLETE AND STOPPED; no next turn,
+worker/source/build/story/CI/native-investigation restart or design checkpoint commit/push
+is authorized. Development GHA stays disabled/NOT RUN, native investigation PAUSED and
+VP-001 OPEN UNKNOWN; original evidence and limitations remain unchanged.
+
+## Next iteration: built-in funcs and internal versioned bindings
+
+After reviewing completed20, the user asked for a next-iteration proposal. Assistant suggested
+path-based nested datum access; user preferred successive ordinary getters. Source review clarified
+that current20 implements only example-local fixed Python map operations with STRING opcodes and a
+bound top-level-map facade, not URI-addressed built-in funcs. The old draft lists dml://map/get and
+collection funcs, but that is not current implementation. No built-in dml: funcs are as built.
+
+User proposed a special built-in execution adapter, versioned adapter/implementation support shipped
+inside DML, then clarified this adapter can be internal logic rather than an external component.
+Current local bindings record an adapter URI datum inside the selected binding DAG, not directly on
+the intent; the local reader recognizes one fixed URI/profile, not generic URI adapter dispatch.
+Assistant proposed a reserved adapter URI; user instead proposed the following simpler convention:
+
+```text
+dml://builtin/map/get                   func / logical intent
+  implementation choice
+    binding DAG
+      adapter:     NULL
+      source:      dml://source/builtin/map/get/v1  (URI datum)
+      interpreter: NULL
+      timeout-ms:  NULL
+```
+
+Assistant endorsed this model; user stated **“sounds good. show me what we have so far”**.
+This records agreement to the conceptual built-in direction and illustrative NULL/internal binding
+model, NOT an implemented profile, exact role/API/function-set approval, prepared handoff or GO.
+The func URI identifies purpose; exact immutable binding and versioned source URI identify selected
+implementation. NULL adapter deliberately selects internal execution, not unspecified adapter;
+NULL interpreter/timeout indicate no external interpreter/subprocess timeout. Normal input/profile
+bounds still matter. Built-in source URI is a symbolic shipped implementation identifier, not captured
+code bytes or a fetch target. DML dispatches exact supported versions; no silent latest substitution.
+Newer releases can retain older bindings/handlers for historical execution; recorded descriptors
+alone do not supply executable compatibility. Unsupported binding/version must fail explicitly.
+Historical executability, result validity and explicit reuse selection remain separate.
+
+Earlier assistant suggestions remain candidate details: distinct built-in ordinary binding role/
+profile rather than relaxing local-Python validation; initial map_empty/map_insert/map_get/list_get;
+internal fixed dispatch without external jobs/general evaluator/new native node kinds; operation
+recording within enclosing computational boundaries rather than separate Q/T for every primitive.
+Existing value-only access/source-recording separation and func+full-argument-map-value reuse
+remain the design baseline; graph-level node arguments/results are clarified below. Chained getters
+should not expose graph/repository provenance or infer
+an origin globally from equal datum IDs. Exact invocation/source bookkeeping/binding validation/
+initial primitive semantics/native-versus-Python implementation/acceptance counts still need design.
+A separate adapter URI was an assistant alternative, superseded here by the user's NULL convention.
+
+No implementation/source/glossary/spec/diagram/build/test/story/worker/native investigation/CI or
+commit/push action follows this conversation. Development GHA disabled, native investigation PAUSED,
+private candidate incomplete-unexecuted retained/VP-001 OPEN UNKNOWN/BOTH coordinator-owned remain.
+Prepare/review a bounded design/example/handoff when requested, then separate implementation GO.
+No design checkpoint publication requested.
+
+### Standard func invocation: argument-map node to result node
+
+The user challenged assistant shorthand “funcs receive computational datums”: the graph-level
+argument should be a node whose value is a MAP datum. Assistant corrected the earlier categorical
+no-nodes claim, distinguishing DML call arguments from implementation value/provenance access.
+The user then proposed ALL funcs receive an argument-map node and return a node: built-ins need
+not return a sub-DAG, while other funcs return a node representing a result sub-DAG. Assistant
+endorsed this recursive model, with explicit returned-value semantics rather than arbitrary-DAG
+root extraction, value-only implementation access and separately retained source relationships.
+
+The user explicitly agreed: **“yes, func invocation is the standard procedure, like in C: copy
+arguments onto the stack (in dml that means forming the argument map node)”**. Agreed direction:
+ONE graph-level call convention for built-in and other funcs, `func(argument-map node) -> result
+node`. Argument preparation evaluates/selects argument values and forms the map construction node,
+retaining source-node relationships in the graph; MAP children remain datum IDs, not source-node
+references. A built-in may return a primitive operation node directly; other funcs return a node
+representing their result sub-DAG. Minimal result sub-DAGs are allowed; no full internal Python
+capture requirement. Values returned by one call can supply another argument-map construction.
+
+C's stack is a calling-convention analogy, not a literal mutable stack or machine ABI selected for
+DML. Construction/source-node identity can differ while argument-map datum values match. Logical
+func access must not implicitly reveal provenance; whether that is a node facade or another exact
+API remains open. Existing func+full-argument-value reuse direction stays, not full source-node
+identity. The precise primitive call recorder/operation node/result-value contract, built-in
+bindings/dispatch, occurrence boundaries/limits/API/native layouts and next acceptance story still
+need a bounded plan. This is conceptual agreement, NOT current implementation, prepared handoff or
+implementation GO. No source/spec/glossary/diagram/worker/build/story/CI/native investigation or
+commit/push restart; existing stop/disabled/UNKNOWN boundaries remain.
+
+## Iteration21 candidate preparation
+
+The user requested **“good. prep the iteration”** after the built-in/standard-invocation summary.
+Coordinator prepared [DESIGN](iterations/21-internal-builtins/DESIGN.md),
+[EXAMPLE](iterations/21-internal-builtins/EXAMPLE.md) and
+[HANDOFF](iterations/21-internal-builtins/HANDOFF.md). This authorizes candidate preparation only,
+not exact profile/API/initial function set/story approval or implementation/delegation/publication GO.
+Exact engineering spellings remain refinable; read all three for review, then separate GO.
+
+Agreed basis: common argument-map NODE -> result NODE calls; built-ins may return primitive
+operation nodes, other funcs result-sub-DAG nodes; value access does not implicitly expose source
+provenance. User's NULL adapter/interpreter/timeout + versioned builtin source URI binding selects
+internal DML code, supports retained historical handlers, and never silently falls back to latest.
+
+Read-only source finding: current native `src/uri.c` and owning as-built URI rule actually reject
+ALL dml: scheme references. Recommend narrowly permitting reference datums through existing
+canonicalization/codec/storage/transfer, not inventing a new datum kind or hash/layout. Closed
+builtin dispatch owns executable definitions; storing an unknown URI does not execute it. Recommend
+corresponding narrow reserved-intent guards in old local/exchange request validation so new reference
+support cannot let a user Python binding claim a dml: builtin intent. Existing Python binding role/
+fields and all child/attempt/publication/observation/lifetime/LMDB mechanics otherwise unchanged.
+This prerequisite was found during preparation, NOT implemented or tested. Early approximate file
+lookups/rg patterns missed uppercase test/source locations; corrected actual uri.c/records/C tests
+establish the finding, no experiment/native attribution inferred.
+
+Recommended NEW installed additive Python `daggerml.builtin` (candidate name), fixed URI-bound
+empty/insert/get/list-get handlers, actual distinct map/get-v1/v2 compatible entrypoints, exact NULL
+binding profile, value-oriented recorder-owned node handles and ordinary operation/argument/normal
+result DAG profiles using existing native Literal/SubDAG storage. Built-in semantic primitive node
+may use an ordinary DAG storage carrier; this is not a new native primitive enum. Native C/CLI
+invocation is deferred in this candidate, CLI native inspection retained. Bootstrap argument-map
+preparation prevents recursive map/insert-to-prepare-map/insert. THIS invocation/source association,
+explicit return-node/value contract, bounded16 arguments/16positions/64reached records, failed-scope
+publication discipline and real installed module/linked-native provenance need review. These are
+assistant engineering candidates, not user-selected exact schema or as-built claims.
+
+Candidate story THREE own Q/TWO synchronous LOCAL attempts: nested [13,29] sum42 with get-v1;
+source-distinct equal full argument MAP/new requested get-v2 path reuses OLD T/R42; changed [13,30]
+miss then fresh43/get-v2. Six caller empty/insert positions + eight actual child getter positions +
+two real post-promotion pinned old/new compatibility calls = sixteen successful builtin positions,
+zero support Q/T. New example-local one-known-S/Dn/own-Q-W/pinned reader, NOT another generic table/
+cache/default framework; old20 and earlier APIs remain unchanged. Compatibility proof is retained
+handlers inside ONE future new installation, not an already shipped older builtin release or old20
+reader compatibility. Exact counts/profile/API/code location remain candidate details for review.
+
+After future GO: fresh bounded isolated local build/install for changed native URI/new shippedmodule;
+focused primary checks/sole final unchanged full-v/SAME stopped installed-history independent readers
+under owning validation policy. No repeated full/fixture/computation rituals; no cloud/service/image/
+global tooling/download without separate approval, native runtime investigation or generic evaluator.
+Diagram review follows actual native storage/URI/boundary claims, never proposed native entities.
+
+Preparation verifies implementation clean HEAD7e9bf133d5d175a492fb1e9d651e91a476358604. No DML/source/
+spec/glossary/diagram edits/build/test/install/story/worker/CI/native probe/commit/push performed.
+Development GHA remains disabled; no new API-state verification needed/performed. Private native19
+candidate incomplete-unexecuted/investigation PAUSED/BOTH coordinator-owned. VP-001 planning revisit
+remains OPEN UNKNOWN/no standing waiver: new URI/parser/intent validation is not old async/LMDB
+failure diagnosis, no process/open/lifetime change selected; any related need/recurrence requires
+fresh scope/triage. Historical raw failures/cancellations/65possiblelost/unknowns remain. No design
+checkpoint commit/push requested. Candidate review precedes separate implementation GO.
+
+## Iteration21 plan review
+
+The user stated **“reviewed”** after preparation of the bounded
+[DESIGN](iterations/21-internal-builtins/DESIGN.md),
+[EXAMPLE](iterations/21-internal-builtins/EXAMPLE.md) and
+[HANDOFF](iterations/21-internal-builtins/HANDOFF.md). This records bounded plan/handoff review,
+NOT implementation/delegation/publication GO or as-built behavior. Exact engineering spellings
+remain refinable. Separate GO remains required; no worker/source/spec/glossary/diagram/build/
+install/story/CI/native investigation/experiment/commit/push restart or checkpoint publication.
+Current DML stays published7e9bf13/completed20 stopped; GHA disabled/native investigation PAUSED/
+private candidate incomplete-unexecuted/VP-001 OPEN UNKNOWN/BOTH coordinator-owned unchanged.
+
+## Iteration21 implementation and publication authorization
+
+The user stated **“iteration is GO. have the agent in window 2 implement it in a new session.
+you monitor its work, review, and provide feedback as necessary until the work is satisfactory.
+then have the agent commit and push.”** This approves bounded internal-builtins
+[DESIGN](iterations/21-internal-builtins/DESIGN.md),
+[EXAMPLE](iterations/21-internal-builtins/EXAMPLE.md) and
+[HANDOFF](iterations/21-internal-builtins/HANDOFF.md) for implementation, superseding their
+pending-review/GO wording only within scope. Exact engineering spellings remain refinable;
+no as-built or acceptance outcome is claimed. See
+[coordination](iterations/21-internal-builtins/COORDINATION.md).
+
+Existing worker `%215` in window2 starts a verified NEW Pi session; coordinator `%197` monitors,
+independently reviews and provides feedback before exact focused publication. BOTH builds/source
+handed to worker until targeted freeze/release. Fresh isolated installed THREE-Q/TWO synchronous
+LOCAL/SIXTEEN builtin-position story, focused checks/ONE final unchanged full-v and risk-based
+SAME stopped-history NONEXECUTING independent review follow the owning validation policy.
+Development GHA remains disabled, not re-enabled by GO; native19 investigation PAUSED/private
+candidate incomplete-unexecuted retained/VP-001 OPEN UNKNOWN/no standing waiver. Narrow URI/
+namespace changes only, no LMDB/open/async/lifetime investigation. Related need/recurrence needs
+fresh scoped triage. No extra agent/cloud/global/service/image/generic evaluator/cache/framework/
+native entity/resources/scheduler/release/package/later turn/design checkpoint publication.
+
+## Iteration21 independent acceptance and publication gate
+
+Coordinator independently ACCEPTS exact frozen29 at parent
+`7e9bf133d5d175a492fb1e9d651e91a476358604`, complete diff
+`7efa71cbda59ce5e81555315f49cb7c4807d361c970691e90e4c5fd33012dc87`.
+See [REVIEW](iterations/21-internal-builtins/REVIEW.md),
+[RESULTS](iterations/21-internal-builtins/RESULTS.md) and
+[COORDINATION](iterations/21-internal-builtins/COORDINATION.md).
+Independent48 focused/FINAL-installed1424 NONEXECUTING pass, SAME stopped467 typed history and
+already-stopped95-row no-job NaN evidence/native+publicS/actual spines/versions/source/choice/
+provenance/custody/immutable bytes. Reviewed worker146/full2929/native506/original-installed3Q2T16
+remain distinct. No duplicated full/story/computation. BN001-004 resolved; original7aab story
+versus final60679 pure NaN comparator qualification retained, not claimed final-source execution.
+Failed/weak probes/fixture oracles/mutations/tooling/EOF/doc byte qualifications remain preserved.
+
+BOTH/source/prefixes/stopped evidence returned ONLY for exact29 staged path/secret/whitespace audit,
+focused worker commit/NORMAL existing master push/exact accepted current+committed hashes/parent/
+clean source-index/live remote, read-only disableddevelopment/activerelease workflow verification,
+RESULTS/disposition/explicitSTOP ALL. Published SHA/outcomes/finalSTOP pending. No force/tag/release/
+package/design publication/source/test/build/story/read repetition/GHA enable-run/native19/later
+turn. Development GHA intentionally NOTRUN/notpass/no fresh platformgreen; private19 PAUSED/
+VP001 OPEN UNKNOWN/no older diagnosis/standing waiver. User-delegated acceptance applied within
+this bounded turn, not a new turn/investigation permission.
+
+## Iteration21 final publication and stop
+
+Bounded Iteration21 is **COMPLETE AND STOPPED**, independently accepted and normally published
+**[`a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3`](https://github.com/micha/dml/commit/a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3)**,
+parent `7e9bf133d5d175a492fb1e9d651e91a476358604`. See
+[RESULTS](iterations/21-internal-builtins/RESULTS.md),
+[REVIEW](iterations/21-internal-builtins/REVIEW.md),
+[COORDINATION](iterations/21-internal-builtins/COORDINATION.md) and
+[as-built authority](../dml/docs/internal-builtins.md).
+
+Installed internal builtins implement standard argument-map NODE -> NODE calls, exact NULL/
+versioned URI bindings, real distinct retained map-get-v1/v2 and fixed empty/insert/list-get,
+ordinary strict source/arguments/operation/trace/normal-return profiles. Native references now
+allow canonical dml: URIs without changing hash/layout/schema; external local/exchange Python
+requests reject reserved intents. Source links stay outside MAP datum values; one-S example
+reuses by intent/full MAP value, own new Q separates requested sources/v2 from old execution/v1.
+No new native opcode/entity/general evaluator/registry/cache framework is claimed.
+
+Independent48 focused/FINAL-installed1424 NONEXECUTING pass, worker146/full2929/new728/native100%/
+CLI141 and actual original-installed3Q2T16/SAME467/native506 remain distinct. Original story ran
+builtin7aab, final typed-NaN comparator60679 validated separately by no-job95/SAME stopped-history/
+focused/full/independent evidence, not repeated final-source child execution. BN001-004resolved;
+all original failed/weak oracles/NaN regression/install wrapper/EOF/doc/tooling/rawCIUNKNOWNs retained.
+
+Worker exact29 stagedaudit/commit/normalpush0; coordinator independently verifies actual current+
+committed+accepted hashes/parent/clean source-index/live originmaster AFTER push. Independent live
+workflow GETs development232868302 disabled_manually/Release233518745 active. GHA intentionally
+NOTRUN/notpass/no freshplatformgreen; no control/settings/release/native19 changes or VP001 waiver.
+Two direct children known0reapedabsent, owned originals safely unavailable; original/final15/runtime/
+three storehashes/evidence retained, no external fixture/image/service to retire.
+
+Worker RESULTS finalized independent publication audit and qualifications, explicit FINAL STOP ACK/
+STOP ALL/no further tools/BOTH builds/source/prefixes/stopped evidence returned to coordinator.
+No worker/source/build/story/computation/reader/CI/native investigation/service/image/extraagent/
+cloud/global/release/package/later feature/design checkpoint commit/push restart follows this
+completion. Native19 PAUSED/private candidate incomplete-unexecuted/VP001 OPEN UNKNOWN and
+older65possiblylost remain, final pass not their diagnosis/fix. User review does not inherit new GO.
+
+## Iteration22 composed-node-calls candidate preparation
+
+After completed21, the user requested a next proposal. Assistant recommended composing separately
+recorded ordinary add and double funcs using installed argument-map NODE -> result NODE calls,
+value-based downstream reuse and separately preserved actual source/producing-attempt provenance.
+The user suggested ALSO `add(29,13)`: different named-argument MAP/add reuse key from `add(13,29)`,
+equal result42 and therefore equal downstream double MAP/key. Assistant endorsed that case without
+commutativity normalization; reversing insertion order of identical pairs is a different matter.
+Fresh repeated same-input add separately tests same-key/distinct producing occurrence.
+
+The user questioned recorder-handle loading and whether this meant only put_datum results could
+currently be arguments, with a missing result-node extraction case. Coordinator inspected actual
+sources and corrected the proposal: `put_datum` returns DATUM ID, `put_literal` returns native NODE
+ID; installed `Recorder.load` ALREADY accepts retained normal-return profiles with explicit returned
+node/value/trace/Q/full-input validation. Source support also includes literals and builtin results.
+Loading a recorded DAG in a new recorder changes only temporary Python handle ownership, not graph
+identity/execution/provenance. Structural return inspection does NOT itself prove attempt success;
+public S supplies the separate exact Q/T/R/F authority. No arbitrary-DAG-root extraction or missing
+new primitive should be assumed. Earlier shorthand overstated the gap and remains visibly corrected.
+
+The user stated **“good, that seemed odd to me -- makes sense now. proceed”**. Coordinator explicitly
+interpreted this as offered design/example/handoff PREPARATION, with implementation GO separate, then
+prepared [DESIGN](iterations/22-composed-node-calls/DESIGN.md),
+[EXAMPLE](iterations/22-composed-node-calls/EXAMPLE.md) and
+[HANDOFF](iterations/22-composed-node-calls/HANDOFF.md). Exact engineering candidate approval,
+implementation/delegation/publication GO and as-built claims remain pending.
+
+Read-only source review finds current sum-pair bridge hard-coded intent/choice/slot, but public node/
+return/S/Q/transfer APIs sufficient for the proposed composition. Recommend NEW example-local two
+fixed func contracts/captured Python sources, public successful add-S validation BEFORE write,
+existing load OUTER R/arguments, atomic I+C snapshot with ordinary separate C capturing exact selected
+S/T/R/slot and actual input source, new decision/Cq/W/pinned reader. Keep strict builtin arguments/Q/
+old helper roles unchanged. MAP contains only computational values; Q inputs I retain actual R,
+selected attempt witness C is separate captured context, not secretly present in the value. One known
+selected-double slot; upstream immutable S slots provide producer authority, not add-cache selection.
+Read historical downstream's ORIGINAL composition chain separately from NEW requested chain; no
+old input/trace rewriting, private codec/native entity/generic evaluator/cache table/discovery.
+These C/decision/schema/batch/helper mechanics are assistant candidates, not added user decisions.
+
+Recommended story **EIGHT Q/SIX synchronous LOCAL attempts/TEN child map-get positions**:
+initial add42/double84; fresh identical add42/reused double84; swapped add42/reused double84;
+changed add43/fresh double86. FOUR actual adds/TWO doubles, no support Q/T or construction/compatibility
+calls. Bootstrap argument preparation is not builtin invocation; no double getter/newT/completion on
+reuse, no automatic adoption after fresh86. Full MAP equality typed/canonical; trace positions and
+occurrences distinct from deduplicated native content. Exact engineering spellings remain refinable.
+
+Planning revisits VP-001 OPEN UNKNOWN/owner/conditions: unchanged synchronous adapter presumed,
+not async/LMDB/open/lifetime repair; related needs or recurrence require fresh scoped triage, no
+standing waiver. Native19 PAUSED/private candidate incomplete-unexecuted retained. Development GHA
+stays disabled/NOT RUN/not pass; local future evidence not fresh platform assurance. Owning validation
+policy recommends focused checks/one installed story/one worker final full-v/risk-based SAME stopped-
+history NONEXECUTING independent review only AFTER reviewed plan and separate GO.
+
+DML verified clean HEAD `a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3`; implementation unchanged. Existing
+accumulated uncommitted design notes preserved. Preparation uses read-only source/doc inspection and
+local Markdown/link checks only, no implementation/spec/glossary/diagram edits/build/test/install/
+story/worker/native probe/CI/experiment/service/image/commit/push. BOTH/source remain coordinator-
+owned. No extra agent/cloud/global/release/package/later turn/design checkpoint publication; no
+completed21/paused19 authorization inheritance. Read ALL three candidates for review, then separate GO.
+
+## Iteration22 implementation and publication authorization
+
+The user stated **“iteration is GO. have the agent in window 2 implement it in a new session.
+you monitor its work, review, and provide feedback as necessary until the work is satisfactory.
+then have the agent commit and push.”** This approves bounded composed-node-call
+[DESIGN](iterations/22-composed-node-calls/DESIGN.md),
+[EXAMPLE](iterations/22-composed-node-calls/EXAMPLE.md) and
+[HANDOFF](iterations/22-composed-node-calls/HANDOFF.md) for implementation, superseding their
+pending-review/GO text only within scope. Exact engineering spellings remain refinable; no as-built
+or acceptance outcome. See [coordination](iterations/22-composed-node-calls/COORDINATION.md).
+
+Coordinator `%197` verified `/new`/New session started/zero context in existing worker `%215` at
+15:44UTC on 2026-11-02 before assignment. DML clean master a523b0b; accumulated design notes preserved.
+BOTH builds/source explicitly transferred to worker until targeted freeze/release. New example-local
+public successful-producer composition/value-based reuse/separate actual requested-versus-historical
+producer witness, own Q/W; prefer unchanged installed runtime. Missing public seam needs review first.
+Fresh bounded isolated installed EIGHT-Q/SIX synchronous LOCAL/TEN-getter story/focused checks/ONE
+final unchanged full-v/risk-based SAME stopped-history NONEXECUTING independent review authorized.
+No speculative duplicate story/full; stop on failure/uncertain custody and retain original evidence.
+
+Development GHA stays disabled/NOTRUN/notpass/no enable-run-workflow-control change. Native19 PAUSED/
+private candidate incomplete-unexecuted retained/VP-001 OPEN UNKNOWN/no standing waiver; related need/
+recurrence requires fresh scoped triage. No extra worker/cloud/global/service/image/generic evaluator/
+cache/framework/native entity/resources/scheduler/release/package/later turn/design checkpoint
+publication. Independent acceptance precedes focused worker commit/NORMAL existing push/exact source-
+remote-workflow-state verification/RESULTS/finalSTOP/BOTH returned. Outcomes pending.
+
+## Iteration22 independent acceptance and publication gate
+
+Coordinator independently ACCEPTS exact frozen13 at parent
+`a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3`, complete diff SHA256
+`75e02202a5131d119329c3a6389ebd676ce43f0b7af2c283ef0a834adb30c2c2`.
+See [review](iterations/22-composed-node-calls/REVIEW.md),
+[results](iterations/22-composed-node-calls/RESULTS.md) and
+[coordination](iterations/22-composed-node-calls/COORDINATION.md).
+Independent41focused/1607 installed SAME641 NONEXECUTING checks actual0, four blocker controls,
+actual native/public S/orderedFparents/C/own-Q/W/summary/new-requested versus old-executed chains/
+full typed bytes/source/runtime/immutable data/six known0wait-reapedabsent children verified.
+No duplicate full/story/arithmetic. Worker87+5/solefull3021/actual8Q6T10getter reviewed separately.
+Original focused/installation/tool failures/test-only ONE+ONE EOF-LF AST-equal qualification and
+independent path-spelling/F-parent/Selection-inspection-basis reader-oracle corrections retained,
+not runtime fixes/retryuntilgreen; all helper/controller/logical/reader story bytes remain current.
+
+BOTH/source/prefix/stopped evidence returned ONLY for exact13 stagedaudit/focused worker commit/
+NORMAL existingpush/exact accepted-current-committed-parent-clean-live remote/workflowGET/RESULTS/
+disposition/explicitSTOP. Actual publication/STOP pending. GHA disabled/NOTRUN/notpass/release
+unchanged/native19 PAUSED/privatecandidate incomplete-unexecuted/VP001 OPEN UNKNOWN remain; no
+freshplatformgreen/older diagnosis/standingwaiver/extra computation/laterturn/design publication.
+
+## Iteration22 final publication and stop
+
+Bounded Iteration22 is **COMPLETE AND STOPPED**, independently accepted and normally published
+**[`a57125cdf735310f2330226ce6272b3a67e53f62`](https://github.com/micha/dml/commit/a57125cdf735310f2330226ce6272b3a67e53f62)**,
+parent `a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3`. Read
+[results](iterations/22-composed-node-calls/RESULTS.md),
+[review](iterations/22-composed-node-calls/REVIEW.md),
+[coordination](iterations/22-composed-node-calls/COORDINATION.md) and
+[implemented informative example](../dml/docs/composed-node-calls.md).
+
+New example-local public-API ordinary add/double composition uses existing standard argument-map
+NODE→normal-return NODE loader and public successful S authority. Atomic I/C captures actual outer
+R and exact selected upstream S/T outside computational MAP values/unchanged Q/arguments. Own Q/W
+value hits preserve NEW requested producer chain versus OLD executed double's ORIGINAL chain,
+without new T/getters/completion. Swapped add operands differ upstream/equal42 converges downstream;
+changed43 yields fresh86 without automatic adoption. No new native entity/opcode/runtime/evaluator/
+cache registry/private codec/old helper redesign or diagram storage change.
+
+Independent41focused/1607 installed SAME641 NONEXECUTING checks pass, distinct from reviewed
+worker87+5/sole unchanged full3021/actual EIGHT-Q/SIX synchronous LOCAL/TEN-getter story. Entire641
+native bundle/caller bytes/public S/ordered final parents/C/own-Q/W/summary/source/runtime/current
+executed helpers/immutable data and six knownwait0reapedabsent children independently verified.
+No duplicate full/story/arithmetic. Original worker focused/install/test fault/EOF hygiene failures,
+two test ONE+ONE EOF-LF AST-equal hash qualifications, independent path-spelling/F-parent/Selection
+inspection-basis reader-oracle corrections and immediate expanded-SHA typo correction preserved.
+Final pass/publication is not older async/LMDB/65bytes/rawCIUNKNOWN diagnosis.
+
+Worker accepted13 stagedaudit/commit/NORMAL existingpush0; independent actual publicationaudit0
+verifies exact accepted/current/committed13/complete diff/parent/clean source-index/live originmaster
+AFTER push. Independent READ-ONLY workflowGET CI232868302 disabled_manually/Release233518745 active.
+Development GHA intentionally NOTRUN/notpass/no freshplatformgreen/no control or settings change.
+Installed15/originalreceipt/SAME641 datahashes unchanged; owned original source/workspace/packet/
+expected paths safely unavailable/inert evidence retained/no external service/image/fixture.
+Worker RESULTS finalized/explicit STOP ALL/no further tools/BOTH builds/source/prefix/stopped owned
+evidence returned. Native19 PAUSED/private candidate incomplete-unexecuted/VP001 OPEN UNKNOWN/no
+standingwaiver; related needs/recurrence require fresh scope. No worker/source/build/test/story/
+computation/reader/GHA/native investigation/service/image/extraagent/cloud/global/release/package/
+laterturn/design checkpoint commit/push restart. User review does not inherit new-turn permission.
+
+## Proposed Iteration23: closure-bound dependencies
+
+After completed22, the user requested a next-iteration proposal. Assistant proposed a composed
+`double_sum` func: one outer argument-map NODE/result NODE call, explicitly programmed inner add
+and double calls, and separate outer versus inner reuse. Suggested cases were fresh(13,29), an
+outer reuse hit for repeated(13,29), and fresh outer(29,13) with equal42 allowing inner double reuse.
+These are assistant proposals, not an agreed exact story or approved implementation plan.
+
+The user asked whether this requires func dependencies bound to the closure at func creation time.
+Assistant agreed with the capture direction but corrected the vocabulary: dependencies are bound
+at **closure creation time**. A logical func/intent may have multiple closures capturing different
+selected callable dependencies. Arguments remain invocation-supplied; later moving implementation
+defaults should not silently change an existing captured closure. Capturing a callable dependency is
+separate from selecting a historical attempt for reuse; the latter's decision basis still needs design.
+Assistant recommended making captured callable dependencies the central capability rather than
+merely adding a composition wrapper with hard-coded dependency lookup. Exact capture representation,
+API, outer result/nested occurrence association, execution ownership and reuse policy remain open.
+
+The user stated **“yes, you're right about the vocabulary. good catch.”** This confirms the vocabulary
+correction, not approval of all proposed mechanics, plan preparation or implementation/delegation/
+publication GO. No replacement glossary meaning is introduced: the existing provisional closure and
+captured dependency terms apply. No design/example/handoff has been prepared for23.
+
+The user then corrected assistant's callable-only framing: dependencies may be ANY dependencies,
+including constants. Assistant agreed: the distinction is binding time, not callable versus noncallable;
+a closure can capture callable bindings, literal/configuration nodes or other computational inputs.
+Capture fixes a node reference, not necessarily external contents referenced by that node, and does
+not prove full preservation. The user stated **“perfect”**, confirming this generalized conceptual
+framing. Proposed focus is **closure-bound dependencies**, with callable dependencies and constants
+as examples. Exact schema/API/story/plan approval and implementation GO remain separate and pending.
+
+Iteration22 stays accepted complete-stopped; development GHA disabled/NOT RUN/not pass, native19
+investigation PAUSED/private candidate incomplete-unexecuted retained/VP001 OPEN UNKNOWN/BOTH
+coordinator-owned. No DML/source/spec/glossary/diagram/worker/build/test/story/reader/CI/investigation/
+experiment/commit/push restart follows this discussion; no design checkpoint publication requested.
+
+## Iteration23 candidate preparation
+
+After the generalized capture agreement, assistant offered preparing design/example/handoff with
+implementation GO separate. The user stated **“proceed”**, authorizing that preparation, not delegation/
+implementation/publication. Coordinator prepared [DESIGN](iterations/23-closure-bound-dependencies/DESIGN.md),
+[EXAMPLE](iterations/23-closure-bound-dependencies/EXAMPLE.md) and
+[HANDOFF](iterations/23-closure-bound-dependencies/HANDOFF.md). Read all three before review.
+
+Agreed conceptual direction: any dependencies, including constants and callable bindings, captured
+at closure creation; invocation arguments supplied later. Exact storage/API/identity/story remain
+assistant candidates. No glossary/specification change or generic capture guarantee follows.
+
+Read-only current-source review finds Recorder.call supports fixed internal builtins only,
+publish_callable wraps one normal callable, local/exchange validate exact pre-dispatch/publication/
+completion tree/parent deltas, and runner custody is direct-child only. Thus the initial proposed
+outer-double_sum/separate-inner-add-double requests would need additional invocation/history/process
+work, not simply capture authoring. Assistant explicitly recommends deferring that nested ordinary-call
+story and FIRST demonstrating captures with one fixed scaled-sum local func, shipped getter bindings
+and a literal-source scale. This narrowing is a recommendation for candidate review, not another
+user decision or proof that all other implementations are impossible. No runtime feasibility run.
+
+Recommend NEW example-local ordinary callable/environment/capture-key/closure/decision roles,
+E-before-binding-before-C construction avoiding self-ID cycles, graph retention links plus captured
+E ID/exact Python bytes, unchanged Q/binding/arguments/return/local protocol. Requested capture stays
+separate from invocation MAP and OLD executed capture. Prototype capture types are fixed supported
+internal getters and I64 constant, not a restriction on the conceptual term dependency.
+
+A captured scale changes meaning despite same intent and invocation MAP. Candidate NEW key includes
+recomputed computational capture K (scale datum plus captured getter FUNC URIs), alongside intent/full
+invocation MAP; source origin and exact equivalent getter binding remain provenance. This refines
+func identity in this NEW helper, not silent rewriting of old keys or approved generic recursive
+closure equivalence/masks/facets. Exact capture-key mechanics need explicit plan review.
+
+Candidate story SIX own Q/FOUR synchronous LOCAL attempts/EIGHT map-get positions: initialv1-scale2
+fresh84/adoptS1; old capture reuse84 after defaultsv2-scale3; old capture fresh84/v1; equivalent new
+v2/different-origin-scale2 capture reuseOLD84; new capture fresh84/v2; scale3 miss/fresh126/no adoption.
+Zero inner ordinary requests/support jobs/list/construction/compatibility calls/nested workers.
+
+After future reviewed plan/GO only: focused meaningful checks, sole isolated installed story/one
+final unchanged worker full-v and independent risk-based SAME stopped-history NONEXECUTING review.
+Owning validation policy applies; no duplicate full/computation rituals or inherited fixture scope.
+VP-001 planning revisit OPEN UNKNOWN/same owner/conditions/no standing waiver; proposed synchronous
+examples do not diagnose or authorize async/LMDB/open/lifetime work. Related need/recurrence needs
+fresh scoped triage. Native19 PAUSED/private candidate incomplete-unexecuted retained/GHA disabled/
+NOTRUN/notpass/BOTH coordinator-owned remain.
+
+Preparation verifies DML clean HEAD `a57125cdf735310f2330226ce6272b3a67e53f62`. ONLY design-note edits,
+read-only source/doc inspection and local Markdown/link/whitespace checks; no implementation/source/
+glossary/spec/diagram/build/install/test/story/reader/worker/investigation/CI/experiment/service/image/
+commit/push restart. No extra agent/cloud/global/release/package/later feature/design checkpoint
+publication. Candidate review precedes separate GO; completed22/paused19 permissions not inherited.
+
+## Iteration23 implementation and publication authorization
+
+The user stated **“iteration is GO. have the agent in window 2 implement it in a new session. you
+monitor its work, review, and provide feedback as necessary until the work is satisfactory. then
+have the agent commit and push.”** This approves the bounded23 DESIGN/EXAMPLE/HANDOFF, including
+fixed scaled-sum/getter+constant captures and nested ordinary-call deferral, for implementation;
+pending review/GO wording is superseded ONLY within that scope. Exact engineering spellings remain
+refinable; no as-built or acceptance outcome yet.
+
+Coordinator started EXISTING `dml-design:2`/%215 with `/new`, directly verified NEW session/zero
+context/unchanged model, and submitted [assignment](iterations/23-closure-bound-dependencies/ASSIGNMENT.txt).
+See [coordination](iterations/23-closure-bound-dependencies/COORDINATION.md). BOTH builds/source
+handed to worker until targeted changed-surface/HEAD freeze/release; coordinator monitors, independently
+reviews and provides feedback BEFORE authorizing accepted focused worker commit/NORMAL existing push.
+
+Pre-edit map/draft review/read-only installed readiness precede sole6Q4LOCAL8getter story; focused
+meaningful checks/ONE final unchanged worker full-v/risk-based SAME-history NONEXECUTING review under
+owning validation policy. Missing downloads/installations require approval. GHA stays disabled/
+NOTRUN/notpass; native19 PAUSED/privatecandidate incomplete-unexecuted retained/VP001 OPEN UNKNOWN/
+no standing waiver. Related need/recurrence requires fresh scope/triage. No extra worker/cloud/global/
+service/image/generic framework/native entity/release/package/later turn/design checkpoint publication.
+Implementation/acceptance/publication outcomes pending; completed22/paused19 permissions not inherited.
+
+## Iteration23 final publication and stop
+
+Bounded Iteration23 is **COMPLETE AND STOPPED**, independently accepted exact THIRTEEN paths and
+normally published **[`965cec4`](https://github.com/micha/dml/commit/965cec450356e5f776b68bc311fa4d7eaf690519)**,
+ONE parent `a57125cdf735310f2330226ce6272b3a67e53f62`. Read
+[results](iterations/23-closure-bound-dependencies/RESULTS.md),
+[review](iterations/23-closure-bound-dependencies/REVIEW.md),
+[coordination](iterations/23-closure-bound-dependencies/COORDINATION.md) and
+[implemented informative example](../dml/docs/closure-bound-dependencies.md).
+
+Explicit immutable getter bindings and I64 scale source are captured at closure creation, separately
+from exact a,b invocation arguments. New ordinary F/E/K/C and decision conventions use public APIs,
+actual graph retention and exact E/wrapper/helper/logical source bytes; no self-ID cycle or moving
+default lookup. Capture-aware intent+recomputed K+full MAP key prevents scale3 reusing scale2's84,
+while equal-valued source-distinct scale2/equivalent supported getter versions retain provenance but
+match computationally. Own Q/W reuse preserves NEW requested v2/sourceB versus OLD executed v1/sourceA;
+fresh work does not adopt. No generic arbitrary-callable equivalence/native entity/evaluator/nested
+ordinary worker/API or old helper-key change; native storage diagram claims unaffected.
+
+Coordinator independently ran44 focused metadata checks and authored1066 installed SAME464-history
+NONEXECUTING assertions, both0/empty stderr, no duplicate full/computation. ALL typed caller+replica
+rows/captures/public S/ordered F/Q/W/actual default promotion/pinned A/8getters/summary/no adoption/
+immutable data/source identity/four known0wait-reapedabsent children verified. Worker focused78+9/
+sole6Q4LOCAL8getter/actual84,84,84,84,84,126 remain distinct.
+
+Initial final full RAWtool1000sTIMEOUT at94% had noXML/checkexit/ownerexit/end; exact group exit UNKNOWN,
+not a pass or runtime diagnosis. Coordinator authorized ONE unchanged additional full solely for
+missing complete final evidence: driver/owner/check0/fullXML3108pass/native+Python100%/unchanged
+thresholds/deadlines/skips. Raw63bytespossiblylost/2warnings retained. Two tests' ONE+ONE terminalLF
+repairs have original copies/hashes/AST WITH locations equal; prior full-source qualifications and
+earlier mutant edge-test reconstruction explicitly retained. Seven executed helpers/controller/runtime
+sources remain exact current. Original coverage misuse/test-oracle errors/sessiontime/count corrections
+retained, not silently greenwashed.
+
+Worker actual stageaudit/commit/NORMAL existingpush0; independent publicationaudit0 exact current+
+committed+accepted+frozen13/parent/master/clean source-index/live originmaster AFTER push. Independent
+READ-ONLY workflowGET development232868302 disabled_manually/Release233518745 active; GHA NOTRUN/notpass.
+Install15/source+compiled/SAME data/evidence hashes unchanged, ONLY owned originals unavailable/inert
+evidence retained/no external fixture. Worker RESULTS finalized/explicit FINAL STOP ALL/no further
+tools/BOTH builds/source/prefix/stopped evidence returned. Native19 PAUSED/privatecandidate incomplete-
+unexecuted/VP001 OPEN UNKNOWN/no older diagnosis/standingwaiver/freshplatformgreen. Completed GO permits
+no worker/source/build/test/story/computation/reader/GHA/native investigation/service/image/extraagent/
+cloud/global/release/package/laterturn/design checkpoint restart. User review does not inherit new-turn
+permission.
+
+## Iteration24 agreed direction and candidate preparation
+
+After completed23 the user requested the next proposal. Assistant recommended a `double_sum` func
+invoking exact add/double closures captured at closure creation: common argument-map NODE -> result
+NODE, outer reuse skipping inner calls, swapped add(29,13) producing equal42 and permitting downstream
+reuse, and defaults not retargeting existing captures. These examples illustrate the direction;
+exact APIs/identity/publication/execution arrangement remained open.
+
+The user asked about the proposed “bounded, synchronous call interface supplied by the trusted
+wrapper, restricted to the closure's captured callable dependencies”, then whether trusted wrapper
+means execution adapter. Assistant clarified and corrected the wording: logical composition, DML
+call recording/reuse resolution, adapter execution/cleanup and recording integration are responsibility
+distinctions, not necessarily new entities/services. “Wrapper-supplied” should not predetermine where
+orchestration lives. Synchronous means obtaining a result node/error before continuing, not necessarily
+same-process. Restricted targets mean pinned captured dependencies, NOT a security sandbox. Bounded
+first slice means finite calls, no arbitrary recursion/scheduler or complete capture guarantee.
+
+The revised proposal made those distinctions explicit, preserved capture-aware identity without
+assuming arbitrary callable URI equivalence, and identified inner/outer association/publication/custody
+as the main design question. The user stated **“agreed. proceed”**. Coordinator treats this as agreement
+to the direction plus the offered candidate preparation, NOT exact schema/API/adapter/story approval
+or implementation/delegation/publication GO. No worker was contacted or restarted.
+
+Prepared [DESIGN](iterations/24-captured-ordinary-calls/DESIGN.md),
+[EXAMPLE](iterations/24-captured-ordinary-calls/EXAMPLE.md) and
+[conditional HANDOFF](iterations/24-captured-ordinary-calls/HANDOFF.md). Read ALL THREE before review.
+Read-only source review finds existing builtin dispatch fixed, Recorder write scopes/handle ownership
+single-batch, local/exchange tree/parent checks exact and process custody direct-child only. Thus the
+interface is NOT already implemented, and outer ordinary calls cannot be inserted casually into an
+old local publication or counted as old public-S-validated local attempts.
+
+Assistant recommends one NEW example-local synchronous in-process outer adapter, with unchanged
+synchronous local exchange for leaf funcs in isolated owned repositories. The SAME finite application
+owns direct leaf children; no outer worker/async/RPC/descendants. New outer Q/T/phase/return/selection
+ordinary profiles have their own structural authority, not made-up old local roles. Short public
+recording batches plus session-owned copied node handles preserve exact sources across calls; no
+native handle/write spans dispatch. Conservative NEW intent+verified-B/E+full-MAP keys account for
+captures without asserting general ordinary-callable equivalence. Old helpers/roles stay unchanged.
+These are assistant candidate mechanics for review, NOT additional user decisions or measured feasibility.
+
+Recommended sole story FOUR outer Q/THREE in-process outer T/SIX leaf Q/FIVE synchronous LOCAL leaf T:
+TEN requests/EIGHT attempts/FIVE direct leaf children/FOURTEEN getter positions. Outer-hit row makes
+no inner Q; swapped row gets NEW add R/NEW double Q with OLD selected double T/R; explicit final fresh
+control proves pinned old execution after changed defaults without adoption. Existing16/16/64 and
+transfer caps retained; prospective graph/custody/profile design needs pre-edit review after future GO.
+No source run, compiler, installation, experiment, story or actual counts claimed in preparation.
+
+Implementation verified clean HEAD `965cec450356e5f776b68bc311fa4d7eaf690519`; ONLY design-note edits,
+read-only source/docs and local Markdown/link/whitespace checks. Completed23 stays stopped/BOTH builds
+and source coordinator-owned. Development GHA disabled/NOT RUN/not pass; native19 PAUSED/private
+candidate incomplete-unexecuted retained; VP-001 planning revisit OPEN UNKNOWN/same coordinator owner/
+conditions/no standing waiver or investigation permission. Related need/recurrence requires fresh scope.
+No source/spec/glossary/diagram/worker/build/install/test/story/reader/CI/native investigation/service/
+image/experiment/commit/push restart, extra agent/cloud/global/release/package/later turn/design checkpoint.
+Review candidates, then separate GO; completed23/paused19 authorizations are not inherited.
+
+## Iteration24 implementation and publication authorization
+
+On 2026-11-02 the user stated **“iteration is GO. have the agent in window 2 implement it in a
+new session. you monitor its work, review, and provide feedback as necessary until the work is
+satisfactory. then have the agent commit and push.”** This approves bounded24 DESIGN/EXAMPLE/HANDOFF
+for implementation, including the example-local synchronous in-process outer adapter and unchanged
+LOCAL leaves, not as-built behavior. Exact engineering spellings remain refinable; mandatory concrete
+pre-edit review BEFORE coding/build/run and readiness review BEFORE sole installed story remain.
+
+Coordinator inspected clean implementation master/index/HEAD965cec450356e5f776b68bc311fa4d7eaf690519,
+existing idle window2 `%215`, sent `/new` and observed **New session started**, zero context and
+unchanged model before assigning [worker handoff](iterations/24-captured-ordinary-calls/ASSIGNMENT.txt).
+See [coordination](iterations/24-captured-ordinary-calls/COORDINATION.md) for actual saved-session ACK,
+review gates and later evidence. BOTH builds/source explicitly handed to worker until targeted
+changed-surface/HEAD freeze and release. Coordinator monitors/reviews/feedback until satisfactory;
+focused accepted worker commit/NORMAL existing push only after independent acceptance/instruction.
+Unrelated design notes preserved; no design checkpoint publication requested.
+
+Bounded sole FOURouterQ/THREEouterT/SIXleafQ/FIVELOCALleafT/14getter story, public APIs/new example-local
+helpers/unchanged runtime preferred; missing seam requires review BEFORE expansion. Owning validation
+policy/focused meaningful evidence/one final unchanged worker full-v with true completion/exit and no
+optional tool1000s cutoff/SAME stopped-history NONEXECUTING independent review, no duplicate full/
+computation rituals. Development GHA disabled NOTRUN notpass/no enable-run-control change; native19
+PAUSED/private candidate incomplete-unexecuted retained/VP001 OPEN UNKNOWN/same follow-up owner and
+conditions/no standing waiver. Related need/recurrence requires fresh scope/triage. No extra agent/
+cloud/global/service/image/generic evaluator-cache-framework/native entity/resources/scheduler/release/
+package/later turn/design checkpoint publication; completed23/paused19 permissions not inherited.
+Implementation/acceptance/publication outcomes pending; historical candidate statuses above superseded
+ONLY within this bounded scope.
+
+Pre-edit seven-area plan reviewed; worker statically found full requested+ORIGINAL direct semantic
+union72/projected74, not native measurement. Coordinator explicitly chose source-sharing alternative
+B ONLY in [PRE-EDIT](iterations/24-captured-ordinary-calls/PRE-EDIT.md): two outer getters enforce a,b
+I64 then ordinary add receives ORIGINAL exact input-map NODE; construct double input from exact add R
+DIRECT. No source projection or aggregate96 extension. TWO maps rather than original THREE, separate
+owning ledgers retain fourteen actual getter positions even shared immutable content. Symbolic full
+union50 still needs actual prospective validation/reservations before launch. Concrete failures/
+initial-final same-occurrence T/outer W reviewed. Worker ACK implementing new example-local draft/
+focused public/native-fault checks/finite measured mutants, unchanged runtime; readiness preparation
+via existing cache/tools allowed but STOP before sole installed computation for coordinator review.
+See coordination; BOTH worker-owned, acceptance/publication pending, all stop boundaries unchanged.
+
+## Iteration24 final delivery and stop
+
+Bounded captured ordinary-call implementation is independently accepted and normally published through
+`59b38303fe2f4c89d6fce3b01933f7260eb28320`, initial33 commit291d9a5 and feature-parent965cec.
+Actual logical double_sum invokes captured ordinary add/double through NEW example-local in-process
+outer adapter plus unchanged synchronous LOCAL leaves. Original argument-map NODE forwarded to add;
+exact returned add R feeds double, values/provenance separate, outer and inner selected reuse keep own
+new Q versus OLD producers, moving defaults do not retarget closure and fresh work does not adopt.
+
+Independent2052 installed SAME979 typed rows x TWO stores NONEXECUTING assertions and reporter3 pass;
+reviewed worker actual10Q8T5DIRECT LOCAL14getters/custody/SAME readers remain distinct. One full RAWexit1
+passed native7 and pytest3354+two warnings, then NoSource coverage reporting; PythonJUnit ABSENT. User
+explicitly permits needed exclusions/expedited completion: EXACT3 generated scaffold labels excluded,
+canonical code100 retained, reporter3 + resumed0 completes remaining memory/CLI141/native100 gates
+without second47min suite. This is accepted COMBINED evidence, not successful original standard command
+or fresh platformgreen. ONEp124 no-value raise/static AST/source-B marker qualification also retained.
+
+First installed controller kind-collision failure is retained as partialUNKNOWN1Q1T1getter/zeroleaf,
+controller-only fix/realphase regression29/new-context activation reviewed; successful record stores/
+sources separate and immutable. Staged whitespace failure accidentally ignored by shell before initial
+local commit, corrected secret audit and fail-closed EOF followup1/3/1/1 suffix bytes/ASTlocations equal;
+originalaudit/incorrecttwoLF premise/coordinator tracked-only/FNF129-vs-summary131 oracle corrections,
+old executed sourceB byte identities/other raw failed or weak probes remain explicitly qualified.
+
+Final independent publication audit verifies exact cumulative33/currentcommittedaccepted EOF-equivalence/
+clean master-index/live originmaster after normal push0 and independent workflow GET developmentdisabled/
+releaseactive. Worker RESULTS finalized and explicit STOP ALL/no further tools/BOTH builds/source/prefix/
+stopped evidence returned. No amend/force/tag/release/package/design checkpoint publication. See
+[review](iterations/24-captured-ordinary-calls/REVIEW.md), [results](iterations/24-captured-ordinary-calls/RESULTS.md)
+and [coordination](iterations/24-captured-ordinary-calls/COORDINATION.md). GHA NOTRUN/notpass/native19PAUSED/
+VP001OPENUNKNOWN/no older diagnosis/standing waiver. Completed GO is not permission to restart or begin
+another turn; future direction only when requested. User requested no design checkpoint commit/push.
+
+## Checkpoint through Iteration24: retrospective review
+
+The user requested “let's take a checkpoint here and review what we've learned so for”.
+This authorizes a local design checkpoint of accumulated Iteration20–24 notes and a retrospective,
+not implementation or a push. [Learning summary](checkpoints/24-lessons.md) separates demonstrated
+capabilities, conceptual agreements, example-specific policies and open review questions.
+
+The central lessons are separate record/computation/occurrence identity; value-oriented node calls
+with actual source provenance retained separately; dependencies pinned at closure creation; explicit
+selection/fresh/adoption/default decisions; and ordinary captured composition with separate outer
+and inner reuse. Capture-aware matching remains example-specific, not a general equivalence system.
+Validation is evidence of particular behavior, not automatic scientific certification or all-platform
+assurance. Original failures, source qualifications, combined24 validation and UNKNOWNs remain intact.
+
+Implementation locally verified clean at59b38303fe2f4c89d6fce3b01933f7260eb28320, unchanged by this
+checkpoint. Existing worker stays stopped/BOTH coordinator-owned; development GHA disabled/native19
+investigation PAUSED/private candidate retained/VP-001 OPEN UNKNOWN and existing follow-up conditions
+remain. No tests/builds/readers/story/CI/native investigation or new implementation delegation launched.
+Earlier no-design-checkpoint-request statements describe their historical turns, superseded ONLY by
+this local checkpoint request. No next direction or new engineering plan is selected.
+
 ## Resume point
+
+**Review the checkpoint through Iteration24:** [what we have learned](checkpoints/24-lessons.md).
+Discuss the conceptual foundation and remaining questions before choosing another turn. Local design
+checkpoint requested; no push or implementation restart. DML clean59b3830/completed24 stopped/GHA
+disabled/native19 PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned remain. The older resume stages
+below are historical, not active assignments.
+
+Iteration24 **COMPLETE AND STOPPED through59b38303fe2f4c89d6fce3b01933f7260eb28320**.
+Read [final delivery](#iteration24-final-delivery-and-stop),
+[review](iterations/24-captured-ordinary-calls/REVIEW.md) and
+[results](iterations/24-captured-ordinary-calls/RESULTS.md). Exact cumulative33/normalpush/independent2052+3/
+clean/live remote/workflows/workerSTOP/BOTH return verified. Accepted combined originalfull1/3354 tests+
+resumed0/canonicalPython8962/native100 preserves rawfailedreport/noPythonJUnit/EOF-source/warnings/oracle
+qualifications; no automatic extra suite/computation. GHA disabled/native19PAUSED/VP001OPENUNKNOWN;
+no restart/later turn/design checkpoint. Older resume stages below historical where superseded.
+
+Iteration24 **GO: existing window2 assigned in a verified NEW session**. Read
+[authorization](#iteration24-implementation-and-publication-authorization), ALL THREE24 documents and
+[coordination](iterations/24-captured-ordinary-calls/COORDINATION.md). Concrete seven-item pre-edit
+review accepted source-sharing B ONLY: outer getters validate a,b I64/add ORIGINAL input NODE/double
+map exact addR DIRECT/TWO maps/14 owning positions/no projection/cap increase. Worker drafting/focused
+checks; FINAL readiness STATIC accepted, ONE exact installed10Q8T5LOCAL14getter plus successful-stage
+SAME blocked readers/one final unchanged full-v authorized historically; FIRST activation RAWfailedcontroller logging collision
+BEFORE leaflaunch. SAME read-only triage0/partialUNKNOWN/zerochildren; ONLY controllerfix+metadata
+regression GO, fresh readiness/explicit activation REQUIRED before story/full. Originals retained,
+independent implementation acceptance/publication pending. Monitor/independently review/feedback before
+accepted focused worker NORMAL commit/push. BOTH builds/source
+worker-owned until targeted freeze/release; one final unchanged full-v/SAME nonexecuting independent
+review. GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN; no extra worker/later turn/design checkpoint.
+Outcomes pending; older resume stages below historical where superseded.
+
+Iteration24 **captured-ordinary-call DESIGN/EXAMPLE/HANDOFF prepared for review; separate GO pending**.
+Read [agreement/preparation](#iteration24-agreed-direction-and-candidate-preparation) and ALL THREE
+[documents](iterations/24-captured-ordinary-calls/HANDOFF.md). Direction agreed; in-process outer adapter,
+NEW outer profiles/short-scope session bridge/conservative B-E key/10Q8T5LOCAL14getter are assistant
+candidates, not approved engineering/as-built evidence. DML clean965cec4/completed23 stopped/BOTH
+coordinator-owned/GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN. No source/worker/build/test/story/
+reader/CI/investigation/commit/push restart or design checkpoint. Review then separate GO. Older resume
+stages below historical.
+
+Iteration23 **COMPLETE AND STOPPED through965cec450356e5f776b68bc311fa4d7eaf690519**.
+Read [delivery](#iteration23-final-publication-and-stop), [review](iterations/23-closure-bound-dependencies/REVIEW.md)
+and [results](iterations/23-closure-bound-dependencies/RESULTS.md). Exact13/parenta57125c/current+
+committed+frozen/clean/live originmaster/workflows independently verified; independent44/1066 SAME464
+NONEXECUTING versus worker78+9/completefull3108/sole6Q4LOCAL8getter. InitialRAWtoolTIMEOUT/groupUNKNOWN/
+raw63possiblylost/EOF+mutant qualifiers retained. Worker finalSTOP/BOTH returned; GHA disabled/NOTRUN/
+native19 PAUSED/VP001 OPEN UNKNOWN. No restart/laterturn/design checkpoint permission; next direction
+only when requested. Older resume stages historical where superseded.
+
+Iteration23 **GO; existing window2 assigned in a verified NEW session**.
+Read [authorization](#iteration23-implementation-and-publication-authorization), ALL THREE23 docs
+and [coordination](iterations/23-closure-bound-dependencies/COORDINATION.md). Monitor/independently
+review/feedback before satisfactory focused worker NORMAL commit/push. BOTH builds/source worker-owned
+until targeted freeze/release; isolated6Q4LOCAL8getter/one final unchanged full-v/SAME nonexecuting
+review. GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN; no extra worker/later turn/design checkpoint.
+Outcomes pending; older resume states below historical where superseded.
+
+Iteration23 **closure-bound-dependency DESIGN/EXAMPLE/HANDOFF prepared for review; implementation GO pending**.
+Read [preparation](#iteration23-candidate-preparation) and ALL THREE documents linked above.
+General dependency capture is agreed; scaled-sum/fixed getter+constant/C-E-K-D/capture-aware reuse/
+SIX-Q-FOUR-local-EIGHT-getter and deferring nested ordinary requests are assistant candidates for review,
+not as-built or exact plan approval. DML clean published a57125c/completed22 stopped; GHA disabled/
+native19 PAUSED/VP001 OPEN UNKNOWN/BOTH coordinator-owned. No worker/source/build/story/reader/CI/
+investigation/commit/push restart or design checkpoint. Review then separate GO; older states historical.
+
+
+Iteration22 **COMPLETE AND STOPPED**, independently accepted/published
+`a57125cdf735310f2330226ce6272b3a67e53f62`/parenta523b0b/exact13/current+committed+accepted/clean/
+live remote verified. Read [delivery](#iteration22-final-publication-and-stop),
+[review](iterations/22-composed-node-calls/REVIEW.md) and
+[results](iterations/22-composed-node-calls/RESULTS.md). Independent41/1607 SAME641 NONEXECUTING
+versus worker87+5/full3021/actual8Q6T10getter; original failures/source+oracle qualifications retained.
+Worker STOP ALL/BOTH returned; GHA disabled/NOTRUN/native19 PAUSED/VP001 OPEN UNKNOWN. No restart/
+laterturn/design checkpoint permission. Discuss next direction only when requested; old states historical.
+
+Iteration22 **INDEPENDENTLY ACCEPTED exact13; accepted focused worker publication/STOP pending**.
+Read [acceptance](#iteration22-independent-acceptance-and-publication-gate) and
+[review](iterations/22-composed-node-calls/REVIEW.md). Independent41/1607 SAME641 NONEXECUTING,
+reviewed worker87+5/full3021/actual8Q6T10getter. Worker exactpublication/identity/workflowGET/RESULTS/
+STOP only; no source/build/reader/story/computation/GHA/native19/later turn/design checkpoint.
+GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN/failures+oracle qualifications retained. Older states
+historical where superseded.
+
+Iteration22 **GO: bounded composed-node-call implementation delegated to existing window2 in a
+verified NEW Pi session**. Read [authorization](#iteration22-implementation-and-publication-authorization),
+ALL THREE22 plan documents and [coordination](iterations/22-composed-node-calls/COORDINATION.md).
+Monitor/review/feedback until satisfactory, then accepted focused worker normal commit/push.
+BOTH builds/source worker-owned until targeted freeze/release; isolated installed8Q6T10getter/ONE
+final unchanged full-v/SAME-history NONEXECUTING review. GHA disabled/native19 PAUSED/VP001 OPEN
+UNKNOWN; no extra worker/later turn/design checkpoint. Outcomes pending; older resume states historical.
+
+Iteration22 **composed-node-call candidates prepared for review; implementation GO pending**.
+Read [preparation and corrections](#iteration22-composed-node-calls-candidate-preparation) and ALL THREE
+[design](iterations/22-composed-node-calls/DESIGN.md),
+[example](iterations/22-composed-node-calls/EXAMPLE.md),
+[handoff](iterations/22-composed-node-calls/HANDOFF.md). Existing return-node support is not missing;
+proposed new work connects public successful producers/node arguments/own requests/downstream value
+reuse and separate selected-attempt provenance. Recommended C/decision/reader/8Q6T10getters need
+review then separate GO, not as-built. DML clean a523b0b/completed21 stopped/GHA disabled/native19
+PAUSED/VP001 OPEN UNKNOWN/BOTH coordinator-owned. No worker/source/build/story/CI/native investigation/
+commit/push restart or checkpoint requested. Earlier resume states historical where superseded.
+
+Iteration21 **COMPLETE AND STOPPED**, independently accepted and normally published
+`a523b0bfc8c4cc9f96a36b7b62138d9645b3eab3`. Read [delivery](#iteration21-final-publication-and-stop),
+[review](iterations/21-internal-builtins/REVIEW.md) and
+[results](iterations/21-internal-builtins/RESULTS.md). Exact29/current+committed+parent/clean source/
+live remote verified; worker finalSTOP/BOTH returned. Independent48/FINAL-installed1424 distinct
+from reviewed workerfull2929/original3Q2T16/SAME467/final-nojobNaN95. Original/final qualification/
+rawerrors/VP001 OPEN UNKNOWN/native19 PAUSED retained; development GHA disabled/NOTRUN/notpass.
+No new turn/restart or design checkpoint commit/push permission. Discuss next direction only when
+requested; completed GO does not authorize implementation/investigation. Earlier resume states historical.
+
+Iteration21 **independently ACCEPTED exact29; focused worker normal publication/STOP pending**.
+Read [acceptance](#iteration21-independent-acceptance-and-publication-gate),
+[review](iterations/21-internal-builtins/REVIEW.md) and
+[coordination](iterations/21-internal-builtins/COORDINATION.md). Independent48/FINAL-installed1424
+NONEXECUTING distinct from reviewed workerfull2929/original3Q2T16/SAME467/NaN95. Original/final
+runtime qualifications preserved. Await exact publication/workflowGET/RESULTS/STOP then coordinator
+final identity/disposition audit; no extra full/story/GHA/native19/later turn/design checkpoint.
+Earlier resume statements below historical where superseded.
+
+Iteration21 **GO: reviewed bounded internal-builtins implementation assigned to existing window2
+in a NEW session**. Read [authorization](#iteration21-implementation-and-publication-authorization),
+ALL THREE plan documents and [coordination](iterations/21-internal-builtins/COORDINATION.md).
+Monitor/review/feedback until satisfactory, then accepted focused worker normal commit/push.
+BOTH builds/source worker-owned until targeted release; fresh isolated installed3Q2T/16positions/
+ONE final unchanged full-v/SAME-history NONEXECUTING independent review. GHA disabled/native19
+PAUSED/VP-001 OPEN UNKNOWN; no later turn/design checkpoint. Final outcomes pending.
+Earlier resume statements below historical where superseded.
+
+Iteration21 **bounded internal-builtins plan reviewed; implementation GO pending**.
+Read [review checkpoint](#iteration21-plan-review) and ALL THREE linked documents. Exact engineering
+spellings remain refinable; review is not as-built/delegation/publication permission. Separate GO
+required; no worker/source/build/install/story/CI/native investigation/commit/push restart. DML7e9bf13/
+completed20 stopped/GHA disabled/VP-001 OPEN UNKNOWN/BOTH coordinator-owned; no checkpoint requested.
+Earlier resume statements below historical where superseded.
+
+Iteration21 **candidate internal-builtins DESIGN/EXAMPLE/HANDOFF prepared for review; GO pending**.
+Read [preparation](#iteration21-candidate-preparation) and ALL THREE linked documents. Agreed common
+node calling convention/NULL internal versioned binding, recommended installed fixed Python surface/
+ordinary profiles/narrow native URI references+external namespace guards/three-Q-two-local story
+remain distinguishable. No worker/source/build/install/story/CI/native investigation/commit/push
+restart. Current DML7e9bf13/completed20 stopped/GHA disabled/VP-001 OPEN UNKNOWN/BOTH coordinator-owned.
+Review candidates, then separate GO; earlier resume statements below historical where superseded.
+
+Next direction: URI-addressed built-ins/internal versioned bindings plus
+[standard node-based func invocation](#standard-func-invocation-argument-map-node-to-result-node).
+User agrees argument-map construction is the common calling procedure; built-ins can return a
+primitive node, other funcs return a result-sub-DAG node. Value access stays separate from source
+provenance; exact profiles/APIs/acceptance plan still open. No prepared handoff/implementation GO.
+
+Next direction: [URI-addressed built-in funcs with internal versioned bindings](#next-iteration-built-in-funcs-and-internal-versioned-bindings).
+User agrees conceptual NULL-adapter/source-URI model; exact profiles/APIs/function set/acceptance
+plan remain open, no implementation GO or prepared handoff. Iteration20 accepted complete-stopped;
+GHA disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned. No restart or
+checkpoint publication; older resume statements below historical where superseded.
+
+The user has [reviewed and accepted completed Iteration20](#iteration20-user-review).
+Remain stopped; discuss a new direction only when requested, with separate authorization
+before implementation. No checkpoint publication requested.
+
+Iteration20 **COMPLETE AND STOPPED through `7e9bf133d5d175a492fb1e9d651e91a476358604`**.
+Read [delivery](#iteration20-delivery-publication-and-stop),
+[RESULTS](iterations/20-recorded-argument-maps/RESULTS.md) and
+[REVIEW](iterations/20-recorded-argument-maps/REVIEW.md). Recorded maps/datum-only callable access/
+func-value reuse and separate actual provenance delivered, independent37/2424 and reviewed
+worker2798/sole actual5Q4T6getter remain distinct. Exact15/clean source+live remote verified;
+GHA disabled/NOT RUN/notpass, native investigation PAUSED/VP-001 OPEN UNKNOWN/original failures
+preserved. Worker STOP ALL/BOTH coordinator-owned; no restart/later turn/checkpoint authorized.
+Earlier resume points below historical where superseded.
+
+Iteration20 **GO; existing window-2 agent in a NEW session implements the reviewed replacement**.
+Read [authorization](#iteration20-implementation-and-publication-authorization), ALL THREE plan
+documents and [coordination](iterations/20-recorded-argument-maps/COORDINATION.md). Monitor/review/
+feedback until satisfactory, then explicit accepted worker normal commit/push. BOTH builds/source
+worker-owned until targeted freeze/release; FIVE-Q/FOUR local/SIX getter story/one final unchanged
+full-v/risk-based SAME-history readers. GHA disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN.
+No extra workers/cloud/global/later turn/design publication. Final outcomes pending; earlier resume
+points below are historical where superseded.
+
+Iteration20 **bounded replacement recorded-argument-map plan reviewed; implementation GO pending**.
+Read [plan review](#iteration20-replacement-plan-review) and ALL THREE replacement documents.
+No source/worker/build/story/CI/native investigation/commit/push restart. Exact engineering
+spellings refinable; prior projection plan deferred/GHA disabled/VP-001 OPEN UNKNOWN preserved.
+Earlier preparation/review-pending resume points below are historical where superseded.
+
+Iteration20 **replacement recorded-argument-map design/example/handoff prepared for review;
+implementation GO pending**. Read [preparation](#iteration20-replacement-candidate-preparation)
+and all three replacement documents. Source/profile/facade/trace/datum-keyed-table/FIVE-Q-FOUR-local
+mechanics are candidates, not schema approval/as-built/implementation permission. Old projection
+candidate deferred. No worker/source/build/story/CI/investigation/commit/push restart. DML clean
+47131da; GHA disabled/native investigation PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned.
+Review then separate GO; older resume points below are historical where superseded.
+
+Iteration20 **bounded recorded-map prototype direction agreed**: ordinary-DAG/Python map_empty,
+immutable map_insert (duplicate error), map_get (missing error), datum-only callable operation
+interface, explicit returned-datum contract, and func+argument-map-datum caching. Read
+[prototype agreement](#iteration20-agreed-prototype-recorded-map-operations-and-datum-only-callable-access).
+Replacement design/example/handoff not yet prepared; exact mechanics/counts need review, then
+separate implementation GO. Prior projection candidate deferred; GHA disabled/native investigation
+paused/VP-001 OPEN UNKNOWN; no worker/source/build/story/publication restart.
+
+Latest Iteration20 agreement: **recorded argument-map construction retains source relationships;
+funcs use datum-only map access**. Read [argument maps](#iteration20-argument-maps-value-structure-versus-construction-provenance).
+Construction/insertion/access computational primitives and their bounded plan are not yet implemented
+or prepared; current datum storage operations alone do not record derivation. No implementation GO.
+
+Iteration20 **redirected to value arguments and separate provenance; revised candidate not yet
+prepared**. Read [direction](#iteration20-redirection-value-arguments-and-separate-provenance).
+Prior projection-policy candidate DEFERRED, not an executable handoff. Clarify/design typed value
+and callable access boundaries before replacement design/example/handoff; no implementation GO.
+No worker/source/build/story/CI/investigation restart; GHA disabled/VP-001 OPEN UNKNOWN preserved.
+Earlier resume points below are historical where superseded.
+
+Iteration20 **candidate design/example/handoff prepared for review; implementation GO pending**.
+Read [planning](#iteration20-agreed-direction-and-candidate-preparation) and all three linked
+candidate documents. Direction agreed/preparation authorized; fixed-profile/P/Mp/Dp/projection/
+public-authority/seven-Q-six-local mechanics remain candidates. No worker/source/build/story/
+CI/investigation/commit/push restart. DML clean47131da; development GHA disabled/native investigation
+PAUSED/VP-001 OPEN UNKNOWN. Review then separate GO; earlier resume points below are historical.
 
 Iteration19 **accepted feature `a71e89f`; investigation continues through diagnosticround2 `47131da`**.
 ActualCI41299279030 attempt1 running; no production/nativefix or finalgreen/disposition/STOP.

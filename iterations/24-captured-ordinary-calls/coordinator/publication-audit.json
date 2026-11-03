@@ -1,0 +1,16 @@
+{
+  "independent_publication_audit": "PASS",
+  "published_sha": "59b38303fe2f4c89d6fce3b01933f7260eb28320",
+  "parent": "291d9a5aa3e997a4807297a8c58a3574c0a77b42",
+  "feature_parent": "965cec450356e5f776b68bc311fa4d7eaf690519",
+  "cumulative_exact_paths": 33,
+  "current_committed_accepted_EOF_equivalent": true,
+  "clean_master_index": true,
+  "live_remote_after_push": "59b38303fe2f4c89d6fce3b01933f7260eb28320",
+  "development_workflow": "disabled_manually",
+  "release_workflow": "active",
+  "GHA_not_run_not_pass": true,
+  "successful_and_failed_evidence_immutable": true,
+  "executed_old_source_EOF_B_identity_qualified": true,
+  "raw_original_full_failed_resumed_combined": true
+}

@@ -1,0 +1,33 @@
+{
+  "independent_checks": 2052,
+  "independently_authored_NONEXECUTING": true,
+  "actual_typed_bundle_rows": 979,
+  "repositories": [
+    {
+      "repository": "/work/repos/micha/dml/build/iteration24/acceptance/corrected/story/caller.dml",
+      "outer_requests": 4,
+      "leaf_requests": 6,
+      "outer_attempts": 3,
+      "local_attempts": 5,
+      "getter_positions": 14
+    },
+    {
+      "repository": "/work/repos/micha/dml/build/iteration24/acceptance/corrected/story/replica.dml",
+      "outer_requests": 4,
+      "leaf_requests": 6,
+      "outer_attempts": 3,
+      "local_attempts": 5,
+      "getter_positions": 14
+    }
+  ],
+  "before": {
+    "/work/repos/micha/dml/build/iteration24/acceptance/corrected/story/caller.dml": "c92d91f1e39e57f15bf7dbe28696cb98779fa520f72447fe2b74b9bfaa170e0c",
+    "/work/repos/micha/dml/build/iteration24/acceptance/corrected/story/replica.dml": "50d3a1511168e759d014300a5e6fd9058e568779a67509f210ca1335dc81d713"
+  },
+  "after": {
+    "/work/repos/micha/dml/build/iteration24/acceptance/corrected/story/caller.dml": "c92d91f1e39e57f15bf7dbe28696cb98779fa520f72447fe2b74b9bfaa170e0c",
+    "/work/repos/micha/dml/build/iteration24/acceptance/corrected/story/replica.dml": "50d3a1511168e759d014300a5e6fd9058e568779a67509f210ca1335dc81d713"
+  },
+  "new_requests_attempts_computations": 0,
+  "no_historical_PID_actions": true
+}

@@ -1,0 +1,10 @@
+{
+  "initial_commit": "291d9a5aa3e997a4807297a8c58a3574c0a77b42",
+  "parent": "965cec450356e5f776b68bc311fa4d7eaf690519",
+  "committed_frozen_paths": 33,
+  "committed_frozen_hashes_exact": true,
+  "independent_credential_scan_findings": [],
+  "original_staged_whitespace_audit_FAILED": true,
+  "unguarded_shell_continued_commit": true,
+  "publication_HOLD_pending_EOF_only_followup": true
+}

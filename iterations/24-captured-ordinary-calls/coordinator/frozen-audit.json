@@ -1,0 +1,25 @@
+{
+  "frozen_source_paths": 33,
+  "current_frozen_equal": true,
+  "head": "965cec450356e5f776b68bc311fa4d7eaf690519",
+  "emptyindex": true,
+  "raw_full_exit": 1,
+  "primary_pytest_pass": 3354,
+  "PythonJUnit_absent_qualified": true,
+  "resumed_exit": 0,
+  "retainedPython": 8962,
+  "native_raw_counter_sums": {
+    "LF": 1667,
+    "LH": 1667,
+    "FNF": 129,
+    "FNH": 129,
+    "BRF": 1550,
+    "BRH": 1550
+  },
+  "native_primary_function_summary": "131/131 100%",
+  "coordinator_oracle_correction": "First static audit wrongly equated raw FNF129 sum with primary summary131; both hit=total, no DML test/threshold failure. Alias/count relationship not diagnosed.",
+  "preservedCoverageData_exact": true,
+  "failed_context_preserved": true,
+  "successful_story_data_immutable": true,
+  "independent_static_audit": "PASS"
+}

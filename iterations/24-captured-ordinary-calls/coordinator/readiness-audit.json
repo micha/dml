@@ -1,0 +1,19 @@
+{
+  "static_audit": "PASS",
+  "current_changed_paths": 31,
+  "exact_copied_sources": 10,
+  "installed_artifacts": 15,
+  "worker_metadata_control_exits": [
+    0,
+    0,
+    0
+  ],
+  "worker_v23_cases": 5,
+  "cumulative_informative_retained_statements": 1144,
+  "approved_excluded_raise": 124,
+  "source_AST_with_locations_equal": true,
+  "old_proof_pre_marker_qualified": true,
+  "story_absent": true,
+  "independently_executed_DML_tests_builds_readers_computations": 0,
+  "not_implementation_acceptance": true
+}
