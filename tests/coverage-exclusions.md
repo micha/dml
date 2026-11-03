@@ -567,6 +567,60 @@ THAT offline client, full native bytes/ordered parents/occurrence populations an
 persisted census. Original failures and UNKNOWN causes remain in
 [Iteration15 RESULTS](../../dml-design/iterations/15-intent-reuse-defaults/RESULTS.md).
 
+## Iteration 24 captured-ordinary-call exclusion
+
+Only `examples/captured_calls.py`, `inspect_closure()`'s
+`raise ValueError("captured dependency not retained")` carries `# pragma: no cover`.
+The condition and every other statement in the function remain measured.
+
+The earlier outer-DAG membership check uses `builtin.Inspector._retained`, which
+completely traverses typed native DAG/node edges through ALL-parent commit history.
+Strict `b.shape`/`b.link` checks establish that binding, environment, key, captured
+add/double closures and map binding are actual linked SubDAGs. Once the outer DAG
+is retained, every such linked dependency MUST be in the same native closure.
+Reaching this final raise requires a broken native closure/Inspector, not a legal
+malformed application state passing the earlier checks. Fabricating inconsistent
+membership flags would violate the native inspector contract without adding assurance.
+
+This precise one-line denominator removal is **not a passing test**. Malformed
+capture profiles, supported binding/source identity, native retention and ORIGINAL
+Q/T/F/selection/producer authority remain meaningful retained tests. No block/function,
+source omission, threshold, native failure/ref/control/reuse guard or profile is excluded.
+Revisit this invariant if native closure traversal or the captured-link profile changes.
+See [Iteration24 coverage checkpoint](../../dml-design/iterations/24-captured-ordinary-calls/COVERAGE-STATUS.md)
+for pre-marker source/proof qualification, AST-with-locations equality and actual populations.
+
+## Iteration 24 generated HOST reporting labels
+
+The user separately approved exact report/source-population omissions for ONLY these
+root-qualified synthetic labels in `scripts/check.sh`:
+
+- `$root/HOST captured leaf entry`: ten-line test-generated bootstrap prelude.
+- `$root/HOST captured reuse entry`: ten-line test-generated bootstrap prelude.
+- `$root/isolated old event append`: one-line isolated legacy serialization regression.
+
+These are non-maintained execution scaffolds, not captured maintained helper aliases
+or production modules. The first two import/retain exact wrapper/logical bytes and
+invoke the validated fixed leaf wrapper; their execution is already exercised by the
+HOST functional/native-authority tests and separately by actual installed five-child
+acceptance. The third is deliberately executed against the same real phase receipt
+and rejects the historical duplicate-key bug. Their synthetic filenames have no
+source file at report time; repeating measurement of these generated test statements
+adds no maintained-code assurance. Their excluded statement population is not claimed
+as passing coverage. The original measured lines/data and RAW failed full report remain.
+
+Actual `examples/captured_call_leaf.py`, `examples/composed_node_funcs.py`, every other
+maintained example/helper/package and meaningful guard remain measured with retained
+100% threshold. Only these three exact labels join the existing tests/subprojects/build
+omissions, consistently for collection/report/XML/HTML; no wildcard example/package
+omission, ignore-errors or runtime/captured-binding change. Pure reporter regressions
+prove all three absent scaffold labels can be omitted while actual uncovered maintained
+source still fails the unchanged 100% gate. Revisit if a label becomes maintained code.
+
+See [reporting completion evidence](../../dml-design/iterations/24-captured-ordinary-calls/REPORTING-COMPLETION.md)
+for original immutable data/source/counter provenance, missing Python JUnit qualification
+and raw full failure versus subsequent resumed-stage outcomes.
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through

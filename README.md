@@ -166,6 +166,11 @@ getter bindings and an I64 scale source at closure creation, separately from inv
 Its new capture-aware key preserves requested versus OLD executed capture; default changes never
 retarget immutable closures. [Explicit installed acceptance](tests/closures/README.md) has six Q/
 four synchronous LOCAL attempts/eight child getters, not nested ordinary calls or a general evaluator.
+The [captured ordinary-call draft](docs/captured-ordinary-calls.md) supplies a fixed double_sum with
+actual captured add/double calls through a NEW example-local in-process adapter and unchanged LOCAL
+leaves. Short recording scopes/direct result nodes preserve own requests versus OLD selected chains;
+convenience defaults do not retarget captures. [Gated installed acceptance](tests/captured_calls/README.md)
+is opt-in and currently pending; no native entity, general evaluator or runtime dispatcher is added.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

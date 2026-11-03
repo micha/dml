@@ -40,7 +40,7 @@ run_python_tests_and_coverage_if_present() {
   local coverage_out="$2"
   local enforce_coverage="$3"
   local coverage_threshold=100
-  local omit_patterns="$root/tests/*,$root/subprojects/*,$root/build/*"
+  local omit_patterns="$root/tests/*,$root/subprojects/*,$root/build/*,$root/HOST captured leaf entry,$root/HOST captured reuse entry,$root/isolated old event append"
   local source_count
 
   if [ ! -d "$root/tests" ]; then
@@ -106,8 +106,8 @@ PY
   python3 -m coverage report --omit "$omit_patterns" --fail-under="$coverage_threshold"
 
   echo "==> Generating Python coverage reports"
-  python3 -m coverage xml --fail-under="$coverage_threshold" -o "$coverage_out/python-coverage.xml"
-  python3 -m coverage html --fail-under="$coverage_threshold" -d "$coverage_out/python-html"
+  python3 -m coverage xml --omit "$omit_patterns" --fail-under="$coverage_threshold" -o "$coverage_out/python-coverage.xml"
+  python3 -m coverage html --omit "$omit_patterns" --fail-under="$coverage_threshold" -d "$coverage_out/python-html"
 }
 
 run_mull() {
