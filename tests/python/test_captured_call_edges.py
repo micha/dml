@@ -306,6 +306,3 @@ def test_ACTUAL_retained_selected_ancestry_reaches8_next_edge9_rejected_BEFORE_Q
         app.record_request(path, commit=commit, ref="must-not-create-q4")
     assert max(depths) == 9 and len(host) == 6
     assert (path / "data.mdb").read_bytes() == before
-
-
-

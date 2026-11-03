@@ -181,4 +181,3 @@ def test_reserved_event_payload_key_rejects_BEFORE_list_or_log_mutation(tmp_path
     with pytest.raises(RuntimeError, match="reserved event category"):
         story.append_event(tmp_path, rows, "phase", dict(event="spoofed", kind="get-a"))
     assert rows == original and (tmp_path / "events.jsonl").read_bytes() == before
-

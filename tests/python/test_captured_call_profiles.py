@@ -203,4 +203,3 @@ def test_moved_defaults_cannot_retarget_prepared_call_BEFORE_dispatch(case, tmp_
     assert publications[0].binding == q.closure["add"]["binding"]
     assert result.value == d.Datum.i64(42)
     session.ended = True  # Deliberately retained partial outer; HOST only, no live child/handle.
-

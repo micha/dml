@@ -907,4 +907,3 @@ def inspect_failed_witness(path, commit, witness, request):
         or got.completion.outcome != "failure"):
         raise ValueError("failed witness PUBLIC completion differs")
     return got
-
