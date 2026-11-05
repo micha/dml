@@ -4,7 +4,10 @@ The in-process adapter is NOT a local-python Q/T/F producer. All completion/sele
 inspection is nonexecuting. Separate short writes retain exact native source/history.
 """
 
+from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import wraps
+from inspect import signature
 from pathlib import Path
 import re
 import tempfile
@@ -28,6 +31,55 @@ CONTROLS = ("fresh", "try-selected", "require-selected")
 # Increment ONLY when crossing a selected ORIGINAL outer/leaf producer authority.
 # Its own request/spine/prerequisite functions preserve depth; helper frames add nothing.
 MAX_AUTHORITY_DEPTH = 8
+
+# A synchronous inspection never changes the inspected repository. Share ONLY
+# successful immutable-history checks within that call, never across reads,
+# publication, repository instances or authority depths. Retain each proof's
+# complete semantic union so a cache hit cannot hide the caller's budget.
+_inspection_proofs = ContextVar("captured_call_inspection_proofs", default=None)
+
+
+def _inspection_proof(check):
+    parameters = signature(check)
+
+    @wraps(check)
+    def inspected(*args, **kwargs):
+        bound = parameters.bind(*args, **kwargs)
+        bound.apply_defaults()
+        values = bound.arguments
+        authority_depth(values["depth"])
+        incoming = values["seen"]
+        incoming = set() if incoming is None else incoming
+        budget(incoming)
+        key = (check, str(Path(values["path"]).resolve()),
+               tuple((n, v) for n, v in values.items() if n not in ("path", "seen")))
+        proofs = _inspection_proofs.get()
+        token = None
+        if proofs is None:
+            proofs = {}
+            token = _inspection_proofs.set(proofs)
+        try:
+            if key not in proofs:
+                reached = set()
+                values["seen"] = reached
+                try:
+                    result = check(*bound.args, **bound.kwargs)
+                finally:
+                    incoming.update(reached)
+                proofs[key] = result, frozenset(reached)
+            result, reached = proofs[key]
+            incoming.update(reached)
+            budget(incoming)
+            # Completion/selection responses expose the caller's full union,
+            # not just the proof-local IDs. Never mutate a cached response.
+            if isinstance(result, dict) and "semantic_ids" in result:
+                return dict(result, semantic_ids=frozenset(incoming))
+            return result
+        finally:
+            if token is not None:
+                _inspection_proofs.reset(token)
+
+    return inspected
 
 
 def authority_depth(depth):
@@ -220,6 +272,7 @@ def validate_recorded(path, recorded, base, binding_name, inputs_name, target, i
     return spec
 
 
+@_inspection_proof
 def inspect_leaf_success(path, *, commit, slot, seen=None, depth=0):
     """Public S plus ORIGINAL captured decision, exact trace and upstream producer."""
     authority_depth(depth)
@@ -424,6 +477,7 @@ def record_request(path, *, commit, closure_name="outer", inputs_name="inputs", 
     return response
 
 
+@_inspection_proof
 def inspect_request(path, *, commit, request, seen=None, depth=0):
     authority_depth(depth)
     seen = set() if seen is None else seen
@@ -518,6 +572,7 @@ def history(tx, commit):
     return seen
 
 
+@_inspection_proof
 def inspect_selection(path, *, commit, slot=SLOT, seen=None, depth=0):
     authority_depth(depth)
     transfer.export_commit(path, commit=commit)
@@ -553,6 +608,7 @@ def payload_names(aid, index, kind):
     return {key: "payload-" + aid + "-%02d-" % index + key for key in PHASE_LINKS[kind]}
 
 
+@_inspection_proof
 def inspect_completion(path, *, commit, seen=None, depth=0):
     """Strict NEW authority over native phases; never executes logical arithmetic."""
     authority_depth(depth)
@@ -629,6 +685,7 @@ def inspect_completion(path, *, commit, seen=None, depth=0):
                 getters=tuple(spine["getters"]), calls=call_ids, semantic_ids=frozenset(seen))
 
 
+@_inspection_proof
 def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
     """Walk actual native step deltas backwards, then validate ordered semantic transitions."""
     authority_depth(depth)
