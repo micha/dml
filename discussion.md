@@ -1,10 +1,13 @@
 # Agent-first DML design discussion — checkpoint
 
-Current discussion: **User-requested checkpoint and retrospective through Iteration24**.
-Read [what we have learned](checkpoints/24-lessons.md) for demonstrated capabilities, conceptual
-corrections, remaining uncertainty and assistant-origin review questions. Local design checkpoint
-only; no push, implementation restart or next-turn GO. Completed24 remains stopped at59b3830,
-development GHA disabled/native19 PAUSED/VP-001 OPEN UNKNOWN. Older status blocks retain history.
+Current discussion: **User-requested test-performance checkpoint**.
+Read [performance checkpoint](checkpoints/test-performance.md) and
+[detailed results](maintenance/test-performance/RESULTS.md). DML clean at locally committed,
+NOT PUSHED55a73e9; two slow tests optimized, standard full-v passed, optional four-worker trial
+3361pass/8m58s. The next two slow cases mainly repeat fixture setup in an ungrouped consuming
+module; grouping it is an assistant suggestion, not a selected next task. Local design checkpoint
+only; no push, optimization/test/build/worker/CI restart. GHA disabled/native19 PAUSED/VP-001 OPEN
+UNKNOWN remain. Older status blocks below are historical, including Iteration24's published59b3830.
 
 Current task: **Iteration24 COMPLETE AND STOPPED**, independently accepted and normally published
 **`59b38303fe2f4c89d6fce3b01933f7260eb28320`**, initial291d9a5/feature-parent965cec/exact cumulative33/
@@ -5247,9 +5250,38 @@ remain. No tests/builds/readers/story/CI/native investigation or new implementat
 Earlier no-design-checkpoint-request statements describe their historical turns, superseded ONLY by
 this local checkpoint request. No next direction or new engineering plan is selected.
 
+## Test-performance checkpoint
+
+After the Iteration24 learning checkpoint, the user requested per-test timing, authorized
+optimizing the two slowest cases and then adding pytest-xdist for ONE four-worker trial.
+The [results](maintenance/test-performance/RESULTS.md) preserve exact commands/evidence,
+serial versus profiled versus parallel timings, validation and reporting limitations.
+DML helper/regressions/dependency are locally committed55a73e9, NOT PUSHED; initial design
+results commit99cd523. DML source/index clean; external tools flake change is unversioned
+and evidence-retained. No new feature iteration or native-investigation restart occurred.
+
+The user then asked for the next two slow tests. The latest trial points to two cases in
+`test_captured_call_adapter_responses.py`,42.7s/41.7s total, each about33.4s setup. This consumer
+imports expensive module-scoped history setup but was spread across workers. Grouping it
+is an assistant suggestion, not a demonstrated fix or selected implementation task.
+
+The user requested “let's make a checkpoint here”. The [checkpoint](checkpoints/test-performance.md)
+records the local state and possible resume point. This authorizes ONLY local design notes/commit;
+no push or more optimization/test/profile/build/install/worker/story/CI activity. Development GHA
+disabled, native19 PAUSED/private candidate retained, VP-001 OPEN UNKNOWN/owner/conditions remain;
+no platform-green, parallel-coverage or earlier runtime diagnosis claim.
+
 ## Resume point
 
-**Review the checkpoint through Iteration24:** [what we have learned](checkpoints/24-lessons.md).
+**Review the test-performance checkpoint:** [current state and next candidates](checkpoints/test-performance.md).
+DML clean local55a73e9, NOT PUSHED; design results99cd523. Two original slow tests improved without
+weakening assertions, full standard gate passed, four-worker trial3361pass/8m58s. Optional parallel
+execution is not yet a maintained parallel coverage gate. The next two slow cases are dominated by
+repeated setup in an ungrouped fixture-consuming module; grouping it is a suggestion pending user
+selection and authorization. Checkpoint only: no further run/change/push. GHA disabled/native19
+PAUSED/VP-001 OPEN UNKNOWN remain. Older resume stages below are historical.
+
+**Earlier review checkpoint through Iteration24:** [what we have learned](checkpoints/24-lessons.md).
 Discuss the conceptual foundation and remaining questions before choosing another turn. Local design
 checkpoint requested; no push or implementation restart. DML clean59b3830/completed24 stopped/GHA
 disabled/native19 PAUSED/VP-001 OPEN UNKNOWN/BOTH coordinator-owned remain. The older resume stages

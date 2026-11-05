@@ -1070,6 +1070,30 @@ native19 PAUSED/private candidate retained/VP-001 OPEN UNKNOWN with existing own
 Review questions are assistant suggestions, not selected next-turn decisions. Earlier per-turn
 no-design-checkpoint-request wording remains historical, superseded only for this local request.
 
+## Current test-performance checkpoint
+
+After the Iteration24 learning review, the user separately authorized timing the Python
+suite, optimizing the two slowest tests, then adding pytest-xdist and ONE four-worker trial.
+Read [results](maintenance/test-performance/RESULTS.md) and
+[checkpoint](checkpoints/test-performance.md). DML is now clean at LOCAL, NOT PUSHED
+`55a73e9fa4895cce39a081070ebff906a3b67f19` (parent59b3830): inspection-local successful-proof
+reuse, four safety regressions and optional pytest-xdist dependency. Original assertions,
+semantic budgets/authority depth/deadlines/coverage thresholds remain. Final focused250/
+standardfull3361+native7+memory+100 gates and separate parallel3361/8m58s pass; original warnings,
+instrumentation/speedup/report-property qualifications/raw offline preparation failure retained.
+External tools flake updated/unversioned with unchanged lockfile; exact bytes preserved. No push/CI.
+
+The user requested a local commit, producing DML55a73e9 and design-results99cd523. After reviewing
+the next two slow tests (parallel totals42.7/41.7s, each33.4s setup in an ungrouped fixture-consuming
+module), the user requested “let's make a checkpoint here”. This authorizes ONLY local design
+checkpoint documentation/commit, not grouping implementation or another optimization/run/push.
+Grouping that consumer is an assistant suggestion pending user selection; no maintained parallel
+runner/coverage gate selected. Existing workers stopped/source-builds coordinator-owned;
+GHA disabled/native19 PAUSED/private candidate retained/VP-001 OPEN UNKNOWN/owner/conditions remain.
+No tests/build/install/profile/story/worker/CI/native investigation restart, dependencies/service/
+image/cloud/global/release/package/later turn or push authorized. Historical Iteration24 source
+identity/status and earlier checkpoint statements remain historical, not current HEAD claims.
+
 ## Vocabulary
 
 - Maintained documentation uses glossary terms consistently. Add or clarify a term

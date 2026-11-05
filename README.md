@@ -6,6 +6,14 @@ its existing draft specifications.
 
 ## Start here
 
+- **Test-performance checkpoint:** [current state and resume candidates](checkpoints/test-performance.md)
+  and [detailed results](maintenance/test-performance/RESULTS.md). DML clean local55a73e9,
+  NOT PUSHED; slow-test proof reuse preserves assertions/bounds, full standard gate passed,
+  optional four-worker trial3361pass/8m58s. Next two cases mostly repeat setup in an ungrouped
+  fixture consumer; grouping is an assistant suggestion, not a selected task. Local design
+  checkpoint only/no further run/change/push. GHA disabled/native19 PAUSED/VP-001 OPEN UNKNOWN
+  remain; earlier states below are historical.
+
 - **Checkpoint and learning review through Iteration24:**
   [readable synthesis](checkpoints/24-lessons.md) and
   [discussion checkpoint](discussion.md#checkpoint-through-iteration24-retrospective-review).
@@ -555,7 +563,14 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
-User-requested **checkpoint and retrospective through Iteration24**. Read
+User-requested **test-performance checkpoint**. Read [checkpoint](checkpoints/test-performance.md)
+and [results](maintenance/test-performance/RESULTS.md). DML clean locally committed55a73e9/NOT PUSHED;
+full standard gate passed and optional four-worker Python timing trial passed3361 in8m58s.
+Next candidates are fixture-consumer grouping or further profiling, not selected/authorized work.
+Local design commit only/no new run/change/push; GHA disabled/native19 PAUSED/VP-001 OPEN UNKNOWN
+remain. Older focus stages below retain history.
+
+Earlier user-requested **checkpoint and retrospective through Iteration24**. Read
 [what we have learned](checkpoints/24-lessons.md), then discuss remaining questions before selecting
 another turn. Local design commit only; DML unchanged/clean59b3830/completed24 stopped/GHA disabled/
 native19 PAUSED/VP-001 OPEN UNKNOWN. No new implementation or push authorization. Older focus
