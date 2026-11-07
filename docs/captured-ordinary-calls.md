@@ -117,6 +117,20 @@ was refined from4 after a real HOST validation failure; existing runtime/semanti
 were not changed. The fixed story's HOST before-return/final reader paths measured max5; actual
 retained ancestry reaches8 and next edge9 rejects before Q. Installed evidence remains pending.
 
+**Inspection-local memoization (performance only).** One independent read-only inspection
+can share successful pinned snapshot export checks, public preparation/selection validation,
+and builtin inspectors for the SAME transaction/commit. Depth remains part of every recursive
+proof key; active/seen semantic state is never reset. A bounded example-local read view can
+share copied immutable record descriptions within that inspection. Each cache hit checks the
+actual public transaction's owner/thread/ended state via an uncached ref lookup; the ref value
+is ignored. Mutable refs, failures and authoring/dispatch are not cached; no handle is kept
+active beyond its native short scope. Changed
+API functions/transfer limits use distinct keys. New top-level inspection always revalidates;
+no persistent repository cache or computational reuse policy is introduced. Original source/
+producer/phase checks and64 semantic budget remain. This assumes the source repository is not
+mutated during the synchronous inspection, like the existing proof scope—not a security or
+complete environmental-capture guarantee.
+
 Outer S has exact role/completion BYTES16/C/Q/finalT/R, rooted at R. The F ID is metadata, not a
 native retention edge: F must be in ALL-parent history. Reader validates original completion,
 initial-to-final T and both ordered call associations. Explicit select authors ONLY absent S after F.

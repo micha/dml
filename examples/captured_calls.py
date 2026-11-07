@@ -4,6 +4,7 @@ The in-process adapter is NOT a local-python Q/T/F producer. All completion/sele
 inspection is nonexecuting. Separate short writes retain exact native source/history.
 """
 
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
@@ -52,7 +53,8 @@ def _inspection_proof(check):
         incoming = set() if incoming is None else incoming
         budget(incoming)
         key = (check, str(Path(values["path"]).resolve()),
-               tuple((n, v) for n, v in values.items() if n not in ("path", "seen")))
+               tuple((n, v) for n, v in values.items() if n not in ("path", "seen")),
+               _limits(), b.MAX_ARGUMENTS, b.MAX_POSITIONS, b.MAX_RECORDS, MAX_AUTHORITY_DEPTH)
         proofs = _inspection_proofs.get()
         token = None
         if proofs is None:
@@ -80,6 +82,102 @@ def _inspection_proof(check):
                 _inspection_proofs.reset(token)
 
     return inspected
+
+
+def _inspection_read(key, read):
+    proofs = _inspection_proofs.get()
+    if proofs is None:
+        return read()
+    if key not in proofs:
+        proofs[key] = read()
+    return proofs[key]
+
+
+def _limits():
+    return (transfer.MAX_OBJECTS, transfer.MAX_RECORD_BYTES,
+            transfer.MAX_PACKED_BYTES, transfer.MAX_BUNDLE_BYTES)
+
+
+def _validated_snapshot(path, commit):
+    def validate():
+        transfer.export_commit(path, commit=commit)
+        return True  # Do not retain potentially large serialized bundles.
+    return _inspection_read(("snapshot", transfer.export_commit,
+        str(Path(path).resolve()), commit, _limits()), validate)
+
+
+def _public_selection(path, commit, slot):
+    return _inspection_read(("public-selection", selection.inspect,
+        str(Path(path).resolve()), commit, slot, _limits()),
+        lambda: selection.inspect(path, commit=commit, slot=slot))
+
+
+def _inspector(tx, commit):
+    # No constructor bypass or supplied membership flags. The same actual
+    # transaction/commit shares the PUBLIC inspector's growing semantic union;
+    # never reset active/seen state or reuse it on a different transaction.
+    inspector = _inspection_read(("builtin-inspector", b.Inspector, tx, commit, _limits()),
+        lambda: b.Inspector(tx, commit=commit))
+    # Reentrant independent inspection must not borrow another active walk.
+    return b.Inspector(tx, commit=commit) if inspector.active else inspector
+
+
+class _InspectionReads:
+    """Private readonly view; copied immutable values, NEVER mutable refs/handles."""
+    _immutable = {"get_record", "get_datum", "get_node", "get_dag", "get_tree", "get_commit", "lookup_node"}
+
+    def __init__(self, tx, cache):
+        self._tx, self._cache, self._open = tx, cache, True
+
+    def __getattr__(self, method):
+        if method not in self._immutable and method != "get_ref":
+            raise AttributeError(method)
+        def read(*args):
+            if not self._open:
+                raise d.InvalidStateError("invalid_state", detail="inspection read scope ended")
+            native = getattr(self._tx, method)
+            # Only exact immutable key types can match cached reads. Other
+            # inputs delegate to the public API's normal validation/errors.
+            eligible = (method in self._immutable and
+                ((method == "get_record" and len(args) == 2 and type(args[0]) is str and type(args[1]) is d.ObjectId)
+                 or (method == "lookup_node" and len(args) == 2 and type(args[0]) is d.ObjectId and type(args[1]) is str)
+                 or (method not in ("get_record", "lookup_node") and len(args) == 1 and type(args[0]) is d.ObjectId)))
+            key = (method, native.__func__, args) if eligible else None
+            values = self._cache[0]
+            if eligible and key in values:
+                # Use the public API, not private transaction flags. This
+                # uncached ref lookup checks owner/thread/ended state; its
+                # value is ignored and conveys NO navigation authority.
+                try:
+                    self._tx.get_ref("inspection-read-state")
+                except d.NotFoundError:
+                    pass
+                return values[key]
+            value = native(*args)
+            size = len(value) if type(value) is bytes else 0
+            if isinstance(value, d.Datum) and value.kind in ("bytes", "string", "uri"):
+                size = len(value.value if value.kind == "bytes" else value.value.encode("utf-8"))
+            if eligible and len(values) < transfer.MAX_OBJECTS and self._cache[1] + size <= transfer.MAX_PACKED_BYTES:
+                values[key] = value
+                self._cache[1] += size
+            return value
+        setattr(self, method, read)
+        return read
+
+
+@contextmanager
+def _read(path):
+    with d.Repository(path) as repo, repo.read() as tx:
+        proofs = _inspection_proofs.get()
+        if proofs is None:
+            yield tx
+        else:
+            cache = proofs.setdefault(("immutable-reads", str(Path(path).resolve())), [{}, 0])
+            view = _InspectionReads(tx, cache)
+            try:
+                yield view
+            finally:
+                view._open = False
 
 
 def authority_depth(depth):
@@ -135,7 +233,7 @@ def budget(seen):
 
 
 def arguments(tx, commit, dag, names, seen):
-    inspector = b.Inspector(tx, commit=commit)
+    inspector = _inspector(tx, commit)
     full = inspector.arguments(dag)
     fields = b.shape(tx, dag, ("role", "value", "entries"), b.ARGUMENTS_ROLE, "value")
     rows = tx.get_dag(b.link(tx, fields["entries"]))
@@ -151,7 +249,7 @@ def arguments(tx, commit, dag, names, seen):
 
 
 def inspect_closure(tx, commit, dag):
-    retained = b.Inspector(tx, commit=commit).retained
+    retained = _inspector(tx, commit).retained
     fields = b.shape(tx, dag, ("role", "intent", "binding", "environment", "key"), C_ROLE)
     if dag not in retained or b.scalar(tx, fields["intent"], "uri") != INTENT:
         raise ValueError("outer captured intent/retention differs")
@@ -212,7 +310,7 @@ def prepare_arguments(path, *, commit, values, inputs_name, ref):
         raise ValueError("outer input requires exact a,b")
     for value in values.values():
         d.Datum.i64(value)
-    transfer.export_commit(path, commit=commit)
+    _validated_snapshot(path, commit)
     with d.Repository(path) as repo, repo.write() as tx:
         entries = tree(tx, commit)
         if inputs_name in entries:
@@ -227,7 +325,7 @@ def prepare_arguments(path, *, commit, values, inputs_name, ref):
 
 def promote_defaults(path, *, commit, ref):
     name(ref)
-    transfer.export_commit(path, commit=commit)
+    _validated_snapshot(path, commit)
     with d.Repository(path) as repo, repo.write() as tx:
         entries = tree(tx, commit)
         for func in ("add", "double"):
@@ -251,9 +349,12 @@ def single_delta(tx, commit, added, replaced=()):
 
 
 def public_prepare(path, commit, binding_name, inputs_name, intent, request=None):
-    with tempfile.TemporaryDirectory(prefix="dml-captured-call-validation-") as root:
-        return ex.prepare_exchange(path, commit=commit, binding_name=binding_name, inputs_name=inputs_name,
-            intent_uri=intent, request=request, worker_ref="validation", workspace=Path(root) / "input")
+    def prepare():
+        with tempfile.TemporaryDirectory(prefix="dml-captured-call-validation-") as root:
+            return ex.prepare_exchange(path, commit=commit, binding_name=binding_name, inputs_name=inputs_name,
+                intent_uri=intent, request=request, worker_ref="validation", workspace=Path(root) / "input")
+    return _inspection_read(("public-preparation", ex.prepare_exchange,
+        str(Path(path).resolve()), commit, binding_name, inputs_name, intent, request, _limits()), prepare)
 
 
 def validate_recorded(path, recorded, base, binding_name, inputs_name, target, inputs, ref):
@@ -277,8 +378,8 @@ def inspect_leaf_success(path, *, commit, slot, seen=None, depth=0):
     """Public S plus ORIGINAL captured decision, exact trace and upstream producer."""
     authority_depth(depth)
     seen = set() if seen is None else seen
-    selected = selection.inspect(path, commit=commit, slot=slot)
-    with d.Repository(path) as repo, repo.read() as tx:
+    selected = _public_selection(path, commit, slot)
+    with _read(path) as tx:
         pre = tx.get_commit(selected.completion).parents[0]
         cq = tx.get_commit(pre).parents[0]
         dc = tx.get_commit(cq).parents[0]
@@ -316,7 +417,7 @@ def inspect_leaf_success(path, *, commit, slot, seen=None, depth=0):
         full, sources = arguments(tx, commit, selected.inputs, leaf.contract(selected.intent_uri)[1], seen)
         if slot_number == 0 and selected.inputs != b.link(tx, qfields["inputs"]):
             raise ValueError("add Q must consume ORIGINAL exact outer input DAG")
-        inspector = b.Inspector(tx, commit=commit)
+        inspector = _inspector(tx, commit)
         result = inspector.node(selected.result)
         returned = b.shape(tx, selected.result, ("role", "returned", "value", "trace", "request", "inputs"), b.RETURN_ROLE, "value")
         if (b.link(tx, returned["request"]), b.link(tx, returned["inputs"]), result.value.kind) != (
@@ -362,7 +463,7 @@ def inspect_leaf_success(path, *, commit, slot, seen=None, depth=0):
         or (slot_number == 1 and prefix["double_inputs"] != selected.inputs)):
         raise ValueError("ORIGINAL leaf requires exact outer getter/call/input prefix")
     if slot_number == 1:
-        with d.Repository(path) as repo, repo.read() as tx:
+        with _read(path) as tx:
             first = tx.get_dag(prefix["calls"][0]).bindings
             if (b.link(tx, first["selection"]), b.scalar(tx, first["selection-slot"], "string")) != (upstream_dag, upstream_slot):
                 raise ValueError("ORIGINAL double THIS actual prior add association differs")
@@ -378,7 +479,7 @@ def inspect_leaf_success(path, *, commit, slot, seen=None, depth=0):
 
 
 def inspect_getter(tx, commit, dag, inputs, key, binding, seen):
-    inspector = b.Inspector(tx, commit=commit)
+    inspector = _inspector(tx, commit)
     got = inspector.node(dag)
     fields = b.shape(tx, dag, ("role", "func", "binding", "arguments", "value"), b.OPERATION_ROLE, "value")
     args = tx.get_dag(b.link(tx, fields["arguments"]))
@@ -415,8 +516,8 @@ def resolve(path, commit, closure_name, inputs_name, control, double_control, se
     authority_depth(depth)
     if control not in CONTROLS or double_control not in CONTROLS:
         raise ValueError("unsupported explicit reuse control")
-    transfer.export_commit(path, commit=commit)
-    with d.Repository(path) as repo, repo.read() as tx:
+    _validated_snapshot(path, commit)
+    with _read(path) as tx:
         entries = tree(tx, commit)
         closure = inspect_closure(tx, commit, entries[name(closure_name)])
         full, _ = arguments(tx, commit, entries[name(inputs_name)], ("a", "b"), seen)
@@ -481,7 +582,7 @@ def record_request(path, *, commit, closure_name="outer", inputs_name="inputs", 
 def inspect_request(path, *, commit, request, seen=None, depth=0):
     authority_depth(depth)
     seen = set() if seen is None else seen
-    with d.Repository(path) as repo, repo.read() as tx:
+    with _read(path) as tx:
         q, qid = occurrence(tx, request, Q_ROLE, "cq-", ("intent", "binding", "inputs", "closure", "decision"))
         dc = single_delta(tx, commit, ("outer-request-" + qid,))
         if tree(tx, commit)["outer-request-" + qid] != request:
@@ -545,7 +646,7 @@ def select_outer(path, *, commit, completion, slot=SLOT, ref):
     name(slot)
     name(ref)
     got = inspect_completion(path, commit=completion)
-    transfer.export_commit(path, commit=commit)
+    _validated_snapshot(path, commit)
     with d.Repository(path) as repo, repo.write() as tx:
         entries = tree(tx, commit)
         if slot in entries or completion not in history(tx, commit):
@@ -575,8 +676,8 @@ def history(tx, commit):
 @_inspection_proof
 def inspect_selection(path, *, commit, slot=SLOT, seen=None, depth=0):
     authority_depth(depth)
-    transfer.export_commit(path, commit=commit)
-    with d.Repository(path) as repo, repo.read() as tx:
+    _validated_snapshot(path, commit)
+    with _read(path) as tx:
         dag = tree(tx, commit)[name(slot)]
         fields = b.shape(tx, dag, ("role", "completion", "closure", "request", "attempt", "result"), S_ROLE, "result")
         completion = oid(tx, fields["completion"])
@@ -613,8 +714,8 @@ def inspect_completion(path, *, commit, seen=None, depth=0):
     """Strict NEW authority over native phases; never executes logical arithmetic."""
     authority_depth(depth)
     seen = set() if seen is None else seen
-    transfer.export_commit(path, commit=commit)
-    with d.Repository(path) as repo, repo.read() as tx:
+    _validated_snapshot(path, commit)
+    with _read(path) as tx:
         parents = tx.get_commit(commit).parents
         if len(parents) != 1:
             raise ValueError("outer completion requires one previous phase")
@@ -668,11 +769,11 @@ def inspect_completion(path, *, commit, seen=None, depth=0):
     if returned_id is not None:
         if spine["returned"] != returned_id or spine["failed"] is not None or len(spine["getters"]) != 2:
             raise ValueError("premature/fake outer return")
-        with d.Repository(path) as repo, repo.read() as tx:
+        with _read(path) as tx:
             rf = b.shape(tx, returned_id, ("role", "request", "initial-attempt", "inputs", "returned", "value", "call0", "call1", "getter0", "getter1"), RETURN_ROLE, "value")
             last = tx.get_dag(call_ids[-1]).bindings
             result = b.link(tx, last["result"])
-            inspector = b.Inspector(tx, commit=commit)
+            inspector = _inspector(tx, commit)
             actual = inspector.node(result)
             datum, value = b.node_value(tx, rf["value"])
             if (tuple(b.link(tx, rf[n]) for n in ("request", "initial-attempt", "inputs", "returned", "call0", "call1", "getter0", "getter1")) !=
@@ -690,7 +791,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
     """Walk actual native step deltas backwards, then validate ordered semantic transitions."""
     authority_depth(depth)
     steps = []
-    with d.Repository(path) as repo, repo.read() as tx:
+    with _read(path) as tx:
         cursor = commit
         while True:
             parents = tx.get_commit(cursor).parents
@@ -753,7 +854,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
         if any(row[4] != i for i, row in enumerate(reversed(steps))):
             raise ValueError("phase positions not consecutive")
     q = inspect_request(path, commit=submission, request=request, seen=seen, depth=depth)
-    with d.Repository(path) as repo, repo.read() as tx:
+    with _read(path) as tx:
         initial_fields, initial_aid = occurrence(tx, initial, T_ROLE, "ca-", ("request", "plan"))
         if (q.action != "execute-fresh" or initial_aid != aid
             or b.link(tx, initial_fields["request"]) != q.request or b.link(tx, initial_fields["plan"]) != q.plan):
@@ -765,7 +866,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
     for current, kind, links, values, index in reversed(steps):
         if failed is not None or returned is not None:
             raise ValueError("phase follows terminal result/failure")
-        with d.Repository(path) as repo, repo.read() as tx:
+        with _read(path) as tx:
             if kind in ("get-a", "get-b"):
                 if len(getters) >= 2 or kind != ("get-a", "get-b")[len(getters)] or calls or prep is not None:
                     raise ValueError("outer getter order/dispatch guard differs")
@@ -860,7 +961,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
                     raise ValueError("outer return before both successful calls")
                 returned = links["return"]
         if kind == "leaf-pending":
-            with d.Repository(path) as repo, repo.read() as tx:
+            with _read(path) as tx:
                 pf = tx.get_dag(pending).bindings
                 own_q = b.link(tx, pf["request"])
                 bn = payload_names(aid, index - 1, "leaf-prepare")["binding"]
@@ -871,7 +972,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
                 raise ValueError("pending public Q exact dimensions differ")
         if kind == "leaf-done":
             failed_witness = None
-            with d.Repository(path) as repo, repo.read() as tx:
+            with _read(path) as tx:
                 fields = tx.get_dag(links["call"]).bindings
                 status = b.scalar(tx, fields["status"], "string")
                 extras = ("selection", "selection-slot", "attempt", "result") if status == "success" else ("witness",) if status == "failure" else None
@@ -907,7 +1008,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
                     raise ValueError("fresh call ORIGINAL Q/joined F differs")
                 if claimed != (selected.dag, selected.attempt, selected.result):
                     raise ValueError("call success public ORIGINAL S/T/R differs")
-                with d.Repository(path) as repo, repo.read() as tx:
+                with _read(path) as tx:
                     selected_target = leaf.inspect(tx, b.link(tx, tx.get_dag(pending).bindings["closure"]), *leaf.sources())
                     selected_inputs = b.link(tx, tx.get_dag(pending).bindings["inputs"])
                     requested, _ = arguments(tx, current, selected_inputs, leaf.contract(selected_target["intent"])[1], seen)
@@ -926,7 +1027,7 @@ def inspect_spine(path, commit, request, initial, aid, seen, depth=0):
 
 
 def _has_slot(path, commit, slot):
-    with d.Repository(path) as repo, repo.read() as tx:
+    with _read(path) as tx:
         return slot in tree(tx, commit)
 
 
