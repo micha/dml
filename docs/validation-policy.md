@@ -27,7 +27,13 @@ When executable runtime/build/test tooling changes, the worker runs the unchange
 standard gate once on final relevant sources (`scripts/check.sh -v` in the project tools
 environment). Preserve tests, coverage/memory thresholds, skips/exclusions and budgets.
 A fresh full pre-edit baseline is optional: select it when it can distinguish a meaningful
-problem, not simply to repeat a recent exact published pass.
+problem, not simply to repeat a recent exact published pass. The same gate optionally
+supports resource-aware worker coverage with `DML_TEST_WORKERS=auto`; serial remains the
+default. [Build and Test](../README.md#optional-resource-aware-parallel-coverage) owns
+worker selection, memory estimates, fixture grouping, counter merging and report locations.
+Report the actual selected workers, tests, coverage and memory checks; parallel collection
+alone is not evidence that all worker data was measured or combined. CI provisioning and
+workflow enablement are separate decisions, not implied by this optional local profile.
 
 The coordinator independently reviews the changed surface and validates according to risk;
 a second complete suite or installed fixture is not automatic. Recheck affected behavior

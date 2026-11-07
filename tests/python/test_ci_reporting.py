@@ -37,7 +37,7 @@ def isolated_environment():
     environment = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("PYTEST_", "COVERAGE_")) and key != "PYTHONPATH"
+        if not key.startswith(("PYTEST_", "COVERAGE_", "DML_TEST_")) and key != "PYTHONPATH"
     }
     environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     return environment

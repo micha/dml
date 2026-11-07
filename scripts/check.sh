@@ -25,6 +25,10 @@ Environment:
                  (defaults to build/check/test_version when present)
   SKIP_MULL=1    Skip Mull mutation testing (legacy override)
   LCOV_EXCLUDES  Colon-separated lcov --remove patterns
+  DML_TEST_WORKERS  0 (default serial), auto (CPU/memory-aware), or explicit count
+  DML_TEST_WORKER_MB  Memory allowance per parallel worker (default 1024 MiB)
+  DML_TEST_RESERVE_MB  Available memory reserved for controller/headroom (1024 MiB)
+  DML_TEST_REPORT_DIR  Worker resource/memory reports (build/test-results/parallel)
 EOF
 }
 
@@ -94,8 +98,35 @@ PY
   fi
 
   echo "==> Running Python and CLI tests with coverage"
-  python3 -m coverage erase
-  python3 -m coverage run --source "$root" --omit "$omit_patterns" -m pytest -q
+  if [ "${DML_TEST_WORKERS:-0}" = "0" ]; then
+    python3 -m coverage erase
+    python3 -m coverage run --source "$root" --omit "$omit_patterns" -m pytest -q
+  else
+    if ! python3 -c 'import pytest_cov, xdist, psutil' >/dev/null 2>&1; then
+      echo "error: parallel coverage requires pytest-cov, pytest-xdist and psutil from requirements-dev.txt" >&2
+      return 1
+    fi
+    require_cmd gcov-tool
+    python3 -m coverage erase
+    mkdir -p "$coverage_out"
+    local config="$coverage_out/parallel.coveragerc"
+    python3 - "$config" "$root" "$omit_patterns" <<'PY'
+import configparser
+import pathlib
+import sys
+config = configparser.ConfigParser(interpolation=None)
+config["run"] = {"source": sys.argv[2], "omit": "\n" + "\n".join(sys.argv[3].split(","))}
+with pathlib.Path(sys.argv[1]).open("w") as stream:
+    config.write(stream)
+PY
+    # Start each optional parallel gate with NEW worker-counter/report custody.
+    # Only these owned generated directories are cleared; source/data untouched.
+    export DML_TEST_GCOV_DIR="$coverage_out/native-workers"
+    rm -rf "$DML_TEST_GCOV_DIR"
+    python3 -m pytest -q -n "$DML_TEST_WORKERS" --dist=loadgroup --max-worker-restart=0 \
+      --cov="$root" --cov-config="$config" --cov-report= --cov-fail-under=0
+    merge_parallel_native_coverage "$root" "$coverage_out"
+  fi
 
   if [ "$enforce_coverage" -eq 1 ]; then
     echo "==> Enforcing 100% Python source coverage"
@@ -108,6 +139,50 @@ PY
   echo "==> Generating Python coverage reports"
   python3 -m coverage xml --omit "$omit_patterns" --fail-under="$coverage_threshold" -o "$coverage_out/python-coverage.xml"
   python3 -m coverage html --omit "$omit_patterns" --fail-under="$coverage_threshold" -d "$coverage_out/python-html"
+}
+
+merge_parallel_native_coverage() {
+  local root="$1"
+  local out="$2"
+  local workers="$out/native-workers"
+  local merged="$out/native-merged"
+  local worker
+  [ -d "$workers" ] || return 0
+  require_cmd gcov-tool
+  echo "==> Combining isolated parallel native coverage counters"
+  rm -rf "$merged" "$merged.next"
+  # Include initial C-test counters AND any non-worker child counters. gcov-tool
+  # merges compatible raw counters, not reports or invented hit/line data.
+  python3 - "$root/build/check" "$merged" <<'PY'
+import pathlib
+import shutil
+import sys
+source, destination = map(pathlib.Path, sys.argv[1:])
+destination.mkdir(parents=True)
+for path in source.rglob("*.gcda"):
+    target = destination / path.relative_to(source)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(path, target)
+PY
+  for worker in "$workers"/*; do
+    [ -d "$worker" ] || continue
+    # gcov-tool uses libgcov output routines: inherited worker relocation
+    # variables redirect its own merged files and can trigger a GCC ICE.
+    ( unset GCOV_PREFIX GCOV_PREFIX_STRIP
+      gcov-tool merge "$merged" "$worker" -o "$merged.next" )
+    rm -rf "$merged"
+    mv "$merged.next" "$merged"
+  done
+  python3 - "$merged" "$root/build/check" <<'PY'
+import pathlib
+import shutil
+import sys
+source, destination = map(pathlib.Path, sys.argv[1:])
+for path in source.rglob("*.gcda"):
+    target = destination / path.relative_to(source)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(path, target)
+PY
 }
 
 run_mull() {
