@@ -6,13 +6,15 @@ import sys
 import daggerml as d
 from daggerml import builtin as b, local, transfer
 import pytest
+from worker_history_seed import worker_seed
 
 from test_exchange_records import clone
 from test_captured_calls import app, adapter, bridge, leaf, fresh, pin_double
 
 
-@pytest.fixture(scope="module")
-def frozen(tmp_path_factory):
+@pytest.fixture(scope="session")
+@worker_seed
+def frozen(tmp_path_factory, pytestconfig):
     root = tmp_path_factory.mktemp("captured-profiles")
     path = root / "caller"
     commit = app.initialize(path, sys.executable)

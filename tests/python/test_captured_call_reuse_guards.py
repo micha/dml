@@ -11,14 +11,16 @@ import sys
 import daggerml as d
 from daggerml import builtin as b, local, transfer
 import pytest
+from worker_history_seed import worker_seed
 
 from test_exchange_records import clone
 from test_captured_calls import app, bridge, leaf, fresh, pin_double
 from test_captured_call_history_guards import last_phase
 
 
-@pytest.fixture(scope="module")
-def reuse_history(tmp_path_factory):
+@pytest.fixture(scope="session")
+@worker_seed
+def reuse_history(tmp_path_factory, pytestconfig):
     root = tmp_path_factory.mktemp("captured-reuse-guards")
     path = root / "caller"
     base = app.initialize(path, sys.executable)
