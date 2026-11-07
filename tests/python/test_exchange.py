@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parents[2]
 ADD = (ROOT / "examples/local_add.py").read_bytes()
 
 
-@pytest.fixture
-def exchange_runtime(tmp_path, monkeypatch):
-    package = tmp_path / "runtime" / "daggerml"
+def copy_exchange_runtime(root):
+    """Copy the current test runtime; callable by independently owned seed fixtures."""
+    package = root / "runtime" / "daggerml"
     package.mkdir(parents=True)
     for name in (
         "__init__.py",
@@ -37,8 +37,14 @@ def exchange_runtime(tmp_path, monkeypatch):
         str(extension).endswith(s) for s in importlib.machinery.EXTENSION_SUFFIXES
     )
     shutil.copyfile(extension, package / extension.name)
-    monkeypatch.setenv("PYTHONPATH", str(package.parent))
     return package.parent
+
+
+@pytest.fixture
+def exchange_runtime(tmp_path, monkeypatch):
+    runtime = copy_exchange_runtime(tmp_path)
+    monkeypatch.setenv("PYTHONPATH", str(runtime))
+    return runtime
 
 
 def literal(tx, value):

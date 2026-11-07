@@ -9,9 +9,10 @@ import sys
 import daggerml as d
 from daggerml import transfer
 import pytest
+from worker_history_seed import worker_seed
 from hypothesis import given, strategies as st
 
-from test_exchange import ROOT, exchange_runtime, typed_oracle
+from test_exchange import ROOT, exchange_runtime, typed_oracle, copy_exchange_runtime
 from test_exchange_records import clone
 from test_caller_requests import assert_file_unchanged
 
@@ -31,9 +32,7 @@ finally:
     sys.path[:] = paths
 
 
-@pytest.fixture
-def state(tmp_path):
-    path = tmp_path / "maps"
+def _state_at(path):
     base, literals = story.initialize(path, sys.executable, ROOT / "examples")
     current = base
     sources = {}
@@ -44,14 +43,79 @@ def state(tmp_path):
     return path, base, literals, sources, inputs
 
 
+@pytest.fixture(scope="session")
+@worker_seed
+def map_state_seed(tmp_path_factory, pytestconfig):
+    """One immutable metadata seed per worker; no process or live handle."""
+    path = tmp_path_factory.mktemp("map-state-seed") / "maps"
+    state = _state_at(path)
+    inputs = state[-1]
+    names = ("main", *("source-" + n for n in state[3]), "first-empty", "first-insert-0", "first-inputs")
+    with d.Repository(path) as repo, repo.read() as tx:
+        refs = tuple((name, tx.get_ref(name)) for name in names)
+    bundle = transfer.export_commit(path, commit=inputs.commit)
+    return bundle, refs, state[1:]
+
+
 @pytest.fixture
-def success(state, exchange_runtime, tmp_path):
-    path, _, _, _, inputs = state
-    table = reuse.define_table(path, commit=inputs.commit, table_name="double-table", intent_uri=story.DOUBLE, ref="empty-table")
-    q = story.request(path, table.commit, number=1, func="double", input_name=inputs.name)
-    selected, child = story.execute(path, tmp_path, q, 1)
-    indexed = reuse.select_entry(path, commit=selected.commit, table_name="double-table", selection_slot=selected.slot, ref="indexed")
-    return path, q, selected, indexed, child
+def state(tmp_path, map_state_seed):
+    # Never share a mutable repository. Restore ONLY pinned public objects and
+    # explicit refs; no data.mdb/lock.mdb copying or old workspace execution.
+    bundle, refs, fields = map_state_seed
+    path = tmp_path / "maps"
+    with d.Repository(path, create=True):
+        pass
+    transfer.import_commit(path, bundle)
+    with d.Repository(path) as repo, repo.write() as tx:
+        for name, commit in refs:
+            tx.create_ref(name, commit)
+    base, literals, sources, inputs = fields
+    return path, base, literals, dict(sources), inputs
+
+
+@pytest.fixture(scope="session")
+@worker_seed
+def map_success_seed(tmp_path_factory, map_state_seed, pytestconfig):
+    """ONE actual reaped producer per worker; negatives use isolated clones."""
+    root = tmp_path_factory.mktemp("map-success-seed")
+    bundle, base_refs, fields = map_state_seed
+    path = root / "maps"
+    with d.Repository(path, create=True):
+        pass
+    transfer.import_commit(path, bundle)
+    with d.Repository(path) as repo, repo.write() as tx:
+        for name, commit in base_refs:
+            tx.create_ref(name, commit)
+    inputs = fields[-1]
+    runtime = copy_exchange_runtime(root)
+    with pytest.MonkeyPatch.context() as environment:
+        environment.setenv("PYTHONPATH", str(runtime))
+        table = reuse.define_table(path, commit=inputs.commit, table_name="double-table", intent_uri=story.DOUBLE, ref="empty-table")
+        q = story.request(path, table.commit, number=1, func="double", input_name=inputs.name)
+        selected, child = story.execute(path, root, q, 1)
+        indexed = reuse.select_entry(path, commit=selected.commit, table_name="double-table", selection_slot=selected.slot, ref="indexed")
+    assert child["exit"] == 0 and child["reaped"]
+    extra = ("empty-table", q.decision.name, q.recorded.ref, "request-" + q.recorded.request_id,
+             "completion-1", "success-1", "indexed")
+    with d.Repository(path) as repo, repo.read() as tx:
+        refs = (*base_refs, *((name, tx.get_ref(name)) for name in extra))
+    return transfer.export_commit(path, commit=indexed.commit), refs, (q, selected, indexed, child)
+
+
+@pytest.fixture
+def success(state, exchange_runtime, tmp_path, map_success_seed, map_state_seed):
+    # All cases retain REAL successful producer evidence, but metadata/read
+    # negatives no longer launch an equivalent new child just for setup.
+    path = state[0]
+    bundle, refs, fields = map_success_seed
+    transfer.import_commit(path, bundle)
+    existing = {name for name, _ in map_state_seed[1]}
+    with d.Repository(path) as repo, repo.write() as tx:
+        for name, commit in refs:
+            if name not in existing:
+                tx.create_ref(name, commit)
+    q, selected, indexed, child = fields
+    return path, q, selected, indexed, dict(child)
 
 
 def changed(path, base, name, dag):

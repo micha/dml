@@ -14,7 +14,7 @@ import daggerml as d
 from daggerml import transfer
 import pytest
 
-from test_recorded_maps import state, success, app as maps, reuse, funcs, story
+from test_recorded_maps import state, success, map_state_seed, map_success_seed, app as maps, reuse, funcs, story
 from test_exchange import ROOT, exchange_runtime, typed_oracle
 from test_binding_failures import core
 from test_caller_requests import assert_file_unchanged, track_typed_puts

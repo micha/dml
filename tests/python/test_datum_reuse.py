@@ -7,7 +7,7 @@ import daggerml as d
 from daggerml import exchange as ex, transfer
 import pytest
 
-from test_recorded_maps import state, success, app as maps, binding, funcs, reuse, story, changed
+from test_recorded_maps import state, success, map_state_seed, map_success_seed, app as maps, binding, funcs, reuse, story, changed
 from test_exchange import exchange_runtime, typed_oracle
 from test_exchange_records import clone
 from test_caller_requests import assert_file_unchanged
