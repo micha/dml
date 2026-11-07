@@ -33,10 +33,61 @@ and writes HTML reports under:
 - `build/coverage/python-html` (Python coverage via coverage.py, when Python
   source files exist outside tests)
 
-Python test dependencies are in `requirements-dev.txt` (pytest, Hypothesis, and
-coverage.py). Windows CI installs the corresponding UCRT64 packages through
+Python test dependencies are in `requirements-dev.txt` (pytest, pytest-xdist,
+pytest-cov, psutil, Hypothesis, and coverage.py). The current parallel-coverage
+profile uses pytest-cov 7 and requires a development Python of at least 3.9;
+this does not change the installed library's Python requirement. Windows CI
+installs the corresponding UCRT64 packages through
 [MSYS2](https://www.msys2.org/docs/python/) so native extensions match its Python
-build.
+build. Workflow provisioning is unchanged: the added support tests require the
+new declared development dependencies, so existing MSYS2 package provisioning
+needs an update before running this updated suite there. Hosted Windows/macOS
+validation and non-GNU counter merging are not demonstrated.
+
+### Optional resource-aware parallel coverage
+
+```bash
+DML_TEST_WORKERS=auto scripts/check.sh -v
+```
+
+The default remains serial (`DML_TEST_WORKERS=0`). `auto` chooses the minimum of
+host physical cores (logical CPUs if physical topology is unknown), process CPU
+eligibility/quota, and the memory capacity after reserving headroom. This avoids
+counting SMT threads as extra full cores when physical topology is available.
+It respects Linux cgroup v1/v2 CPU quotas and remaining memory at visible parent
+limits, as well as host available memory and process affinity where supported.
+Fractional CPU quotas below one core use one worker. Failed/unknown allocation
+probes use one worker with an explicit diagnostic; known insufficient memory
+fails before launching workers rather than pretending the allocation is safe.
+Windows job-object/container quotas are not currently detected.
+
+Initial conservative allowances are **1024 MiB per worker plus 1024 MiB reserve**.
+Set `DML_TEST_WORKER_MB` and `DML_TEST_RESERVE_MB` to positive integer MiB values
+when a measured workload needs a different profile. These are admission estimates,
+not enforced OS memory limits or claims of measured maximum usage. Explicit
+`DML_TEST_WORKERS=N` bypasses automatic sizing for diagnosis; it can oversubscribe
+resources. Direct `python3 -m pytest -n auto --dist=loadgroup` uses the same policy;
+`--maxprocesses=N` can cap automatic selection. No worker restart/retry is requested
+by the check script; test/runtime deadlines and all tests remain unchanged.
+
+pytest-cov combines worker Python coverage using the same source scope and omit
+list as serial validation. Existing coverage.py report/XML/HTML stages still
+apply the original threshold (100%, or informational with `-c`). No subprocess
+coverage patch is enabled: this preserves the previous measurement scope rather
+than silently extending coverage to application subprocesses. Shared history
+fixtures are grouped by their consuming module, not only their defining file.
+Worker JUnit suite properties are forwarded to the controller, preserving native
+diagnostic properties that upstream xdist does not combine itself.
+
+Parallel native counters are isolated per worker and merged with initial C-test
+counters by **gcov-tool from the same GCC toolchain** before lcov reporting.
+The optional profile requires this tool; missing tools and merge failures fail
+the gate. Workers sample their own process-tree RSS once per second; shared pages
+can be counted more than once and transient peaks can be missed. Resource choices,
+sampled peaks/errors, exit status and suite properties are written under
+`build/test-results/parallel` (override with `DML_TEST_REPORT_DIR`). These metrics
+are tuning evidence, not an OOM guarantee. The LMDB entity diagram is unchanged:
+this adds test tooling, not stored entities or execution semantics.
 
 CI uses `scripts/check.sh -c`: coverage reports are informational, while build,
 test, and report-generation failures still fail the job.
