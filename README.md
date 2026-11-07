@@ -6,6 +6,38 @@ its existing draft specifications.
 
 ## Start here
 
+- **Holistic test-performance checkpoint and continuation:**
+  [checkpoint](checkpoints/holistic-test-performance.md). DML clean LOCAL15555c0 after three
+  focused commits of22 paths, NOT PUSHED; latest ordinary3421/100/9m57s, no optional Valgrind/
+  full JUnit/five-minute success. User authorized checkpoint then proceed with assurance map/
+  redundant-validation review and scoped improvement, not blanket native/API expansion.
+  No GHA/native19/default-parallel/fast-slow change; older status blocks below historical.
+
+- **Frozen fixture setup experiment checked; five-minute goal unmet:**
+  [results](maintenance/test-performance/FIXTURE-SEEDS.md). Worker-local successful seeds,
+  per-case public snapshot restoration/four new guards; original test-function ASTs exact.
+  ONE ordinary auto4 gate3421pass/Python+native100 in9m57s, Python9m43s; Valgrind NOT enabled.
+  Only about2.5% Python-phase gain versus preceding covered run, no convincing overall gain;
+  user's8m36s ordinary timing is faster. Twenty-two paths uncommitted/local55a73e9, no automatic
+  further run/API expansion/commit/push/CI/native19. Older status blocks below are historical.
+
+- **Further history/read optimization locally validated:**
+  [results](maintenance/test-performance/HISTORY-MEMO.md). Example-only inspection memoization
+  preserves native active-state/depth/semantic guards and original assertions. Final auto4
+  gate3417pass/Python+native100/Valgrind completes11m53s (Python9m58s), not five minutes;
+  longest cases now3m42s/2m33s. Thirteen implementation paths uncommitted at55a73e9;
+  low-level repository/native APIs unchanged. Broader read/reachability profiling is a
+  candidate requiring scope review before runtime/API expansion. No fast/slow split,
+  commit/push/CI or native19 restart. Older status blocks below preserve history.
+
+- **Resource-aware parallel coverage locally validated:**
+  [results and remaining five-minute target](maintenance/test-performance/PARALLEL-COVERAGE.md).
+  Current DML HEAD55a73e9 has ten uncommitted tooling paths; final auto4 full gate passes3407/
+  Python+native100/Valgrind in14m42s, NOT five minutes. Original auto8 failures and causal gcov-env
+  correction/physical-core sizing/targeted evidence retained. No fast/slow split or CI provisioning
+  change selected, no commit/push for this stage; native19 PAUSED/VP-001 OPEN UNKNOWN remain.
+  Older checkpoint/status blocks below are historical.
+
 - **Test-performance checkpoint:** [current state and resume candidates](checkpoints/test-performance.md)
   and [detailed results](maintenance/test-performance/RESULTS.md). DML clean local55a73e9,
   NOT PUSHED; slow-test proof reuse preserves assertions/bounds, full standard gate passed,
@@ -563,7 +595,22 @@ proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
 
-User-requested **test-performance checkpoint**. Read [checkpoint](checkpoints/test-performance.md)
+**History/read memoization is locally validated**, not committed or published. Read
+[results](maintenance/test-performance/HISTORY-MEMO.md). Auto4 full gate3417pass/100coverage/
+Valgrind completes11m53s; five-minute goal remains open. Thirteen uncommitted implementation
+paths at55a73e9, with low-level repository/native APIs unchanged. Next candidate is profiling
+shared read/reachability/transfer work outside this example; runtime/API expansion needs
+scope review. No further automatic run/publication/CI/native19 activity. Older focus below
+is chronological history, not current timings or source-clean claims.
+
+Earlier **parallel coverage/automatic resource sizing was locally implemented and validated**, not published.
+Read [results](maintenance/test-performance/PARALLEL-COVERAGE.md). Auto4 full gate3407pass/100coverage/
+Valgrind completes14m42s; five-minute goal remains unmet and longest case alone8m34s. Current source
+has ten uncommitted tooling paths at55a73e9. Next candidate is reducing repeated validation/history
+work; fast/slow modes remain a conditional fallback, not selected. No further automatic full run,
+commit/push/CI or paused-native investigation restart. Older focus stages below retain history.
+
+Earlier user-requested **test-performance checkpoint**. Read [checkpoint](checkpoints/test-performance.md)
 and [results](maintenance/test-performance/RESULTS.md). DML clean locally committed55a73e9/NOT PUSHED;
 full standard gate passed and optional four-worker Python timing trial passed3361 in8m58s.
 Next candidates are fixture-consumer grouping or further profiling, not selected/authorized work.

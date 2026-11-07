@@ -1,13 +1,13 @@
 # Agent-first DML design discussion — checkpoint
 
-Current discussion: **User-requested test-performance checkpoint**.
-Read [performance checkpoint](checkpoints/test-performance.md) and
-[detailed results](maintenance/test-performance/RESULTS.md). DML clean at locally committed,
-NOT PUSHED55a73e9; two slow tests optimized, standard full-v passed, optional four-worker trial
-3361pass/8m58s. The next two slow cases mainly repeat fixture setup in an ungrouped consuming
-module; grouping it is an assistant suggestion, not a selected next task. Local design checkpoint
-only; no push, optimization/test/build/worker/CI restart. GHA disabled/native19 PAUSED/VP-001 OPEN
-UNKNOWN remain. Older status blocks below are historical, including Iteration24's published59b3830.
+Current discussion: **Holistic test-performance work; local checkpoint committed**.
+Read [checkpoint](checkpoints/holistic-test-performance.md). DML is clean LOCAL15555c0 after
+three focused checkpoint commits (parallel coverage/memoization/frozen seeds), NOT PUSHED.
+Latest ordinary auto4 gate3421/Python+native100/9m57s, no optional Valgrind/full JUnit; five-minute
+goal unmet and fixture whole-suite gain unproven. User selected checkpoint then proceed with
+holistic work: assurance map/redundant validation trace before scoped changes, no blanket native/
+low-level API expansion. Assertions/budgets/deadlines/coverage unchanged; no fast/slow/default-
+parallel change. GHA disabled/native19 PAUSED/VP-001 OPEN UNKNOWN; earlier states historical.
 
 Current task: **Iteration24 COMPLETE AND STOPPED**, independently accepted and normally published
 **`59b38303fe2f4c89d6fce3b01933f7260eb28320`**, initial291d9a5/feature-parent965cec/exact cumulative33/
@@ -5271,9 +5271,112 @@ no push or more optimization/test/profile/build/install/worker/story/CI activity
 disabled, native19 PAUSED/private candidate retained, VP-001 OPEN UNKNOWN/owner/conditions remain;
 no platform-green, parallel-coverage or earlier runtime diagnosis claim.
 
+## Resource-aware parallel coverage
+
+The user requested continuing test optimization toward a full suite within five minutes, with
+fast/slow modes as a conditional fallback if optimization cannot achieve it. After clarification
+that the40m48s full gate spent38m44s in serial covered Python tests (not30 minutes in rebuild/
+Valgrind), the user selected parallel coverage as the next step. The user further specified
+worker counts from available CPU AND memory, suitable for varying CI capacity, then said
+“agreed. proceed”. This authorized bounded local coverage/resource-policy implementation and
+validation, not workflow enablement, native19 investigation, new runtime feature or publication.
+
+[Results](maintenance/test-performance/PARALLEL-COVERAGE.md) preserve early focused failures,
+raw auto8 full5fail/3402pass, SAME raw gcov profile clean-env0/prefixed-env4 controls, physical
+cores4 versus logical8,73 corrected focused/160 targeted passes and ONE corrected full gate.
+Final automatic4 gate3407pass/9131Pythonlines/native100/Valgrind in14m42s, two original warnings;
+actual native suite properties forwarded to XML. Per-worker sampled peak114–244MiB supports
+retaining the conservative1GiB allowance, not an OOM guarantee. Deadlines/assertions/thresholds/
+exclusions unchanged; original failures and older UNKNOWNs remain, no VP-001 diagnosis/waiver.
+
+Five-minute goal NOT met: longest covered case8m34s. No fast/slow split selected, no claim that
+more workers solve it. Current HEAD55a73e9 remains NOT PUSHED with ten uncommitted tooling paths
+and an unversioned external Nix tools change. Defaults remain serial; optional auto coverage
+is locally validated, not hosted-platform assurance or complete CI dependency provisioning.
+No coding worker/extra agent or further automatic full run; native19 stays PAUSED.
+
+## History/read memoization
+
+The user stated “good work. proceed” after the locally validated parallel-coverage baseline
+and offer to reduce repeated ancestry/history validation. Coordinator profiled ONLY the original
+ancestry test, then implemented bounded example-only successful-check/inspector/copied-read
+memoization. [Results](maintenance/test-performance/HISTORY-MEMO.md) own exact scope/evidence.
+No low-level repository API/native/lifetime/URI/entity change or coding-worker restart.
+
+Successful checks and immutable records are shared only within one source-read-only inspection;
+refs/failures are not cached, each warm read checks the real public transaction state, inspectors
+retain their seen/active guards, recursive keys include exact depth and live bounds, and new top-level
+calls revalidate. Original tests/assertions remain; ten new cache/state/bounds tests protect changes.
+Final auto4 standard gate trueexit0/3417pass/Python9194/native100/Valgrind in11m53s, two original warnings.
+Longest original cases222.017s/152.928s versus513.696s/296.219s. Both sources/earlier runs retained,
+no new exclusion/deadline/threshold change, no installed-story replay or old failure diagnosis.
+
+Five-minute goal NOT met. The much smaller overall gain shows other modules now dominate;
+profiling shared read/reachability/transfer work is a candidate requiring scope review before
+runtime/API expansion. Fast/slow modes remain a conditional fallback, not selected. Thirteen paths
+uncommitted at55a73e9/NOT PUSHED; no further automatic full run, commit/push/CI/native19 activity.
+
+## Frozen fixture setup experiment
+
+The user said “go ahead and give it a try” after the offer to reduce repeated fixture
+construction/validation before low-level API expansion. Nine additional test-only paths
+reuse successful worker-local immutable seeds and restore separate case repositories via
+public transfer. Four new isolation/stash guards and unchanged original test-function ASTs;
+no native lockfile copying, changed assertion/deadline/budget/coverage exclusion/threshold.
+[Results](maintenance/test-performance/FIXTURE-SEEDS.md) preserve raw fixture-visibility errors,
+weaker imported-FixtureDef/session-scope version and corrected config-stash sharing.
+239 focused pass; ONE ordinary auto4 gate trueexit0/3421pass/unchanged100 in9m57s, Python9m43s,
+Valgrind NOT enabled. Only about2.5% Python-phase gain versus prior covered run, not compelling
+overall improvement; user's ordinary8m36s timing is faster. No full JUnit/durations requested;
+actual logs/report evidence, missing XML not reconstructed. Five-minute goal unmet. Twenty-two
+paths uncommitted/local55a73e9; no automatic further run, API expansion, commit/push/CI/native19.
+
+## Holistic performance checkpoint and continuation
+
+The user asked whether repeated Python work is the dominant issue, then whether a holistic
+approach could minimize test redundancy. Assistant distinguished measured example/application
+validation orchestration from Python-language/native-storage attribution, and proposed an
+assurance map/layered tests/minimal fixtures/operation-local validation context/work-count
+regressions. The user said **“make a checkpoint commit, then proceed”**. Three focused LOCAL
+implementation commits checkpoint all22 paths through15555c0; clean source, no push. The
+[checkpoint](checkpoints/holistic-test-performance.md) preserves current evidence and bounded
+continuation: source/assurance map first, measured coherent example-level changes with preserved
+contracts; native/low-level API expansion reviewed separately. No fast/slow split/extra agent/
+workflow change/native19 restart or old failure diagnosis follows. Design checkpoint local only.
+
 ## Resume point
 
-**Review the test-performance checkpoint:** [current state and next candidates](checkpoints/test-performance.md).
+**Holistic test-performance work from clean LOCAL15555c0:**
+[checkpoint](checkpoints/holistic-test-performance.md). Start with assurance/dependency map and
+actual redundant-validation chain. Five-minute target unmet; latest ordinary3421/100/9m57s,
+no Valgrind/full JUnit. User authorized local checkpoint then bounded continuation, no push/GHA/
+native19/default-parallel or blanket native/API scope expansion. Older stages below historical.
+
+**Earlier frozen fixture setup and the still-unmet five-minute goal:**
+[latest experiment](maintenance/test-performance/FIXTURE-SEEDS.md). Ordinary auto4 full3421pass/
+Python+native100/9m57s, no optional Valgrind. Focused sharing/isolation pass, but no convincing
+whole-gate gain; next bounded profiling or retention decision remains to review. Twenty-two
+uncommitted implementation paths/local55a73e9, no automatic new run/publication/CI/native19.
+
+**Earlier history/read memoization and the remaining five-minute goal:**
+[latest results](maintenance/test-performance/HISTORY-MEMO.md).
+Final auto4 full gate3417pass/unchanged100coverage/Valgrind,11m53s (Python9m58s). Original slow cases
+now3m42s/2m33s; original assertions remain, no low-level repository/native API changes. Source at55a73e9
+has thirteen uncommitted paths. Other modules account for the remaining time; broader shared-read/
+reachability profiling is a candidate requiring bounded scope review before runtime changes.
+Fast/slow modes remain conditional/unimplemented. No further automatic run/publication/CI/native19.
+Older resume stages below preserve chronology, not current timings or source-clean claims.
+
+**Earlier resource-aware parallel coverage:**
+[local implementation/results](maintenance/test-performance/PARALLEL-COVERAGE.md).
+Final auto4 full gate3407pass/100coverage/Valgrind,14m42s; source at55a73e9 with ten uncommitted
+tooling paths. The next bottleneck is the8m34s ancestry/history-validation case, not worker
+memory or merely scheduling. Further reduction of repeated validation/history work is a
+candidate requiring a bounded plan; fast/slow modes remain conditional and unimplemented.
+No automatic further full/profile run or commit/push/CI/native19 restart. Older resume stages
+below retain history, including the earlier clean checkpoint and no-coverage trial.
+
+**Earlier test-performance checkpoint:** [current state and next candidates](checkpoints/test-performance.md).
 DML clean local55a73e9, NOT PUSHED; design results99cd523. Two original slow tests improved without
 weakening assertions, full standard gate passed, four-worker trial3361pass/8m58s. Optional parallel
 execution is not yet a maintained parallel coverage gate. The next two slow cases are dominated by

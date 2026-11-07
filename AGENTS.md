@@ -1094,6 +1094,96 @@ No tests/build/install/profile/story/worker/CI/native investigation restart, dep
 image/cloud/global/release/package/later turn or push authorized. Historical Iteration24 source
 identity/status and earlier checkpoint statements remain historical, not current HEAD claims.
 
+## Current resource-aware parallel coverage
+
+The user subsequently requested continuing test optimization toward at most FIVE minutes for
+the full suite, with fast/slow modes only if optimization cannot reach it. After selecting
+parallel coverage and CPU+memory-adaptive workers for varying CI capacity, the user stated
+“agreed. proceed”. This authorized bounded local test-tooling/dependency integration and
+validation; see [results](maintenance/test-performance/PARALLEL-COVERAGE.md). It supersedes
+checkpoint no-restart wording ONLY for this scope, not paused native19 or a new runtime feature.
+
+Ten tooling paths are now uncommitted at DML HEAD55a73e9. Default remains serial; optional
+DML_TEST_WORKERS=auto chooses physical-core/affinity/quota/memory capacity, with1GiB per worker
+and1GiB reserve. Unknown resources selectone/diagnostic, known insufficient allocation errors.
+Added pytest-cov/psutil, early test plugin, consumer-fixture grouping, suite-property forwarding,
+worker RSS reports and isolated raw native counter merge. Source scope/EXACT exclusions/100
+thresholds/ALL assertions/deadlines remain; no fast/slow split or maintained native/entity change.
+External tools flake updated/unversioned; lock unchanged. No workflow/budget/runner/release change,
+GHA enable/run, extra coding agent, cloud/service/image or commit/push was requested/performed.
+
+Final corrected auto4 standard gate TRUEexit0:3407Python/two warnings/native7/Valgrind/Python9131/
+native1667lines131functions1550branches100,14m42s (Python12m36s). FIVE-minute goal NOT met:
+longest case513.696s. Initial auto8 RAW5fail/3402pass/deadline200ms/GCC mergeICE, SAME-counter
+clean-env0/relocation-env4 causal controls, physical4/logical8 admission correction,73 focused/
+160 targeted evidence and bounded ONE corrected full preserved; no automatic third full. Probe
+peaks114–244MiB at4 are sampled/not maximum guarantees. Native suite3properties actually in XML;
+no original-cause/hosted-platform/CI provisioning assurance. Source/data/both builds coordinator-
+owned; worker sessions remain stopped. No further automatic test/full/profile/native19 restart;
+next performance direction needs a bounded plan, especially BEFORE related runtime expansion.
+Native19 PAUSED/private candidate retained/VP-001 OPEN UNKNOWN/owner/conditions/no waiver remain.
+
+## Current history/read optimization
+
+The user subsequently said “good work. proceed” after the parallel-coverage baseline and offer
+to reduce repeated ancestry/history validation. Scope is example-level inspection optimization,
+not low-level repository/native API or paused-native investigation. See
+[results](maintenance/test-performance/HISTORY-MEMO.md). Profiler1 original ancestry pass identifies
+4164reachability/7.47million native reads; within-ONE-inspection export/public-S/preparation checks,
+SAMEtx+commit public Inspector and bounded copied immutable public reads now share work. Mutable
+refs/failures not cached; warm reads check actual owner/thread/ended state via public ref lookup
+whose value is ignored. No active/seen reset/constructor bypass/live handles beyond short scopes.
+Exact depth and live bounds remain in recursive keys; fresh top-level read revalidates.
+
+Additional THREE paths: examples/captured_calls.py, new ten-test read-memo regression file and
+owning example docs. Thirteen implementation paths total now uncommitted atHEAD55a73e9. Original
+slow-test bodies/assertions/deadlines/limits/coverage exclusions remain; no native/storage/low-level
+API/diagram entity change. Final259 focused covered/14final guard tests and ONE final auto4 full
+TRUEexit0:3417Python/two warnings/native7/Valgrind/Python9194/native100 in11m53s; slow cases222.017/
+152.928s. Earlier source copies/intermediate guard refinements/one sampling error retained;
+no repeat installed story/CI/GHA/old diagnosis. FIVE-minute goal NOT met, no fast/slow split selected.
+Next shared-read/reachability profiling needs a bounded plan and runtime/API scope review BEFORE
+expansion. No further automatic suite/profile/native19 restart or commit/push requested. Source/
+both builds/evidence coordinator-owned, old worker sessions stopped; GHA-disabled decision/native19
+PAUSED/private candidate retained/VP-001 OPEN UNKNOWN/owner/conditions/no waiver unchanged.
+
+## Current frozen fixture setup experiment
+
+The user said “go ahead and give it a try” after the bounded offer to amortize repeated
+fixture setup, preserving assertions/deadlines and separately reviewing low-level API scope.
+See [results](maintenance/test-performance/FIXTURE-SEEDS.md). Nine test-only paths added to
+previous13/twenty-two uncommitted atlocal55a73e9; worker-config successful seed stash/pinned
+public import + explicit refs into OWN case stores, no database/lock copying or native/API edits.
+Existing six modules' test-function ASTs exact HEAD; four new isolation/cache guards. Raw93
+fixture-visibility errors/weaker importedFixtureDef scope correction preserved.239focuspass,
+ONE ordinary auto4 TRUEexit0/3421pass/two original warnings/Python9194/native100 in9m57s,
+Python582.87s; optional Valgrind NOT requested. Full JUnit/durations ABSENT/no reconstruction;
+actual logs/coverage/data/source/worker reports retained. Only~2.5% Python-phase improvement
+versus prior597.95s, userordinary8m36s faster; no convincing overall speedup/five-minute success.
+No automatic further suite/profile to prefer a timing, low-level API expansion, fast/slow split,
+default-parallel/CI/workflow/install/commit/push. Review next bounded profiling or retention
+of fixture complexity. Both builds/source/evidence coordinator-owned/old coding workers stopped;
+GHA disabled/native19 PAUSED/private candidate retained/VP001 OPEN UNKNOWN/owner/conditions unchanged.
+
+## Current holistic performance continuation
+
+The user said “make a checkpoint commit, then proceed” after the holistic assurance-map/
+layered-test/minimal-fixture/operation-local validation-context/work-count proposal. Read
+[checkpoint](checkpoints/holistic-test-performance.md). Three focused LOCAL DML commits
+checkpoint22 paths through15555c01e4db19a20b4de7049f776c4d995bd5e0; clean source, NOT PUSHED.
+Local design checkpoint authorized too, no remote publication. Existing reports' uncommitted/
+parent/no-restart wording is historical, narrowly superseded for this continuation only.
+Start bounded read-only assurance/dependency/redundant-work review using retained profiles,
+then concrete example-level scoped improvement/regressions; concrete native/low-level repository/
+API expansion still reviewed BEFORE edits, no blanket runtime permission. No repeat-full-until-
+faster: focused checks/ONE final unchanged full-v after final substantive changes per owning
+policy; related installed story/native19/VP001 investigation not inherited. Preserve assertions,
+provenance/depth/semantic/transfer bounds/deadlines/coverage scope/exclusions/100 thresholds.
+No fast/slow/default-parallel/workflow/GHA/service/image/cloud/global/extraagent/install/download/
+release/package/push. BOTH/source coordinator-owned/old coding workers stopped; GHA disabled/
+native19 PAUSED/privatecandidate retained/VP001 OPEN UNKNOWN/owner/conditions remain. Goal5min
+unmet, ordinary3421/100/9m57/noValgrind/nofullXML/failure qualifications preserved.
+
 ## Vocabulary
 
 - Maintained documentation uses glossary terms consistently. Add or clarify a term

@@ -1,5 +1,9 @@
 # Slow-test performance — bounded local work
 
+Subsequent separately authorized work: [resource-aware parallel coverage](PARALLEL-COVERAGE.md)
+is locally validated/uncommitted. The records below own the earlier committed optimization
+and no-coverage trial; they do not describe the newer coverage profile or current source diff.
+
 Status: locally committed and validated; **not pushed**.
 DML commit: `55a73e9fa4895cce39a081070ebff906a3b67f19`
 (parent `59b38303fe2f4c89d6fce3b01933f7260eb28320`), exact three paths:
