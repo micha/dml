@@ -1,0 +1,2 @@
+# Optional spike-only embedded engine; not a maintained DML dependency.
+duckdb==1.5.2
