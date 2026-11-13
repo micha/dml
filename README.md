@@ -6,6 +6,167 @@ its existing draft specifications.
 
 ## Start here
 
+- **Per-exercise reuse COMPLETE/ACCEPTED/STOPPED, isolated/uncommitted:**
+  [results](maintenance/relational-testing/PER-EXERCISE-RESULTS.md),
+  [coordination](maintenance/relational-testing/PER-EXERCISE-COORDINATION.md).
+  Actual one-input change reruns only own E/P/C; NEW-process persisted reuse/OLD producer index/
+  scoped verified pool/main-sibling choices.63Q33T8E11P14C30reuse/SAME4272/causal corrected286PASS;
+  original48focused/284full rawfailures and guard/import corrections preserved. No main/CI/push/
+  production promotion; future-gate delegation bounded and now stopped, not restart permission.
+
+- **Per-exercise corrected49focus PASS; readiness BLOCKED on two new provenance/type guards:**
+  [readiness and proposed follow-up](maintenance/relational-testing/PER-EXERCISE-READINESS.md),
+  [coordination](maintenance/relational-testing/PER-EXERCISE-COORDINATION.md).
+  Approved narrow adapter correction done, prep0/49PASS1.62s/XML0, v1failure preserved.
+  Static PE-002 unchecked reported outcome/PE-003 discarded native kinds require owning guards/
+  targeted6metadata-only tests before story. No new correction/story/full/CI/main/push authorized.
+
+- **Per-exercise prototype drafted; first focused gate RAW FAILED / stopped for narrow correction:**
+  [failure/proposal](maintenance/relational-testing/PER-EXERCISE-FOCUS-FAILURE.md),
+  [coordination](maintenance/relational-testing/PER-EXERCISE-COORDINATION.md).
+  User accepted pre-edit; new12files/prior59exact/pinprep0;48focus33PASS15setupERRORS0.67s/exit1.
+  New plain-dict validator receives extractor defaultdict. Explicit boundary conversion+pure
+  regression/one corrected prep+49focus proposed, not yet performed. No SQL/acceptance/main/CI/push.
+
+- **Per-exercise reuse GO; mandatory concrete pre-edit gate ready for acceptance:**
+  [coordination](maintenance/relational-testing/PER-EXERCISE-COORDINATION.md),
+  [pre-edit review](maintenance/relational-testing/PER-EXERCISE-PRE-EDIT.md).
+  Current assistant owns isolated new spike slice only. Actual read-only source/pin/ELF review;
+  new12files/stores/schema/custody/query confinement/finite gates concretized, no coding/native/
+  snapshots/tests/stage activation yet. Separate readiness before sole63Q33T story. Main/shared
+  builds/CI/commit/push/promotion/native19 unchanged, pre-edit acceptance pending.
+
+- **Per-exercise reuse candidates PREPARED FOR REVIEW; separate implementation GO required:**
+  [design](maintenance/relational-testing/PER-EXERCISE-DESIGN.md),
+  [example](maintenance/relational-testing/PER-EXERCISE-EXAMPLE.md),
+  [conditional handoff](maintenance/relational-testing/PER-EXERCISE-HANDOFF.md).
+  User “proceed” authorized offered plan preparation, not engineering. Recommended3case E/P/C
+  keys/current-request→OLD-producer index/isolated fixtures/shared stores/pooled facts/scoped checks;
+  one changed input reruns only its chain. Seven-round63Q33T candidate, max15selectors/limits unchanged.
+  No code/test/story/native reader/build/install/CI/commit/push or additional test-conversion claim.
+
+- **Recorded controller wired to shared indexed original16 profile COMPLETE/STOPPED:**
+  [results](maintenance/relational-testing/INDEXED-CONTROLLER-RESULTS.md),
+  [plan](maintenance/relational-testing/INDEXED-CONTROLLER-PLAN.md).
+  User requested integration, new thin fixed adapter reuses original controller core unchanged.
+  E portable indexed bundle → P pooled indexed context → C independent16case agreement; actual
+  fresh-controller-process reuse/no stages.12pure/ONE6round18Q12T3E4P5C6reuse/SAME1368+exact3Q/
+  final229pass;97knownwaitedabsent/7workingorigins retired/evidence retained. No main/CI/push/promotion.
+
+- **More existing tests in shared indexed storage COMPLETE/ACCEPTED/STOPPED:**
+  [results](maintenance/relational-testing/SHARED-EXISTING-RESULTS.md),
+  [plan](maintenance/relational-testing/SHARED-EXISTING-PLAN.md).
+  Original15 persisted builtin-profile bodies +equal-nested-source body unchanged; no-ref shared
+  fixture/publication seam, indexed native contexts/observations, independent mixed-builtin SQL.
+ 23focus/ONE16case49call demo15reject1accept/753reads/SAME299/final217 pass; reviewer-scope correction
+  preserved.8newfiles uncommitted, old source/main/shared builds unchanged; no integration/push/CI.
+
+- **Shared exercise repo/indexed contexts COMPLETE/ACCEPTED/STOPPED, isolated/uncommitted:**
+  [results](maintenance/relational-testing/SHARED-INDEX-RESULTS.md) and
+  [plan](maintenance/relational-testing/SHARED-INDEX-PLAN.md).
+  User implementation GO: one exercise repo, emptyP0, PN parents=(PN-1,CN), immutable index/context/
+  observations in DML; case-scoped normalization/checks. Demo4cases24calls/275reads/fork+context
+  transfer/SAME102checks/final194pass. Raw23pass1fail warning-prefix transport and failed UNIT
+  harness retained, narrow data/diagnostic separation fixed. No main/shared builds/CI/install/
+  commit/push/controller promotion; old incremental controller unchanged and stopped.
+
+- **Shared exercise repository/versioned index direction agreed; no new GO:**
+  [discussion](discussion.md#shared-exercise-repository-versioned-index-and-publication-chain).
+  User selects empty P0 and publication-first parent order: PN.parents=(PN-1,CN). Updated immutable
+  index under well-known snapshot binding identifies exercise roots; parent links retain histories,
+  not blanket case availability. Exact schema/API/isolation/recovery/validation plan open; no new
+  implementation/run/worker/commit/push or prepared handoff. Completed prototype stays stopped.
+
+- **Incremental testing prototype COMPLETE/ACCEPTED/STOPPED, isolated and uncommitted:**
+  [results](maintenance/relational-testing/INCREMENTAL-RESULTS.md) and
+  [coordination](maintenance/relational-testing/INCREMENTAL-COORDINATION.md).
+  User delegated bounded review decisions; causal manifest-order fix preserved originalRAW1.
+  Corrected49focus/sole21Q15T4E5P6C6reuse/SAME853checks/ONE final169cases pass; owning-rule sensitivity
+  outer assertion deliberatelyRAW1/no adoption.782pinnedassets/42knownwaitedabsent/9native originals
+  retired with evidence retained. No main/shared-build use/maintained full/coverage/platform promise,
+  commit/push/integration/controller promotion; old uncertainty preserved. GHA/native19/VP001 unchanged.
+
+- **Incremental draft implemented; FIRST snapshot preparation RAWfailed / STOP before focus:**
+  User accepted pre-edit; new12 spike-only files/static checks, main/shared builds untouched.
+  [Failure/correction request](maintenance/relational-testing/INCREMENTAL-PREPARATION-FAILURE.md)
+  identifies canonical Path-component vs relative-string ordering, preserving incomplete snapshots/
+  trueexit1/no pin receipt/no XML/no native import or stage. Narrow TWO-file fix+ONE fresh preparation/
+ 49-case focus decision pending; original48 controls unrun, no automatic retry/story/full/commit/push.
+  [Coordination](maintenance/relational-testing/INCREMENTAL-COORDINATION.md) owns current gate state.
+
+- **Incremental prototype GO; concrete pre-edit gate pending before coding/runs:**
+  User “reviewed. GO” approves the bounded isolated plan. Current assistant owns ONLY new spike
+  files/outputs, not active Iteration25/main/shared builds. [Pre-edit plan](maintenance/relational-testing/INCREMENTAL-PRE-EDIT.md)
+  and [coordination](maintenance/relational-testing/INCREMENTAL-COORDINATION.md) record static pins,
+  qualified native provenance/RUNPATH handling, portable custody/schema/finite validation. No
+  source/store/test/native activation/build/install/commit/push yet; later readiness gates story.
+  GHA disabled/native19 PAUSED/VP001 OPEN UNKNOWN unchanged; no main integration/extra agent.
+
+- **Incremental testing prototype candidates prepared; review then separate GO:**
+  [design](maintenance/relational-testing/INCREMENTAL-DESIGN.md),
+  [worked example](maintenance/relational-testing/INCREMENTAL-EXAMPLE.md) and
+  [conditional handoff](maintenance/relational-testing/INCREMENTAL-HANDOFF.md).
+  User “agreed. proceed!” authorized preparation only. Recommended pinned trusted controller/
+  isolated map-get E/P/C stages/conservative whole-build invalidation; seven-round21-stage-request/
+  4exercise5projection6check story and separate adoption/branch proof are candidates, not as-built.
+  Random sampling deferred; no new runs/source/dependencies/commit/push/main integration/agent.
+  Existing Iteration25 worker/shared-build authority and GHA/native19/VP001 boundaries unchanged.
+
+- **Separate relational/incremental testing session handoff:**
+  [context, evidence, decisions and next planning boundary](maintenance/relational-testing/HANDOFF.md).
+  Isolated uncommitted `../dml-relational-spike` at15555c0; SAME44-case READ_ONLY/TEMP oracle
+  1/2/4-connection totals6.56/4.47/3.50s including setup,218/65 verdicts match. Not full-suite
+  or complete replacement assurance; raw failures/HOST limits retained. Incremental controller/
+  persistent test-result caching unbuilt; random sampled refresh explicitly deferred. Handoff
+  documentation only/no new runs/integration/commit/push; active Iteration25 scope stays separate.
+
+- **Iteration25 GO; existing window-2 agent started in a verified NEW Pi session:**
+  [design](iterations/25-implementation-bound-invocation/DESIGN.md),
+  [example](iterations/25-implementation-bound-invocation/EXAMPLE.md),
+  [handoff](iterations/25-implementation-bound-invocation/HANDOFF.md) and
+  [coordination](iterations/25-implementation-bound-invocation/COORDINATION.md).
+  Reviewed bounded implementation-only captures/common node-call/intent+full MAP VALUE reuse plan
+  approved for implementation, coordinator review/feedback, then accepted focused worker NORMAL
+  commit/push. Mandatory pre-edit/readiness gates;13Q10T6LOCAL17getter/SAME nonexecuting review/ONE
+  unchanged final full-v. BOTH builds/source worker-owned until freeze/release. GHA stays disabled,
+  native19 PAUSED/VP001 OPEN UNKNOWN; no extra worker/later turn/design publication. Outcomes pending.
+
+- **Earlier Iteration25 plan reviewed; separate implementation GO then pending:**
+  [design](iterations/25-implementation-bound-invocation/DESIGN.md),
+  [worked example](iterations/25-implementation-bound-invocation/EXAMPLE.md),
+  [conditional handoff](iterations/25-implementation-bound-invocation/HANDOFF.md) and
+  [agreement/preparation](discussion.md#iteration25-implementation-only-captures-and-candidate-preparation).
+  User approved revised proposal/preparation, then reviewed all three candidates; see
+  [review checkpoint](discussion.md#iteration25-plan-review). This is not implementation GO. Captures ONLY at
+  implementation closure creation; semantic variability in arguments; intent+full MAP VALUE reuse,
+  exact requested/OLD producer provenance retained. Narrow common installed Python invocation/capture
+  interface plus NEW example integration/13Q10T6LOCAL17getter are reviewed candidate mechanics, not as-built.
+  Test-performance work postponed, correctness retained. DML clean LOCAL15555c0/not pushed here;
+  no source/build/install/test/story/reader/worker/CI/investigation/commit/push restart. GHA disabled/
+  native19 PAUSED/VP001 OPEN UNKNOWN/BOTH coordinator-owned/old workers stopped. Review then GO.
+
+- **Project-local tools restoration verified:**
+  [results](maintenance/test-performance/TOOLS-REPAIR.md). Normal trusted substitution restores
+  SAME pinned tools/source/lock; separate project validation-profile GC root protects closure.
+  46 targeted tools checks pass, pinned flake works offline afterward. Original hash failure/
+  unknown package-absence cause retained, no global/CI/full/DMLnative/runtime/commit/push changes.
+  DML clean15555c0; read prototypes still rejected/5min unmet, next whole-history plan pending.
+
+- **Installed Python read experiments rejected; checkpoint preserved:**
+  [results](maintenance/test-performance/VALIDATION-READS-RESULTS.md). User approved Python
+  validation internals with C/storage/public APIs unchanged. Three prototypes passed focused
+  checks/reduced reads but no convincing speedup; restored clean15555c0, no code retained.
+  Final draft238focused/two modules100, not full assurance. Repeated132scans/63exports persist;
+  next target whole-history validation, not more wrappers. Full tools preparation blocked,
+  no automatic repair/fetch/profile/full/GHA/native19/commit/push. New review notes local.
+
+- **Holistic assurance/work review:**
+  [review](maintenance/test-performance/HOLISTIC-REVIEW.md). ONE current HOST-metadata profile
+  passes;132retained scans/63exports persist despite memoization, setup .05s. Candidate shared
+  installed-Python validation internals need concrete scope review; Nix full preparation raw
+  hash mismatch BEFORE tests, unchanged tools bytes, cached serial profile-only environment.
+  No runtime/native/API edits/repeat/provisioning/push; checkpoints preserved, review notes local.
+
 - **Holistic test-performance checkpoint and continuation:**
   [checkpoint](checkpoints/holistic-test-performance.md). DML clean LOCAL15555c0 after three
   focused commits of22 paths, NOT PUSHED; latest ordinary3421/100/9m57s, no optional Valgrind/
@@ -594,6 +755,22 @@ The checkpoint is chronological. Later clarifications can supersede earlier
 proposals; it is not a finalized specification or implementation approval.
 
 ## Current focus
+
+**Iteration25 GO: implementation-bound invocation.** Existing window-2 worker in a verified NEW
+session; [coordination](iterations/25-implementation-bound-invocation/COORDINATION.md) owns gates and
+custody. Read ALL THREE candidates; pre-edit review before coding/build/run and installed readiness
+before sole13Q10T6LOCAL17getter story. Coordinator monitors/independently reviews/feeds back, then
+accepted focused worker NORMAL commit/push. BOTH/source worker-owned until freeze/release; GHA
+remains disabled/native19 PAUSED/VP001 OPEN UNKNOWN. Acceptance/publication pending, no later turn.
+
+Earlier **Iteration25 plan reviewed: implementation-bound invocation.** Read ALL THREE
+[design](iterations/25-implementation-bound-invocation/DESIGN.md),
+[example](iterations/25-implementation-bound-invocation/EXAMPLE.md) and
+[handoff](iterations/25-implementation-bound-invocation/HANDOFF.md). Bounded candidates reviewed;
+exact engineering spellings remain refinable and separate implementation GO is pending. Implementation captures only,
+intent+full argument-MAP value reuse, common node-call interface, requested-versus-produced provenance.
+Performance engineering postponed, not silently removed/finished. DML clean LOCAL15555c0/no push;
+no current engineering/validation/session/publication permission. Older focus blocks below historical.
 
 **History/read memoization is locally validated**, not committed or published. Read
 [results](maintenance/test-performance/HISTORY-MEMO.md). Auto4 full gate3417pass/100coverage/
