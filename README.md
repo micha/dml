@@ -222,6 +222,14 @@ actual captured add/double calls through a NEW example-local in-process adapter 
 leaves. Short recording scopes/direct result nodes preserve own requests versus OLD selected chains;
 convenience defaults do not retarget captures. [Gated installed acceptance](tests/captured_calls/README.md)
 is opt-in and currently pending; no native entity, general evaluator or runtime dispatcher is added.
+The additive [implementation-bound invocation surface](docs/implementation-bound-invocation.md)
+provides explicitly imported `daggerml.calls` structural captures and a common owned node-call
+facade. NEW example integration routes outer/leaf/getter calls through that facade and matches
+reuse by intent plus full argument-MAP value while retaining exact requested/OLD producer authority.
+Old helper keys/APIs stay unchanged. One current installed local story (13Q/10T, six direct LOCAL
+children,17 getters) and blocked SAME caller/replica reader pass; final full validation, independent
+acceptance and publication remain pending. This is not hosted-platform assurance; development GHA
+remains disabled.
 Its [glossary](docs/spec-next/glossary.md) owns the shared vocabulary. The old draft
 specification below remains design context, not an implementation claim.
 

@@ -24,14 +24,17 @@ from that subdirectory. Maintained Python/native binding sources still live ther
 
 The `python-runtime` Meson install tag selects only:
 
-- `daggerml/__init__.py`, `local.py`, `builtin.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
+- `daggerml/__init__.py`, `local.py`, `builtin.py`, `calls.py`, `transfer.py`, `exchange.py`, `exchange_worker.py`,
   `ssh.py`, `ssh_worker.py`, `floci.py`, `floci_http.py`, `floci_worker.py`,
   `_core.pyi`, `py.typed`;
 - the linked `_core` extension;
 - the native `daggerml/_bin/dml` (`dml.exe` on Windows).
 
 Wheel installation excludes the static archive, C headers, test-only extensions,
-fault controls and dependency installs. Native core/dependency code is statically
+fault controls and dependency installs. The explicitly imported
+[calls draft](implementation-bound-invocation.md) adds only `calls.py` to this inventory;
+example backend/source/history integration is not installed or imported by it.
+Native core/dependency code is statically
 linked into the extension/executable, not copied into another maintained source
 implementation. Root Meson installation also offers the C archive/headers; the
 CLI executable's install location is the package directory stated above.

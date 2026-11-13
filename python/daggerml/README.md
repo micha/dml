@@ -44,6 +44,12 @@ The separately imported [internal builtin surface](../../docs/internal-builtins.
 fixed URI/versioned NULL bindings, argument-map node/result-node calls and nested map/list
 getters with copied values and separate source relationships. Ordinary semantic profiles use
 existing native storage; no general evaluator, plugin registry or sandbox is introduced.
+The additive explicitly imported [calls surface](../../docs/implementation-bound-invocation.md)
+records implementation-only captures and supplies a trusted-integration-owned common node-call
+facade. Structural closure reading is not source/execution/producer-success proof. New example
+intent+full-MAP reuse keeps requested versus OLD producer provenance; old APIs/keys stay unchanged.
+The current isolated installed local story and blocked SAME-history reader pass. Final full
+validation, independent acceptance and publication remain pending; no hosted-platform claim.
 
 ## Local build
 

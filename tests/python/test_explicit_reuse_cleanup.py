@@ -123,7 +123,7 @@ def test_ineligible_reports_retain_owned_artifacts(tmp_path, mode):
     ["success", "setup", "call", "teardown", "skip", "cleanup-error", "unrelated"],
 )
 def test_real_pytest_phase_order_failure_retention_and_visible_cleanup_error(
-    tmp_path, mode
+    tmp_path, mode, monkeypatch
 ):
     case = tmp_path / "case"
     case.mkdir()
@@ -162,8 +162,13 @@ def test_success(specimen):
     )
     name = "test_unrelated.py" if mode == "unrelated" else "test_explicit_reuse.py"
     (case / name).write_text(source)
+    parent_report = tmp_path / "parent-report.xml"
+    parent_bytes = b"owning parent report must survive independent child pytest"
+    parent_report.write_bytes(parent_bytes)
+    monkeypatch.setenv("PYTEST_ADDOPTS", f"--basetemp={tmp_path} --junitxml={parent_report}")
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
+    environment.pop("PYTEST_ADDOPTS", None)
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "--basetemp", str(base), name],
         cwd=case,
@@ -171,6 +176,7 @@ def test_success(specimen):
         capture_output=True,
         timeout=30,
     )
+    assert parent_report.read_bytes() == parent_bytes
     output = (result.stdout + result.stderr).decode()
     assert "INTERNALERROR" not in output
     assert result.returncode == (

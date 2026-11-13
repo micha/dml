@@ -621,6 +621,95 @@ See [reporting completion evidence](../../dml-design/iterations/24-captured-ordi
 for original immutable data/source/counter provenance, missing Python JUnit qualification
 and raw full failure versus subsequent resumed-stage outcomes.
 
+## Iteration 25 structural capture cycle exclusions
+
+ONLY these TWO raise statements in `python/daggerml/daggerml/calls.py` carry a
+line-local `# pragma: no cover`:
+
+- `_StructureWalk.inspect_environment` (behind public `inspect_environment`):
+  `raise CallError("cyclic capture structure")`.
+- `_StructureWalk.inspect_closure` (behind public `inspect_closure`):
+  `raise CallError("cyclic closure structure")`.
+
+Both conditions/guards and every other statement remain measured. Coordinator independently
+reviewed and approved this precise no-value exclusion under the user's standing coverage policy.
+Native `put_object` validates existing typed references before immutable insertion/collision
+rejection. Transfer import requires earlier typed rows and native hash identity; export rejects
+reached cycles. Legal immutable parent-first C/E capture graphs cannot enter an active recursive
+cycle. Fabricating a private `_active` set would exercise a Python guard, not add native assurance.
+
+These two excluded statements are NOT passing tests. Constructor/reader actual structural depth8/
+next9, strict capture types/versions/source/link authority, Context ownership/poison, native semantic
+64/65, ORIGINAL producer8/9, failure/UNKNOWN and request/phase/result association paths remain
+meaningful measured tests. No function/block/source omission, denominator change elsewhere,
+threshold reduction or missing meaningful-path exclusion is authorized. Revisit if mutable nodes,
+forward references, native insertion/identity/import/export or structural traversal semantics change.
+
+Original zero-exclusion v16 population1609/1788 and raw failures remain preserved. The two comment
+markers change calls.py source/install hash; older evidence is qualified, not silently treated as
+current bytes. IC-003 relocates exactly the SAME two guard raises into the private one-operation
+walk; both active conditions remain measured. No additional statement exclusion was introduced.
+Source hashing/line positions changed, so old v25 facade291/291 is not final module population.
+Final affected-source and full-gate populations belong to
+[Iteration25 results](../../dml-design/iterations/25-implementation-bound-invocation/RESULTS.md).
+
+## Iteration 25 validated native NODE40 size exclusions
+
+ONLY THREE additional exact raise statements have line-local `# pragma: no cover`:
+
+- `calls._StructuralReads.get_node`: `raise CallError("structural native node size differs")`.
+- `implementation_call_leaf.shallow_scalar`: `raise ValueError("native shallow node size differs")`.
+- `implementation_call_leaf.shallow_link`: the same exact size-error raise in that function.
+
+Coordinator independently approved these statements ONLY after checking owning native Literal/
+SubDAG record-v1 layout: EXACT40 bytes. Each guard follows a successful validated public
+`get_record("node", id)`; invalid packed size/type/hash rejects BEFORE returning raw bytes. A lying
+Python raw response would force the raise but add no native assurance. Conditions and every actual
+node KIND/field/shape/reference/scalar/profile-byte/budget/association check remain measured tests.
+No function/block/source omit, weakened assertion/deadline/cap or100 threshold change.
+
+These excluded statements are NOT passing tests. Revisit on native node/layout/identity/codec/read
+validation changes. Metadata negative tests genuinely exercise Literal/SubDAG mismatch and oversized
+scalar/DAG refusal; they do NOT fabricate raw node bytes or failed proofs for coverage.
+
+Nonexecuting v31 derivative combines ONLY original v29+v30 after strict identical7 runtime/source
+hash equality to BOTH actual pre-run copies and then-current bytes. Pre-marker report/provenance/
+original databases remain intact. Then the three inline comment-only markers changed calls.py and
+leaf captured source BYTES; complete AST INCLUDING line/column/end locations remains identical.
+The derivative is not unqualified exact-new-hash current100/readiness assurance after markers.
+See [current accounting](../../dml-design/iterations/25-implementation-bound-invocation/CURRENT-COVERAGE.md).
+
+## Iteration 25 FOUR late fixed-shallow duplicate raises
+
+ONLY FOUR independently source-reviewed/approved raise statements have line-local pragmas:
+
+- `implementation_calls.inspect_closure`: `fixed outer capture names differ` and
+  `fixed outer capture kind/intent differs`.
+- `implementation_call_leaf.environment`: `leaf requires exact getter captures` and
+  `leaf captured func kind/intent differs`.
+
+Conditions/loops and every earlier meaningful shallow/structure/type/source/version/budget check
+remain measured. Successful fixed shallow inspection establishes exact names/kinds/intents on the
+SAME immutable native C/E/row IDs; generic completed capture projection returns those unchanged
+fields in the same transaction. No logical/backend/recorded-source execution callback or mutable-ref
+retargeting intervenes. Native read/lifetime/budget failures occur earlier, not contradictory success.
+Forcing fake native/Inspector descriptions adds no native assurance. These raises are NOT passing tests.
+
+ALL retention, supported version/source BYTES/shared-binding, ORIGINAL public Q/T/R/F/producer/phase/
+ref/failure/provenance checks remain meaningful and measured. No additional statement/function/block/
+source omit or100 threshold reduction. Total Iteration25 approved excluded statements is NINE:
+2 native immutable cycles +3 validated-NODE40 +these4 exact duplicates.
+
+Revisit when shallow sets/scalar requirements, C/E/row links, capture projection/filtering, callbacks,
+read-view/native transaction ownership, mutable records/native identity/read/import or structural memo
+semantics change. Detailed source-only invariant route:
+[FOUR statement review](../../dml-design/iterations/25-implementation-bound-invocation/SHALLOW-DUPLICATE-RAISES.md).
+
+Original source/hashes before inline comments retained under markers-v43. Exactly2+2 inline comments,
+complete AST INCLUDING line/column/end positions equivalent, no line insertion. BOTH profile and leaf
+captured B bytes change. Original matched coverage derivatives remain qualified old-hash evidence,
+not exact-new-hash current100 after markers. Final fresh full uses final source only after permission.
+
 ## Memory-check accounting
 
 `check.sh -v` now additionally exercises the actual binding under Valgrind through
