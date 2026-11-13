@@ -1,5 +1,12 @@
 # Agent-first DML design discussion — checkpoint
 
+Current source checkpoint: spike committed `62b4104` on `spike/per-exercise-reuse` (84source/docs,
+parent15555c0/current accepted bytes exact). User then requests allremaining designnotes LOCALcommit
+and spikebranch push toexistingDMLorigin; explicitly excludes activeIteration25 implementation and
+selects no designremote. Current turn is Git/docs checkpoint only, not tests/reader/stage/build/CI/
+newfeature restart. Prepared pins retain original372-source baseline, not automatically rebased by
+tracking spike files. Ignored native/evidence preserved. Engineering remains complete/stopped below.
+
 Current separate task: **Per-exercise reuse COMPLETE/ACCEPTED/STOPPED**.
 User approved this and future bounded gates; guardfix/6PASS, sole63Q33T8E11P14C30reuse story0,
 SAME4272audit0/53actorswait0absent/3datahashesunchanged, originalfinal284RAW265pass19aliasSetupErrors
@@ -6100,6 +6107,13 @@ PAUSED/privatecandidate/VP001 OPEN UNKNOWN/owner/conditions/no waiver. Delegated
 completedturn, expiresSTOP; futurework requiresnewscope. No checkpoint requested.
 
 ## Resume point
+
+**Git checkpoint only: spike62b4104/newbranch, design notes locally committed on request:**
+User selects commitallremaining designnotes locally/no remote; push ONLYspike/per-exercise-reuse to
+existingmicha/dmlorigin; activeIteration25source/BOTHshared builds excluded. No binaries/evidence/
+CI/main-worker/source/test/stage/native19 restart. Original pins baseline15555c0 preserved, not
+rebased to new tracked spike inventory; prioruncommitted states historical. Outcomes in terminal
+reply; engineering stays stopped, separate new scope for further work.
 
 **Per-exercise reuse complete/accepted/stopped; review before any new continuation:**
 [results](maintenance/relational-testing/PER-EXERCISE-RESULTS.md),

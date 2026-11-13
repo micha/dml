@@ -1694,6 +1694,21 @@ shared builds untouched/separateowned; GHA disabledNOTRUN/native19 PAUSED/privat
 OPEN UNKNOWN/existingowner/conditions/no waiver retained. No platform/maintainedcoverage/full-suite/
 installed/security/fullcapture/5min/olderdiagnosis claim. No checkpoint requested.
 
+## Relational spike source checkpoint / publication request
+
+User requested new-branch commit: isolated spike source/docs84 files committed as
+`62b4104dfade52fb574cdc80f933eb02a81994d5` on `spike/per-exercise-reuse`, parent15555c0,
+accepted code bytes exact/clean worktree. The user subsequently requested “commit everything and
+push”, then explicitly selected SPIKE+ALLdesignnotes, EXCLUDING separate active Iteration25
+implementation; design commit stays LOCAL (no remote), push ONLY spike branch to existing DMLorigin.
+This authorizes bounded Git/doc checkpoint/publication only, no source/test/stage/build/CI/native19
+restart or main-worker takeover. Ignored binaries/stores/evidence remain uncommitted. Original
+prepared pins still intentionally name original372tracked baseline15555c0; adding tracked spike
+source changes current candidate inventory, not a rebased pin/current runnable preparation claim.
+Main/Iteration25/source/BOTH shared builds untouched, GHA disabled/release unchanged; no force/tag/
+release/package/newremote. Commit/push outcome recorded in terminal reply, previous uncommitted
+statements historical. No permission to continue engineering after this checkpoint.
+
 ## Vocabulary
 
 - Maintained documentation uses glossary terms consistently. Add or clarify a term
