@@ -1709,6 +1709,21 @@ Main/Iteration25/source/BOTH shared builds untouched, GHA disabled/release uncha
 release/package/newremote. Commit/push outcome recorded in terminal reply, previous uncommitted
 statements historical. No permission to continue engineering after this checkpoint.
 
+## Decommissioning preservation branches
+
+User clarified the separate Iteration25 worker has been STOPPED, then explicitly approved pushing
+its unaccepted source WIP and the complete design history to preservation branches in existing
+micha/dml: `wip/iteration25-stopped` and `archive/dml-design`. See [notice](PRESERVATION.md).
+This supersedes historical active-worker/no-design-push wording ONLY for source/docs preservation,
+not implementation acceptance/runtime/source/test/build/fixture/CI/native19 restart. WIP original
+base15555c0/37actual changed sourcefiles preserved byteexact plusnotice; no main/master movement/
+merge/force/tag/release. Design archive retains bb8bdcf and full history; no newremote/repository.
+Accepted spike remains62b4104 onspike/per-exercise-reuse. Ignored raw evidence/native/build artifacts
+NOT pushed by Git, still need separate durable backup before instance/volume disposal. No cloud/
+global/service/shutdown/deletion authority. Worker stopped is user-reported, uncommittedfiles not
+proof of activity. Current preservation commit/push outcomes interminal; further engineering remains
+stopped, VP001 OPEN UNKNOWN/native19 PAUSED/GHA disabled and originalfailed evidence retained.
+
 ## Vocabulary
 
 - Maintained documentation uses glossary terms consistently. Add or clarify a term

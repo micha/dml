@@ -6108,6 +6108,13 @@ completedturn, expiresSTOP; futurework requiresnewscope. No checkpoint requested
 
 ## Resume point
 
+**Decommissioning source preservation:** user reports Iteration25 worker stopped (earlier “active”
+was an ownership instruction, not process evidence). User approves WIP/source push on
+wip/iteration25-stopped and complete designhistory archive/dml-design toexistingmicha/dml.
+[Preservation notice](PRESERVATION.md) distinguishes unaccepted WIP/no tests/no merge from accepted
+spike62b4104. No worker/runtime/build/reader/CI/native19 restart. Native/build/rawignored evidence
+still NOT backed up by these source pushes—separate durable backup needed before disposal.
+
 **Git checkpoint only: spike62b4104/newbranch, design notes locally committed on request:**
 User selects commitallremaining designnotes locally/no remote; push ONLYspike/per-exercise-reuse to
 existingmicha/dmlorigin; activeIteration25source/BOTHshared builds excluded. No binaries/evidence/
