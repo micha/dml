@@ -153,6 +153,10 @@ formatter or linter, defer to its rules and update this section accordingly.
 Tooling and project layout guidance is being rewritten from scratch.
 Do not treat prior command examples or directory assumptions as canonical.
 
+The optional `nix develop` environment and Linux `nix develop .#valgrind` shell are documented in
+[README — Optional Nix development shell](README.md#optional-nix-development-shell).
+They supply tools; `scripts/check.sh` remains the standard validation entrypoint.
+
 
 ## Updating This File
 

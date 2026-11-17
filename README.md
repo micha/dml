@@ -51,6 +51,48 @@ fixture. Default checks never start it; host mocks/prior packet replay/CI do not
 Mutation testing uses `.mull.yml`; when `-m` is passed, `scripts/check.sh`
 targets `build/check/test_version` by default when present.
 
+### Optional Nix development shell
+
+With [Nix](https://nix.dev/install-nix) installed and the `nix-command` and
+`flakes` experimental features enabled, enter the pinned development environment:
+
+```sh
+nix develop
+```
+
+The optional `flake.nix`/`flake.lock` provide development tools for x86_64 and
+aarch64 Linux/macOS, not a DML package or a replacement build system. The shell
+uses Python 3.12 (matching CI) and GCC with matching gcov. Run the existing
+workflows inside the shell, or invoke them directly:
+
+```sh
+nix develop -c scripts/check.sh
+nix develop -c scripts/setup-lsp.sh
+```
+
+For Linux memory checks, use the separate Valgrind shell:
+
+```sh
+nix develop .#valgrind -c scripts/check.sh -v
+```
+
+On aarch64 Linux this shell builds the pinned Python 3.12 interpreter with
+`-fno-tree-loop-vectorize`, avoiding Memcheck false positives from GCC-vectorized
+CPython string scans. Meson and Python test dependencies use that same interpreter.
+The first entry requires source builds; the default shell remains unchanged.
+DML compiler flags, Valgrind error detection and existing suppressions are unchanged.
+On x86_64 Linux the Valgrind shell uses the standard interpreter; it is not offered
+on macOS. Re-evaluate the workaround when updating the pinned Python/GCC/Valgrind
+versions. Mull is not included.
+
+On Linux, `nix flake check` tests the interpreter's Python-only reproducers under
+Valgrind and verifies that a deliberate uninitialised C read still fails. These
+focused toolchain checks do not replace `scripts/check.sh`.
+
+Nix is not required for the Meson, Python packaging or non-Nix workflows above.
+The shell does not start services or run checks automatically; mutation testing
+and the explicit installed acceptance gates retain their separate prerequisites.
+
 ## C Editor Setup
 
 Run `scripts/setup-lsp.sh` in your build environment (Meson, Ninja, a C compiler,
