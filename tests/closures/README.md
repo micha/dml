@@ -1,8 +1,10 @@
 # Explicit installed closure-bound-dependency acceptance
 
 Opt-in controller, **NOT** a default fixture. [Owning example](../../docs/closure-bound-dependencies.md),
-[builtins](../../docs/internal-builtins.md), [handoff](../../../dml-design/iterations/23-closure-bound-dependencies/HANDOFF.md)
-and [validation policy](../../docs/validation-policy.md) own scope. No Docker/SSH/Batch/image/service,
+[builtins](../../docs/internal-builtins.md) and
+[validation policy](../../docs/validation-policy.md) own scope. The historical handoff is
+`dml-design/iterations/23-closure-bound-dependencies/HANDOFF.md` in an optional external
+sibling checkout, not a required local documentation target. No Docker/SSH/Batch/image/service,
 native lifecycle fix, nested ordinary worker or generic evaluator.
 
 ## Readiness and sole launch
@@ -61,6 +63,7 @@ stopped evidence, preserve original failures/bytes; never repeat computation to 
 
 [Finite mutations](mutations.py) use measured private candidate/plugins and focused HOST tests.
 Native rollback/substitution/host coverage differ from actual installed children/platform assurance.
-[Results](../../../dml-design/iterations/23-closure-bound-dependencies/RESULTS.md) retain commands/source
-qualifications/raw failures/custody/independent disposition. GHA remains disabled/NOTRUN/notpass;
+The external historical `dml-design/iterations/23-closure-bound-dependencies/RESULTS.md`
+record retains commands/source qualifications/raw failures/custody/independent disposition;
+its absence from this checkout supplies no local validation evidence. GHA remains disabled/NOTRUN/notpass;
 native19 PAUSED/VP001 OPEN UNKNOWN, no historical diagnosis/standing waiver/fresh platform green.

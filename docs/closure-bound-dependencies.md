@@ -114,5 +114,7 @@ SAME retained history goes to fresh blocked NONEXECUTING readers, never repeated
 and datum-only MAP children add no native entity/key/hash/layout/relationship. Development GHA stays
 disabled/NOT RUN/not pass; native19 PAUSED and VP-001 OPEN UNKNOWN remain. Local evidence does not
 supply fresh platform all-green or historical diagnosis/standing waiver. Actual execution, source
-qualifications, custody, acceptance/publication belong to
-[Iteration23 results](../../dml-design/iterations/23-closure-bound-dependencies/RESULTS.md).
+qualifications, custody, acceptance/publication belong to the external historical
+`dml-design/iterations/23-closure-bound-dependencies/RESULTS.md` record. That optional
+sibling checkout is not distributed with this repository; this reference is not local
+validation evidence.

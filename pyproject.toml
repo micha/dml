@@ -19,6 +19,10 @@ classifiers = [
   "Operating System :: Microsoft :: Windows",
 ]
 
+[tool.pytest.ini_options]
+# Isolated experiments retain explicit path-based invocation.
+testpaths = ["tests"]
+
 [tool.meson-python]
 limited-api = true
 

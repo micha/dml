@@ -99,6 +99,10 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Use Valgrind for memory checks when requested or when touching memory-critical
   code paths.
 - Use `scripts/check.sh` as the standard end-to-end validation entrypoint.
+- Default pytest discovery covers `tests/`; isolated `spikes/` experiments require explicit
+  paths and are excluded from maintained Python coverage by user-approved scope decision.
+  See [maintained validation scope](README.md#maintained-validation-scope) and the
+  [exclusion catalog](tests/coverage-exclusions.md#explicit-experimental-scope-boundary).
 - CI uses `scripts/check.sh -c` to report coverage without percentage gates;
   see `README.md` (Build and Test) for validation modes and Windows dependencies.
 - Use descriptive test names that capture the behavior.

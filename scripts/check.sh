@@ -44,7 +44,7 @@ run_python_tests_and_coverage_if_present() {
   local coverage_out="$2"
   local enforce_coverage="$3"
   local coverage_threshold=100
-  local omit_patterns="$root/tests/*,$root/subprojects/*,$root/build/*,$root/HOST captured leaf entry,$root/HOST captured reuse entry,$root/isolated old event append"
+  local omit_patterns="$root/tests/*,$root/subprojects/*,$root/build/*,$root/spikes/*,$root/HOST captured leaf entry,$root/HOST captured reuse entry,$root/isolated old event append"
   local source_count
 
   if [ ! -d "$root/tests" ]; then
@@ -71,7 +71,7 @@ import pathlib
 import sys
 
 root = pathlib.Path(sys.argv[1])
-excluded_parts = {"tests", "subprojects", "build", ".venv", "venv"}
+excluded_parts = {"tests", "subprojects", "build", "spikes", ".venv", "venv"}
 count = 0
 
 for path in root.rglob("*.py"):

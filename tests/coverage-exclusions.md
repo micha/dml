@@ -12,6 +12,18 @@ boundary/error handling, allocation failure and rollback. Difficulty alone does
 not justify excluding a path. The default gate still requires 100% of the
 **retained** line/function/branch population; exclusions are not passing tests.
 
+## Explicit experimental scope boundary
+
+The user approved excluding isolated `spikes/` experiments from the maintained default
+gate. `scripts/check.sh` omits exactly `$root/spikes/*` from Python measurement/reporting
+and excludes `spikes` during source counting; `pyproject.toml` limits default pytest
+discovery to `tests/`. This is a scope decision, **not** a no-value/unreachable-code
+exclusion or proof that experimental code passes. Maintained thresholds stay at 100%.
+Explicit spike paths remain runnable with their own dependencies and fixtures. See
+[maintained validation scope](../README.md#maintained-validation-scope) for commands and
+ownership. Existing historical spike failures remain recorded, not waived or diagnosed
+by a successful maintained gate.
+
 ## Meaningful failure tests
 
 - [test_boundaries.c](c/test_boundaries.c) tests checked arithmetic, malformed

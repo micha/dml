@@ -1,8 +1,10 @@
 # Linux/Nix portability continuation
 
-Status: focused controls and ARM64 story PASS; standard full gate BLOCKED. Not accepted as
-an all-green delivery, not committed or published. This record owns this continuation's
-results; [README](README.md#linuxnix-portability-continuation) owns the workflow.
+Historical portability status: focused controls and ARM64 story PASS; branch-wide standard
+full gate BLOCKED at execution. That snapshot was subsequently committed as `b46c409`;
+its failed gate is not retroactively passing. The maintained gate now passes under the
+explicit scope decision below. This record owns this continuation's results;
+[README](README.md#linuxnix-portability-continuation) owns the workflow.
 
 ## Source and scope
 
@@ -86,6 +88,59 @@ remains historical evidence, not fresh coverage. The bounded spike works here, b
 failure blocks overall acceptance. Follow-up owner: next coordinator, before commit/publication,
 resolve branch-wide experimental dependency/discovery/fixture scope without silently excluding
 failed checks. No CI was started and no hosted-platform assurance is available.
+
+## Maintained-gate scope follow-up
+
+Base: `b46c4099df7e0d2a61b88e4d96105f38166bab7b`, with uncommitted scope/tooling/test/docs
+changes. The user explicitly selected **Separate spike scope**: exclude isolated `spikes/`
+from default test discovery and Python coverage, keep explicit spike invocations, and retain
+100% maintained thresholds. This is an approved scope change, not a no-value exclusion,
+fix for the six historical experimental collection errors, or evidence for unrun experiments.
+[Maintained validation scope](../../../README.md#maintained-validation-scope) owns the boundary;
+[exclusion rationale](../../../tests/coverage-exclusions.md#explicit-experimental-scope-boundary)
+records exactly `$root/spikes/*` and source-counting exclusion of `spikes`.
+
+Change-validation map:
+
+- `pyproject.toml` defaults to `tests/`: subprocess collection controls using the actual
+  configuration prove default discovery and explicit experimental-path override.
+- `scripts/check.sh` source counting and shared serial/parallel omit list: actual source
+  counter controls plus coverage text/XML/HTML checks exclude experiment-only files while
+  retaining maintained files and a real uncovered-maintained-source failure at 100%.
+- Closure documentation: optional external historical references are named as such, not
+  broken repository-local links requiring an unrelated sibling checkout. The unchanged
+  maintained relative-link test passes; no test assertion was removed.
+- Native/runtime spike bytes are unchanged; prior focused controls/story remain historical
+  evidence. No new spike review, preparation, store, acceptance story or service was launched.
+
+Fresh aarch64 Linux/Nix execution:
+
+| Check | Actual outcome |
+| --- | --- |
+| Initial focused scope tests | 10 passed |
+| First `nix develop .#valgrind -c scripts/check.sh -v` | Command runner interrupted at 200 seconds after 7 C passes and partial Python progress; no gate result |
+| One longer-timeout diagnostic attempt, same gate | exit 1; 3421 passed, 2 failed: exact omit-list expectation and absent external closure-results link |
+| Final focused tests after fixes | exit 0; 22 passed in 1.00s |
+| Final `nix develop .#valgrind -c scripts/check.sh -v` | exit 0; 7 C tests, 3423 Python/CLI tests in 672.70s, 2 runpy warnings |
+| Python coverage | 9194 retained statements, 0 missed, 100% |
+| C coverage | 1681/1681 lines, 131/131 functions, 1550/1550 branches; existing exclusions retained |
+| Binding memory workload | Valgrind: 0 errors, 0 definitely lost bytes; existing runtime suppressions retained |
+| Native CLI memory workload | passed, 141 Valgrind processes |
+
+The repeat gate followed specific substantive fixes, not retry-until-green. The first timeout
+was the command-runner limit, not a raised test/fixture budget. Serial validation used the default
+worker setting; no parallel run, installed acceptance, mutation run, CI or cross-platform result
+is claimed. C totals include a fully hit compiler dependency header; they are retained lcov
+populations, not a marker-free claim. Two existing runpy warnings and unused lcov-pattern warnings
+remain. No skips, lowered thresholds or new production-code exclusions were added.
+
+Review: same-assistant final diff/source review, not a second independent reviewer. The default
+discovery setting still permits explicit experimental paths; all coverage reporters and the
+parallel configuration consume the same owning omit list. No installed API/native/storage
+behavior changed. The final source diff/stat and raw logs are retained in `build/scope-audit/`;
+subsequent edits only record documentation/guidance. No commit, push or CI was performed in this
+follow-up. Historical branch-wide failure and experimental fixture/dependency limitations remain
+in the earlier sections; the maintained pass does not resolve or waive them.
 
 ## Retained local evidence
 

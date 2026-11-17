@@ -103,6 +103,50 @@ def test_production_presence_function_drains_many_paths_and_preserves_no_files(
         ) in output
 
 
+def test_default_discovery_keeps_experiments_explicit(tmp_path):
+    # Use the actual project configuration with tiny owned tests, not historical stores.
+    shutil.copyfile(ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    for directory in ("tests", "spikes"):
+        target = tmp_path / directory
+        target.mkdir()
+        (target / f"test_{directory}.py").write_text("def test_scope(): pass\n")
+    environment = os.environ.copy()
+    environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+    environment.pop("PYTEST_ADDOPTS", None)
+    for paths, included, excluded in (
+        ([], "tests/test_tests.py", "spikes/test_spikes.py"),
+        (["spikes"], "spikes/test_spikes.py", "tests/test_tests.py"),
+    ):
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "--collect-only", "-q", *paths],
+            cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=30,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        output = result.stdout.replace("\\\\", "/")
+        assert included in output
+        assert excluded not in output
+
+
+def test_experimental_coverage_scope_matches_source_counting(tmp_path):
+    source = (ROOT / "scripts/check.sh").read_text()
+    omit = re.search(r'local omit_patterns="([^"]+)"', source).group(1).split(",")
+    assert "$root/spikes/*" in omit
+    # Execute the current source-counter block against an experiment-only tree.
+    counter = source.split('python3 - "$root" <<\'PY\'\n', 1)[1].split("\nPY", 1)[0]
+    spikes = tmp_path / "spikes"
+    spikes.mkdir()
+    (spikes / "experiment.py").touch()
+    for maintained, expected in ((False, "0"), (True, "1")):
+        if maintained:
+            (tmp_path / "maintained.py").touch()
+        result = subprocess.run(
+            [sys.executable, "-c", counter, str(tmp_path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == expected
+
+
 def test_only_macOS_x86_and_Windows_AMD64_outer_CI_budgets_are_twenty_minutes():
     # Read the owning workflow scalar, without adding a YAML dependency or
     # changing any test/runtime timeout. GitHub evaluates this simple selector.

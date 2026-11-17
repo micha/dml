@@ -44,6 +44,20 @@ new declared development dependencies, so existing MSYS2 package provisioning
 needs an update before running this updated suite there. Hosted Windows/macOS
 validation and non-GNU counter merging are not demonstrated.
 
+### Maintained validation scope
+
+Default pytest discovery uses `tests/` (configured in `pyproject.toml`). The standard
+coverage gate excludes `spikes/` from Python source counting and measurement, in both
+serial and parallel modes. Maintained coverage thresholds remain 100%; this is an
+explicit experiment boundary, not coverage evidence for excluded experimental code.
+No individual maintained tests are skipped or excluded.
+
+Isolated experiments remain runnable by explicit path and keep their own dependencies,
+fixture requirements and acceptance records. See the
+[relational spike](spikes/relational_invariants/README.md) and
+[portable per-exercise workflow](spikes/relational_invariants/per_exercise/README.md#linuxnix-portability-continuation).
+The standard gate does not validate those experiments or recreate their historical stores.
+
 ### Optional resource-aware parallel coverage
 
 ```bash

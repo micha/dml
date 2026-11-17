@@ -30,7 +30,7 @@ def report(root, data, mode="report", output=None):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
-def test_exact_three_missing_scaffolds_omitted_all_reporters_keep_real_code(tmp_path):
+def test_scaffolds_and_explicit_experiments_omitted_all_reporters_keep_real_code(tmp_path):
     root = tmp_path / "source-root"
     root.mkdir()
     maintained = root / "kept.py"
@@ -38,6 +38,10 @@ def test_exact_three_missing_scaffolds_omitted_all_reporters_keep_real_code(tmp_
     data = root / ".coverage"
     cov = coverage.CoverageData(basename=str(data))
     cov.add_lines({str(maintained): {1}, **{str(root / label): set(range(1, 11)) if i < 2 else {1} for i, label in enumerate(LABELS)}})
+    experiment = root / "spikes/experiment.py"
+    experiment.parent.mkdir()
+    experiment.write_text("unmeasured = 1\n")
+    cov.add_lines({str(experiment): set()})
     cov.write()
     before = hashlib.sha256(data.read_bytes()).hexdigest()
     assert all(not (root / label).exists() for label in LABELS)
@@ -47,6 +51,7 @@ def test_exact_three_missing_scaffolds_omitted_all_reporters_keep_real_code(tmp_
         assert "No source for code" not in result.stdout + result.stderr
     xml = (tmp_path / "report.xml").read_text()
     assert "kept.py" in xml and all(label not in xml for label in LABELS)
+    assert "experiment.py" not in xml
     assert hashlib.sha256(data.read_bytes()).hexdigest() == before
 
 
@@ -68,7 +73,7 @@ def test_actual_maintained_source_uncovered_STILL_fails_100(tmp_path):
 def test_owning_omit_list_is_exact_and_consistent_no_guard_module_omission():
     source = (ROOT / "scripts/check.sh").read_text()
     got = patterns(ROOT).split(",")
-    assert got == [str(ROOT / "tests/*"), str(ROOT / "subprojects/*"), str(ROOT / "build/*"), *[str(ROOT / label) for label in LABELS]]
+    assert got == [str(ROOT / "tests/*"), str(ROOT / "subprojects/*"), str(ROOT / "build/*"), str(ROOT / "spikes/*"), *[str(ROOT / label) for label in LABELS]]
     assert not any("examples" in value or "python" in value for value in got)
     assert 'coverage report --omit "$omit_patterns" --fail-under="$coverage_threshold"' in source
     assert 'coverage xml --omit "$omit_patterns" --fail-under="$coverage_threshold"' in source
