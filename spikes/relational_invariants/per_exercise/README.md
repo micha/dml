@@ -30,13 +30,54 @@ materializer admission/confined ALL-view SQL is prerequisite. Reused checks are 
 not new coverage/platform execution; ordinary grouping/pool admission still performs metadata IO.
 Fresh results unselected until explicit adoption.15selector story bound; no increased caps/deadlines.
 
-Commands are conditional on gates, not permission to rerun after STOP:
+## Linux/Nix portability continuation
+
+This section owns the current preparation workflow. The acceptance above is historical;
+new manifests and runs do not inherit it. Linux x86-64 and ARM64 can generate their own
+source/native/runtime identities. Other operating systems and the older indexed controller
+(with its separate historical tool/fault-artifact pins) are outside this continuation.
+
+Enter `nix develop` for the compiler, Python, pytest and DuckDB CLI. In that shell, build an
+owned native extension without the shell's mutable output-directory RUNPATH:
 
 ```sh
-python -I -B spikes/relational_invariants/per_exercise/driver.py prepare "$PWD" build/relational-spike/per-exercise-v1/pins
-# ONLY after separate readiness acceptance:
-python -I -B spikes/relational_invariants/per_exercise/driver.py story build/relational-spike/per-exercise-v1/pins/pins.json build/relational-spike/per-exercise-v1/story
+export NIX_LDFLAGS="${NIX_LDFLAGS#-rpath $PWD/outputs/out/lib}"
+meson setup build/spike-native --wrap-mode=nodownload
+ninja -C build/spike-native _core.abi3.so
+mkdir -p build/portable-spike
+python -I -B spikes/relational_invariants/incremental/runtime.py "$PWD" \
+  build/portable-spike/review.json --core build/spike-native/_core.abi3.so
 ```
+
+Inspect the review manifest before preparation. It records tracked source bytes (plus the new
+runtime support module before its first commit), an explicitly chosen native artifact, resolved
+Nix executables and hashes, machine architecture, native library paths and runtime closure.
+It is a review input, not a signature or a reproducible-build certificate. Keep its printed
+SHA256 with review notes. Untracked application files are not implicitly admitted. Source or
+artifact changes require a new manifest, not a relaxed comparison. Use fresh output directories.
+Run focused tests with `-B`: importing frozen modules must not add bytecode files to the exact
+asset inventory. An ordinary pytest invocation can contaminate its own snapshot; verification
+then correctly rejects that snapshot rather than ignoring the extra files.
+
+```sh
+python -I -B spikes/relational_invariants/per_exercise/driver.py prepare "$PWD" \
+  build/portable-spike/pins --review build/portable-spike/review.json
+PORTABLE_REVIEW="$PWD/build/portable-spike/review.json" \
+PER_EXERCISE_PINS="$PWD/build/portable-spike/pins/pins.json" \
+  python -B -m pytest -q spikes/relational_invariants/test_portable_pins.py \
+  spikes/relational_invariants/per_exercise/test_per_exercise.py
+# After focused checks and review, one bounded seven-round acceptance story:
+python -I -B spikes/relational_invariants/per_exercise/driver.py story \
+  build/portable-spike/pins/pins.json build/portable-spike/story
+```
+
+Preparation checks review inputs before copying; verification checks frozen assets, source/native
+claims and current runtime executable hashes. Runtime identity participates in namespaces and
+stage keys. Checkers receive the pinned DuckDB executable explicitly; standalone shared-index
+checks resolve DuckDB from PATH. Linux `/proc` receipts still reject loaded shared libraries
+outside the declared immutable closure. This is not a security sandbox, hermetic build or
+cross-machine cache portability claim. Receipts retain absolute locations and cannot be relocated.
+No historical evidence stores, tests or services are automatically restarted by these commands.
 
 Seven-round intended63Q33T8E11P14C30reuse/5poolload14queryCLI/1newcontinuation. Grouping7 events
 additional to63requests+33attempt reservations. Actual scopes/caps/PIDs/true exits and artifact hashes

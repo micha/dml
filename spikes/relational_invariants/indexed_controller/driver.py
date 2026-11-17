@@ -15,7 +15,7 @@ from incremental.artifacts import describe,finalize
 from incremental.identity import FORMAT,canonical,digest,key
 from incremental.records import Store
 from incremental.stages import load_dml
-from incremental.driver import PYTHON,environment,LIMITS
+from incremental.driver import environment,LIMITS
 from .pins import prepare,verify
 
 
@@ -74,7 +74,7 @@ class Controller:
              'producer':producer,'key':key(inputs),'output':str(partial),
              'upstream':None if upstream is None else str(parent/upstream['name'])}
         job_path=self.directory/(name+'.job.json');job_path.write_bytes(canonical(job))
-        command=[PYTHON,'-I','-B',str(Path(self.pins['root'])/'code/indexed_controller/stages.py'),str(job_path)]
+        command=[self.pins['runtime']['python'],'-I','-B',str(Path(self.pins['root'])/'code/indexed_controller/stages.py'),str(job_path)]
         with (partial/'stdout.log').open('wb') as stdout,(partial/'stderr.log').open('wb') as stderr:
             process=subprocess.Popen(command,cwd=self.directory,env=environment(self.pins,self.directory),
                                      stdout=stdout,stderr=stderr,start_new_session=True)
@@ -93,7 +93,7 @@ class Controller:
                 or receipt['process']!={'pid':process.pid,'parent':os.getpid(),'group':process.pid}
                 or receipt['payload']!=expected_payload or receipt['package']!=str(expected_package)
                 or receipt['core_sha256']!=self.pins['core_sha256'] or receipt['runtime']!=self.pins['runtime_digest']
-                or receipt['python']!=PYTHON or receipt['entry_sha256']!=digest((Path(self.pins['root'])/expected_payload/
+                or receipt['python']!=self.pins['runtime']['python'] or receipt['entry_sha256']!=digest((Path(self.pins['root'])/expected_payload/
                     'spikes/relational_invariants/shared_existing'/entry).read_bytes())
                 or len(receipt['children'])!={'E':0,'P':1,'C':16}[stage]
                 or any(c['wait_exit']!=0 or c['command'][0]!=self.pins['runtime']['duckdb'] for c in receipt['children'])):
@@ -121,7 +121,7 @@ def story(pins_path,directory):
     for number,(candidate,p,c,fresh) in enumerate(configs,1):
         if number==2:
             output=controller.directory/'continuation.json'
-            command=[PYTHON,'-I','-B',str(Path(controller.pins['root'])/'code/indexed_controller/driver.py'),
+            command=[controller.pins['runtime']['python'],'-I','-B',str(Path(controller.pins['root'])/'code/indexed_controller/driver.py'),
                      'continue',str(controller.pins_path),str(controller.directory)]
             with (controller.directory/'continuation.stdout').open('wb') as stdout,(controller.directory/'continuation.stderr').open('wb') as stderr:
                 env=environment(controller.pins,controller.directory)

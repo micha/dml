@@ -15,51 +15,37 @@ if __package__ in (None, ''):
 from .artifacts import admit, describe, finalize
 from .identity import FORMAT, canonical, digest, exact, file_manifest, key, manifest_digest, parse
 from .records import Store
+from .runtime import read_review, source_manifest, verify_runtime
 
-PYTHON = '/nix/store/jy00n3jp5xj8s40n1fbldmkcr5n7avxc-python3-3.13.15/bin/python3.13'
-DUCKDB = '/nix/store/ck8gcahsxids1hs72wrb8xqc00l044qn-duckdb-1.5.2/bin/duckdb'
-GLIBC = '/nix/store/fsd4vbp9zjd9iaicq2fb9lpc1h5j973y-glibc-2.42-100/lib'
-GCC = '/nix/store/dqj57l1prad38vjrad4bs9d977i4q5zm-gcc-15.3.0-lib/lib'
-CORE = '5fd0ce05a9bb48bb7bdcf2b7de212427f54522c37301e12e4ec7fc7f14fda134'
-TRACKED = '6dfe866aa2fd13938a938260542240d8a55694e83103484c5adfff5d48583c3b'
-SOURCE = ('identity.py', 'artifacts.py', 'records.py', 'stages.py', 'driver.py', '__init__.py')
+SOURCE = ('identity.py', 'artifacts.py', 'records.py', 'stages.py', 'driver.py', 'runtime.py', '__init__.py')
 LIMITS = {'bundle_bytes': 33554432, 'record_bytes': 4194304, 'packed_bytes': 16777216,
           'bundle_objects': 100000, 'extraction_objects': 10000, 'roots': 4,
           'arguments': 16, 'positions': 16, 'builtin_reached': 64,
           'stage_data_bytes': 33554432, 'stage_log_bytes': 1048576}
 
 
-def prepare(worktree, destination):
+def prepare(worktree, destination, *, review_path=None):
     """Copies executable/source bytes ONLY. Never opens any database/imports native code."""
     worktree, destination = Path(worktree).resolve(), Path(destination).resolve()
     if destination.exists():
         raise ValueError('pin directory already exists')
-    if subprocess.check_output(['git', '-C', str(worktree), 'diff', 'HEAD', '--']):
-        raise ValueError('candidate tracked sources differ')
-    rows = []
-    for line in subprocess.check_output(['git', '-C', str(worktree), 'ls-files', '-s']).decode().splitlines():
-        meta, name = line.split('\t', 1)
-        mode, _, stage = meta.split()
-        if mode not in ('100644', '100755') or stage != '0' or (worktree / name).is_symlink():
-            raise ValueError('unexpected candidate source type')
-        raw = (worktree / name).read_bytes()
-        rows.append({'path': name, 'mode': mode, 'sha256': digest(raw), 'size': len(raw)})
-    if digest(canonical(rows)) != TRACKED:
+    if review_path is None:
+        raise ValueError('explicit review_path required; generate and inspect a runtime review first')
+    reviewed = read_review(review_path)
+    rows = source_manifest(worktree)
+    if rows != reviewed['sources']:
         raise ValueError('reviewed candidate source inventory differs')
-    core = worktree / 'build/spike-native/_core.abi3.so'
-    if digest(core.read_bytes()) != CORE:
+    core = Path(reviewed['core'])
+    if digest(core.read_bytes()) != reviewed['core_sha256']:
         raise ValueError('reviewed native artifact differs')
-    if digest(Path(PYTHON).read_bytes()) != '85ee2b9c856b1bd76c8ba64b2d5081456dec55b1404a785674faa542ed2ba4a5':
-        raise ValueError('reviewed Python differs')
-    if digest(Path(DUCKDB).read_bytes()) != 'e098062c23f5005743d09c689c72e5e0ef6cbce22834836fa814cf4a564d6206':
-        raise ValueError('reviewed DuckDB differs')
     destination.mkdir(parents=True)
     for variant in ('A', 'B'):
         candidate = destination / ('candidate-' + variant)
         for row in rows:
             target = candidate / row['path']
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes((worktree / row['path']).read_bytes())
+            source = worktree if variant == 'A' else destination / 'candidate-A'
+            target.write_bytes((source / row['path']).read_bytes())
         package = candidate / 'python/daggerml/daggerml'
         (package / '_core.abi3.so').write_bytes(core.read_bytes())
         if variant == 'B':
@@ -69,13 +55,14 @@ def prepare(worktree, destination):
     controller.mkdir(parents=True)
     for row in rows:
         if row['path'].startswith('python/daggerml/daggerml/'):
-            (controller / Path(row['path']).name).write_bytes((worktree / row['path']).read_bytes())
+            (controller / Path(row['path']).name).write_bytes(
+                (destination / 'candidate-A' / row['path']).read_bytes())
     (controller / '_core.abi3.so').write_bytes(core.read_bytes())
     new_code = destination / 'controller/code/incremental'
     new_code.mkdir(parents=True)
+    old = destination / 'candidate-A/spikes/relational_invariants'
     for name in SOURCE:
-        (new_code / name).write_bytes((Path(__file__).parent / name).read_bytes())
-    old = worktree / 'spikes/relational_invariants'
+        (new_code / name).write_bytes((old / 'incremental' / name).read_bytes())
     for variant, names in {'exercise': ['exerciser.py'],
                            'P1': ['normalizer.py', 'engine.py', 'schema.py'],
                            'P2': ['normalizer.py', 'engine.py', 'schema.py'],
@@ -96,12 +83,7 @@ def prepare(worktree, destination):
     before, following = sql.split(start, 1)
     _, after = following.split(end, 1)
     weak.write_text(before + end + after)
-    closure = sorted(set(subprocess.check_output(['nix-store', '--query', '--requisites',
-        str(Path(PYTHON).parents[1]), str(Path(DUCKDB).parents[1])]).decode().splitlines()))
-    runtime = {'python': PYTHON, 'python_sha256': digest(Path(PYTHON).read_bytes()),
-               'duckdb': DUCKDB, 'duckdb_sha256': digest(Path(DUCKDB).read_bytes()),
-               'closure': closure, 'library_path': GLIBC + ':' + GCC,
-               'profile': 'Linux-x86_64-minimal-env-I-B-fixed-hash-locale-no-network-v1'}
+    runtime = reviewed['runtime']
     files = file_manifest(destination)
     fingerprints = {name: manifest_digest(file_manifest(destination / name))
                     for name in ('candidate-A', 'candidate-B', 'controller/daggerml',
@@ -112,13 +94,14 @@ def prepare(worktree, destination):
                                  'runtime': digest(canonical(runtime)), 'format': FORMAT}))
     pins = {'root': str(destination), 'namespace': namespace, 'runtime': runtime,
             'runtime_digest': digest(canonical(runtime)), 'fingerprints': fingerprints,
-            'core_sha256': CORE, 'tracked_source_manifest': rows, 'assets': files,
+            'core_sha256': reviewed['core_sha256'], 'review': reviewed,
+            'tracked_source_manifest': rows, 'assets': files,
             'wrapper': digest((new_code / 'stages.py').read_bytes())}
     (destination / 'pins.json').write_bytes(canonical(pins))
     for path in destination.rglob('*'):
         if path.is_file():
             path.chmod(0o444)
-    return pins
+    return verify_pins(destination / 'pins.json')
 
 
 def verify_pins(path):
@@ -126,7 +109,8 @@ def verify_pins(path):
     if path.is_symlink():
         raise ValueError('symlink pin receipt')
     pins = exact(parse(path.read_bytes()), {'root', 'namespace', 'runtime', 'runtime_digest', 'fingerprints',
-                                          'core_sha256', 'tracked_source_manifest', 'assets', 'wrapper'})
+                                          'core_sha256', 'review', 'tracked_source_manifest', 'assets', 'wrapper'})
+    verify_runtime(pins['runtime'])
     root = Path(pins['root'])
     if root != path.parent.resolve():
         raise ValueError('pin location differs')
@@ -143,9 +127,18 @@ def verify_pins(path):
     if (fingerprints != pins['fingerprints'] or namespace != pins['namespace']
             or pins['runtime_digest'] != digest(canonical(pins['runtime']))
             or pins['wrapper'] != digest((root / 'controller/code/incremental/stages.py').read_bytes())
-            or pins['core_sha256'] != CORE or pins['runtime']['python'] != PYTHON
-            or pins['runtime']['duckdb'] != DUCKDB or digest(canonical(pins['tracked_source_manifest'])) != TRACKED):
+            or pins['core_sha256'] != pins['review']['core_sha256']
+            or pins['runtime'] != pins['review']['runtime']
+            or pins['tracked_source_manifest'] != pins['review']['sources']):
         raise ValueError('pin claims/namespace disagree with actual frozen inputs')
+    for row in pins['tracked_source_manifest']:
+        raw = (root / 'candidate-A' / row['path']).read_bytes()
+        if digest(raw) != row['sha256'] or len(raw) != row['size']:
+            raise ValueError('frozen candidate differs from reviewed source')
+    for package in ('candidate-A/python/daggerml/daggerml',
+                    'candidate-B/python/daggerml/daggerml', 'controller/daggerml'):
+        if digest((root / package / '_core.abi3.so').read_bytes()) != pins['core_sha256']:
+            raise ValueError('frozen native artifact differs from review')
     return pins
 
 
@@ -238,8 +231,8 @@ class Controller:
                'output': str(partial), 'upstream': None if upstream is None else str(root / upstream['name'])}
         job_path = self.directory / (name + '.job.json')
         job_path.write_bytes(canonical(job))
-        command = [PYTHON, '-I', '-B', str(Path(self.pins['root']) / 'controller/code/incremental/stages.py'),
-                   str(job_path)]
+        command = [self.pins['runtime']['python'], '-I', '-B',
+                   str(Path(self.pins['root']) / 'controller/code/incremental/stages.py'), str(job_path)]
         with (partial / 'stdout.log').open('wb') as stdout, (partial / 'stderr.log').open('wb') as stderr:
             process = subprocess.Popen(command, cwd=self.directory, env=environment(self.pins, self.directory),
                                        stdout=stdout, stderr=stderr, start_new_session=True)
@@ -256,7 +249,7 @@ class Controller:
             if (receipt['stage'] != job['stage'] or receipt['key'] != job['key']
                     or receipt['producer'] != producer or receipt['variant'] != variant
                     or receipt['process'] != {'pid': process.pid, 'parent': os.getpid(), 'group': process.pid}
-                    or loaded['runtime'] != self.pins['runtime_digest'] or loaded['python'] != PYTHON):
+                    or loaded['runtime'] != self.pins['runtime_digest'] or loaded['python'] != self.pins['runtime']['python']):
                 raise ValueError('actual stage receipt disagrees with requested activation')
             stage = job['stage']
             payload = ('exercise/exerciser.py' if stage == 'E' else
@@ -267,12 +260,12 @@ class Controller:
                 expected_package = (Path(self.pins['root']) / ('candidate-' + candidate) /
                                     'python/daggerml/daggerml' if stage == 'E' else
                                     Path(self.pins['root']) / 'controller/daggerml')
-                if loaded['package'] != str(expected_package / '__init__.py') or loaded['core'] != CORE:
+                if loaded['package'] != str(expected_package / '__init__.py') or loaded['core'] != self.pins['core_sha256']:
                     raise ValueError('actual candidate/decoder import differs')
             if len(receipt['children']) != {'E': 0, 'P': 1, 'C': 3}[stage]:
                 raise ValueError('actual CLI invocation allowance differs')
             for child in receipt['children']:
-                if child['wait_exit'] != 0 or child['command'][0] != DUCKDB:
+                if child['wait_exit'] != 0 or child['command'][0] != self.pins['runtime']['duckdb']:
                     raise ValueError('stage CLI exit/pin differs')
         document = describe(partial, stage=stage_envelope['stage'], key=key(stage_envelope), producer=producer,
                             dependencies=stage_envelope['dependencies'], status=status, exit_code=actual_exit)
@@ -349,9 +342,10 @@ def main():
     parser.add_argument('command', choices=['prepare', 'story'])
     parser.add_argument('source', type=Path, help='worktree for prepare; frozen pins.json for approved story')
     parser.add_argument('destination', type=Path)
+    parser.add_argument('--review', help='explicit reviewed source/native/runtime manifest for prepare')
     args = parser.parse_args()
     if args.command == 'prepare':
-        pins = prepare(args.source, args.destination)
+        pins = prepare(args.source, args.destination, review_path=args.review)
         print(canonical({'namespace': pins['namespace'], 'assets': len(pins['assets']),
                          'pins': str(args.destination / 'pins.json')}).decode())
     else:

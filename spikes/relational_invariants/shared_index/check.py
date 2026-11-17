@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 
 from engine import execute, quote
@@ -10,7 +11,6 @@ from schema import SCHEMA
 from .project import Facts
 
 CHECKS = Path(__file__).resolve().parents[1] / 'checks.sql'
-DUCKDB = '/nix/store/ck8gcahsxids1hs72wrb8xqc00l044qn-duckdb-1.5.2/bin/duckdb'
 
 
 def pool(rows, directory):
@@ -77,7 +77,7 @@ def case_sql(case, result_path=None):
     return '\n'.join(sql)
 
 
-def check_case(database, rows, case, *, output_directory=None):
+def check_case(database, rows, case, *, output_directory=None, duckdb=None):
     actual = sorted([list(item) for item in Facts(rows).reached(case['target'])])
     if actual != case['membership']:
         raise ValueError('supplied case availability differs from actual target closure')
@@ -88,7 +88,10 @@ def check_case(database, rows, case, *, output_directory=None):
     result_path = directory/'rows.jsonl'
     sql = case_sql(case,result_path)
     (directory/'query.sql').write_text(sql)
-    command = [DUCKDB,'-readonly','-batch','-bail','-json',str(database)]
+    executable = duckdb or shutil.which('duckdb')
+    if not executable:
+        raise ValueError('DuckDB is missing; enter nix develop or supply duckdb explicitly')
+    command = [executable,'-readonly','-batch','-bail','-json',str(database)]
     process = subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     stdout, stderr = process.communicate(sql)
     owner = {'pid':process.pid,'wait_exit':process.returncode,'command':command}

@@ -38,6 +38,8 @@
               name = "dml-dev";
               packages = [
                 gcov
+                pkgs.binutils
+                pkgs.duckdb
                 pkgs.git
                 pkgs.lcov
                 (pkgs.meson.override { python3 = interpreter; })
@@ -47,6 +49,9 @@
                   ps.coverage
                   ps.hypothesis
                   ps.pytest
+                  ps.pytest-cov
+                  ps.pytest-xdist
+                  ps.psutil
                 ]))
               ] ++ pkgs.lib.optionals stdenv.hostPlatform.isLinux [ pkgs.valgrind ];
 

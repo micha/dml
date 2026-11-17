@@ -156,6 +156,9 @@ Do not treat prior command examples or directory assumptions as canonical.
 The optional `nix develop` environment and Linux `nix develop .#valgrind` shell are documented in
 [README — Optional Nix development shell](README.md#optional-nix-development-shell).
 They supply tools; `scripts/check.sh` remains the standard validation entrypoint.
+For the isolated Linux/Nix per-exercise spike, follow the explicit source/native/runtime
+review workflow in `spikes/relational_invariants/per_exercise/README.md`; do not substitute
+historical machine hashes or treat reused evidence as fresh test execution.
 
 
 ## Updating This File

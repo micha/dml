@@ -18,14 +18,15 @@ def assert_agreement(case, verdict):
     return True
 
 
-def check(upstream, database, directory, spec):
+def check(upstream, database, directory, spec, *, duckdb):
     from shared_index.check import check_case
     capsule = read(Path(upstream) / 'capsule.json')
     case = capsule['case']
     if (case['label'] != spec['label'] or case['parameters'] != {'value': spec['value']}
             or (case['expectations']['outcome'] == 'reject') != spec['fault']):
         raise ValueError('checker case input differs')
-    verdict = check_case(database, capsule['rows'], case, output_directory=Path(directory) / 'check')
+    verdict = check_case(database, capsule['rows'], case, output_directory=Path(directory) / 'check',
+                         duckdb=duckdb)
     try:
         agreement = assert_agreement(case, verdict)
     except AssertionError:

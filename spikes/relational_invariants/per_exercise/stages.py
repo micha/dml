@@ -52,7 +52,8 @@ def execute(job):
             pool = job['pool']
             admit(pool['directory'], pool['identity'], pool['inputs'], pool['digest'])
             dml.Repository = forbidden
-            agreement = payload.check(job['upstream'], Path(pool['directory']) / 'pool.duckdb', out, job['spec'])
+            agreement = payload.check(job['upstream'], Path(pool['directory']) / 'pool.duckdb', out,
+                                      job['spec'], duckdb=pins['runtime']['duckdb'])
         else:
             raise ValueError('unknown stage')
     if len(children) != cap or any(p.returncode != 0 for p, _ in children):

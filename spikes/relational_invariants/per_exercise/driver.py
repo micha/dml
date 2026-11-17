@@ -14,7 +14,7 @@ if __package__ in (None, ''):
     __package__ = 'per_exercise'
 
 from incremental.artifacts import describe, finalize
-from incremental.driver import PYTHON, environment
+from incremental.driver import environment
 from incremental.identity import canonical, digest, key, parse
 from incremental.records import Store
 from incremental.stages import load_dml
@@ -82,7 +82,7 @@ class Controller:
                'upstream': None if upstream is None else str(self.artifacts / upstream['name']), 'pool': pool}
         job_path = self.directory / (name + '.job.json')
         job_path.write_bytes(canonical(job))
-        command = [PYTHON, '-I', '-B', str(Path(self.pins['root']) / 'code/per_exercise/stages.py'), str(job_path)]
+        command = [self.pins['runtime']['python'], '-I', '-B', str(Path(self.pins['root']) / 'code/per_exercise/stages.py'), str(job_path)]
         with (partial / 'stdout.log').open('wb') as stdout, (partial / 'stderr.log').open('wb') as stderr:
             process = subprocess.Popen(command, env=environment(self.pins, self.directory), cwd=self.directory,
                                        stdout=stdout, stderr=stderr, start_new_session=True)
@@ -104,7 +104,7 @@ class Controller:
             if (receipt['stage'] != stage or receipt['spec'] != spec or receipt['key'] != key(inputs)
                     or receipt['producer'] != producer or receipt['source'] != digest(source.read_bytes())
                     or receipt['package'] != str(package / '__init__.py')
-                    or receipt['core'] != self.pins['core_sha256'] or receipt['python'] != PYTHON
+                    or receipt['core'] != self.pins['core_sha256'] or receipt['python'] != self.pins['runtime']['python']
                     or receipt['runtime'] != self.pins['runtime_digest']
                     or receipt['process'] != {'pid': process.pid, 'parent': os.getpid(), 'group': process.pid}
                     or len(receipt['children']) != (1 if stage == 'C' else 0)
@@ -181,7 +181,7 @@ def story(pins_path, directory):
     rows = []
     for number, (changed, candidate, p, c) in enumerate(configurations, 1):
         if number == 2:
-            command = [PYTHON, '-I', '-B', str(Path(controller.pins['root']) / 'code/per_exercise/driver.py'),
+            command = [controller.pins['runtime']['python'], '-I', '-B', str(Path(controller.pins['root']) / 'code/per_exercise/driver.py'),
                        'continue', str(controller.pins_path), str(controller.directory)]
             with (controller.directory / 'continuation.stdout').open('wb') as stdout, (controller.directory / 'continuation.stderr').open('wb') as stderr:
                 child = subprocess.Popen(command, env=environment(controller.pins, controller.directory),
@@ -226,9 +226,10 @@ if __name__ == '__main__':
     parser.add_argument('mode', choices=('prepare', 'story', 'continue'))
     parser.add_argument('source', type=Path)
     parser.add_argument('destination', type=Path)
+    parser.add_argument('--review', help='explicit reviewed source/native/runtime manifest for prepare')
     args = parser.parse_args()
     if args.mode == 'prepare':
-        record = prepare(args.source, args.destination)
+        record = prepare(args.source, args.destination, review_path=args.review)
         print(canonical({'namespace': record['namespace'], 'assets': len(record['assets'])}).decode())
     elif args.mode == 'story':
         print(canonical(story(args.source, args.destination)).decode())

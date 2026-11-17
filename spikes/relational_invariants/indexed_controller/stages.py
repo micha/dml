@@ -67,7 +67,7 @@ def execute(job):
         if reconstruct(rows,catalog['publication'])!=catalog:raise ValueError('projection artifact catalog differs')
         database=upstream/'pool/pool.duckdb';before=digest(database.read_bytes());verdicts=[]
         for number,case in enumerate(catalog['cases'],1):
-            verdicts.append(check_case(database,rows,case,out/'checks'/f'case-{number:03d}'))
+            verdicts.append(check_case(database,rows,case,out/'checks'/f'case-{number:03d}',duckdb=pins['runtime']['duckdb']))
         if len(verdicts)!=16 or before!=digest(database.read_bytes()):raise ValueError('case count/pool changed')
         agreement=all(v['accepted']==c['expected']==c['observed'] for c,v in zip(catalog['cases'],verdicts))
         (out/'verdict.json').write_bytes(canonical({'cases':verdicts,'agreement':agreement}))

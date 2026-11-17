@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from incremental.driver import prepare as legacy_prepare, verify_pins as legacy_verify, PYTHON,DUCKDB
+from incremental.driver import prepare as legacy_prepare, verify_pins as legacy_verify
 from incremental.identity import canonical,digest,file_manifest,manifest_digest,parse,exact
 
 TOOLS='/nix/store/qx9y6qslvc3pw8mblqx77cm1viv2dyzq-python3-3.13.15-env/lib/python3.13/site-packages'

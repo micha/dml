@@ -29,16 +29,19 @@ def claims(root, base):
             'runtime_digest': digest(canonical(runtime)), 'core_sha256': base['core_sha256']}
 
 
-def prepare(worktree, destination):
+def prepare(worktree, destination, *, review_path=None):
     worktree, root = Path(worktree).resolve(), Path(destination).resolve()
-    root.mkdir(parents=True, exist_ok=False)
-    base = base_prepare(worktree, root / 'base')
-    own = Path(__file__).parent
+    if review_path is None:
+        raise ValueError('explicit review_path required')
+    if root.exists():
+        raise ValueError('pin directory already exists')
+    base = base_prepare(worktree, root / 'base', review_path=review_path)
+    source = root / 'base/candidate-A/spikes/relational_invariants'
+    own = source / 'per_exercise'
     code = root / 'code/per_exercise'
     code.mkdir(parents=True)
     for name in CODE:
         (code / name).write_bytes((own / name).read_bytes())
-    source = worktree / 'spikes/relational_invariants'
     common = root / 'common'
     common.mkdir()
     for name in ('normalizer.py', 'schema.py', 'engine.py', 'checks.sql'):
@@ -59,7 +62,7 @@ def prepare(worktree, destination):
     for path in root.rglob('*'):
         if path.is_file():
             path.chmod(0o444)
-    return pins
+    return verify(root / 'pins.json')
 
 
 def verify(path):

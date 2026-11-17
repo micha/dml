@@ -113,8 +113,11 @@ nix develop
 
 The optional `flake.nix`/`flake.lock` provide development tools for x86_64 and
 aarch64 Linux/macOS, not a DML package or a replacement build system. The shell
-uses Python 3.12 (matching CI) and GCC with matching gcov. Run the existing
-workflows inside the shell, or invoke them directly:
+uses Python 3.12 (matching CI) and GCC with matching gcov. It also supplies DuckDB,
+ELF inspection tools and the optional parallel-test dependencies. The isolated
+[per-exercise spike](spikes/relational_invariants/per_exercise/README.md#linuxnix-portability-continuation)
+has its own explicit review/preparation workflow; entering the shell does not run it.
+Run the existing workflows inside the shell, or invoke them directly:
 
 ```sh
 nix develop -c scripts/check.sh

@@ -7,7 +7,6 @@ import sys
 import pytest
 
 from incremental.identity import canonical, digest, key, parse
-from incremental.driver import DUCKDB
 from incremental.stages import load_dml
 from per_exercise.profiles import envelope, specs, material_key, validate_spec
 from per_exercise.pins import verify
@@ -213,7 +212,7 @@ def control(pins, tmp_path_factory):
     rows = capsules.merge(cases)
     identity, inputs = digest(b'CONTROLpool'), {'profile': 'CONTROL'}
     pool = root / 'pool'
-    fingerprint = capsules.materialize(cases, pool, identity, inputs, DUCKDB)
+    fingerprint = capsules.materialize(cases, pool, identity, inputs, pins['runtime']['duckdb'])
     return {'root': root, 'dml': dml, 'cases': cases, 'rows': rows, 'pool': pool,
             'identity': identity, 'inputs': inputs, 'digest': fingerprint}
 
