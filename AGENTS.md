@@ -164,6 +164,8 @@ For the isolated Linux/Nix per-exercise spike, follow the explicit source/native
 review workflow in `spikes/relational_invariants/per_exercise/README.md`; do not substitute
 historical machine hashes or treat reused evidence as fresh test execution.
 
+The isolated [Quint feasibility spike](spikes/relational_invariants/quint_feasibility/README.md)
+records its own setup and validation. Quint is not required by the maintained gate.
 
 ## Updating This File
 
