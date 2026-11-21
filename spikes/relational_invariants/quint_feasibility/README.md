@@ -1,8 +1,8 @@
 # Quint feasibility: DML refs and transactions
 
 Status: direct Quint evaluation and deterministic Python generation passed for the
-create-only, mixed create/update and transaction-batch profiles on Linux ARM64.
-No Quint adoption or general compiler.
+create-only, mixed create/update, transaction-batch and Python context-completion profiles
+on Linux ARM64. No Quint adoption or general compiler.
 
 ## Authority boundary
 
@@ -293,13 +293,111 @@ real DML before corrupting only the evidence. Logs, generated Python, control so
 are ignored local artifacts under `build/quint-feasibility/transactions/`. The reproduction
 commands above use its `review-fixes/` directory for the corrected profile.
 
+## Python write-context completion
+
+The [Python context contract](../../../docs/spec-next/python-api.md#contexts-and-failure-handling)
+owns the requirements. This profile extends the isolated experiment to actual `with tx:`
+completion, not a direct call to `__exit__`:
+
+- Normal exit publishes clean writes. After a caught mutation failure, normal exit rejects
+  with `invalid_state` and rolls back both the ref and the new marker.
+- Exceptional exit aborts and propagates the **same exception object**, including when an
+  earlier mutation failure was caught inside the context. Matching a type or message is
+  insufficient evidence of original-exception propagation.
+
+[`context_rules.qnt`](context_rules.qnt) imports the existing transaction step, continuity
+and marker predicates rather than redefining them. It adds clean/poisoned normal-exit and
+exceptional-exit predicates over a nested transaction observation and exception evidence.
+[`context_model.qnt`](context_model.qnt) reuses the independent ref-operation transitions,
+then defines context-completion transitions separately from these predicates. Its finite
+scope is again 510 batches: three initial states, 85 histories and two completion modes.
+
+[`context_binding.py`](context_binding.py) catches mutation failures without ending the
+context, then either exits normally or raises a fresh sentinel instance. Exception evidence
+records identity using `is`: original, same-type replacement or suppression; unrelated body
+and exit errors propagate. Only an `InvalidStateError` from normal completion after the body
+finished becomes an ending outcome. Fresh publication reads precede fallback abort cleanup.
+The adapter reuses transaction evidence validation before any rule matches.
+
+[`generate_contexts.py`](generate_contexts.py) adds only the checked two-module import profile
+and the context record/entry point to the existing lowerer. It does not add language operators,
+generate DML bindings or support arbitrary imports. The prior three generated profiles remain
+byte-identical. [`check_context_generation.py`](check_context_generation.py) checks deterministic
+emission, spec changes, fail-closed boundaries and deliberately incorrect completion models;
+[`check_contexts.py`](check_contexts.py) checks direct Quint agreement and Python-only execution.
+
+After the shared setup above, use the same Nix shell:
+
+```sh
+work="$base/contexts"
+mkdir -p "$work/gen-a" "$work/offline/empty-bin"
+"$quint" typecheck "$spike/context_model.qnt"
+"$quint" test "$spike/context_model.qnt" --backend=typescript --max-samples=1
+python -B "$spike/generate_contexts.py" --quint "$quint" \
+  --out "$work/gen-a/generated_contexts.py"
+PYTHONPATH="$base/python:$work/gen-a" python -B "$spike/check_context_generation.py" \
+  --quint "$quint" --out "$work/controls"
+PYTHONPATH="$base/python:$work/gen-a" python -B "$spike/check_contexts.py" \
+  differential --quint "$quint"
+cp "$spike/context_binding.py" "$spike/transaction_binding.py" "$spike/ref_binding.py" \
+  "$spike/check_contexts.py" "$work/gen-a/generated_contexts.py" "$work/offline/"
+python_bin=$(command -v python)
+(cd "$work/offline" && env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" \
+  "$python_bin" -B check_contexts.py offline)
+```
+
+### Context-completion results and review
+
+Base `5f66258` with isolated, unpublished spike changes, using the same Linux ARM64/Nix/
+Quint 0.33.1 toolchain as above. The native target reported no work; the current Python wrapper
+and native module were restaged before execution.
+
+| Check | Result |
+| --- | --- |
+| Bounded model | Both tests passed; 510 contexts safe and every rule matched |
+| Model negative controls | Exceptional publication, marker leakage, replaced exception and poison masking the body exception each failed safety |
+| Deterministic emission | Byte-identical across hash seeds and reordering all four context sets |
+| Spec-only controls | Changed alphabet/bound executed; added rule and changed imported predicate agreed with Quint |
+| Fail-closed controls | Extra import, changed context/imported layouts and unsupported imported list selection emitted no file |
+| Differential evaluation | 12,738 agreeing verdicts over 510 real and 1,613 synthetic contexts |
+| Python-only property | 100 contexts: 20 clean normal exits, 35 poisoned normal exits and 45 exceptional exits; all six rules matched |
+| Evidence controls | Incomplete/misassociated/malformed evidence, 15 fabricated completion failures and five continuity regressions rejected |
+| Actual exit controls | Swallowed/replaced sentinel, publication on exception, silent poisoned completion and non-consuming exit each detected |
+| Error propagation | Unrelated body errors, unrelated sentinel, body `InvalidStateError` and unrelated exit error propagated unchanged |
+| Shrinking | Fabricated exceptional ref leakage shrank initial `b`, `update(a)` to initial `a`, `update(b)` |
+| Earlier profiles | Create-only, mixed and explicit-transaction Python regenerated byte-identically |
+
+The exhaustive concrete run matched 45 clean normal exits, 210 poisoned normal exits and
+255 exceptional exits. All 510 matched continuity/marker rules; 504 matched step effects.
+These are per-rule witnesses, not an assertion of exhaustive branch coverage for arbitrary
+future predicates. The shrink control executed and checked real DML first, then corrupted
+only published-ref evidence. It retained the existing-ref update and original exception;
+this was **value shrinking**, not action-count reduction.
+
+Two collaborating agents split implementation and the independent differential/offline
+harness, then cross-reviewed each other's source and results. The implementation agent
+additionally ran the actual exit/error-propagation and continuity controls independently.
+The first differential invocation failed because its observation module lacked an explicit
+import of transaction constructors; imports in `context_rules` are not re-exports. The harness
+was corrected, `not_found` was added to its synthetic outcomes, and the bounded differential
+and Python-only checks passed. The failed log remains alongside the corrected `*-v2` evidence
+under ignored `build/quint-feasibility/contexts/peer-review/`. Generation controls and independent
+review logs remain under `build/quint-feasibility/contexts/`.
+
+The profile remains isolated: no maintained library, test gate, dependencies or storage model
+changed; no new coverage exclusions were added. The full maintained gate, CI and other platforms
+were not rerun, following the existing isolated validation-scope boundary. Nothing was committed
+or pushed for this continuation. The Python-only stage has no Quint sources/generator or Quint,
+Node or npm on `PATH`; it is not a filesystem sandbox.
+
 ## Limits
 
 The first two profiles cover one ref, pre-existing valid commits, fresh write transactions per
 action and published ref state after each transaction ends. They do not establish transaction
 rollback; the transaction profile separately checks the observed ref and one new scalar datum
-across multiple actions. It covers explicit endings, not context-manager completion, and does
-not cover concurrent readers, invalid commit targets, arbitrary object graphs or unrelated keys.
+across multiple actions. The context profile additionally covers normal and exceptional write-context
+completion, not read contexts, explicit endings within contexts or finalizers. None covers concurrent
+readers, invalid commit targets, arbitrary object graphs or unrelated keys.
 Agreement is evidence for these observations, not proof of arbitrary Quint translation or
 performance at larger scales. There is no verification cache or change to the older SQL/pooling
 spike. The maintained gate, CI and other platforms were not rerun; this experiment retains the
