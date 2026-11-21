@@ -2,8 +2,10 @@
 
 Status: direct Quint evaluation and deterministic Python generation passed for the
 create-only, mixed create/update, transaction-batch, Python context-completion and explicit-ending
-context profiles on Linux ARM64. A separate [graph-backed check](#graph-backed-transaction-verification)
-reopens one transaction batch's saved evidence. No Quint adoption or general compiler.
+context profiles on Linux ARM64. [Graph-backed checks](#graph-backed-transaction-verification)
+reopen saved transaction evidence; [measurements](#transaction-graph-repeatability-and-cost)
+found repeatable roots but did not justify a verification cache for this profile. No Quint
+adoption or general compiler.
 
 ## Authority boundary
 
@@ -550,8 +552,93 @@ verdicts unchanged.
 
 The harness removes its temporary evidence repositories. Logs, exit codes and reviewed-source
 hashes are ignored local artifacts under `build/quint-feasibility/transaction-graph/`. This is
-one round-trip case, not evidence about cacheability, verification cost or arbitrary graphs.
+one round-trip case; the continuation below checks repeatability and cost separately.
 No maintained code or gate changed, and the full gate and CI were not rerun.
+
+## Transaction graph repeatability and cost
+
+The [measurement harness](measure_transaction_graph.py) pairs two independent executions per
+sample, each in a fresh exercised repository. The direct path checks the live batch. The graph
+path saves the batch to a separate new evidence repository, reopens it with a root pin, then
+checks the reopened batch. Workers run sequentially in fresh Python processes with different
+hash seeds. Both paths execute real operations; there is no cache or skipped execution.
+
+The default run measures 30 pairs per recipe in each of four workers after three warmup pairs
+per worker and recipe. The harness rotates recipe order and alternates which path runs first.
+Each timed check evaluates all six rules; assertions for batch equality, repeat roots, and
+expected verdicts run outside the timers. The four two-action recipes cover clean commit,
+poisoned commit, explicit abort, and a second clean commit with a different first update but
+identical outer observations and verdicts. The clean traces produced distinct roots. An untimed fresh reader verified the pinned graphs and rejected
+a mismatched recipe. Flipping only `markerAfter` in the poisoned batch changed its root, failed
+reopen under the original pin, and violated only `commitPoisoned` under its own pin.
+
+After the shared setup above, in the same Nix shell:
+
+```sh
+work="$base/transaction-graph-measurement"
+mkdir -p "$work/gen" "$work/offline/empty-bin"
+python -B "$spike/generate_transactions.py" --quint "$quint" \
+  --out "$work/gen/generated_transactions.py"
+cp "$spike/measure_transaction_graph.py" "$spike/audit_transaction_graph.py" \
+  "$spike/transaction_graph.py" "$spike/transaction_binding.py" "$spike/ref_binding.py" \
+  "$work/gen/generated_transactions.py" "$work/offline/"
+python_bin=$(command -v python)
+(cd "$work/offline" &&
+  env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" "$python_bin" -B \
+    measure_transaction_graph.py --json "$work/measurement.json" &&
+  env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" PYTHONHASHSEED=123 "$python_bin" -B \
+    audit_transaction_graph.py > "$work/audit-forward.json" &&
+  env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" PYTHONHASHSEED=799 "$python_bin" -B \
+    audit_transaction_graph.py --reverse > "$work/audit-reverse.json" &&
+  cmp "$work/audit-forward.json" "$work/audit-reverse.json")
+```
+
+### Measurement results
+
+Two agents cross-reviewed the harnesses and ran the default measurement separately on the same
+Linux ARM64 host (Nix Python 3.12.15, ext4 `/tmp`, Quint 0.33.1 generation). All three default runs
+produced identical evidence receipts. The table reports ranges of per-recipe, per-run medians,
+not a latency guarantee. The logs retain per-stage minima and maxima; the slowest individual
+save was 161 ms.
+
+| Timed stage | Median range |
+| --- | ---: |
+| Validate and check live evidence | 18–24 µs |
+| Save native evidence graph | 1.65–1.93 ms |
+| Reopen, decode and validate graph | 0.46–0.50 ms |
+| Check reopened evidence | 16–21 µs |
+| Reopen plus generated check | 0.48–0.52 ms |
+| Save, reopen and check after capture | 2.16–2.46 ms |
+| Execute and check live | 1.35–1.95 ms |
+| Execute, save, reopen and check | 3.63–4.78 ms |
+
+Execution includes the exercised repository's temporary lifecycle. Save includes creating,
+committing, and closing the evidence repository, but not creating or cleaning up its enclosing
+temporary workspace. A generated check includes observation validation and verdict accounting.
+Reopen was timed immediately after save in the same process, without flushing OS caches. The
+separate reader's startup and verification were not timed.
+
+The [untimed audit](audit_transaction_graph.py) independently executed and reopened all 510
+bounded recipes twice, in fresh processes with different hash seeds and opposite traversal
+orders. Both passes found 510 distinct roots and identical recipe-to-root maps. Live and reopened
+batches and verdict counts agreed for every recipe. There were 45 clean-commit, 210 poisoned-commit
+and 255 abort witnesses, plus 510 each for continuity and marker freshness and 504 for step effects.
+This is repeatability for this schema and fixed recipe set, not an estimate of Hypothesis cache
+hit rates, collision resistance, or portability across platforms or versions.
+
+**Decision:** do not build a verdict cache for this profile. If the graph is written only to
+obtain a cache key, saving it here already costs far more than checking the live observations.
+If the graph is required anyway and replay must still reopen and validate it, skipping only the
+generated check saves tens of microseconds before lookup costs. Bypassing reopen would be a
+different trust contract and was not measured. Revisit if a richer graph or more expensive
+invariants make verification a material cost. A future cache would need both exact evidence
+identity and checker semantics. A root alone does not attest that the observations occurred,
+and a recipe-only hit would hide the marker publication change demonstrated above.
+
+Raw samples, receipts, source hashes and exits are ignored local artifacts under
+`build/quint-feasibility/transaction-graph/measure-worker/` and
+`build/quint-feasibility/transaction-graph-measurement/coordinator/`. No maintained code or gate
+changed; the full maintained gate and CI were not rerun.
 
 ## Limits
 
