@@ -2,7 +2,8 @@
 
 Status: direct Quint evaluation and deterministic Python generation passed for the
 create-only, mixed create/update, transaction-batch, Python context-completion and explicit-ending
-context profiles on Linux ARM64. No Quint adoption or general compiler.
+context profiles on Linux ARM64. A separate [graph-backed check](#graph-backed-transaction-verification)
+reopens one transaction batch's saved evidence. No Quint adoption or general compiler.
 
 ## Authority boundary
 
@@ -498,6 +499,59 @@ validation-scope boundary. Raw logs, generated Python,
 control sources, exit codes and reviewed-source hashes remain ignored local artifacts under
 `build/quint-feasibility/explicit-contexts/`. The Python-only stage has no Quint sources/generators
 or Quint, Node or npm on `PATH`; it is not a filesystem sandbox.
+
+## Graph-backed transaction verification
+
+This isolated continuation exercises one existing transaction-batch case: start at `a`,
+update to `b`, attempt a duplicate create at `a`, then attempt commit on the poisoned
+transaction. The unchanged [binding](transaction_binding.py) runs the real DML operations
+and captures publication before fallback cleanup. The graph stores those observations after
+the exercise; it neither computes expected state nor re-executes the transaction on replay.
+
+[`transaction_graph.py`](transaction_graph.py) stores a versioned native datum map under
+ref `transaction-evidence` → commit → tree → DAG → literal. Requests and steps use ordered
+datum lists, and snapshots and outcomes use tagged lists. The graph has no JSON payload.
+The evidence repository is separate from the exercised repository. Observed target IDs are
+strings, not links to the original target objects, which this check does not need.
+The reader requires the caller's expected commit ID and recipe, validates the decoded batch,
+and hands it to the existing generated predicates. A root ID identifies the graph; it does not
+attest that the observations actually happened.
+
+After the shared setup above, in the same Nix shell:
+
+```sh
+work="$base/transaction-graph"
+mkdir -p "$work/gen" "$work/offline/empty-bin"
+python -B "$spike/generate_transactions.py" --quint "$quint" \
+  --out "$work/gen/generated_transactions.py"
+cp "$spike/transaction_graph.py" "$spike/check_transaction_graph.py" \
+  "$spike/transaction_binding.py" "$spike/ref_binding.py" \
+  "$work/gen/generated_transactions.py" "$work/offline/"
+python_bin=$(command -v python)
+(cd "$work/offline" && env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" \
+  "$python_bin" -B check_transaction_graph.py)
+```
+
+### Graph-backed results
+
+Both agents cross-reviewed the adapter and harness, then staged and ran the harness separately
+on Linux ARM64 with Nix Python 3.12.15. Fresh Quint 0.33.1 generation was byte-identical to
+that of the reviewed transaction profile. Both runs reopened root
+`e096e6b8470c549025611177fcaaa6e6` and recovered the exact live batch. All six verdicts agreed,
+including in a fresh Python process: four passed and two were unexercised. The staged runs
+had no Quint, Node or npm on `PATH`; they were not filesystem sandboxes.
+
+The harness independently built native graphs with incomplete publication evidence, an unknown
+schema and a parented root. Each was rejected with a matching root pin. The writer rejected
+incomplete evidence before creating an evidence repository. The reader also rejected mismatched
+recipes and a stale pin after the ref moved. A structurally complete graph that incorrectly
+published both the updated ref and the marker violated `commitPoisoned` and left all other
+verdicts unchanged.
+
+The harness removes its temporary evidence repositories. Logs, exit codes and reviewed-source
+hashes are ignored local artifacts under `build/quint-feasibility/transaction-graph/`. This is
+one round-trip case, not evidence about cacheability, verification cost or arbitrary graphs.
+No maintained code or gate changed, and the full gate and CI were not rerun.
 
 ## Limits
 
