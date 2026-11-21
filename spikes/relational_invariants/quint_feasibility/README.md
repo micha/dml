@@ -1,8 +1,8 @@
 # Quint feasibility: DML refs and transactions
 
 Status: direct Quint evaluation and deterministic Python generation passed for the
-create-only, mixed create/update, transaction-batch and Python context-completion profiles
-on Linux ARM64. No Quint adoption or general compiler.
+create-only, mixed create/update, transaction-batch, Python context-completion and explicit-ending
+context profiles on Linux ARM64. No Quint adoption or general compiler.
 
 ## Authority boundary
 
@@ -390,14 +390,126 @@ were not rerun, following the existing isolated validation-scope boundary. Nothi
 or pushed for this continuation. The Python-only stage has no Quint sources/generator or Quint,
 Node or npm on `PATH`; it is not a filesystem sandbox.
 
+## Explicit endings inside Python write contexts
+
+The [Python lifecycle contract](../../../docs/spec-next/python-api.md#contexts-and-failure-handling)
+owns the requirements. The earlier context profile was checkpointed as `484ca43` before
+this continuation; its preceding results are retained evidence, not freshly rerun checks.
+
+This profile executes `commit()` or `abort()` **inside an actual `with tx:`**, catches
+supported explicit-ending errors, and then either finishes normally or raises a fresh body
+sentinel. A successful explicit commit stays published even if the later body raises;
+context exit does not undo a completed transaction. A poisoned explicit commit rejects and
+rolls back before either kind of exit. Explicit abort rolls back in both cases.
+
+- [`explicit_context_rules.qnt`](explicit_context_rules.qnt) reuses the transaction step,
+  continuity and fresh-marker predicates. Its five additional rules check clean/poisoned
+  explicit commit, explicit abort, ended-handle operations and subsequent context exit.
+- [`explicit_context_model.qnt`](explicit_context_model.qnt) defines transitions separately.
+  It enumerates 1,020 contexts: three initial ref states, 85 histories of 0–3 create/update
+  attempts and four ending/exit combinations. This is finite enumeration, not an unbounded
+  proof or external model-checker run.
+- [`explicit_context_binding.py`](explicit_context_binding.py) records the explicit-call
+  outcome separately from the eventual context outcome. Immediately after the explicit
+  ending, **inside the body and before any probes**, a fresh reader observes the ref and
+  marker. Neither later probes, context exit nor fallback cleanup can supply consumption or
+  rollback for that observation. A second fresh reader observes publication after exit.
+- The binding attempts an ended-handle read, mutation, commit and idempotent abort. Transparent
+  instance-local wrappers count public `commit`/`abort` calls only during the tested writer's
+  context exit, excluding reader completion, body probes and fallback cleanup. This detects
+  repeated completion even when an extra abort is otherwise harmless. These observations
+  check supported Python API behavior, not every internal native-handle invariant.
+- Original-exception evidence uses `is`, not matching type/message. Unrelated errors propagate;
+  an `InvalidStateError` from an erroneous exit after the body finished is recorded as an exit
+  failure, including when it masks the sentinel.
+- [`generate_explicit_contexts.py`](generate_explicit_contexts.py) supports only the checked
+  two-module import profile and explicit evidence layout. It reuses the existing expression
+  lowerer; the integer exit-call field adds no arithmetic operators or integer function
+  signatures. [`check_explicit_context_generation.py`](check_explicit_context_generation.py)
+  and [`check_explicit_contexts.py`](check_explicit_contexts.py) own the independent controls.
+
+After the shared setup above, use the same Nix shell:
+
+```sh
+work="$base/explicit-contexts"
+mkdir -p "$work/gen-a" "$work/offline/empty-bin"
+"$quint" typecheck "$spike/explicit_context_model.qnt"
+"$quint" test "$spike/explicit_context_model.qnt" --backend=typescript --max-samples=1
+python -B "$spike/generate_explicit_contexts.py" --quint "$quint" \
+  --out "$work/gen-a/generated_explicit_contexts.py"
+PYTHONPATH="$base/python:$work/gen-a" python -B "$spike/check_explicit_context_generation.py" \
+  --quint "$quint" --out "$work/controls"
+PYTHONPATH="$base/python:$work/gen-a" python -B "$spike/check_explicit_contexts.py" \
+  differential --quint "$quint"
+cp "$spike/explicit_context_binding.py" "$spike/context_binding.py" \
+  "$spike/transaction_binding.py" "$spike/ref_binding.py" "$spike/check_explicit_contexts.py" \
+  "$work/gen-a/generated_explicit_contexts.py" "$work/offline/"
+python_bin=$(command -v python)
+(cd "$work/offline" && env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" \
+  "$python_bin" -B check_explicit_contexts.py offline)
+```
+
+### Explicit-ending results and review
+
+Base `484ca43` with isolated, unpublished spike changes, on Linux ARM64 with the same
+Nix Python 3.12.15, Hypothesis 6.151.10, Node 22.23.2 and Quint 0.33.1 toolchain. Ninja
+reported no work; the current wrapper and native module were restaged before real execution.
+
+| Check | Result |
+| --- | --- |
+| Bounded model | Both tests passed; 1,020 contexts safe and every rule matched |
+| Model negative controls | Abort/poisoned publication, post-commit rollback, replaced sentinel, readable ended handle and repeated abort each failed safety |
+| Deterministic emission | Byte-identical across hash seeds and reordering all four scenario/registry sets |
+| Spec-only controls | Changed alphabet/bound executed all four combinations; a ninth rule and changed imported predicate agreed with Quint |
+| Fail-closed controls | Extra import, changed explicit/imported layouts and unsupported imported list selection emitted no file |
+| Differential evaluation | 23,528 agreeing verdicts over 1,020 real and 1,921 synthetic explicit-ending contexts |
+| Python-only property | 120 contexts; 17 clean commits, 36 poisoned commits and 67 aborts matched; all context-exit/continuity/ended-handle/marker rules matched |
+| Evidence controls | Incomplete/misassociated/malformed evidence, 66 fabricated lifecycle failures and five continuity regressions rejected |
+| Actual adapter controls | Wrong publication, repeated completion, suppressed/replaced sentinel, four incorrect ended operations and three non-consuming explicit endings detected |
+| Error propagation | Unrelated runtime/sentinel/`InvalidStateError` body failures and unrelated exit failure propagated unchanged |
+| Shrinking | Fabricated rollback after successful explicit commit shrank initial `b`, `update(a)` to initial `a`, `update(b)`, both followed by an original body exception |
+| Earlier profiles | All four profiles regenerated byte-identically; focused poisoned normal/exceptional context regressions passed |
+
+The exhaustive concrete run matched 90 clean explicit commits, 420 poisoned explicit commits
+and 510 explicit aborts. All 1,020 matched context-exit, continuity, ended-handle and marker
+rules; 1,008 matched step effects. Every rule had synthetic violations. The synthetic matrices
+cover step observations, completion outcomes/exception identity/call counts, pre-/post-exit
+publication snapshots, each ended-handle probe, marker visibility and disconnected histories.
+These are bounded witnesses and differential results, not exhaustive coverage of arbitrary
+future predicates. The full differential invocation passed on its first run.
+
+The shrink control checked real DML before corrupting only final publication evidence. It
+retained the successful explicit commit, changed ref target and original sentinel. This was
+**value shrinking**, not action-count reduction.
+
+Two agents split the implementation and independent harness, then cross-reviewed the other's
+source. The implementation agent independently reran the complete generation-control and
+Python-only harnesses. Initial offline harness runs exposed two harness defects: a helper's
+positional `batch` parameter conflicted with an evidence field of the same name, and a
+fabricated explicit-ending snapshot also violated the alphabetically earlier context-exit
+rule. Renaming the helper parameter and keeping final publication consistent isolated the
+intended rule. Both failed logs remain under `build/quint-feasibility/explicit-contexts/peer-review/`
+alongside the passing `offline-v3` results; these were harness corrections, not DML changes.
+
+This continuation was checkpointed locally after independent review of the sources and retained
+evidence. No maintained library, gate, dependencies, storage model or coverage exclusions changed.
+The full maintained gate, CI and other platforms were not rerun under the existing isolated
+validation-scope boundary. Raw logs, generated Python,
+control sources, exit codes and reviewed-source hashes remain ignored local artifacts under
+`build/quint-feasibility/explicit-contexts/`. The Python-only stage has no Quint sources/generators
+or Quint, Node or npm on `PATH`; it is not a filesystem sandbox.
+
 ## Limits
 
 The first two profiles cover one ref, pre-existing valid commits, fresh write transactions per
 action and published ref state after each transaction ends. They do not establish transaction
 rollback; the transaction profile separately checks the observed ref and one new scalar datum
 across multiple actions. The context profile additionally covers normal and exceptional write-context
-completion, not read contexts, explicit endings within contexts or finalizers. None covers concurrent
-readers, invalid commit targets, arbitrary object graphs or unrelated keys.
+completion; the explicit-ending context profile separately checks commit/abort inside write
+contexts and subsequent supported ended-handle operations. These context profiles do not cover
+read contexts, owner closure inside a context, re-entry or finalizers. None covers concurrent
+readers, injected native commit failures unrelated to poisoning, invalid commit targets,
+arbitrary object graphs or unrelated keys.
 Agreement is evidence for these observations, not proof of arbitrary Quint translation or
 performance at larger scales. There is no verification cache or change to the older SQL/pooling
 spike. The maintained gate, CI and other platforms were not rerun; this experiment retains the
