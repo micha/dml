@@ -1,8 +1,8 @@
 # Quint design pilot: native pinned-commit export traversal
 
-Status: prerequisites checked, bounded traversal modeled, and the real Python exporter checked
-against the same Quint rules. No native exporter, generated checker, public API change, or
-maintained-gate integration.
+Status: the design pilot has been checkpointed. An opt-in native walker matches the real Python
+exporter on the pilot fixture. The public exporter still uses Python; there is no public API
+change, generated checker, or maintained-gate integration.
 
 ## Authority boundary
 
@@ -151,23 +151,60 @@ as the model. Build and stage an isolated copy of the Python runtime:
 )
 ```
 
-## Proposed implementation boundary
+## Opt-in native comparison
 
-Move only acquisition of the exact ordered `(kind, ID, packed bytes)` rows into C, under a
-single read transaction and from an explicit commit ID. Start with a private binding boundary,
-not a new installed C API. Keep JSON/base64, encoded bundle-size checking, exception mapping,
-and import in Python. Preserve the existing row, per-record, and aggregate packed-byte limits;
-leave no successful partial result on failure. No schema, record, transport, ref, or execution
-policy changes.
+[`src/export_walk.c`](../../../src/export_walk.c) acquires the ordered `(kind, ID, packed bytes)`
+rows for an explicit commit using one live read transaction supplied by its caller. It keeps typed
+active/completed state, visits one child at a time, and returns owned rows only on success. It
+checks the row, per-record and aggregate packed-byte limits. The private `_core._export_rows`
+hook is only compiled with `-Dexperimental_export_walk=true` (default: off). The experiment
+changes neither the installed C API nor `export_commit()`, import, or on-disk storage. Python
+still owns JSON/base64, encoded bundle-size checking, and exception mapping.
 
-Before replacing the Python walk:
+Reproduce on Linux in the repository's Valgrind shell. Use the same Quint install and vendored
+wrap archives as above. The runner snapshots inputs, compiles both variants in new private source
+copies, and prints the receipt directory. It never edits the checkout or `build/check`.
 
-1. Connect the private native walk to the real fixture above. Compare its rows with the same
-   Quint rules and its final bundle bytes with the unchanged Python baseline. Exercise a
-   disposable first-parent-only C build. Direct Quint comparison can come before any new
-   generator; keep Quint out of runtime and the maintained gate.
-2. Check limits, missing or corrupt data, allocation failure, cleanup, and unchanged Python
-   exception behavior. Use the normal maintainer gate and native memory checks before landing.
-3. Measure export time and peak memory on shared, deep and wide graphs. The native indexed
-   tree-entry and binding accessors scan from the start of the record; moving the walk is not
-   evidence of linear runtime or a speedup. Keep codec-iteration redesign out of this first slice.
+```sh
+nix develop .#valgrind -c bash \
+  spikes/relational_invariants/quint_export_design/run_native_export_control.sh \
+  "$PWD/build/quint-feasibility/tool/node_modules/.bin/quint"
+```
+
+| Native build | Rows, left-first / right-first | Ordered subset | Complete and unique | Exact order |
+| --- | ---: | --- | --- | --- |
+| Pristine | 22 / 22 | pass | pass | pass |
+| First-parent-only control | 13 / 21 | pass | fail | fail |
+
+Both pristine exports matched the fixture's ordered rows and the **unchanged Python export bytes**.
+The runner changes one C edge-count rule for the control, omitting the second parent in both
+roots. The retained Quint rules distinguish incomplete exports from ordered subsets. Neither the
+adapter nor the fixture changes between builds. The independent review reran both variants and
+cross-checked the mutation diff and raw output.
+
+The [boundary check](check_native_export_boundaries.py) compares exact, one-below and zero limits,
+and checks missing root, missing reached child, and malformed reached child errors against the
+Python exporter. The [allocation sweep](export_fault_sweep.py) injects each of 79 native and 23
+binding allocation failures in the fixture and verifies recovery on the same read handle. Its
+Valgrind run reported zero errors and zero lost bytes. It precompiles the staged Python because a
+local CPython parser block also reproduced without executing DML; the broader comparison runs
+normally to keep unrelated OpenSSL import diagnostics out of the allocation check. No new
+suppressions were added. The independent native probes also checked finished rows after snapshot
+close, 150 allocation failures on a 34-commit path, and a fake-getter cycle with a shared token
+across two kinds. The synthetic cycle is not a claim about native hash collisions. Both native
+probes reported zero Valgrind errors and zero bytes in use at exit.
+
+The Linux ARM64 comparison receipts are under `build/export-native-control.zYZIls/`. The
+independent review's receipts and disposable native probes are under `build/export-review.Tjv7NB/`.
+The opt-in path is not part of the maintained coverage denominator. The full default
+`scripts/check.sh -v` gate passed on Linux ARM64 with the hook off: 7 C tests, 3,423 Python tests,
+100% maintained coverage, and both memory workloads. Its log is under
+`build/export-validation.5EFbml/`. Remote CI and other platforms were not run.
+
+## Before switching the public exporter
+
+Measure end-to-end export time and peak memory on shared, deep and wide graphs. In particular, the
+indexed tree-entry and binding accessors scan from the start of the record, and the new binding
+materializes the complete packed row set before encoding. This experiment neither establishes a
+speedup nor tests the encoded-size limit via an alternate public exporter. Keep codec-iteration
+redesign separate and leave the default Python path in place pending the measurements.

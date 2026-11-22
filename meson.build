@@ -26,6 +26,15 @@ uriparser_dep = uriparser_proj.get_variable('uriparser_dep')
 
 dml_inc = include_directories('include')
 
+export_walk_sources = []
+export_walk_args = []
+export_walk_inc = []
+if get_option('experimental_export_walk')
+  export_walk_sources = files('src/export_walk.c')
+  export_walk_args = ['-DDML_EXPERIMENTAL_EXPORT_WALK']
+  export_walk_inc = [include_directories('src')]
+endif
+
 dml_sources = files(
   'src/dml.c',
   'src/encoding.c',
@@ -134,7 +143,7 @@ test('test_boundaries', boundary_test)
 # Compile the same sources with dependency-call substitution only in this
 # private test core. The installed library has no hooks or mutable fault state.
 fault_core = static_library(
-  'dml_test_fault_core', dml_sources,
+  'dml_test_fault_core', dml_sources, export_walk_sources,
   include_directories: dml_inc,
   dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
   c_args: ['-include', meson.current_source_dir() / 'tests/c/fault_injection.h'],
@@ -149,7 +158,9 @@ fault_test = executable(
 test('test_faults', fault_test, is_parallel: false)
 
 py.extension_module(
-  '_core', 'python/daggerml/src/_core_module.c',
+  '_core', 'python/daggerml/src/_core_module.c', export_walk_sources,
+  include_directories: export_walk_inc,
+  c_args: export_walk_args,
   dependencies: dml_dep,
   subdir: 'daggerml',
   install: true,
@@ -166,10 +177,10 @@ executable(
 
 py.extension_module(
   '_core_fault', 'python/daggerml/src/_core_module.c', 'tests/c/fault_injection.c',
-  include_directories: [dml_inc, include_directories('tests/c')],
+  include_directories: [dml_inc, include_directories('tests/c')] + export_walk_inc,
   link_with: fault_core,
   dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
-  c_args: ['-DDML_PY_FAULTS'],
+  c_args: ['-DDML_PY_FAULTS'] + export_walk_args,
   limited_api: '3.8', install: false,
 )
 

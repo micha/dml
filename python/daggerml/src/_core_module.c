@@ -7,6 +7,10 @@
 
 #include "dml/dml.h"
 
+#ifdef DML_EXPERIMENTAL_EXPORT_WALK
+#include "export_walk.h"
+#endif
+
 #ifdef DML_PY_FAULTS
 #include "python_faults.h"
 #define CORE_NAME "_core_fault"
@@ -236,6 +240,57 @@ static PyObject *get_record(PyObject *self, PyObject *args) {
   return buffer_bytes(&buffer);
 }
 
+#ifdef DML_EXPERIMENTAL_EXPORT_WALK
+static PyObject *export_row_tuple(const dml_export_rows *rows) {
+  PyObject *result = PyTuple_New((Py_ssize_t)rows->count);
+  if (!result) return NULL;
+  for (size_t i = 0; i < rows->count; i++) {
+    const dml_export_row *row = &rows->items[i];
+    PyObject *item = Py_BuildValue("(iy#y#)", (int)row->type,
+      (const char *)row->id.bytes, (Py_ssize_t)sizeof(row->id.bytes),
+      (const char *)row->record.data, (Py_ssize_t)row->record.len);
+    if (!item || PyTuple_SetItem(result, (Py_ssize_t)i, item) < 0) {
+      Py_DECREF(result);
+      return NULL;
+    }
+  }
+  return result;
+}
+
+static PyObject *export_rows(PyObject *self, PyObject *args) {
+  (void)self;
+  PyObject *obj, *id_obj;
+  Py_ssize_t max_objects, max_record_bytes, max_packed_bytes;
+  if (!PyArg_ParseTuple(args, "OOnnn", &obj, &id_obj, &max_objects, &max_record_bytes, &max_packed_bytes))
+    return NULL;
+  Txn *txn = txn_handle(obj);
+  dml_object_id id;
+  if (!txn || !as_id(id_obj, &id)) return NULL;
+  if (max_objects < 0 || max_record_bytes < 0 || max_packed_bytes < 0) {
+    PyErr_SetString(PyExc_ValueError, "export limits must be nonnegative");
+    return NULL;
+  }
+  dml_export_limits limits = {
+    .max_objects = (size_t)max_objects,
+    .max_record_bytes = (size_t)max_record_bytes,
+    .max_packed_bytes = (size_t)max_packed_bytes,
+  };
+  dml_export_rows rows = {0};
+  dml_export_failure failure;
+  dml_error error;
+  dml_status status = dml_export_walk(txn->ptr, &id, &limits, &rows, &failure, &error);
+  /* The walker leaves rows empty on failure and enforces the Py_ssize_t limits above.
+   * Return profile diagnostics separately for the Python transfer layer to map. */
+  if (status != DML_OK) {
+    if (failure != DML_EXPORT_NONE) return PyUnicode_FromString(error.detail);
+    return fail(status, &error);
+  }
+  PyObject *result = export_row_tuple(&rows);
+  dml_export_rows_free(&rows);
+  return result;
+}
+#endif
+
 static PyObject *put_record(PyObject *self, PyObject *args) {
   (void)self;
   PyObject *obj; int type; const char *data; Py_ssize_t len;
@@ -464,6 +519,9 @@ static PyMethodDef methods[] = {
   {"txn_begin", txn_begin, METH_VARARGS, NULL},
   {"txn_end", txn_end, METH_VARARGS, NULL},
   {"get_record", get_record, METH_VARARGS, NULL},
+#ifdef DML_EXPERIMENTAL_EXPORT_WALK
+  {"_export_rows", export_rows, METH_VARARGS, NULL},
+#endif
   {"put_record", put_record, METH_VARARGS, NULL},
   {"lookup_node", lookup_node, METH_VARARGS, NULL},
   {"ref_op", ref_op, METH_VARARGS, NULL},
