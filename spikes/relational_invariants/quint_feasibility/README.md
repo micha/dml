@@ -6,8 +6,10 @@ and explicit-ending context profiles on Linux ARM64. [Graph-backed checks](#grap
 reopen saved transaction evidence. [Measurements](#transaction-graph-repeatability-and-cost)
 did not justify a verification cache. [Failure artifacts](#replay-a-shrunk-transaction-failure)
 keep graph writes off the passing and shrinking paths. The [final experiment](#native-fault-control)
-caught, shrank, and replayed a fault introduced in a disposable native build. No Quint adoption,
-general compiler, or maintained-gate integration.
+caught, shrank, and replayed a fault introduced in a disposable native build. A separate
+[design-to-build follow-up](#read-context-design-to-build) refined a Python read-context rule in
+Quint and regenerated the concrete test. No Quint adoption, general compiler, or maintained-gate
+integration.
 
 ## Authority boundary
 
@@ -758,6 +760,76 @@ both builds. Neither Python memory check passed. Logs remain in
 `build/quint-feasibility/native-fault-memory.HzMSLx/`, including the passing `native-c/` logs.
 No maintained code changed; the full maintained gate and CI were not rerun.
 
+## Read-context design to build
+
+A read `commit()` on the [Python wrapper](../../../docs/spec-next/python-api.md#contexts-and-failure-handling)
+must reject without ending the transaction. This is deliberately different from the
+[native C entry point](../../../docs/spec-next/repository.md#transactions), which consumes it.
+The design question was whether rejection, exit, and publication checks alone distinguish the
+Python behavior from consuming the handle on rejection.
+
+- **Design:** [`read_context_model.qnt`](read_context_model.qnt) enumerates all 78 histories of
+  one to three attempts (`commit`, `create_ref` targeting an absent ref, or lookup of that absent
+  ref), with normal or exceptional exit. It compares two transition models. The premature-end
+  alternative still returns `invalid_state`, publishes nothing, and leaves an ended handle after
+  exit. Of the 50 histories where an attempted commit prematurely ends the handle, 34 pass the
+  weak rules; the refined `readStillUsable` rule detects all 50. One attempted commit suffices
+  to distinguish them. In a separate model control, substituting the premature-end transition
+  in the safety test made it fail. This is bounded exhaustive enumeration in Quint's TypeScript
+  evaluator, not an unbounded proof or a model-checker run.
+- **Build:** [`read_context_rules.qnt`](read_context_rules.qnt) defines the rules for both modes.
+  The [generator](generate_read_contexts.py) lowers those predicates; the
+  [adapter](read_context_binding.py) reads the seeded ref before the context and uses the **same
+  handle** to read it after every attempt. The adapter also records what is observable after exit,
+  before any fallback cleanup. It does not compute the expected target or outcome. The generator
+  rejects disagreement between the declared rule IDs and verdict branches; the property rejects
+  missing observations and requires concrete witnesses for all rules.
+
+In the Nix shell from the repository root, set `spike` and install Quint as shown in
+[Run locally](#run-locally). The runner builds its own native extension; skip the earlier
+native build steps.
+
+```sh
+bash "$spike/run_read_context_control.sh" "$quint"
+```
+
+The two original Linux ARM64 runs independently built and tested the profile. All four model
+checks passed. The generated source was byte-identical across hash seeds.
+The pristine binding passed all 78 concrete histories and the 78 examples in the finite
+Hypothesis run, witnessing all four rules. A disposable copy of the Python binding was changed to
+abort the read handle before rejecting `commit()`. The native extension, adapter, generator,
+and checker were unchanged. The fault still returned `invalid_state`; the subsequent read on
+that handle returned `invalid_state` instead of the seeded target. The first failing example
+was already one operation, and no other rule failed on it. The harness saved the observations
+reported by the property in a JSON receipt without rerunning the case. A pristine process
+replayed the receipt without DML operations; a separate execution of the same recipe on pristine
+DML passed.
+Offline stages had no Quint, Node or npm on `PATH` and were not filesystem sandboxes. The JSON
+receipt is diagnostic evidence, not a pinned DML graph or a verdict cache.
+
+Direct Quint evaluation and generated Python agreed on 344 verdicts across 78 pristine,
+7 synthetic, and one faulted observation. The synthetic cases checked wrong target before a
+later successful read, wrong rejection, swallowed exception, live handle after exit, both
+publication observations, and classification of an empty body. An incomplete concrete record
+was rejected before checking.
+
+The runner does not perform the model substitution or the separate generation controls. In those
+controls, removing `readStillUsable` from just the registry or just the verdict dispatch produced no
+checker. Removing it from both compiled the weaker contract, which accepted the **same saved
+observations** that the refined contract rejected, with no change to the adapter or implementation.
+Unbound fields and an unsupported action also failed generation. The original logs for these
+controls are in `read-context-model-control.P5786Z/` and `read-context-generation.IhhVN6/` under the
+ignored `build/quint-feasibility/` directory.
+
+The runner prints a `build/quint-feasibility/read-context.*` receipt directory and removes its
+temporary builds and packages on exit. The original receipts are `read-context.eAdaUp` and
+`read-context.QHx8CT`. The checkpoint run, `read-context.vGBSPV`, reproduced their clean, fault,
+replay and differential JSON byte for byte. The maintained Python tests already check a rejected
+read commit followed by a successful read; the new evidence is the design counterexample and its
+transfer to concrete tests without a second handwritten property predicate. This was not a pristine
+DML regression. No maintained code or gate changed, and the full maintained gate and CI were not
+rerun.
+
 ## Limits
 
 The first two profiles cover one ref, pre-existing valid commits, fresh write transactions per
@@ -765,10 +837,10 @@ action and published ref state after each transaction ends. They do not establis
 rollback; the transaction profile separately checks the observed ref and one new scalar datum
 across multiple actions. The context profile additionally covers normal and exceptional write-context
 completion; the explicit-ending context profile separately checks commit/abort inside write
-contexts and subsequent supported ended-handle operations. These context profiles do not cover
-read contexts, owner closure inside a context, re-entry or finalizers. None covers concurrent
-readers, injected native commit failures unrelated to poisoning, invalid commit targets,
-arbitrary object graphs or unrelated keys.
+contexts and subsequent supported ended-handle operations. The read-context follow-up covers
+rejected operations on one read handle and both exit modes. None covers owner closure inside a
+context, re-entry, finalizers, concurrent readers, injected native commit failures unrelated to
+poisoning, invalid commit targets, arbitrary object graphs or unrelated keys.
 Agreement is evidence for these observations, not proof of arbitrary Quint translation or
 performance at larger scales. There is no verification cache or change to the older SQL/pooling
 spike. The maintained gate, CI and other platforms were not rerun; this experiment retains the
