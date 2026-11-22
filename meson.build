@@ -59,8 +59,25 @@ install_headers(
   subdir: 'dml',
 )
 
-meson.override_dependency('dml', declare_dependency(
+dml_dep = declare_dependency(
   link_with: libdml,
   include_directories: dml_inc,
   dependencies: threads_dep,
-))
+)
+meson.override_dependency('dml', dml_dep)
+
+if get_option('quint_tests')
+  python = find_program('python3', version: '>=3.10')
+  quint = find_program('quint')
+  ref_replay = executable('ref_replay', 'tests/ref_replay.c', dependencies: dml_dep)
+  lmdb_inventory = executable(
+    'lmdb_inventory', 'tests/lmdb_inventory.c',
+    dependencies: lmdb_proj.get_variable('lmdb_dep'),
+  )
+  test(
+    'quint-create-ref', python,
+    args: [files('tests/run_ref_create.py'), quint.full_path(), ref_replay, lmdb_inventory,
+           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt')],
+    timeout: 90,
+  )
+endif

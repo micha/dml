@@ -18,9 +18,25 @@ wraps from `subprojects/`. Run the [build check](docs/validation-policy.md) with
 scripts/check.sh
 ```
 
-This configures and compiles a debug build in `build/core-check/`. It does not run
-behavioral tests or measure coverage; the new Quint-based suite is not in place yet.
-The CI matrix runs this same build check.
+This configures and compiles a debug build in `build/core-check/`. The CI matrix
+runs this build-only check; it does not run behavioral tests or measure coverage.
+
+### Quint behavior checks
+
+Use Python 3.10+ and [Quint](https://quint.sh/) 0.33.1 (TypeScript backend). With Node.js
+and npm, you can install Quint locally without changing the project dependencies:
+
+```sh
+npm install --prefix build/quint-tool --no-save --ignore-scripts @informalsystems/quint@0.33.1
+PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
+```
+
+This builds two test-only executables in `build/core-check-quint/` and runs
+`quint-create-ref`. Quint emits ref creation histories. The native runner
+executes the C API, and a separate
+read-only LMDB scan observes what each transaction published. Quint checks the
+statuses and exact inventory changes against the [ref contract](docs/spec-next/repository.md#refs).
+The check is local and opt-in; it does not measure coverage.
 
 ### Install and link the C library
 

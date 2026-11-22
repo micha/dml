@@ -79,22 +79,16 @@ formatter or linter, defer to its rules and update this section accordingly.
 - For the new suite, use Quint to generate attempted histories and evaluate
   observations from real C API calls. The runner must not predict outcomes.
 - Use focused C tests for low-level scenarios such as allocation failures.
-- As coverage measurement is restored, target 100% C line, function, and branch
-  coverage; use mutation testing to assess whether tests detect real changes.
-- Coverage is a means of improving assurance, not an end in itself. The user
-  authorizes narrow exclusions for precise lines/branches/regions where exercising
-  them adds no useful assurance (for example proven-unreachable defensive edges or
-  dependency/compiler-generated code). Record each excluded location and its
-  reasoning in delivery notes; distinguish excluded code from tested code.
-- Add meaningful boundary/error and allocation-failure tests. Difficulty alone
-  does not justify an exclusion. Do not hide real behavior or bugs, lower the
-  remaining coverage thresholds, or treat skipped/failing checks as passed.
-  New exclusions that do not meet this no-value policy need a user decision.
+- Prioritize contract scenarios over coverage percentages. Use coverage as a
+  diagnostic, not a target; see the validation policy for evidence selection.
+- Add meaningful boundary, error, and allocation-failure tests. Do not treat
+  skipped or failing checks as passed.
 - Do not add fault-injection state to the installed library.
 - Use Valgrind for memory checks when requested or when touching memory-critical
   code paths.
-- Use `scripts/check.sh` as the standard validation entrypoint. It is build-only
-  until the new suite lands. Do not count feasibility evidence as current tests.
+- Use `scripts/check.sh` as the standard validation entrypoint. Add `--quint`
+  when testing the replay suite or behavior it covers. Do not count feasibility
+  evidence as current tests.
 - Use descriptive test names that capture the behavior.
 - Keep fixtures small and local to the test when possible.
 
