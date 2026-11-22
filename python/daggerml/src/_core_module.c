@@ -242,11 +242,11 @@ static PyObject *get_record(PyObject *self, PyObject *args) {
 }
 
 #ifdef DML_EXPERIMENTAL_EXPORT_WALK
-static PyObject *export_row_tuple(const dml_export_rows *rows) {
+static PyObject *export_row_tuple(dml_export_rows *rows) {
   PyObject *result = PyTuple_New((Py_ssize_t)rows->count);
   if (!result) return NULL;
   for (size_t i = 0; i < rows->count; i++) {
-    const dml_export_row *row = &rows->items[i];
+    dml_export_row *row = &rows->items[i];
     PyObject *item = Py_BuildValue("(iy#y#)", (int)row->type,
       (const char *)row->id.bytes, (Py_ssize_t)sizeof(row->id.bytes),
       (const char *)row->record.data, (Py_ssize_t)row->record.len);
@@ -254,6 +254,8 @@ static PyObject *export_row_tuple(const dml_export_rows *rows) {
       Py_DECREF(result);
       return NULL;
     }
+    /* y# copied the bytes. Clear this buffer so bulk cleanup only frees the remainder. */
+    dml_buffer_free(&row->record);
   }
   return result;
 }

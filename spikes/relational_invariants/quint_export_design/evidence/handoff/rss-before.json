@@ -1,0 +1,114 @@
+{
+  "native": [
+    {
+      "before_export": {
+        "VmHWM": 20736,
+        "VmRSS": 20736
+      },
+      "walk_and_bind_txn_open": {
+        "VmHWM": 57704,
+        "VmRSS": 57704
+      },
+      "txn_closed": {
+        "VmHWM": 57704,
+        "VmRSS": 45492
+      },
+      "pre_json": {
+        "VmHWM": 52276,
+        "VmRSS": 52276
+      },
+      "bundle_returned": {
+        "VmHWM": 85044,
+        "VmRSS": 68772
+      }
+    },
+    {
+      "before_export": {
+        "VmHWM": 20736,
+        "VmRSS": 20736
+      },
+      "walk_and_bind_txn_open": {
+        "VmHWM": 57704,
+        "VmRSS": 57704
+      },
+      "txn_closed": {
+        "VmHWM": 57704,
+        "VmRSS": 45492
+      },
+      "pre_json": {
+        "VmHWM": 52276,
+        "VmRSS": 52276
+      },
+      "bundle_returned": {
+        "VmHWM": 85044,
+        "VmRSS": 68772
+      }
+    },
+    {
+      "before_export": {
+        "VmHWM": 20736,
+        "VmRSS": 20736
+      },
+      "walk_and_bind_txn_open": {
+        "VmHWM": 57704,
+        "VmRSS": 57704
+      },
+      "txn_closed": {
+        "VmHWM": 57704,
+        "VmRSS": 45492
+      },
+      "pre_json": {
+        "VmHWM": 52276,
+        "VmRSS": 52276
+      },
+      "bundle_returned": {
+        "VmHWM": 85044,
+        "VmRSS": 68772
+      }
+    }
+  ],
+  "python": [
+    {
+      "before_export": {
+        "VmHWM": 20736,
+        "VmRSS": 20736
+      },
+      "pre_json": {
+        "VmHWM": 52952,
+        "VmRSS": 39420
+      },
+      "bundle_returned": {
+        "VmHWM": 73468,
+        "VmRSS": 55800
+      }
+    },
+    {
+      "before_export": {
+        "VmHWM": 20736,
+        "VmRSS": 20736
+      },
+      "pre_json": {
+        "VmHWM": 52952,
+        "VmRSS": 39420
+      },
+      "bundle_returned": {
+        "VmHWM": 73468,
+        "VmRSS": 55800
+      }
+    },
+    {
+      "before_export": {
+        "VmHWM": 20736,
+        "VmRSS": 20736
+      },
+      "pre_json": {
+        "VmHWM": 52952,
+        "VmRSS": 39420
+      },
+      "bundle_returned": {
+        "VmHWM": 73468,
+        "VmRSS": 55800
+      }
+    }
+  ]
+}

@@ -375,6 +375,50 @@ and independent receipts are in `build/wide-iteration.PvlX8E/paired-evidence/res
   exclusions, remote CI, or other platforms. Receipts: `build/export-cursor-gate.vwE78Q/`,
   `build/export-cursor-native.sNHJ9U/`, and `build/export-cursor-control.E4JfAO/`.
 
-The public exporter already benefits from the cursor. Keep the C walker opt-in while testing
-how to avoid holding both sets of packed rows at the C/Python boundary. Recheck payload peak RSS,
-end-to-end timings, byte parity, and error precedence before reconsidering the default.
+The public exporter already benefits from the cursor. The C walker stays opt-in.
+
+## Packed-row handoff
+
+The binding now frees each native packed buffer after copying the row into the Python tuple.
+The tuple is returned only after all rows convert. On failure, the partial tuple is discarded
+and the caller's existing bulk cleanup frees the remaining native buffers. Transaction ownership,
+packed and encoded limits, and Python framing are unchanged.
+
+To reproduce, use the [release-build benchmark recipe above](#end-to-end-export-benchmark) at
+`70d254b` and with the handoff change. Pass `--case payload:1 --case payload:4 --case payload:12`
+and use `--repeats 8`. Primary medians on Linux ARM64:
+
+| Payload | Native before ms | Native after ms | Public RSS MiB | Native before RSS MiB | Native after RSS MiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 MiB | 3.76 | 3.71 | 29.79 | 29.15 | 29.15 |
+| 4 MiB | 14.73 | 15.02 | 42.58 | 45.81 | 45.19 |
+| 12 MiB | 40.97 | 41.57 | 74.52 | 85.84 | 85.21 |
+
+An independent run built both versions and alternated six before/after samples against the same
+repositories. It reproduced the 0.625 MiB peak reduction at 4 and 12 MiB. It did not reproduce
+the direction of the 12 MiB timing change. The native path still used about 11 MiB more peak RSS
+than the public path at 12 MiB.
+
+In a separate 12 MiB diagnostic, three fresh processes per exporter/build sampled `/proc/self/status`
+at the end of binding, after closing the read transaction, before JSON, and after bundle return.
+Writing `5` to `/proc/self/clear_refs` after each marker reset `VmHWM` for the next interval. Native
+peak RSS through binding fell from 56.35 to 46.35 MiB, but by the start of JSON live RSS was
+51.05 versus 50.43 MiB. The highest interval was JSON/UTF-8 through return: 83.05 versus 82.43 MiB
+(public: 71.75 MiB). These measurements include mapped pages and allocator state, not just live
+objects. The earlier release lowers the binding peak but does not remove the full Python tuple's
+packed-byte lifetime during base64 framing.
+
+The exporters produced identical bytes for all 17 fixtures and matched the checkpoint hashes.
+The packed and encoded boundary checks, storage-error precedence, and Quint merge checks passed.
+Under Valgrind, the pinned merge and 12 MiB fixture recovered on the same read handle at all
+injected failure positions (79 native and 23 binding; 58 native and 18 binding, respectively),
+with zero unsuppressed errors and no new suppressions. Independent review repeated the packed
+and encoded boundary checks and pinned merge fault sweep. The [archived receipts](evidence/handoff/)
+include primary and independent timing samples, the RSS probe and its samples, and hashes for the
+17 parity fixtures. Paths in the primary timing receipts are relative to the original checkout.
+The hook-off `-v` gate passed with eight workers: 7 C tests, 3,427 Python tests, 100% maintained
+coverage, and both Valgrind workloads (local log: `build/export-handoff.OhkA9s/gate.log`).
+No remote CI or other platforms ran.
+
+At the close of the study, `export_commit()` still uses Python. Releasing packed Python rows as
+base64 framing consumes them was considered but not tested.

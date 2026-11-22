@@ -1,0 +1,317 @@
+{
+  "platform": "Linux-6.8.0-90-generic-aarch64-with-glibc2.42",
+  "python": "3.12.15 (main, Sep 30 2026, 22:04:19) [GCC 15.3.0]",
+  "affinity": [
+    2
+  ],
+  "files": {
+    "spikes/relational_invariants/quint_export_design/benchmark_export.py": "7c044bdbaeb8d84dedf0d61712a6947c8fe6a04c9a0110285d54fc26359be227",
+    "spikes/relational_invariants/quint_export_design/native_export.py": "e2797637d3a5b3297d2ca3f3b8af571c0a186f9dbb1264b772b489ecf1f2b398",
+    "build/export-handoff.OhkA9s/after/python/daggerml/transfer.py": "1f2ce70ff965026abc7f387b4f076aa63ab64bb160801d08f7d278ee1d9bd562",
+    "build/export-handoff.OhkA9s/after/python/daggerml/__init__.py": "5d06ff50875766b97a6acc202e00d93abae7f768eeea86cdf0835c00a6f98cce",
+    "build/export-handoff.OhkA9s/after/python/daggerml/_core.abi3.so": "2ee31bd202df0a9d21cbad9ea61627e0816fe97af64687f7e9f3f65ea7b95737"
+  },
+  "repeats": 8,
+  "cases": {
+    "payload:1": {
+      "rows": 6,
+      "packed_bytes": 1048844,
+      "bundle_bytes": 1398971,
+      "sha256": "c77f368b5b9592983ab34e927e82a6c08ce59a551d4c3e309b4b416f06dcc39b",
+      "root": "993a00e38227e31d87c259dd2f5df0e5",
+      "samples": [
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4661195
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3861107
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3665023
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4868197
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4301235
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3768440
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3761482
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4764946
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4419652
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3724482
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3561564
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4835988
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4256901
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3507064
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 29852,
+          "elapsed_ns": 3697356
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 30508,
+          "elapsed_ns": 4683237
+        }
+      ],
+      "phases": {
+        "python": {
+          "json_utf8_and_limit_ns": 2227223,
+          "walk_base64_and_row_dicts_ns": 2533682
+        },
+        "native": {
+          "json_utf8_and_limit_ns": 1948679,
+          "acquire_and_bind_ns": 775338,
+          "base64_and_row_dicts_ns": 1160382
+        }
+      }
+    },
+    "payload:4": {
+      "rows": 9,
+      "packed_bytes": 4194740,
+      "bundle_bytes": 5593710,
+      "sha256": "eca2735e77f647a95c2f910f3c623a3192c8683b6bff0fac0622d7c8659da839",
+      "root": "84e328da71603fef9a8f9507715e0073",
+      "samples": [
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 15873807
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 14726716
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 13930545
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 15750764
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 15828681
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 15084218
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 15139511
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 15493971
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 15909057
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 14309130
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 15337511
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 16762354
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 16636645
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 15406262
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 46272,
+          "elapsed_ns": 14953301
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 43600,
+          "elapsed_ns": 15731931
+        }
+      ],
+      "phases": {
+        "python": {
+          "json_utf8_and_limit_ns": 8743471,
+          "walk_base64_and_row_dicts_ns": 7561213
+        },
+        "native": {
+          "json_utf8_and_limit_ns": 8683137,
+          "acquire_and_bind_ns": 2246098,
+          "base64_and_row_dicts_ns": 3928441
+        }
+      }
+    },
+    "payload:12": {
+      "rows": 17,
+      "packed_bytes": 12583796,
+      "bundle_bytes": 16779682,
+      "sha256": "2a661e9d90433aa8100fdf6af2b10282c06efa496d1058f29cba00253cc0525a",
+      "root": "542683fd7fd9f02b26662bf5ccc0b674",
+      "samples": [
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 47742128
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 42014551
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 40615709
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 44247772
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 45247571
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 42713430
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 41047919
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 45518364
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 45257321
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 42168552
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 41569423
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 44540525
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 45084986
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 41562672
+        },
+        {
+          "exporter": "native",
+          "peak_rss_kib": 87260,
+          "elapsed_ns": 41388797
+        },
+        {
+          "exporter": "python",
+          "peak_rss_kib": 76312,
+          "elapsed_ns": 42966014
+        }
+      ],
+      "phases": {
+        "python": {
+          "json_utf8_and_limit_ns": 25414948,
+          "walk_base64_and_row_dicts_ns": 19263785
+        },
+        "native": {
+          "json_utf8_and_limit_ns": 27014083,
+          "acquire_and_bind_ns": 5604409,
+          "base64_and_row_dicts_ns": 11176903
+        }
+      }
+    }
+  }
+}
