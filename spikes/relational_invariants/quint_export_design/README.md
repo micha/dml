@@ -201,10 +201,87 @@ The opt-in path is not part of the maintained coverage denominator. The full def
 100% maintained coverage, and both memory workloads. Its log is under
 `build/export-validation.5EFbml/`. Remote CI and other platforms were not run.
 
-## Before switching the public exporter
+## End-to-end export benchmark
 
-Measure end-to-end export time and peak memory on shared, deep and wide graphs. In particular, the
-indexed tree-entry and binding accessors scan from the start of the record, and the new binding
-materializes the complete packed row set before encoding. This experiment neither establishes a
-speedup nor tests the encoded-size limit via an alternate public exporter. Keep codec-iteration
-redesign separate and leave the default Python path in place pending the measurements.
+[`native_export.py`](native_export.py) is a spike-only candidate: acquire owned packed rows in
+one read transaction, close it, then use the public exporter's Python framing options and limits.
+It neither replaces `export_commit()` nor changes any import or on-disk behavior. The benchmark
+and boundary check do not need Quint.
+
+On Linux, use the Nix development shell and vendored dependency archives as above. Use an idle
+host with a CPU available to your process; substitute its number for `2` below. Both exporters
+run through the same staged release build and interpreter.
+
+```sh
+(
+  set -eu
+  spike=spikes/relational_invariants/quint_export_design
+  mkdir -p build
+  out=$(mktemp -d "$PWD/build/export-benchmark.XXXXXX")
+  export NIX_LDFLAGS="${NIX_LDFLAGS-}"
+  export NIX_LDFLAGS="${NIX_LDFLAGS#-rpath $PWD/outputs/out/lib}"
+  meson setup "$out/native" --wrap-mode=nodownload -Dbuildtype=release -Dexperimental_export_walk=true
+  meson compile -C "$out/native" _core.abi3.so
+  mkdir -p "$out/python/daggerml"
+  cp python/daggerml/daggerml/__init__.py python/daggerml/daggerml/transfer.py \
+    "$out/native/_core.abi3.so" "$out/python/daggerml/"
+  export PYTHONPATH="$out/python"
+  taskset -c 2 python -B "$spike/benchmark_export.py" --out "$out/evidence" --repeats 6
+  python -B "$spike/check_encoded_export_boundaries.py" --out "$out/encoded"
+)
+```
+
+[`benchmark_export.py`](benchmark_export.py) creates immutable fixtures at several sizes: shared
+merge history (diamonds), deep linear history (commits), wide trees and DAGs (named entries or
+bindings sharing one target), and distinct 1 MiB byte payloads in a list. Both wide fixtures have
+just five output rows: they isolate edge fanout rather than unique row count. The
+driver checks exact bundle bytes and expected row count before measuring; that also warms the file
+cache. It alternates exporter order across serial pairs. Each worker opens the repository and
+returns bundle bytes once in a fresh process. It times that call and reads Linux process peak RSS
+(`VmHWM`) before hashing the result. RSS includes interpreter imports and resident mapped pages;
+it is not a measurement of Python heap alone. `results.json` retains samples, hashes, CPU affinity
+and per-case timing breakdowns from one separate instrumented run per exporter. The native
+acquisition phase includes repository open/close and binding copies; Python interleaves walking
+and base64, so its pre-JSON phase cannot separate them.
+
+[`check_encoded_export_boundaries.py`](check_encoded_export_boundaries.py) uses independently
+expected bundles for the two pinned merges. Both exporters accept an exact 3,201-byte cap, reject
+when the cap is one byte smaller or zero with the same error, then export successfully again. The
+check also verifies precedence between count, per-record and aggregate packed limits, and that
+traversal errors still precede the encoded cap. It lowers the cap because with the default packed
+and object count caps, base64, row punctuation, and the header together are bounded below 32 MiB.
+In disposable copies, changing `>` to `>=` failed the exact-cap check, and dropping the check
+failed the one-below case.
+
+### Linux ARM64 results
+
+Both paths produced identical bundle bytes in all 17 cases. Selected largest sizes below are
+medians of six uninstrumented exports per path (Python 3.12.15, GCC 15.3 release build).
+
+| Fixture | Python ms | C rows + Python ms | Speedup | Python RSS MiB | C rows + Python RSS MiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 8,192 shared diamonds | 191.92 | 53.72 | 3.57× | 50.86 | 46.52 |
+| 8,192 linear commits | 53.37 | 15.95 | 3.35× | 31.81 | 30.63 |
+| 16,384 tree entries | 514.95 | 334.64 | 1.54× | 30.22 | 26.07 |
+| 16,384 DAG bindings | 513.18 | 331.65 | 1.55× | 30.39 | 26.07 |
+| 12 MiB of byte payloads | 45.82 | 43.41 | 1.06× | 74.89 | 86.26 |
+
+An independent release build reproduced the same bundle hashes and similar time and RSS ratios
+for four of these cases. Primary receipts are under `build/export-benchmark.aIoVrD/` (use
+`final/results.json`); independent receipts and disposable boundary controls are under
+`build/export-benchmark-review.WENWKY/`. These synthetic, warm-cache runs do not establish
+production workload ratios or performance on other hosts. The separate maintained `-v` gate
+passed with the hook off and eight workers (7 C tests, 3,423 Python tests, 100% maintained
+coverage, and both memory workloads); its log is under `build/export-benchmark-gate.n8e5ux/`.
+
+Wide records are still expensive: quadrupling the entry count from 4,096 to 16,384 took roughly
+15 times as long on the candidate. In one phase sample the candidate spent 335 ms acquiring and
+binding the widest tree and less than 2 ms framing it. Indexed accessors rescan variable-length
+entries from the start in repository validation, Python's native decoder, and the C walk. A linear
+iterator would address a cost shared by both exporters. On the 12 MiB fixture, JSON/UTF-8 and
+return took about 26 ms on either path in the phase runs. The candidate also holds a complete
+packed-row tuple before base64, and the measured peak RSS rose by about 11 MiB.
+
+Keep `export_commit()` on Python. The native walk is promising for history-heavy closures, but
+before proposing a default switch, benchmark linear tree and binding iteration separately and
+find a way to avoid holding two complete packed row sets across the C-to-Python handoff.
