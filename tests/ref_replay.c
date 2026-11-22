@@ -68,23 +68,31 @@ static bool seed_fixture(dml_repo *repo) {
 
   const dml_object_input tree = {.type = DML_REC_TREE};
   dml_object_input commit = {.type = DML_REC_COMMIT};
-  dml_object_id a, b, dag;
-  bool seeded = check_status(put_object(txn, &tree, &commit.value.commit.tree, &error),
-                             &error, "storing fixture tree") &&
-                check_status(put_object(txn, &commit, &a, &error), &error, "storing fixture commit A");
+  dml_object_id a, b, c, empty_tree;
+  dml_tree_entry entry = {.name = bytes("candidate")};
+  const dml_object_input candidate = {.type = DML_REC_TREE, .value.tree = {.items = &entry, .count = 1}};
+  bool seeded = check_status(put_object(txn, &tree, &empty_tree, &error),
+                             &error, "storing fixture tree");
   if (seeded) {
-    /* Child B differs from its parent A while sharing the same tree. */
+    commit.value.commit.tree = empty_tree;
+    seeded = check_status(put_object(txn, &commit, &a, &error), &error, "storing fixture commit A");
+  }
+  if (seeded) {
+    /* B and C are sibling candidates; only C changes the tree. */
     commit.value.commit.parents = (dml_id_array){.items = &a, .count = 1};
     seeded = check_status(put_object(txn, &commit, &b, &error), &error, "storing fixture commit B") &&
-             seed_dag(txn, &dag, &error);
+             seed_dag(txn, &entry.dag, &error) &&
+             check_status(put_object(txn, &candidate, &commit.value.commit.tree, &error),
+                          &error, "storing candidate tree") &&
+             check_status(put_object(txn, &commit, &c, &error), &error, "storing fixture commit C");
   }
   if (!seeded) {
     dml_txn_abort(&txn);
     return false;
   }
   return check_status(dml_txn_commit(&txn, &error), &error, "committing fixture") &&
-         printf("READY") >= 0 && print_id(&a) && print_id(&b) &&
-         print_id(&commit.value.commit.tree) && print_id(&dag) && puts("") != EOF;
+         printf("READY") >= 0 && print_id(&a) && print_id(&b) && print_id(&c) &&
+         print_id(&empty_tree) && print_id(&commit.value.commit.tree) && print_id(&entry.dag) && puts("") != EOF;
 }
 
 static bool parse_id(const char *text, dml_object_id *id) {
@@ -136,6 +144,33 @@ static bool publish(dml_repo *repo, const char *name, const char *parent_text, c
          print_id(&commit.value.commit.tree) && print_id(&commit_id) && puts("") != EOF;
 }
 
+static bool publish_expected(dml_repo *repo, const char *name, const char *expected_text,
+                             const char *target_text) {
+  dml_txn *txn = NULL;
+  dml_error error = {0};
+  dml_object_id expected, target, actual = {0};
+  if (!parse_id(expected_text, &expected) || !parse_id(target_text, &target) ||
+      !check_status(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error), &error, "beginning publication")) {
+    return false;
+  }
+
+  /* Read and conditionally move the ref while holding the same write transaction. */
+  dml_bytes ref = bytes(name);
+  dml_status get = dml_txn_ref_get(txn, ref, &actual, NULL);
+  const char *update = "none";
+  const char *completion;
+  if (get == DML_OK && memcmp(actual.bytes, expected.bytes, sizeof(actual.bytes)) == 0) {
+    dml_status status = dml_txn_ref_update(txn, ref, &target, NULL);
+    update = dml_status_name(status);
+    completion = dml_status_name(dml_txn_commit(&txn, NULL));
+  } else {
+    dml_txn_abort(&txn);
+    completion = txn == NULL ? "aborted" : "active";
+  }
+  return printf("EXPECTED %s", dml_status_name(get)) >= 0 && print_id(&actual) &&
+         printf(" %s %s\n", update, completion) >= 0;
+}
+
 static bool print_commit(const dml_object_view *view) {
   if (!print_id(&view->reference)) return false;
   for (size_t i = 0; i < view->count; i++) {
@@ -177,10 +212,12 @@ int main(int argc, char **argv) {
   bool create = argc == 5 && strcmp(argv[1], "create") == 0;
   bool write = argc == 8 && strcmp(argv[1], "publish") == 0 &&
                (strcmp(argv[6], "commit") == 0 || strcmp(argv[6], "abort") == 0);
+  bool conditional = argc == 6 && strcmp(argv[1], "publish-expected") == 0;
   bool read = argc == 4 && strcmp(argv[1], "read") == 0;
-  if (!seed && !create && !write && !read) {
+  if (!seed && !create && !write && !conditional && !read) {
     fprintf(stderr, "usage: ref_replay seed NEW_REPO | create REPO NAME TARGET |\n"
-                    "       publish REPO NAME PARENT DAG commit|abort EXTRA_NAME | read REPO NAME\n");
+                    "       publish REPO NAME PARENT DAG commit|abort EXTRA_NAME |\n"
+                    "       publish-expected REPO NAME EXPECTED TARGET | read REPO NAME\n");
     return EXIT_FAILURE;
   }
   if (seed && make_fixture_directory(argv[2]) != 0) {
@@ -198,6 +235,7 @@ int main(int argc, char **argv) {
   if (seed) success = seed_fixture(repo);
   else if (create) success = create_ref(repo, argv[3], argv[4]);
   else if (write) success = publish(repo, argv[3], argv[4], argv[5], argv[6], argv[7]);
+  else if (conditional) success = publish_expected(repo, argv[3], argv[4], argv[5]);
   else success = read_ref(repo, argv[3]);
   bool closed = check_status(dml_repo_close(&repo, &error), &error, "closing repository");
   if (fflush(stdout) == EOF) {

@@ -12,7 +12,8 @@ Run `scripts/check.sh` on the final relevant sources. CI runs the same build on
 Linux, macOS, and Windows and retains Meson logs. This build-only gate establishes
 neither test coverage nor runtime correctness. Run `scripts/check.sh --quint` for
 changes to the replay suite or to covered behavior (ref creation, atomic snapshot
-publication and rollback, and binary commit transfer with explicit publication).
+publication and rollback, caller-side conditional publication, and binary commit
+transfer with explicit publication).
 This also runs focused interpreter and native transfer fault tests.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
 currently run these runtime checks.

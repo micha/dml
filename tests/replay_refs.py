@@ -53,13 +53,15 @@ class Suite:
     @contextmanager
     def history(self, directory):
         repo = directory / "repo"
-        a, b, empty_tree, dag = response(rf"READY ({ID}) ({ID}) ({ID}) ({ID})",
-                                         run_native(self.runner, "seed", repo))
-        targets = {"A": a, "B": b}
+        a, b, c, empty_tree, candidate_tree, dag = response(
+            rf"READY ({ID}) ({ID}) ({ID}) ({ID}) ({ID}) ({ID})",
+            run_native(self.runner, "seed", repo),
+        )
+        targets = {"A": a, "B": b, "C": c}
         before = scan_inventory(self.scanner, repo)
-        keys = [f"objects/commits/{a}", f"objects/commits/{b}",
-                f"objects/trees/{empty_tree}", f"objects/dags/{dag}"]
-        if (a == b or any(key.startswith(ref_key("")) for key in before)
+        keys = [f"objects/commits/{target}" for target in targets.values()]
+        keys += [f"objects/trees/{empty_tree}", f"objects/trees/{candidate_tree}", f"objects/dags/{dag}"]
+        if (len(set(keys)) != len(keys) or any(key.startswith(ref_key("")) for key in before)
                 or any(key.encode("ascii").hex() not in before for key in keys)):
             raise ValueError("Expected an unreferenced fixture with the announced objects")
 
@@ -74,7 +76,8 @@ class Suite:
             statuses = list(response(rf"CREATE ({STATUS}) ({STATUS})",
                                      run_native(self.runner, "create", repo, name, targets[target])))
             return dict(op="create", key=ref_key(name), tip=targets[target], tree="", parent="",
-                        extraKey="", finish="commit", rows=[], statuses=statuses, changes=observe(),
+                        extraKey="", finish="commit", expected="", observed="", rows=[],
+                        statuses=statuses, changes=observe(),
                         readback=dict(tip="", tree="", parents=[], statuses=[]))
 
         def publish_snapshot(name, parent, finish, extra_name):
@@ -87,8 +90,26 @@ class Suite:
             readback = read_ref(self.runner, repo, name)
             return dict(op="publish", key=ref_key(name), tip=tip, tree=tree, parent=targets[parent],
                         extraKey=ref_key(extra_name) if extra_name else "", finish=finish,
-                        rows=snapshot_rows(dag, targets[parent], tree, tip),
+                        expected="", observed="", rows=snapshot_rows(dag, targets[parent], tree, tip),
                         statuses=statuses, changes=changes, readback=readback)
 
-        yield Replay({"create_ref": create_ref, "publish_snapshot": publish_snapshot},
-                     fixture=dict(a=a, emptyTree=empty_tree))
+        def observe_ref(name):
+            readback = read_ref(self.runner, repo, name)
+            return dict(op="read", key=ref_key(name), tip="", tree="", parent="", extraKey="",
+                        finish="", expected="", observed="", rows=[], statuses=[],
+                        changes=observe(), readback=readback)
+
+        def publish_expected(name, expected, target):
+            get, observed, update, completion = response(
+                rf"EXPECTED ({STATUS}) ({ID}) ({STATUS}) ({STATUS})",
+                run_native(self.runner, "publish-expected", repo, name, targets[expected], targets[target]),
+            )
+            readback = read_ref(self.runner, repo, name)
+            return dict(op="publish_expected", key=ref_key(name), tip=targets[target], tree="",
+                        parent="", extraKey="", finish="commit", expected=targets[expected],
+                        observed=observed, rows=[], statuses=[get, update, completion],
+                        changes=observe(), readback=readback)
+
+        yield Replay({"create_ref": create_ref, "publish_snapshot": publish_snapshot,
+                      "read_ref": observe_ref, "publish_expected": publish_expected},
+                     fixture=dict(a=a, b=b, c=c, emptyTree=empty_tree, candidateTree=candidate_tree))

@@ -12,9 +12,14 @@ and missing observations or verdicts fail the test rather than skipping a step.
 
 The ref suite stages a tree, its commit, and a move of an existing ref in one write
 transaction. It checks successful commit, explicit abort, and rollback when a later
-update to a missing ref poisons the transaction. An independent LMDB scan checks
-exact persisted changes, and a fresh native process resolves the ref and decodes its
-commit and parent IDs. The transfer suite checks that import leaves the destination
+update to a missing ref poisons the transaction. It also checks caller-side
+conditional publication using the existing C API: two readers observe the same
+`main` tip, one writer moves it, and the other writer aborts because the tip no
+longer matches. Each writer compares and updates within one write transaction.
+An independent LMDB scan checks exact persisted changes, and a fresh native
+process resolves the ref and decodes its commit and parent IDs.
+
+The transfer suite checks that import leaves the destination
 ref alone, then moves it to the imported commit in a separate transaction and
 reopens the repository to read the new tip. A separate public API walk from
 `main` through the commit's tree entry and named DAG binding checks that the
