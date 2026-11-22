@@ -3,6 +3,7 @@ module transfer_histories {
 
   pure def exportCommit(testCase: str): Request = { op: "export_commit", args: List(testCase) }
   pure def importCommit(testCase: str): Request = { op: "import_commit", args: List(testCase) }
+  pure val readValue: Request = { op: "read_value", args: List("all", "z-bound") }
 
   var histories: List[List[Request]]
 
@@ -13,7 +14,8 @@ module transfer_histories {
     List(exportCommit("export"), importCommit("alternative"), exportCommit("reexport"),
          exportCommit("repeat")),
     List(exportCommit("export"), importCommit("import_exported"), { op: "read_main", args: List() },
-         { op: "publish_imported", args: List() }, { op: "read_main", args: List() }),
+         readValue, { op: "publish_imported", args: List() }, { op: "read_main", args: List() },
+         readValue),
     List("busy_import", "bad_magic", "bad_version", "reserved", "short_header", "short_frame",
          "short_record", "trailing", "wrong_kind", "embedded_kind", "wrong_id", "wrong_root",
          "wrong_root_type", "bad_packed", "duplicate", "extra", "thin", "forward", "import")

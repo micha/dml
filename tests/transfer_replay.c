@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -261,6 +262,135 @@ static void read_main(dml_repo *repo) {
   dml_buffer_free(&packed);
 }
 
+static dml_status get_object_view(dml_txn *txn, dml_record_type type, const dml_object_id *id,
+                                  dml_buffer *packed, dml_object_view *view) {
+  dml_status status = dml_txn_get_object(txn, type, id, packed, NULL);
+  if (status != DML_OK) return status;
+  return dml_object_decode(packed->data, packed->len, view, NULL);
+}
+
+static dml_status read_object_reference(dml_txn *txn, dml_record_type type, const dml_object_id *id,
+                                        dml_object_id *reference, uint32_t *node_kind) {
+  dml_buffer packed = {0};
+  dml_object_view view;
+  dml_status status = get_object_view(txn, type, id, &packed, &view);
+  if (status == DML_OK) {
+    *reference = view.reference;
+    if (node_kind != NULL) *node_kind = view.node_kind;
+  }
+  dml_buffer_free(&packed);
+  return status;
+}
+
+static dml_status find_tree_entry(const dml_object_view *tree_view, dml_bytes entry_name,
+                                  dml_object_id *dag_id) {
+  for (size_t i = 0; i < tree_view->count; ++i) {
+    dml_tree_entry entry;
+    dml_status status = dml_object_view_entry(tree_view, i, &entry, NULL);
+    if (status != DML_OK) return status;
+    if (entry.name.len == entry_name.len &&
+        memcmp(entry.name.data, entry_name.data, entry_name.len) == 0) {
+      *dag_id = entry.dag;
+      return DML_OK;
+    }
+  }
+  return DML_NOT_FOUND;
+}
+
+typedef struct {
+  const char *stage;
+  dml_object_id head;
+  dml_object_id datum_id;
+  dml_datum_kind kind;
+  int64_t value;
+} value_observation;
+
+static dml_status read_tree_dag(dml_txn *txn, dml_bytes entry_name, dml_object_id *dag_id,
+                                value_observation *out) {
+  out->stage = "commit";
+  dml_object_id tree_id;
+  dml_status status = read_object_reference(txn, DML_REC_COMMIT, &out->head, &tree_id, NULL);
+  if (status != DML_OK) return status;
+
+  dml_buffer packed = {0};
+  dml_object_view view;
+  out->stage = "tree";
+  status = get_object_view(txn, DML_REC_TREE, &tree_id, &packed, &view);
+  if (status == DML_OK) {
+    out->stage = "tree_entry";
+    status = dml_name_validate(entry_name, NULL);
+    if (status == DML_OK) status = find_tree_entry(&view, entry_name, dag_id);
+  }
+  dml_buffer_free(&packed);
+  return status;
+}
+
+/* The public datum view exposes the validated I64 payload in little-endian order. */
+static int64_t read_i64(const uint8_t *payload) {
+  uint64_t bits = 0;
+  for (size_t i = 0; i < sizeof(bits); ++i) bits |= (uint64_t)payload[i] << (i * 8);
+  return bits <= INT64_MAX ? (int64_t)bits : -1 - (int64_t)(UINT64_MAX - bits);
+}
+
+static dml_status read_literal_datum(dml_txn *txn, const dml_object_id *node_id,
+                                     value_observation *out) {
+  out->stage = "node";
+  dml_object_id datum_id;
+  uint32_t node_kind;
+  dml_status status = read_object_reference(txn, DML_REC_NODE, node_id, &datum_id, &node_kind);
+  if (status != DML_OK) return status;
+  out->stage = "node_kind";
+  if (node_kind != DML_NODE_LITERAL) return DML_INVALID_KIND;
+
+  dml_buffer packed = {0};
+  out->datum_id = datum_id;
+  out->stage = "datum_get";
+  status = dml_txn_get_datum(txn, &out->datum_id, &packed, NULL);
+  if (status == DML_OK) {
+    dml_datum_view datum_view;
+    out->stage = "datum_decode";
+    status = dml_datum_decode(packed.data, packed.len, &datum_view, NULL);
+    if (status == DML_OK) {
+      out->kind = datum_view.kind;
+      if (out->kind == DML_DATUM_I64) out->value = read_i64(datum_view.payload);
+    }
+  }
+  dml_buffer_free(&packed);
+  return status;
+}
+
+static dml_status read_value_path(dml_txn *txn, dml_bytes entry_name, dml_bytes binding_name,
+                                  value_observation *out) {
+  out->stage = "ref";
+  dml_status status = dml_txn_ref_get(txn, name("main"), &out->head, NULL);
+  if (status != DML_OK) return status;
+
+  dml_object_id dag_id, node_id;
+  status = read_tree_dag(txn, entry_name, &dag_id, out);
+  if (status != DML_OK) return status;
+  out->stage = "binding";
+  status = dml_txn_lookup_node(txn, &dag_id, binding_name, &node_id, NULL);
+  if (status != DML_OK) return status;
+  return read_literal_datum(txn, &node_id, out);
+}
+
+static void read_value(dml_repo *repo, const char *entry_name, const char *binding_name) {
+  value_observation observed = {.stage = "begin"};
+  memset(observed.head.bytes, 0xa5, sizeof(observed.head.bytes));
+  memset(observed.datum_id.bytes, 0xa5, sizeof(observed.datum_id.bytes));
+
+  dml_txn *txn = NULL;
+  dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, NULL);
+  if (status == DML_OK) status = read_value_path(txn, name(entry_name), name(binding_name), &observed);
+  dml_txn_abort(&txn);
+
+  char head_hex[DML_OBJECT_ID_HEX_SIZE + 1], datum_hex[DML_OBJECT_ID_HEX_SIZE + 1];
+  format_id(observed.head, head_hex);
+  format_id(observed.datum_id, datum_hex);
+  printf("%s %s %s %s %u %" PRId64 "\n", dml_status_name(status), observed.stage,
+         head_hex, datum_hex, (unsigned)observed.kind, observed.value);
+}
+
 /* The public DML API cannot create these corrupt-store fixtures. */
 static int alter_inventory(const char *path, const char *key, const char *copy_key) {
   MDB_env *env = NULL;
@@ -312,17 +442,19 @@ int main(int argc, char **argv) {
   bool importing = argc == 5 && strcmp(argv[1], "import") == 0;
   bool publishing = argc == 4 && strcmp(argv[1], "publish_main") == 0;
   bool reading = argc == 3 && strcmp(argv[1], "read_main") == 0;
-  if (!create && !exporting && !importing && !publishing && !reading) {
+  bool reading_value = argc == 5 && strcmp(argv[1], "read_value") == 0;
+  if (!create && !exporting && !importing && !publishing && !reading && !reading_value) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
                     "       transfer_replay publish_main REPO TARGET\n"
                     "       transfer_replay read_main REPO\n"
+                    "       transfer_replay read_value REPO TREE_ENTRY BINDING\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
   }
-  const char *mode = publishing || reading ? "" : argv[argc - 1];
+  const char *mode = publishing || reading || reading_value ? "" : argv[argc - 1];
   if (create && strcmp(mode, "source") && strcmp(mode, "destination") &&
       strcmp(mode, "large") && strcmp(mode, "oversize")) {
     fprintf(stderr, "unknown fixture profile: %s\n", mode);
@@ -342,6 +474,8 @@ int main(int argc, char **argv) {
     publish_main(repo, argv[3]);
   } else if (reading) {
     read_main(repo);
+  } else if (reading_value) {
+    read_value(repo, argv[3], argv[4]);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

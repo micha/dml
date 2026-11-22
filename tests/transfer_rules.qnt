@@ -2,6 +2,7 @@ module transfer_rules {
   type Row = { key: str, packed: str }
   type Edge = { parent: str, child: str }
   type Change = { kind: str, key: str, before: str, after: str }
+  type DatumRead = { stage: str, id: str, kind: int, i64: int }
   type Attempt = {
     command: str,
     status: str,
@@ -10,10 +11,11 @@ module transfer_rules {
     result: str,
     binary: str,
     rows: List[Row],
-    changes: List[Change]
+    changes: List[Change],
+    value: DatumRead
   }
   type Commit = { id: str, packed: str }
-  type Fixture = { root: Commit, initialHead: Commit, rows: List[Row], edges: List[Edge] }
+  type Fixture = { root: Commit, initialHead: Commit, datum: str, rows: List[Row], edges: List[Edge] }
   type Observation = { fixture: Fixture, attempts: List[Attempt] }
   type Expected = { present: bool, importedExport: bool, published: bool, canonical: str }
 
@@ -22,8 +24,8 @@ module transfer_rules {
   pure val initial: Expected = {
     present: false, importedExport: false, published: false, canonical: ""
   }
-  pure val publicationSequence = List("export", "import_exported", "read_main",
-                                      "publish_imported", "read_main")
+  pure val publicationSequence = List("export", "import_exported", "read_main", "read_value",
+                                      "publish_imported", "read_main", "read_value")
   pure val goodExports = Set("export", "repeat", "reexport")
   pure val goodImports = Set("import", "alternative", "import_exported")
   pure val emptyExports = Set("missing_root", "missing_edge", "busy_export", "oversize_export")
@@ -56,8 +58,9 @@ module transfer_rules {
       covered or coversPublication(row.attempts))
   }
 
-  pure def expectedStatus(command: str): str =
-    if (goodExports.contains(command) or goodImports.contains(command)
+  pure def expectedStatus(command: str, published: bool): str =
+    if (command == "read_value") (if (published) "ok" else "not_found")
+    else if (goodExports.contains(command) or goodImports.contains(command)
         or command == "read_main" or command == "publish_imported") "ok"
     else if (busy.contains(command)) "invalid_state"
     else if (badHeaders.contains(command)) "invalid_header"
@@ -108,9 +111,23 @@ module transfer_rules {
     else if (attempt.binary != target.packed) "read_commit"
     else "pass"
 
+  pure def valueVerdict(attempt: Attempt, fixture: Fixture, published: bool): str = {
+    val expectedTip = if (published) fixture.root.id else fixture.initialHead.id
+    // The old tree lacks `all`. The new tree binds `all` / `z-bound` to I64(45)
+    // by construction, not by decoding the source fixture's observed bytes.
+    val expected: DatumRead =
+      if (published) { stage: "datum_decode", id: fixture.datum, kind: 3, i64: 45 }
+      else { stage: "tree_entry", id: sentinel, kind: 0, i64: 0 }
+    if (attempt.result != expectedTip) "read_target"
+    else if (attempt.value.stage != expected.stage) "read_value_stage"
+    else if (attempt.value.id != expected.id) "read_datum"
+    else if (attempt.value.kind != expected.kind or attempt.value.i64 != expected.i64) "read_value"
+    else "pass"
+  }
+
   pure def verdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
     val command = attempt.command
-    val status = expectedStatus(command)
+    val status = expectedStatus(command, state.published)
     val completion = if (busy.contains(command) or command == "publish_imported"
                          or command == "read_main") "ok" else "none"
     val changes = attempt.changes.foldl(Set(), (seen, change) => seen.union(Set(change)))
@@ -125,6 +142,7 @@ module transfer_rules {
     else if (command == "publish_imported" and attempt.result != fixture.root.id) "publish_target"
     else if (command == "read_main")
       readVerdict(attempt, if (state.published) fixture.root else fixture.initialHead)
+    else if (command == "read_value") valueVerdict(attempt, fixture, state.published)
     else if (emptyExports.contains(command) and attempt.shape != "empty") "export_not_empty"
     else if (command == "dirty_export" and attempt.shape != "unchanged") "export_changed_buffer"
     else if (attempt.shape == "" and status != "ok" and attempt.result != sentinel)
@@ -150,30 +168,40 @@ module transfer_rules {
   pure val leaf = { key: "aa", packed: "bb" }
   pure val root = { key: "cc", packed: "dd" }
   pure val fixture = {
-    root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" },
+    root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" }, datum: "aa",
     rows: List(leaf, root), edges: List({ parent: "cc", child: "aa" })
   }
+  pure val noValue: DatumRead = { stage: "", id: "", kind: 0, i64: 0 }
   pure val exported = {
     command: "export", status: "ok", completion: "none", shape: "buffer", result: "cc",
-    binary: "ff", rows: List(leaf, root), changes: List()
+    binary: "ff", rows: List(leaf, root), changes: List(), value: noValue
   }
   pure val rejected = {
     command: "extra", status: "invalid_payload", completion: "none", shape: "", result: sentinel,
-    binary: "", rows: List(), changes: List()
+    binary: "", rows: List(), changes: List(), value: noValue
   }
   pure val earlyPublication = {
     command: "import_exported", status: "ok", completion: "none", shape: "", result: "cc",
-    binary: "", rows: List(), changes: List(
+    binary: "", rows: List(), value: noValue, changes: List(
       { kind: "added", key: "aa", before: "", after: "bb" },
       { kind: "added", key: "cc", before: "", after: "dd" }, mainMoved(fixture))
   }
   pure val published = {
     command: "publish_imported", status: "ok", completion: "ok", shape: "", result: "cc",
-    binary: "", rows: List(), changes: List(mainMoved(fixture))
+    binary: "", rows: List(), changes: List(mainMoved(fixture)), value: noValue
   }
   pure val readback = {
     command: "read_main", status: "ok", completion: "ok", shape: "", result: "cc",
-    binary: "dd", rows: List(), changes: List()
+    binary: "dd", rows: List(), changes: List(), value: noValue
+  }
+  pure val valueRead = {
+    command: "read_value", status: "ok", completion: "none", shape: "", result: "cc",
+    binary: "", rows: List(), changes: List(),
+    value: { stage: "datum_decode", id: "aa", kind: 3, i64: 45 }
+  }
+  pure val valueMiss = {
+    ...valueRead, status: "not_found", result: "ee",
+    value: { stage: "tree_entry", id: sentinel, kind: 0, i64: 0 }
   }
   pure val imported = { ...earlyPublication, changes: List(
     { kind: "added", key: "aa", before: "", after: "bb" },
@@ -196,7 +224,19 @@ module transfer_rules {
     verdict(readback, fixture, importedState) == "read_target",
     verdict({ ...readback, result: "ee", binary: "11" }, fixture, publishedState) == "read_target",
     verdict({ ...readback, binary: "11" }, fixture, publishedState) == "read_commit",
-    coversPublication(List(exported, imported, exported, readback, published, readback, exported)),
-    not(coversPublication(List(exported, imported, published, readback, readback)))
+    verdict(valueMiss, fixture, importedState) == "pass",
+    verdict({ ...valueMiss, value: { ...valueMiss.value, stage: "tree" } },
+      fixture, importedState) == "read_value_stage",
+    verdict(valueRead, fixture, publishedState) == "pass",
+    verdict({ ...valueRead, value: { ...valueRead.value, id: "bb" } },
+      fixture, publishedState) == "read_datum",
+    verdict({ ...valueRead, value: { ...valueRead.value, kind: 4 } },
+      fixture, publishedState) == "read_value",
+    verdict({ ...valueRead, value: { ...valueRead.value, i64: 44 } },
+      fixture, publishedState) == "read_value",
+    coversPublication(List(exported, imported, exported, readback, valueMiss,
+                           published, readback, valueRead, exported)),
+    not(coversPublication(List(exported, imported, valueMiss, published, readback, valueRead))),
+    not(coversPublication(List(exported, imported, readback, valueMiss, published, readback)))
   }
 }

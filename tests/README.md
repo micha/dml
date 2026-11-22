@@ -16,7 +16,10 @@ update to a missing ref poisons the transaction. An independent LMDB scan checks
 exact persisted changes, and a fresh native process resolves the ref and decodes its
 commit and parent IDs. The transfer suite checks that import leaves the destination
 ref alone, then moves it to the imported commit in a separate transaction and
-reopens the repository to read the new tip.
+reopens the repository to read the new tip. A separate public API walk from
+`main` through the commit's tree entry and named DAG binding checks that the
+same path is absent before publication and resolves to the expected datum ID,
+kind, and scalar value afterward. Each read must leave the inventory unchanged.
 
 ## Add a request or operation
 

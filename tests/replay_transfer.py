@@ -153,6 +153,10 @@ def variant(command, frames):
     return bundle
 
 
+def no_value():
+    return dict(stage="", id="", kind=0, i64=0)
+
+
 def export_attempt(runner, command, repo, root, path):
     mode = {"busy_export": "busy", "dirty_export": "dirty"}.get(command, "normal")
     path.unlink(missing_ok=True)
@@ -164,7 +168,7 @@ def export_attempt(runner, command, repo, root, path):
     raw = path.read_bytes() if path.exists() else b""
     result, rows = decode(raw) if raw else ("", [])
     return dict(status=status, shape=shape, completion=completion, result=result,
-                rows=rows, binary=raw.hex())
+                rows=rows, binary=raw.hex(), value=no_value())
 
 
 def import_attempt(runner, repo, path, command):
@@ -174,7 +178,8 @@ def import_attempt(runner, repo, path, command):
     if not match:
         raise ValueError(f"Unexpected C import response: {stdout!r}")
     status, result, completion = match.groups()
-    return dict(status=status, shape="", completion=completion, result=result, rows=[], binary="")
+    return dict(status=status, shape="", completion=completion, result=result,
+                rows=[], binary="", value=no_value())
 
 
 def fixture_model(frames, kept):
@@ -183,6 +188,7 @@ def fixture_model(frames, kept):
 
     return dict(
         root=commit(frames["root"]), initialHead=commit(kept["keep"]),
+        datum=frames["fifth"].identifier.hex(),
         rows=[frames[label].row for label in EDGES],
         edges=[dict(parent=frames[label].row["key"], child=frames[child].row["key"])
                for label, children in EDGES.items() for child in children],
@@ -223,6 +229,7 @@ class Suite:
             "import_commit": fixture.import_commit,
             "publish_imported": fixture.publish_imported,
             "read_main": fixture.read_main,
+            "read_value": fixture.read_value,
         }, fixture_model(frames, kept))
 
 
@@ -285,7 +292,7 @@ class TransferHistory:
         status, completion = match.groups()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command="publish_imported", status=status, completion=completion, shape="",
-                    result=self.imported, binary="", rows=[], changes=changes)
+                    result=self.imported, binary="", rows=[], changes=changes, value=no_value())
 
     def read_main(self):
         repo = self.destination
@@ -297,7 +304,21 @@ class TransferHistory:
         status, result, completion, packed = match.groups()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command="read_main", status=status, completion=completion, shape="",
-                    result=result, binary=packed, rows=[], changes=changes)
+                    result=result, binary=packed, rows=[], changes=changes, value=no_value())
+
+    def read_value(self, entry, binding):
+        repo = self.destination
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "read_value", repo, entry, binding)
+        match = re.fullmatch(r"([a-z_]+) ([a-z_]+) ([0-9a-f]{32}) ([0-9a-f]{32}) "
+                             r"([0-9]+) (-?[0-9]+)\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C snapshot read response: {stdout!r}")
+        status, stage, head, datum, kind, value = match.groups()
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command="read_value", status=status, completion="none", shape="", result=head,
+                    binary="", rows=[], changes=changes,
+                    value=dict(stage=stage, id=datum, kind=int(kind), i64=int(value)))
 
     def bundle_for(self, case):
         if case in self.large_bundles:
