@@ -111,6 +111,74 @@ def test_public_bindings_copy_order_alias_and_scope(binding_names):
                 assert tx.get_dag(second).bindings["root"] == node
 
 
+@settings(max_examples=20, deadline=None)
+@example(["a", "ab-2", "z" * 128])
+@given(st.lists(names, unique=True, min_size=2, max_size=12))
+def test_named_records_preserve_distinct_targets_and_canonical_order(entry_names):
+    with tempfile.TemporaryDirectory() as scratch:
+        with dml.Repository(Path(scratch) / "repo", create=True) as repo:
+            with repo.write() as tx:
+                nodes = [tx.put_literal(tx.put_datum(i)) for i in range(len(entry_names))]
+                dags = [tx.put_dag(root=node) for node in nodes]
+                bindings = list(zip(entry_names, nodes, strict=True))
+                entries = list(zip(entry_names, dags, strict=True))
+                dag = tx.put_dag(root=nodes[0], bindings=bindings)
+                tree = tx.put_tree(entries)
+            with repo.read() as tx:
+                decoded = tx.get_dag(dag)
+                assert decoded.root == nodes[0]
+                assert list(decoded.bindings.items()) == sorted(bindings)
+                assert list(tx.get_tree(tree).items()) == sorted(entries)
+                for name, node in bindings:
+                    assert tx.lookup_node(dag, name) == node
+
+
+@pytest.mark.parametrize(("kind", "first_failure"), [
+    ("tree", "named"), ("dag", "named"), ("dag", "root"),
+])
+def test_named_reference_validation_keeps_first_error_and_poisons_put(tmp_path, kind, first_failure):
+    path = tmp_path / "repo"
+    target_kind = "dag" if kind == "tree" else "node"
+    collection = "dags" if target_kind == "dag" else "nodes"
+    with dml.Repository(path, create=True) as repo, repo.write() as tx:
+        nodes = [tx.put_literal(tx.put_datum(i)) for i in range(4)]
+        if kind == "tree":
+            targets = [tx.put_dag(root=node) for node in nodes]
+        else:
+            targets = nodes
+        # Canonical scan: a valid short name, then the long name, then the final name.
+        pairs = [("z", targets[2]), ("bb-" + "b" * 77, targets[1]), ("a", targets[0])]
+        identity = tx.put_tree(pairs) if kind == "tree" else tx.put_dag(root=nodes[3], bindings=pairs)
+        packed = tx.get_record(kind, identity)
+        wrong_id = tx.get_record(target_kind, targets[0])
+
+    overwrite(path, f"objects/{collection}/{targets[1]}", b"bad")
+    overwrite(path, f"objects/{collection}/{targets[2]}", wrong_id)
+    if first_failure == "root":
+        overwrite(path, f"objects/nodes/{nodes[3]}", wrong_id)
+    expected = "integrity_error" if first_failure == "root" else "invalid_header"
+    with dml.Repository(path) as repo:
+        with repo.read() as tx:
+            with pytest.raises(dml.DmlError) as error:
+                tx.get_record(kind, identity)
+            assert error.value.code == expected
+            if kind == "dag":
+                # Looking up the valid prefix never bypasses full reference validation.
+                with pytest.raises(dml.DmlError) as error:
+                    tx.lookup_node(identity, "a")
+                assert error.value.code == expected
+        tx = repo.write()
+        earlier = tx.put_datum("rollback sentinel")
+        with pytest.raises(dml.DmlError) as error:
+            tx.put_record(kind, packed)
+        assert error.value.code == expected
+        with pytest.raises(dml.InvalidStateError):
+            tx.commit()
+        with repo.read() as tx:
+            with pytest.raises(dml.NotFoundError):
+                tx.get_datum(earlier)
+
+
 def test_descriptions_and_argument_failure_boundaries(tmp_path):
     node = dml.ObjectId(b"\0" * 16)
     pairs = [("a", node)]

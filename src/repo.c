@@ -11,6 +11,7 @@
 #include "dml/repo.h"
 #include "encoding.h"
 #include "error_internal.h"
+#include "object_internal.h"
 #include "record_internal.h"
 
 #ifdef _WIN32
@@ -387,21 +388,17 @@ static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
     status = lookup_object(txn, referenced_type, &view.reference, &ignored, error);
     if (status != DML_OK) return status;
   }
+  const uint8_t *cursor = dml_named_entries_begin(&view);
+  dml_record_type target_type = type == DML_REC_TREE ? DML_REC_DAG
+                             : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_COMMIT;
   for (size_t i = 0; i < view.count; i++) {
     dml_object_id id;
-    if (type == DML_REC_TREE) {
-      dml_tree_entry entry;
-      (void)dml_object_view_entry(&view, i, &entry, NULL);
-      id = entry.dag;
-    } else if (type == DML_REC_DAG) {
-      dml_dag_binding binding;
-      (void)dml_object_view_binding(&view, i, &binding, NULL);
-      id = binding.node;
+    if (cursor != NULL) {
+      dml_bytes name;
+      dml_named_entry_next(&cursor, &name, &id);
     } else {
       (void)dml_object_view_parent(&view, i, &id, NULL);
     }
-    dml_record_type target_type = type == DML_REC_TREE ? DML_REC_DAG
-                               : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_COMMIT;
     status = lookup_object(txn, target_type, &id, &ignored, error);
     if (status != DML_OK) return status;
   }
@@ -516,9 +513,10 @@ dml_status dml_txn_lookup_node(dml_txn *txn, const dml_object_id *dag,
   dml_object_view view;
   (void)dml_object_decode(buffer.data, buffer.len, &view, NULL);
   status = DML_NOT_FOUND;
+  const uint8_t *cursor = dml_named_entries_begin(&view);
   for (size_t i = 0; i < view.count; i++) {
     dml_dag_binding binding;
-    (void)dml_object_view_binding(&view, i, &binding, NULL);
+    dml_named_entry_next(&cursor, &binding.name, &binding.node);
     if (binding.name.len == name.len && memcmp(binding.name.data, name.data, name.len) == 0) {
       *out = binding.node;
       status = DML_OK;

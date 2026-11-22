@@ -274,14 +274,107 @@ production workload ratios or performance on other hosts. The separate maintaine
 passed with the hook off and eight workers (7 C tests, 3,423 Python tests, 100% maintained
 coverage, and both memory workloads); its log is under `build/export-benchmark-gate.n8e5ux/`.
 
-Wide records are still expensive: quadrupling the entry count from 4,096 to 16,384 took roughly
-15 times as long on the candidate. In one phase sample the candidate spent 335 ms acquiring and
-binding the widest tree and less than 2 ms framing it. Indexed accessors rescan variable-length
-entries from the start in repository validation, Python's native decoder, and the C walk. A linear
-iterator would address a cost shared by both exporters. On the 12 MiB fixture, JSON/UTF-8 and
-return took about 26 ms on either path in the phase runs. The candidate also holds a complete
+At this checkpoint, quadrupling the entry count from 4,096 to 16,384 took roughly 15 times as
+long on the candidate. In one phase sample the candidate spent 335 ms acquiring and binding the
+widest tree and less than 2 ms framing it. Repository validation, Python's native decoder, and the
+C walk all used indexed accessors that rescanned variable-length entries from the start. On the
+12 MiB fixture, JSON/UTF-8 and return took about 26 ms on either path in the phase runs. The candidate also holds a complete
 packed-row tuple before base64, and the measured peak RSS rose by about 11 MiB.
 
 Keep `export_commit()` on Python. The native walk is promising for history-heavy closures, but
-before proposing a default switch, benchmark linear tree and binding iteration separately and
-find a way to avoid holding two complete packed row sets across the C-to-Python handoff.
+wide-record scaling and the packed-row handoff must be evaluated separately before proposing a
+switch.
+
+## Linear named-entry iteration
+
+The follow-up replaces repeated indexed reads with a private forward cursor over validated
+packed bytes. Repository get/put reference validation, DAG name lookup, Python object decoding,
+and the opt-in C walker now consume tree entries and DAG bindings in packed order, without
+rescanning the prefix. Public indexed accessors retain the same behavior; native CLI iteration
+is outside this comparison. `export_commit()` still uses Python traversal. No packed records,
+transfer format, or public interfaces changed.
+
+[`benchmark_wide_export.py`](benchmark_wide_export.py) compares release builds before and after
+the cursor change against the same five-row fixtures. It times packed get and insert (including
+native reference validation), native decoding, lookup of the last DAG name, and both end-to-end
+exporters. The isolated operation timers exclude repository and transaction setup. Inserts run
+in a dependency-only store and abort after timing. Each timed call runs in a fresh process; its
+result is checked against the fixture before the sample is accepted. The runtime order alternates
+across pairs after warm-up. Fixture identities, bundle hashes, samples, and runtime
+hashes are recorded in `results.json`.
+
+Run in the Linux Nix shell with the vendored wrap archives and an idle CPU as above. Build the
+baseline from checkpoint `6a3c4b8`; use the same staged release build recipe for the current
+checkout. For example:
+
+```sh
+(
+  set -eu
+  spike=spikes/relational_invariants/quint_export_design
+  mkdir -p build
+  out=$(mktemp -d "$PWD/build/export-wide.XXXXXX")
+  mkdir -p "$out/before-src/subprojects"
+  git archive 6a3c4b8 | tar -x -C "$out/before-src"
+  cp -a subprojects/packagecache "$out/before-src/subprojects/"
+  export NIX_LDFLAGS="${NIX_LDFLAGS-}"
+  export NIX_LDFLAGS="${NIX_LDFLAGS#-rpath $PWD/outputs/out/lib}"
+  stage() {
+    local label=$1 source=$2
+    meson setup "$out/$label-build" "$source" --wrap-mode=nodownload \
+      -Dbuildtype=release -Dexperimental_export_walk=true
+    meson compile -C "$out/$label-build" _core.abi3.so
+    mkdir -p "$out/$label-python/daggerml"
+    cp "$source/python/daggerml/daggerml/"{__init__,transfer}.py \
+      "$out/$label-build/_core.abi3.so" "$out/$label-python/daggerml/"
+  }
+  stage before "$out/before-src"
+  stage after "$PWD"
+  taskset -c 2 python -B "$spike/benchmark_wide_export.py" \
+    --baseline-python "$out/before-python" --candidate-python "$out/after-python" \
+    --out "$out/evidence" --repeats 6
+)
+```
+
+### Linux ARM64 scaling results
+
+At widths 4,096 → 8,192 → 16,384, doubling width took 3.55–4.00× as long before the
+change and 1.79–2.25× as long after it, across the measured operations. At width 16,384,
+the medians of six warm-cache samples were:
+
+| Operation | Tree before → after (ms) | DAG before → after (ms) |
+| --- | ---: | ---: |
+| Packed get | 166.3 → 1.72 | 164.0 → 1.73 |
+| Packed put | 169.6 → 1.65 | 168.1 → 1.67 |
+| Native decode | 165.3 → 2.13 | 163.6 → 1.88 |
+| Last-name lookup | — | 329.8 → 1.82 |
+| Public Python export | 517.6 → 21.7 | 514.8 → 22.9 |
+| Opt-in C walk + Python framing | 328.6 → 3.53 | 329.6 → 3.58 |
+
+An independent pair of builds matched all eight fixture identities and bundle hashes and
+reproduced the scaling (3.54–4.04× before versus 1.88–2.20× after per doubling). These are
+synthetic fixtures with shared targets; packed put excludes sorting and commit, and last-name
+lookup includes full read/reference validation. The benchmark does not measure RSS. Primary
+and independent receipts are in `build/wide-iteration.PvlX8E/paired-evidence/results.json` and
+`build/export-cursor-review.CjHqjl/evidence/results.json` respectively.
+
+### Correctness checks
+
+- Maintained regressions check variable-length names with distinct targets, canonical order,
+  first-error precedence on read and write, and transaction poisoning. Independent review ran
+  the new tests against both builds.
+- The opt-in checks reproduced both pinned merge bundles, their Quint verdicts, all packed and
+  encoded limit boundaries, storage errors, and recovery. Both exporters also matched the 17
+  checkpoint fixtures' bundle hashes, row counts, and packed and encoded sizes.
+- A 46-row fixture descends past the initial C stack capacity while both named cursors are
+  suspended. It checks exact rows and resumes through aliases to distinct siblings. In a
+  disposable build, resetting the tree cursor for every edge failed this oracle. Valgrind
+  reported zero errors in the existing allocation sweep; the independent run on the deep fixture
+  exercised 152 native and 47 binding allocation positions with recovery and zero errors.
+- The maintained `scripts/check.sh -v` gate ran with the hook off and seven workers: 7 C tests,
+  3,427 Python tests, 100% maintained coverage, and both Valgrind workloads. No new coverage
+  exclusions, remote CI, or other platforms. Receipts: `build/export-cursor-gate.vwE78Q/`,
+  `build/export-cursor-native.sNHJ9U/`, and `build/export-cursor-control.E4JfAO/`.
+
+The public exporter already benefits from the cursor. Keep the C walker opt-in while testing
+how to avoid holding both sets of packed rows at the C/Python boundary. Recheck payload peak RSS,
+end-to-end timings, byte parity, and error precedence before reconsidering the default.

@@ -54,6 +54,36 @@ def compare_limits(repo, commit, expected):
                       tx._handle, commit.bytes, exact.objects, exact.record, exact.packed))
 
 
+def check_cursor_resumes_after_stack_growth(path):
+    expected = []
+    with dml.Repository(path, create=True) as repo, repo.write() as tx:
+        def save(kind, oid):
+            expected.append(((kind, str(oid)), tx.get_record(kind, oid)))
+            return oid
+
+        def literal(value):
+            return save("node", tx.put_literal(save("datum", tx.put_datum(value))))
+
+        # The DAG root precedes its named bindings. Descending through the first
+        # binding grows the stack while both the DAG and tree cursors are suspended.
+        root_node = literal("DAG root")
+        deep = save("dag", tx.put_dag(root=literal("deep leaf")))
+        for _ in range(16):
+            deep_node = save("node", tx.put_subdag(deep))
+            deep = save("dag", tx.put_dag(root=deep_node))
+        first = save("node", tx.put_subdag(deep))
+        last = literal("last named binding")
+        main = save("dag", tx.put_dag(root=root_node, bindings=[
+            ("z", last), ("ab-alias", first), ("a" * 128, first),
+        ]))
+        tail = save("dag", tx.put_dag(root=literal("last tree entry")))
+        tree = save("tree", tx.put_tree([("z", tail), ("b-alias", main), ("a" * 128, main)]))
+        commit = save("commit", tx.put_commit(tree))
+
+    compare_limits(path, commit, tuple(expected))
+    return len(expected)
+
+
 def compare_storage_errors(repo, driver):
     def verify(commit, expected_code=None):
         baseline = capture_error(dml.DmlError, lambda: transfer.export_commit(repo, commit=commit))
@@ -94,6 +124,7 @@ def main():
     # Separate pristine repository for error setup (then edit it with the existing raw-store driver).
     error_repo = args.out / "errors.dml"
     summary = {"limit_boundaries": "pass", **compare_faults(repo),
+               "stack_growth_rows": check_cursor_resumes_after_stack_growth(args.out / "cursor.dml"),
                **compare_storage_errors(error_repo, args.core_driver.resolve())}
     result = json.dumps(summary, indent=2, sort_keys=True) + "\n"
     (args.out / "summary.json").write_text(result, encoding="utf-8")

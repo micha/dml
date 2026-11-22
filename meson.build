@@ -25,14 +25,13 @@ uriparser_proj = subproject('uriparser', default_options: ['default_library=stat
 uriparser_dep = uriparser_proj.get_variable('uriparser_dep')
 
 dml_inc = include_directories('include')
+dml_internal_inc = include_directories('src')
 
 export_walk_sources = []
 export_walk_args = []
-export_walk_inc = []
 if get_option('experimental_export_walk')
   export_walk_sources = files('src/export_walk.c')
   export_walk_args = ['-DDML_EXPERIMENTAL_EXPORT_WALK']
-  export_walk_inc = [include_directories('src')]
 endif
 
 dml_sources = files(
@@ -159,7 +158,7 @@ test('test_faults', fault_test, is_parallel: false)
 
 py.extension_module(
   '_core', 'python/daggerml/src/_core_module.c', export_walk_sources,
-  include_directories: export_walk_inc,
+  include_directories: dml_internal_inc,
   c_args: export_walk_args,
   dependencies: dml_dep,
   subdir: 'daggerml',
@@ -177,7 +176,7 @@ executable(
 
 py.extension_module(
   '_core_fault', 'python/daggerml/src/_core_module.c', 'tests/c/fault_injection.c',
-  include_directories: [dml_inc, include_directories('tests/c')] + export_walk_inc,
+  include_directories: [dml_inc, dml_internal_inc, include_directories('tests/c')],
   link_with: fault_core,
   dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
   c_args: ['-DDML_PY_FAULTS'] + export_walk_args,

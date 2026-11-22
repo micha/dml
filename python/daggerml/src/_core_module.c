@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "dml/dml.h"
+#include "object_internal.h"
 
 #ifdef DML_EXPERIMENTAL_EXPORT_WALK
 #include "export_walk.h"
@@ -483,17 +484,17 @@ static PyObject *decode_object(PyObject *self, PyObject *args) {
   dml_status s = dml_object_decode((const uint8_t *)data, (size_t)len, &view, &error);
   if (s != DML_OK) return fail(s, &error);
   PyObject *items = PyTuple_New((Py_ssize_t)view.count); if (!items) return NULL;
+  const uint8_t *cursor = dml_named_entries_begin(&view);
   for (size_t i = 0; i < view.count; i++) {
     PyObject *item;
-    if (view.type == DML_REC_TREE) {
-      dml_tree_entry entry; dml_object_view_entry(&view, i, &entry, &error);
-      item = Py_BuildValue("NN", PyUnicode_DecodeUTF8((const char *)entry.name.data, (Py_ssize_t)entry.name.len, "strict"), id_bytes(&entry.dag));
-    } else if (view.type == DML_REC_DAG) {
-      dml_dag_binding binding; dml_object_view_binding(&view, i, &binding, &error);
-      item = Py_BuildValue("NN", PyUnicode_DecodeUTF8((const char *)binding.name.data,
-        (Py_ssize_t)binding.name.len, "strict"), id_bytes(&binding.node));
+    dml_object_id id;
+    if (cursor != NULL) {
+      dml_bytes name;
+      dml_named_entry_next(&cursor, &name, &id);
+      item = Py_BuildValue("NN", PyUnicode_DecodeUTF8((const char *)name.data,
+        (Py_ssize_t)name.len, "strict"), id_bytes(&id));
     } else {
-      dml_object_id id; dml_object_view_parent(&view, i, &id, &error); item = id_bytes(&id);
+      dml_object_view_parent(&view, i, &id, &error); item = id_bytes(&id);
     }
     if (!item) { Py_DECREF(items); return NULL; }
     PyTuple_SetItem(items, (Py_ssize_t)i, item);

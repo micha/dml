@@ -5,6 +5,7 @@
 #include "dml/object.h"
 #include "encoding.h"
 #include "error_internal.h"
+#include "object_internal.h"
 #include "record_internal.h"
 
 static int alphanumeric(uint8_t byte) {
@@ -131,11 +132,9 @@ dml_status dml_object_view_entry(const dml_object_view *view, size_t index,
   if (view == NULL || out == NULL || view->type != DML_REC_TREE || index >= view->count) {
     return invalid(error, DML_INVALID_ARGUMENT, "invalid tree entry access");
   }
-  size_t offset = 24;
-  for (size_t i = 0; i < index; i++) offset += 20 + dml_read_u32_le(view->record + offset);
-  out->name.len = dml_read_u32_le(view->record + offset);
-  out->name.data = view->record + offset + 4;
-  memcpy(out->dag.bytes, out->name.data + out->name.len, 16);
+  const uint8_t *cursor = dml_named_entries_begin(view);
+  for (size_t i = 0; i < index; i++) cursor += 20 + dml_read_u32_le(cursor);
+  dml_named_entry_next(&cursor, &out->name, &out->dag);
   return DML_OK;
 }
 
@@ -144,11 +143,9 @@ dml_status dml_object_view_binding(const dml_object_view *view, size_t index,
   if (view == NULL || out == NULL || view->type != DML_REC_DAG || index >= view->count) {
     return invalid(error, DML_INVALID_ARGUMENT, "invalid DAG binding access");
   }
-  size_t offset = 40;
-  for (size_t i = 0; i < index; i++) offset += 20 + dml_read_u32_le(view->record + offset);
-  out->name.len = dml_read_u32_le(view->record + offset);
-  out->name.data = view->record + offset + 4;
-  memcpy(out->node.bytes, out->name.data + out->name.len, 16);
+  const uint8_t *cursor = dml_named_entries_begin(view);
+  for (size_t i = 0; i < index; i++) cursor += 20 + dml_read_u32_le(cursor);
+  dml_named_entry_next(&cursor, &out->name, &out->node);
   return DML_OK;
 }
 

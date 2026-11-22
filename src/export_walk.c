@@ -6,6 +6,7 @@
 #include <xxhash.h>
 
 #include "error_internal.h"
+#include "object_internal.h"
 
 typedef struct {
   dml_record_type type;
@@ -27,6 +28,7 @@ typedef struct {
     dml_object_view object;
   } view;
   size_t next_edge;
+  const uint8_t *next_named_entry;
 } export_frame;
 
 typedef struct {
@@ -110,7 +112,9 @@ static dml_status read_frame(dml_txn *txn, export_frame *frame, const dml_export
   if (key->type == DML_REC_DATUM) {
     return dml_datum_decode(record->data, record->len, &frame->view.datum, error);
   }
-  return dml_object_decode(record->data, record->len, &frame->view.object, error);
+  status = dml_object_decode(record->data, record->len, &frame->view.object, error);
+  if (status == DML_OK) frame->next_named_entry = dml_named_entries_begin(&frame->view.object);
+  return status;
 }
 
 static size_t edge_count(const export_frame *frame) {
@@ -151,16 +155,15 @@ static dml_status read_edge(export_frame *frame, export_key *out, dml_error *err
         out->id = view->reference;
         return DML_OK;
       }
-      dml_dag_binding binding;
-      dml_status status = dml_object_view_binding(view, index - 1, &binding, error);
-      if (status == DML_OK) out->id = binding.node;
-      return status;
+      dml_bytes name;
+      dml_named_entry_next(&frame->next_named_entry, &name, &out->id);
+      return DML_OK;
     }
     case DML_REC_TREE: {
-      dml_tree_entry entry;
-      dml_status status = dml_object_view_entry(view, index, &entry, error);
-      if (status == DML_OK) *out = (export_key){DML_REC_DAG, entry.dag};
-      return status;
+      dml_bytes name;
+      out->type = DML_REC_DAG;
+      dml_named_entry_next(&frame->next_named_entry, &name, &out->id);
+      return DML_OK;
     }
     case DML_REC_COMMIT:
       if (index == 0) {
