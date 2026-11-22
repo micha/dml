@@ -11,6 +11,9 @@ caught, shrank, and replayed a fault introduced in a disposable native build. A 
 Quint and regenerated the concrete test. No Quint adoption, general compiler, or maintained-gate
 integration.
 
+The [trace interpreter design](TRACE-INTERPRETER-DESIGN.md) records the proposed follow-up:
+Quint supplies histories for native replay, with independent evidence of repository changes.
+
 ## Authority boundary
 
 This note records the protocol and results of this experiment, not a DML requirement.
