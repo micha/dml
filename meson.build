@@ -41,6 +41,7 @@ libdml = static_library(
     'src/record.c',
     'src/repo.c',
     'src/text.c',
+    'src/transfer.c',
     'src/uri.c',
   ),
   include_directories: dml_inc,
@@ -56,6 +57,7 @@ install_headers(
   'include/dml/object.h',
   'include/dml/record.h',
   'include/dml/repo.h',
+  'include/dml/transfer.h',
   subdir: 'dml',
 )
 
@@ -69,6 +71,8 @@ meson.override_dependency('dml', dml_dep)
 if get_option('quint_tests')
   python = find_program('python3', version: '>=3.10')
   quint = find_program('quint')
+  trace_interpreter = files('tests/run_histories.py')
+  test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
   ref_replay = executable('ref_replay', 'tests/ref_replay.c', dependencies: dml_dep)
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
@@ -76,8 +80,43 @@ if get_option('quint_tests')
   )
   test(
     'quint-create-ref', python,
-    args: [files('tests/run_ref_create.py'), quint.full_path(), ref_replay, lmdb_inventory,
+    args: ['-B', trace_interpreter, 'replay_refs', quint.full_path(), ref_replay, lmdb_inventory,
            files('tests/ref_histories.qnt', 'tests/ref_rules.qnt')],
     timeout: 90,
+  )
+  transfer_replay = executable(
+    'transfer_replay', 'tests/transfer_replay.c',
+    dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
+  )
+  test(
+    'quint-transfer', python,
+    args: ['-B', trace_interpreter, 'replay_transfer', quint.full_path(), transfer_replay, lmdb_inventory,
+           files('tests/transfer_histories.qnt', 'tests/transfer_rules.qnt')],
+    timeout: 90,
+  )
+
+  # Instrument the test copies only, never the installed library.
+  transfer_fault_subject = static_library(
+    'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
+    include_directories: dml_inc,
+    dependencies: vendor_headers,
+    c_args: ['-Dmalloc=dml_fault_malloc', '-Dcalloc=dml_fault_calloc', '-Drealloc=dml_fault_realloc'],
+  )
+  transfer_faults = executable(
+    'transfer_faults', 'tests/transfer_faults.c',
+    objects: transfer_fault_subject.extract_all_objects(recursive: false),
+    dependencies: dml_dep,
+  )
+  test(
+    'native-transfer-faults', python,
+    args: ['-c', '''
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    subprocess.run([sys.argv[1], Path(tmp) / 'source', Path(tmp) / 'dest'], check=True)
+''', transfer_faults],
   )
 endif

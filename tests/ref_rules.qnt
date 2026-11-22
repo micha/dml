@@ -8,6 +8,16 @@ module ref_rules {
     changes: List[Change]
   }
 
+  type Observation = { attempts: List[Attempt] }
+
+  pure def verdictAccepted(verdict: str): bool = verdict == "created" or verdict == "duplicate"
+
+  pure def coveragePass(_evidence: List[Observation], verdicts: List[List[str]]): bool = {
+    val seen = verdicts.foldl(Set(), (allSeen, row) =>
+      row.foldl(allSeen, (seen, verdict) => seen.union(Set(verdict))))
+    Set("created", "duplicate").subseteq(seen)
+  }
+
   pure def addition(key: str, value: str): Change =
     { kind: "added", key: key, before: "", after: value }
 
@@ -25,8 +35,8 @@ module ref_rules {
     }
 
   // The expected state follows the requests, not the statuses returned by the implementation.
-  pure def historyVerdicts(attempts: List[Attempt]): List[str] =
-    attempts.foldl({ keys: Set(), verdicts: List() }, (state, attempt) => {
+  pure def historyVerdicts(observed: Observation): List[str] =
+    observed.attempts.foldl({ keys: Set(), verdicts: List() }, (state, attempt) => {
       keys: state.keys.union(Set(attempt.refKey)),
       verdicts: state.verdicts.append(stepVerdict(state.keys.contains(attempt.refKey), attempt))
     }).verdicts

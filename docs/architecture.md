@@ -14,10 +14,12 @@ persist immutable objects and atomically create or update refs to commits.
 - [object.h](../include/dml/object.h): object codecs, borrowed views, and name validation.
 - [repo.h](../include/dml/repo.h): repository and transaction handles, typed object
   storage, scoped node lookup, and refs.
+- [transfer.h](../include/dml/transfer.h): buffered commit export/import with an
+  exact dependency closure and atomic import.
 
 xxHash, LMDB, utf8proc, and uriparser are private dependencies of the [C library](../README.md#install-and-link-the-c-library).
 The [LMDB entity diagram](lmdb-entity-diagram.html) shows the implemented storage model.
 
-There is no maintained binding, CLI, execution layer, or transfer implementation
-on this branch. The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
+There is no maintained binding, CLI, execution layer, or remote adapter on this
+branch. The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
 preserves the earlier implementations and evidence without defining current behavior.

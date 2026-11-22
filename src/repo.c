@@ -13,6 +13,7 @@
 #include "error_internal.h"
 #include "object_internal.h"
 #include "record_internal.h"
+#include "repo_internal.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -289,8 +290,9 @@ static size_t object_key(dml_record_type type, const dml_object_id *id, char key
   return prefix_len + 32;
 }
 
-static dml_status lookup_object(dml_txn *txn, dml_record_type expected, const dml_object_id *id,
-                                 MDB_val *value, dml_error *error) {
+static dml_status lookup_bounded_object(dml_txn *txn, dml_record_type expected,
+                                        const dml_object_id *id, size_t max_size,
+                                        MDB_val *value, dml_error *error) {
   char key_bytes[48];
   MDB_val key = {object_key(expected, id, key_bytes), key_bytes};
   uint16_t type;
@@ -303,6 +305,9 @@ static dml_status lookup_object(dml_txn *txn, dml_record_type expected, const dm
   }
   if (code != MDB_SUCCESS) {
     return storage_error(error, code, "reading immutable object");
+  }
+  if (value->mv_size > max_size) {
+    return dml_set_error(error, DML_INVALID_BOUNDS, 0, "object exceeds transfer record size limit");
   }
   status = dml_validate_envelope(value->mv_data, value->mv_size, &type, error);
   if (status != DML_OK) {
@@ -335,107 +340,57 @@ static dml_status lookup_object(dml_txn *txn, dml_record_type expected, const dm
   return DML_OK;
 }
 
-static dml_status lookup_datum(dml_txn *txn, const dml_object_id *id,
-                               MDB_val *value, dml_error *error) {
-  return lookup_object(txn, DML_REC_DATUM, id, value, error);
+static dml_status lookup_object(dml_txn *txn, dml_record_type expected, const dml_object_id *id,
+                                MDB_val *value, dml_error *error) {
+  return lookup_bounded_object(txn, expected, id, SIZE_MAX, value, error);
 }
 
-static dml_status validate_references(dml_txn *txn, const uint8_t *data, size_t len,
-                                      dml_error *error) {
-  dml_datum_view view;
-  dml_status status = dml_datum_decode(data, len, &view, error);
-  if (status != DML_OK || view.kind < DML_DATUM_LIST) {
-    return status;
-  }
-  for (size_t i = 0; i < view.count; i++) {
-    MDB_val ignored;
-    if (view.kind == DML_DATUM_MAP) {
-      dml_datum_map_entry entry;
-      (void)dml_datum_view_map_entry(&view, i, &entry, NULL);
-      status = lookup_datum(txn, &entry.key, &ignored, error);
-      if (status == DML_NOT_FOUND) {
-        status = dml_set_error(error, DML_INVALID_KIND, 0,
-                               "record_type=datum;detail=composite_ref_not_datum");
-      }
-      if (status != DML_OK) return status;
-      status = lookup_datum(txn, &entry.value, &ignored, error);
-    } else {
-      dml_object_id id;
-      (void)dml_datum_view_id(&view, i, &id, NULL);
-      status = lookup_datum(txn, &id, &ignored, error);
-    }
-    if (status == DML_NOT_FOUND) {
-      status = dml_set_error(error, DML_INVALID_KIND, 0,
-                             "record_type=datum;detail=composite_ref_not_datum");
-    }
-    if (status != DML_OK) return status;
+dml_status dml_repo_transfer_ready(dml_repo *repo, dml_error *error) {
+  if (repo == NULL) return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "repository is null");
+  if (repo->active_txns != 0) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "transfer requires no active transactions");
   }
   return DML_OK;
+}
+
+dml_status dml_txn_borrow_object(dml_txn *txn, dml_record_type type, const dml_object_id *id,
+                                 size_t max_size, dml_bytes *out, dml_error *error) {
+  MDB_val value;
+  dml_status status = lookup_bounded_object(txn, type, id, max_size, &value, error);
+  if (status == DML_OK) *out = (dml_bytes){value.mv_data, value.mv_size};
+  return status;
 }
 
 static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
-                                             const uint8_t *data, size_t len,
-                                             dml_error *error) {
-  if (type == DML_REC_DATUM) return validate_references(txn, data, len, error);
-  dml_object_view view;
-  dml_status status = dml_object_decode(data, len, &view, error);
-  if (status != DML_OK) return status; /* LCOV_EXCL_BR_LINE: caller already checked type, encoding and ID. */
-  MDB_val ignored;
-  if (type != DML_REC_TREE) {
-    dml_record_type referenced_type = type == DML_REC_NODE
-                                    ? (view.node_kind == DML_NODE_LITERAL ? DML_REC_DATUM : DML_REC_DAG)
-                                  : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_TREE;
-    status = lookup_object(txn, referenced_type, &view.reference, &ignored, error);
-    if (status != DML_OK) return status;
-  }
-  const uint8_t *cursor = dml_named_entries_begin(&view);
-  dml_record_type target_type = type == DML_REC_TREE ? DML_REC_DAG
-                             : type == DML_REC_DAG ? DML_REC_NODE : DML_REC_COMMIT;
-  for (size_t i = 0; i < view.count; i++) {
-    dml_object_id id;
-    if (cursor != NULL) {
-      dml_bytes name;
-      dml_named_entry_next(&cursor, &name, &id);
-    } else {
-      (void)dml_object_view_parent(&view, i, &id, NULL);
+                                             const uint8_t *data, dml_error *error) {
+  dml_object_refs refs;
+  dml_record_type target_type;
+  dml_object_id id;
+  dml_object_refs_init(&refs, data, type);
+  while (dml_object_refs_next(&refs, &target_type, &id)) {
+    MDB_val ignored;
+    dml_status status = lookup_object(txn, target_type, &id, &ignored, error);
+    if (status == DML_NOT_FOUND && type == DML_REC_DATUM) {
+      return dml_set_error(error, DML_INVALID_KIND, 0,
+                           "record_type=datum;detail=composite_ref_not_datum");
     }
-    status = lookup_object(txn, target_type, &id, &ignored, error);
     if (status != DML_OK) return status;
   }
   return DML_OK;
 }
 
-static dml_status put_object(dml_txn *txn, dml_record_type type,
-                              const uint8_t *data, size_t len,
-                              dml_object_id *out, dml_error *error) {
+dml_status dml_txn_store_validated_object(dml_txn *txn, dml_record_type type,
+                                          const dml_object_id *id, dml_bytes record,
+                                          dml_error *error) {
   char key_bytes[48];
-  MDB_val key = {0, key_bytes};
-  MDB_val value = {len, (void *)data};
-  MDB_val existing;
-  dml_status status;
-  int code;
-  if (txn == NULL || txn->mode != DML_TXN_WRITE || txn->poisoned) {
-    return dml_set_error(error, DML_INVALID_STATE, 0, "transaction is not writable");
-  }
-  if (out == NULL) {
-    txn->poisoned = 1;
-    return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "object id output is null");
-  }
-  status = dml_object_id_compute(data, len, out, error);
-  if (status == DML_OK && dml_read_u16_le(data + 6) != type) {
-    status = dml_set_error(error, DML_INVALID_KIND, 0, "object does not have the expected type");
-  }
-  if (status == DML_OK) status = validate_object_references(txn, type, data, len, error);
-  if (status != DML_OK) {
-    txn->poisoned = 1;
-    return status;
-  }
-  key.mv_size = object_key(type, out, key_bytes);
-  code = mdb_put(txn->native, txn->repo->dbi, &key, &value, MDB_NOOVERWRITE);
+  MDB_val key = {object_key(type, id, key_bytes), key_bytes};
+  MDB_val value = {record.len, (void *)record.data};
+  int code = mdb_put(txn->native, txn->repo->dbi, &key, &value, MDB_NOOVERWRITE);
   if (code == MDB_KEYEXIST) {
-    status = lookup_object(txn, type, out, &existing, error);
+    MDB_val existing;
+    dml_status status = lookup_object(txn, type, id, &existing, error);
     if (status == DML_OK &&
-        (existing.mv_size != len || memcmp(existing.mv_data, data, len) != 0)) {
+        (existing.mv_size != record.len || memcmp(existing.mv_data, record.data, record.len) != 0)) {
       status = dml_set_error(error, DML_INTEGRITY_ERROR, 0,
                              "object id collision or stored corruption");
     }
@@ -449,6 +404,28 @@ static dml_status put_object(dml_txn *txn, dml_record_type type,
   return DML_OK;
 }
 
+static dml_status put_object(dml_txn *txn, dml_record_type type,
+                             const uint8_t *data, size_t len,
+                             dml_object_id *out, dml_error *error) {
+  if (txn == NULL || txn->mode != DML_TXN_WRITE || txn->poisoned) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "transaction is not writable");
+  }
+  if (out == NULL) {
+    txn->poisoned = 1;
+    return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "object id output is null");
+  }
+  dml_status status = dml_object_id_compute(data, len, out, error);
+  if (status == DML_OK && dml_read_u16_le(data + 6) != type) {
+    status = dml_set_error(error, DML_INVALID_KIND, 0, "object does not have the expected type");
+  }
+  if (status == DML_OK) status = validate_object_references(txn, type, data, error);
+  if (status != DML_OK) {
+    txn->poisoned = 1;
+    return status;
+  }
+  return dml_txn_store_validated_object(txn, type, out, (dml_bytes){data, len}, error);
+}
+
 static dml_status get_object(dml_txn *txn, dml_record_type type, const dml_object_id *id,
                               dml_buffer *out, dml_error *error) {
   MDB_val value;
@@ -460,7 +437,7 @@ static dml_status get_object(dml_txn *txn, dml_record_type type, const dml_objec
   out->len = 0;
   status = lookup_object(txn, type, id, &value, error);
   if (status == DML_OK) {
-    status = validate_object_references(txn, type, value.mv_data, value.mv_size, error);
+    status = validate_object_references(txn, type, value.mv_data, error);
   }
   if (status != DML_OK) return status;
   out->data = malloc(value.mv_size);
@@ -542,7 +519,7 @@ static dml_status validate_ref_target(dml_txn *txn, const dml_object_id *id, dml
   MDB_val value;
   dml_status status = lookup_object(txn, DML_REC_COMMIT, id, &value, error);
   if (status == DML_OK) {
-    status = validate_object_references(txn, DML_REC_COMMIT, value.mv_data, value.mv_size, error);
+    status = validate_object_references(txn, DML_REC_COMMIT, value.mv_data, error);
   }
   return status;
 }

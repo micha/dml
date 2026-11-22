@@ -1,7 +1,8 @@
 # DML
 
 DML currently provides a C library for content-addressed data and history in a local
-transactional repository. See the [as-built specification](docs/spec-next/README.md)
+transactional repository, with [binary commit transfer](docs/spec-next/transfer.md).
+See the [as-built specification](docs/spec-next/README.md)
 for the implemented contracts and [architecture](docs/architecture.md) for the module
 boundaries.
 
@@ -31,12 +32,14 @@ npm install --prefix build/quint-tool --no-save --ignore-scripts @informalsystem
 PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
-This builds two test-only executables in `build/core-check-quint/` and runs
-`quint-create-ref`. Quint emits ref creation histories. The native runner
-executes the C API, and a separate
-read-only LMDB scan observes what each transaction published. Quint checks the
-statuses and exact inventory changes against the [ref contract](docs/spec-next/repository.md#refs).
-The check is local and opt-in; it does not measure coverage.
+This builds the test executables in `build/core-check-quint/` and runs
+`quint-create-ref`, `quint-transfer`, and focused interpreter and native fault tests.
+The [shared trace interpreter](tests/README.md) replays requests from Quint against
+native C executables. Quint checks observations against the
+[ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
+A separate read-only LMDB scan observes what each transaction published. The native
+fault test checks transfer allocation failures without adding hooks to the library.
+These checks are local and opt-in; they do not measure coverage.
 
 ### Install and link the C library
 

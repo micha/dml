@@ -6,6 +6,18 @@
 #include "dml/object.h"
 #include "encoding.h"
 
+typedef struct {
+  const uint8_t *next;
+  size_t remaining;
+  dml_record_type type;
+  dml_record_type record_type;
+  bool first;
+} dml_object_refs;
+
+/* Only initialize with a validated immutable record. The cursor borrows it. */
+void dml_object_refs_init(dml_object_refs *refs, const uint8_t *data, dml_record_type type);
+bool dml_object_refs_next(dml_object_refs *refs, dml_record_type *type, dml_object_id *id);
+
 /* Cursors borrow the packed bytes of a successfully decoded view. A cursor
  * must not outlive or read past view->count entries in that record. It holds
  * no pointer into the view itself, so moving the view does not invalidate it. */

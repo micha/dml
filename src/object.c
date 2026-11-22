@@ -50,6 +50,42 @@ static dml_status named_error(dml_error *error, dml_status status, uint16_t type
   return invalid(error, status, detail);
 }
 
+static int compare_parent_ids(const void *left, const void *right) {
+  return memcmp(left, right, DML_OBJECT_ID_SIZE);
+}
+
+static dml_status validate_parents(const uint8_t *parents, size_t count, dml_error *error) {
+  bool duplicate = false;
+  if (count <= 32) {
+    for (size_t i = 1; i < count && !duplicate; i++) {
+      for (size_t j = 0; j < i; j++) {
+        if (compare_parent_ids(parents + i * DML_OBJECT_ID_SIZE,
+                               parents + j * DML_OBJECT_ID_SIZE) == 0) {
+          duplicate = true;
+          break;
+        }
+      }
+    }
+  } else {
+    /* Keep the packed parent order. Sort a copy rather than checking every pair. */
+    size_t bytes = count * DML_OBJECT_ID_SIZE;
+    uint8_t *sorted = malloc(bytes);
+    if (sorted == NULL) return invalid(error, DML_OUT_OF_MEMORY, "copying commit parents");
+    memcpy(sorted, parents, bytes);
+    qsort(sorted, count, DML_OBJECT_ID_SIZE, compare_parent_ids);
+    for (size_t i = 1; i < count; i++) {
+      if (compare_parent_ids(sorted + (i - 1) * DML_OBJECT_ID_SIZE,
+                             sorted + i * DML_OBJECT_ID_SIZE) == 0) {
+        duplicate = true;
+        break;
+      }
+    }
+    free(sorted);
+  }
+  return duplicate ? invalid(error, DML_INVALID_PAYLOAD, "record_type=commit;detail=duplicate_parent")
+                   : DML_OK;
+}
+
 /* Only called after envelope validation. Bounds are checked before each load. */
 dml_status dml_validate_object(const uint8_t *data, size_t len, uint16_t type,
                                  dml_error *error) {
@@ -67,14 +103,7 @@ dml_status dml_validate_object(const uint8_t *data, size_t len, uint16_t type,
     if (count != (len - 40) / 16 || (len - 40) % 16 != 0) {
       return invalid(error, DML_INVALID_BOUNDS, "record_type=commit;detail=parent_count");
     }
-    for (size_t i = 0; i < count; i++) {
-      for (size_t j = 0; j < i; j++) {
-        if (memcmp(data + 40 + i * 16, data + 40 + j * 16, 16) == 0) {
-          return invalid(error, DML_INVALID_PAYLOAD, "record_type=commit;detail=duplicate_parent");
-        }
-      }
-    }
-    return DML_OK;
+    return validate_parents(data + 40, count, error);
   }
   size_t base = type == DML_REC_DAG ? 40 : 24;
   if (len < base) return named_error(error, DML_INVALID_BOUNDS, type, "size");
@@ -105,6 +134,60 @@ dml_status dml_validate_object(const uint8_t *data, size_t len, uint16_t type,
     offset += name_len + 16;
   }
   return offset == len ? DML_OK : named_error(error, DML_INVALID_BOUNDS, type, "trailing_bytes");
+}
+
+void dml_object_refs_init(dml_object_refs *refs, const uint8_t *data, dml_record_type type) {
+  *refs = (dml_object_refs){.record_type = type};
+  switch (type) {
+    case DML_REC_DATUM: {
+      uint32_t kind = dml_read_u32_le(data + 20);
+      if (kind >= DML_DATUM_LIST) {
+        refs->type = DML_REC_DATUM;
+        refs->remaining = (size_t)dml_read_u32_le(data + DML_DATUM_PREFIX_SIZE) *
+                          (kind == DML_DATUM_MAP ? 2 : 1);
+        refs->next = data + DML_DATUM_PREFIX_SIZE + 4;
+      }
+      break;
+    }
+    case DML_REC_NODE:
+      refs->type = dml_read_u32_le(data + 20) == DML_NODE_LITERAL ? DML_REC_DATUM : DML_REC_DAG;
+      refs->next = data + 24;
+      refs->remaining = 1;
+      break;
+    case DML_REC_DAG:
+    case DML_REC_COMMIT:
+      refs->type = type == DML_REC_DAG ? DML_REC_NODE : DML_REC_TREE;
+      refs->next = data + 20;
+      refs->remaining = (size_t)dml_read_u32_le(data + 36) + 1;
+      refs->first = true;
+      break;
+    case DML_REC_TREE:
+      refs->type = DML_REC_DAG;
+      refs->next = data + 24;
+      refs->remaining = dml_read_u32_le(data + 20);
+      break;
+    default:
+      break;
+  }
+}
+
+bool dml_object_refs_next(dml_object_refs *refs, dml_record_type *type, dml_object_id *id) {
+  if (refs->remaining == 0) return false;
+  *type = refs->type;
+  refs->remaining--;
+  if (refs->first) {
+    memcpy(id->bytes, refs->next, DML_OBJECT_ID_SIZE);
+    refs->next += DML_OBJECT_ID_SIZE + 4; /* Skip the count after the leading ID. */
+    refs->first = false;
+    if (refs->record_type == DML_REC_COMMIT) refs->type = DML_REC_COMMIT;
+  } else if (refs->record_type == DML_REC_DAG || refs->record_type == DML_REC_TREE) {
+    dml_bytes name;
+    dml_named_entry_next(&refs->next, &name, id);
+  } else {
+    memcpy(id->bytes, refs->next, DML_OBJECT_ID_SIZE);
+    refs->next += DML_OBJECT_ID_SIZE;
+  }
+  return true;
 }
 
 dml_status dml_object_decode(const uint8_t *data, size_t len, dml_object_view *out,

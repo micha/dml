@@ -1,1 +1,1 @@
-option('quint_tests', type: 'boolean', value: false, description: 'Enable Quint-driven C API checks')
+option('quint_tests', type: 'boolean', value: false, description: 'Enable Quint-driven C API checks and focused native tests')

@@ -5,7 +5,7 @@ quint_tests=false
 case "${1:-}" in
   -h|--help)
     echo "Usage: scripts/check.sh [--quint]"
-    echo "Configure and build the C core. With --quint, also run the Quint-driven checks."
+    echo "Configure and build the C core. With --quint, also run behavior and native fault checks."
     exit 0
     ;;
   --quint)
@@ -32,7 +32,7 @@ fi
 meson setup "${setup_args[@]}" "$build_dir" "$root_dir" --wrap-mode=forcefallback -Dbuildtype=debug
 meson compile -C "$build_dir"
 if [ "$quint_tests" = true ]; then
-  meson test -C "$build_dir" --print-errorlogs quint-create-ref
+  meson test -C "$build_dir" --print-errorlogs
 else
   echo "==> C core build passed; behavioral checks did not run (use --quint)."
 fi

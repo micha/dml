@@ -8,7 +8,8 @@ This document owns local repository initialization, persisted object/ref keys,
 direct reference checks, transaction behavior and repository/transaction handle
 ownership in this as-built specification. For encoding, IDs, value buffers and
 errors, see [records.md](records.md). For snapshot/history fields and the shared
-name profile, see [objects.md](objects.md). For documented scope, see [README.md](README.md).
+name profile, see [objects.md](objects.md). For binary bundles and their transitive
+validation, see [Commit transfer](transfer.md). For documented scope, see [README.md](README.md).
 Terms follow the shared [glossary](glossary.md).
 
 Normative sections describe current code. Committing a **storage transaction** is

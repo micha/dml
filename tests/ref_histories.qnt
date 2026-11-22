@@ -1,8 +1,11 @@
 module ref_histories {
-  type Request = { name: str, target: str }
+  type Request = { op: str, args: List[str] }
 
-  pure val createA: Request = { name: "main", target: "A" }
-  pure val createB: Request = { name: "main", target: "B" }
+  pure def createRef(name: str, target: str): Request =
+    { op: "create_ref", args: List(name, target) }
+
+  pure val createA = createRef("main", "A")
+  pure val createB = createRef("main", "B")
 
   var histories: List[List[Request]]
 
@@ -14,9 +17,9 @@ module ref_histories {
 
   // Feed a different name, initial target, and request count to the same runner.
   action changedInit = histories' = List(List(
-    { name: "candidate-1", target: "B" },
-    { name: "other", target: "A" },
-    { name: "candidate-1", target: "A" }
+    createRef("candidate-1", "B"),
+    createRef("other", "A"),
+    createRef("candidate-1", "A")
   ))
 
   action step = histories' = histories

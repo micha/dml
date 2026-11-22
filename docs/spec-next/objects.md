@@ -51,7 +51,7 @@ Node kind determines the target type and contributes to identity.
 
 An initial commit has zero parents. Supplied parent order MUST be preserved;
 duplicate parent IDs MUST be rejected. Changing parent order changes content
-identity. Duplicate checking currently uses pairwise comparison.
+identity.
 
 ## Names and canonical ordering
 
