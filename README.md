@@ -52,12 +52,22 @@ meson compile -C build/release
 meson install -C build/release
 ```
 
-Include `<dml/dml.h>` in a C program. The archive includes the pinned vendor
-libraries; on a Unix compiler driver that accepts `-pthread`, link like this:
+The archive includes the pinned vendor libraries. On a Unix compiler driver that
+accepts `-pthread`, build and run the [standalone transfer example](examples/transfer_history.c)
+against the installed headers and archive:
 
 ```sh
-cc -Ibuild/install/include example.c -Lbuild/install/lib -ldml -pthread -o example
+run_dir=$(mktemp -d "$PWD/build/transfer-example.XXXXXX")
+cc -std=c11 -Ibuild/install/include examples/transfer_history.c \
+  build/install/lib/libdml.a -pthread -o "$run_dir/transfer_history"
+"$run_dir/transfer_history" "$run_dir/source" "$run_dir/destination"
 ```
+
+The program creates two revisions in the source repository and transfers the tip
+and its history. It checks that import does not create `main`, then publishes it
+explicitly. After reopening the destination, it verifies that the tip reads `43`
+and its parent reads `42`. Use two distinct paths that do not yet exist, with
+existing parent directories. The program leaves both repositories for inspection.
 
 ### Optional Nix development shell
 
