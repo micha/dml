@@ -10,6 +10,14 @@ order, and returns one observation per request. A handler records the actual
 API status, even on an expected failure. Unknown operations, bad arguments,
 and missing observations or verdicts fail the test rather than skipping a step.
 
+The ref suite stages a tree, its commit, and a move of an existing ref in one write
+transaction. It checks successful commit, explicit abort, and rollback when a later
+update to a missing ref poisons the transaction. An independent LMDB scan checks
+exact persisted changes, and a fresh native process resolves the ref and decodes its
+commit and parent IDs. The transfer suite checks that import leaves the destination
+ref alone, then moves it to the imported commit in a separate transaction and
+reopens the repository to read the new tip.
+
 ## Add a request or operation
 
 - To exercise an existing operation, add a request to its `*_histories.qnt`

@@ -12,6 +12,8 @@ module transfer_histories {
          importCommit("import"), importCommit("thin"), importCommit("forward")),
     List(exportCommit("export"), importCommit("alternative"), exportCommit("reexport"),
          exportCommit("repeat")),
+    List(exportCommit("export"), importCommit("import_exported"), { op: "read_main", args: List() },
+         { op: "publish_imported", args: List() }, { op: "read_main", args: List() }),
     List("busy_import", "bad_magic", "bad_version", "reserved", "short_header", "short_frame",
          "short_record", "trailing", "wrong_kind", "embedded_kind", "wrong_id", "wrong_root",
          "wrong_root_type", "bad_packed", "duplicate", "extra", "thin", "forward", "import")

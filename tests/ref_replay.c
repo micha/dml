@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,8 +9,12 @@
 
 #include "dml/repo.h"
 
+static dml_bytes bytes(const char *text) {
+  return (dml_bytes){.data = (const uint8_t *)text, .len = strlen(text)};
+}
+
 static int make_fixture_directory(const char *path) {
-  /* Never open a preexisting repository for this write test. */
+  /* Never open a preexisting repository for fixture creation. */
 #ifdef _WIN32
   return _mkdir(path);
 #else
@@ -26,8 +29,8 @@ static bool check_status(dml_status status, const dml_error *error, const char *
   return false;
 }
 
-static dml_status put_fixture_object(dml_txn *txn, const dml_object_input *input,
-                                      dml_object_id *id, dml_error *error) {
+static dml_status put_object(dml_txn *txn, const dml_object_input *input,
+                             dml_object_id *id, dml_error *error) {
   dml_buffer record = {0};
   dml_status status = dml_object_encode(input, &record, error);
   if (status == DML_OK) {
@@ -37,127 +40,169 @@ static dml_status put_fixture_object(dml_txn *txn, const dml_object_input *input
   return status;
 }
 
-static bool seed_fixture(dml_repo *repo, dml_object_id targets[2]) {
+static bool seed_dag(dml_txn *txn, dml_object_id *id, dml_error *error) {
+  const dml_datum_input datum = {.kind = DML_DATUM_I64, .value.i64 = 42};
+  dml_buffer record = {0};
+  dml_object_input node = {.type = DML_REC_NODE, .value.node.kind = DML_NODE_LITERAL};
+  dml_object_input dag = {.type = DML_REC_DAG};
+  bool stored = check_status(dml_datum_encode(&datum, &record, error), error, "encoding datum") &&
+                check_status(dml_txn_put_datum(txn, record.data, record.len, &node.value.node.target,
+                                               error), error, "storing datum") &&
+                check_status(put_object(txn, &node, &dag.value.dag.root, error), error, "storing node") &&
+                check_status(put_object(txn, &dag, id, error), error, "storing DAG");
+  dml_buffer_free(&record);
+  return stored;
+}
+
+static bool print_id(const dml_object_id *id) {
+  char text[DML_OBJECT_ID_HEX_SIZE + 1];
+  return dml_object_id_format(id, text, NULL) == DML_OK && printf(" %s", text) >= 0;
+}
+
+static bool seed_fixture(dml_repo *repo) {
   dml_txn *txn = NULL;
   dml_error error = {0};
-  if (!check_status(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error), &error,
-                    "beginning fixture transaction")) {
+  if (!check_status(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error), &error, "beginning fixture")) {
     return false;
   }
 
   const dml_object_input tree = {.type = DML_REC_TREE};
   dml_object_input commit = {.type = DML_REC_COMMIT};
-  bool seeded =
-    check_status(put_fixture_object(txn, &tree, &commit.value.commit.tree, &error),
-                 &error, "storing fixture tree") &&
-    check_status(put_fixture_object(txn, &commit, &targets[0], &error),
-                 &error, "storing fixture commit A");
+  dml_object_id a, b, dag;
+  bool seeded = check_status(put_object(txn, &tree, &commit.value.commit.tree, &error),
+                             &error, "storing fixture tree") &&
+                check_status(put_object(txn, &commit, &a, &error), &error, "storing fixture commit A");
   if (seeded) {
     /* Child B differs from its parent A while sharing the same tree. */
-    commit.value.commit.parents = (dml_id_array){.items = &targets[0], .count = 1};
-    seeded = check_status(put_fixture_object(txn, &commit, &targets[1], &error),
-                          &error, "storing fixture commit B");
+    commit.value.commit.parents = (dml_id_array){.items = &a, .count = 1};
+    seeded = check_status(put_object(txn, &commit, &b, &error), &error, "storing fixture commit B") &&
+             seed_dag(txn, &dag, &error);
   }
   if (!seeded) {
     dml_txn_abort(&txn);
     return false;
   }
-  return check_status(dml_txn_commit(&txn, &error), &error, "committing fixture transaction");
+  return check_status(dml_txn_commit(&txn, &error), &error, "committing fixture") &&
+         printf("READY") >= 0 && print_id(&a) && print_id(&b) &&
+         print_id(&commit.value.commit.tree) && print_id(&dag) && puts("") != EOF;
 }
 
-static bool announce_fixture(const dml_object_id targets[2]) {
-  char a[DML_OBJECT_ID_HEX_SIZE + 1];
-  char b[DML_OBJECT_ID_HEX_SIZE + 1];
+static bool parse_id(const char *text, dml_object_id *id) {
   dml_error error = {0};
-  if (!check_status(dml_object_id_format(&targets[0], a, &error), &error, "formatting commit A") ||
-      !check_status(dml_object_id_format(&targets[1], b, &error), &error, "formatting commit B")) {
-    return false;
-  }
-  if (printf("READY %s %s\n", a, b) < 0 || fflush(stdout) == EOF) {
-    perror("writing READY");
-    return false;
-  }
-  return true;
+  return check_status(dml_object_id_parse(text, strlen(text), id, &error), &error, "parsing ID");
 }
 
-static bool parse_request(const char *line, dml_bytes *name, size_t *target_index) {
-  const char *separator = strchr(line, ' ');
-  if (separator == NULL || separator == line) return false;
-  for (const char *byte = line; byte < separator; ++byte) {
-    if (isspace((unsigned char)*byte)) return false;
-  }
-  if (strcmp(separator + 1, "A\n") == 0) {
-    *target_index = 0;
-  } else if (strcmp(separator + 1, "B\n") == 0) {
-    *target_index = 1;
-  } else {
-    return false;
-  }
-  *name = (dml_bytes){.data = (const uint8_t *)line, .len = (size_t)(separator - line)};
-  return true;
-}
-
-static bool replay_request(dml_repo *repo, dml_bytes name, const dml_object_id *target) {
+static bool create_ref(dml_repo *repo, const char *name, const char *target_text) {
   dml_txn *txn = NULL;
   dml_error error = {0};
-  if (!check_status(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error), &error,
-                    "beginning ref transaction")) {
+  dml_object_id target;
+  if (!parse_id(target_text, &target) ||
+      !check_status(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error), &error, "beginning ref create")) {
+    return false;
+  }
+  dml_status create = dml_txn_ref_create(txn, bytes(name), &target, NULL);
+  dml_status completed = dml_txn_commit(&txn, NULL);
+  return printf("CREATE %s %s\n", dml_status_name(create), dml_status_name(completed)) >= 0;
+}
+
+static bool publish(dml_repo *repo, const char *name, const char *parent_text, const char *dag_text,
+                    const char *finish, const char *extra_name) {
+  dml_txn *txn = NULL;
+  dml_error error = {0};
+  dml_object_id parent, commit_id = {0};
+  dml_tree_entry entry = {.name = bytes("snapshot")};
+  if (!parse_id(parent_text, &parent) || !parse_id(dag_text, &entry.dag) ||
+      !check_status(dml_txn_begin(repo, DML_TXN_WRITE, &txn, &error), &error, "beginning publication")) {
     return false;
   }
 
-  dml_status create = dml_txn_ref_create(txn, name, target, NULL);
-  /* Exercise transaction completion even after a failed create. */
-  dml_status commit = dml_txn_commit(&txn, NULL);
-  if (printf("STEP %s %s\n", dml_status_name(create), dml_status_name(commit)) < 0 ||
-      fflush(stdout) == EOF) {
-    perror("writing STEP");
-    return false;
+  const dml_object_input tree = {.type = DML_REC_TREE, .value.tree = {.items = &entry, .count = 1}};
+  dml_object_input commit = {.type = DML_REC_COMMIT,
+                             .value.commit.parents = {.items = &parent, .count = 1}};
+  dml_status tree_status = put_object(txn, &tree, &commit.value.commit.tree, NULL);
+  dml_status put_status = put_object(txn, &commit, &commit_id, NULL);
+  dml_status update = dml_txn_ref_update(txn, bytes(name), &commit_id, NULL);
+  const char *extra = *extra_name ?
+    dml_status_name(dml_txn_ref_update(txn, bytes(extra_name), &commit_id, NULL)) : "none";
+  const char *completion;
+  if (strcmp(finish, "abort") == 0) {
+    dml_txn_abort(&txn);
+    completion = txn == NULL ? "aborted" : "active";
+  } else {
+    completion = dml_status_name(dml_txn_commit(&txn, NULL));
+  }
+  return printf("PUBLISH %s %s %s %s %s", dml_status_name(tree_status), dml_status_name(put_status),
+                dml_status_name(update), extra, completion) >= 0 &&
+         print_id(&commit.value.commit.tree) && print_id(&commit_id) && puts("") != EOF;
+}
+
+static bool print_commit(const dml_object_view *view) {
+  if (!print_id(&view->reference)) return false;
+  for (size_t i = 0; i < view->count; i++) {
+    dml_object_id parent;
+    dml_error error = {0};
+    if (!check_status(dml_object_view_parent(view, i, &parent, &error), &error, "reading parent") ||
+        !print_id(&parent)) {
+      return false;
+    }
   }
   return true;
 }
 
-static bool replay_requests(dml_repo *repo, const dml_object_id targets[2]) {
-  char line[1024];
-  while (fgets(line, sizeof(line), stdin) != NULL) {
-    dml_bytes name;
-    size_t target_index;
-    if (!parse_request(line, &name, &target_index)) {
-      fprintf(stderr, "expected a request line '<name> <A|B>\\n' (at most %zu bytes)\n",
-              sizeof(line) - 1);
-      return false;
-    }
-    if (!replay_request(repo, name, &targets[target_index])) return false;
-  }
-  if (ferror(stdin)) {
-    perror("reading requests");
+static bool read_ref(dml_repo *repo, const char *name) {
+  dml_txn *txn = NULL;
+  dml_error error = {0};
+  if (!check_status(dml_txn_begin(repo, DML_TXN_READ, &txn, &error), &error, "beginning ref read")) {
     return false;
   }
-  return true;
+  dml_object_id tip = {0};
+  dml_buffer record = {0};
+  dml_object_view view = {0};
+  dml_status get_ref = dml_txn_ref_get(txn, bytes(name), &tip, NULL);
+  const char *get_object = "none", *decode = "none";
+  if (get_ref == DML_OK) {
+    dml_status get = dml_txn_get_object(txn, DML_REC_COMMIT, &tip, &record, NULL);
+    get_object = dml_status_name(get);
+    if (get == DML_OK) decode = dml_status_name(dml_object_decode(record.data, record.len, &view, NULL));
+  }
+  bool printed = printf("READ %s %s %s", dml_status_name(get_ref), get_object, decode) >= 0 &&
+                 print_id(&tip) && print_commit(&view) && puts("") != EOF;
+  dml_buffer_free(&record);
+  dml_txn_abort(&txn);
+  return printed;
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    fprintf(stderr, "usage: ref_replay NEW_REPO\n");
+  bool seed = argc == 3 && strcmp(argv[1], "seed") == 0;
+  bool create = argc == 5 && strcmp(argv[1], "create") == 0;
+  bool write = argc == 8 && strcmp(argv[1], "publish") == 0 &&
+               (strcmp(argv[6], "commit") == 0 || strcmp(argv[6], "abort") == 0);
+  bool read = argc == 4 && strcmp(argv[1], "read") == 0;
+  if (!seed && !create && !write && !read) {
+    fprintf(stderr, "usage: ref_replay seed NEW_REPO | create REPO NAME TARGET |\n"
+                    "       publish REPO NAME PARENT DAG commit|abort EXTRA_NAME | read REPO NAME\n");
     return EXIT_FAILURE;
   }
-  if (make_fixture_directory(argv[1]) != 0) {
+  if (seed && make_fixture_directory(argv[2]) != 0) {
     perror("creating new fixture directory");
     return EXIT_FAILURE;
   }
 
-  const dml_repo_options options = {.create = true};
+  const dml_repo_options options = {.create = seed};
   dml_repo *repo = NULL;
   dml_error error = {0};
-  if (!check_status(dml_repo_open(argv[1], &options, &repo, &error), &error,
-                    "opening fixture repository")) {
+  if (!check_status(dml_repo_open(argv[2], &options, &repo, &error), &error, "opening repository")) {
     return EXIT_FAILURE;
   }
-
-  dml_object_id targets[2];
-  bool success = seed_fixture(repo, targets) && announce_fixture(targets) &&
-                 replay_requests(repo, targets);
-  if (!check_status(dml_repo_close(&repo, &error), &error, "closing fixture repository")) {
+  bool success;
+  if (seed) success = seed_fixture(repo);
+  else if (create) success = create_ref(repo, argv[3], argv[4]);
+  else if (write) success = publish(repo, argv[3], argv[4], argv[5], argv[6], argv[7]);
+  else success = read_ref(repo, argv[3]);
+  bool closed = check_status(dml_repo_close(&repo, &error), &error, "closing repository");
+  if (fflush(stdout) == EOF) {
+    perror("writing replay response");
     return EXIT_FAILURE;
   }
-  return success ? EXIT_SUCCESS : EXIT_FAILURE;
+  return success && closed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

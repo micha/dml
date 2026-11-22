@@ -33,12 +33,13 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
 This builds the test executables in `build/core-check-quint/` and runs
-`quint-create-ref`, `quint-transfer`, and focused interpreter and native fault tests.
+`quint-refs`, `quint-transfer`, and focused interpreter and native fault tests.
 The [shared trace interpreter](tests/README.md) replays requests from Quint against
 native C executables. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
-A separate read-only LMDB scan observes what each transaction published. The native
-fault test checks transfer allocation failures without adding hooks to the library.
+Fresh native reads and separate read-only LMDB scans check snapshot publication,
+rollback, and explicit ref updates after import. The native fault test checks
+transfer allocation failures without adding hooks to the library.
 These checks are local and opt-in; they do not measure coverage.
 
 ### Install and link the C library

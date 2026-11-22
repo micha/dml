@@ -228,6 +228,39 @@ static void import_bundle(dml_repo *repo, const char *path) {
   printf("%s %s\n", dml_status_name(status), text);
 }
 
+static void publish_main(dml_repo *repo, const char *target_hex) {
+  dml_object_id target;
+  require_ok(dml_object_id_parse(target_hex, strlen(target_hex), &target, NULL),
+             "parsing imported commit ID");
+  dml_txn *txn = NULL;
+  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning publication transaction");
+  dml_status updated = dml_txn_ref_update(txn, name("main"), &target, NULL);
+  dml_status committed = dml_txn_commit(&txn, NULL);
+  printf("%s\n%s\n", dml_status_name(updated), dml_status_name(committed));
+}
+
+static void read_main(dml_repo *repo) {
+  dml_txn *txn = NULL;
+  require_ok(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL), "beginning readback transaction");
+  dml_object_id target;
+  memset(target.bytes, 0xa5, sizeof(target.bytes));
+  dml_status resolved = dml_txn_ref_get(txn, name("main"), &target, NULL);
+  char text[DML_OBJECT_ID_HEX_SIZE + 1];
+  format_id(target, text);
+  printf("%s %s\n", dml_status_name(resolved), text);
+  dml_buffer packed = {0};
+  const char *read_status = "none";
+  if (resolved == DML_OK) {
+    dml_status status = dml_txn_get_object(txn, DML_REC_COMMIT, &target, &packed, NULL);
+    read_status = dml_status_name(status);
+  }
+  dml_txn_abort(&txn);
+  printf("%s ", read_status);
+  for (size_t i = 0; i < packed.len; ++i) printf("%02x", (unsigned)packed.data[i]);
+  printf("\n");
+  dml_buffer_free(&packed);
+}
+
 /* The public DML API cannot create these corrupt-store fixtures. */
 static int alter_inventory(const char *path, const char *key, const char *copy_key) {
   MDB_env *env = NULL;
@@ -277,15 +310,19 @@ int main(int argc, char **argv) {
   bool create = argc == 4 && strcmp(argv[1], "seed") == 0;
   bool exporting = argc == 6 && strcmp(argv[1], "export") == 0;
   bool importing = argc == 5 && strcmp(argv[1], "import") == 0;
-  if (!create && !exporting && !importing) {
+  bool publishing = argc == 4 && strcmp(argv[1], "publish_main") == 0;
+  bool reading = argc == 3 && strcmp(argv[1], "read_main") == 0;
+  if (!create && !exporting && !importing && !publishing && !reading) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
+                    "       transfer_replay publish_main REPO TARGET\n"
+                    "       transfer_replay read_main REPO\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
   }
-  const char *mode = argv[argc - 1];
+  const char *mode = publishing || reading ? "" : argv[argc - 1];
   if (create && strcmp(mode, "source") && strcmp(mode, "destination") &&
       strcmp(mode, "large") && strcmp(mode, "oversize")) {
     fprintf(stderr, "unknown fixture profile: %s\n", mode);
@@ -301,6 +338,10 @@ int main(int argc, char **argv) {
   if (busy) require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning busy transaction");
   if (create) {
     seed(repo, mode);
+  } else if (publishing) {
+    publish_main(repo, argv[3]);
+  } else if (reading) {
+    read_main(repo);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

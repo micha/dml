@@ -79,7 +79,7 @@ if get_option('quint_tests')
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
   )
   test(
-    'quint-create-ref', python,
+    'quint-refs', python,
     args: ['-B', trace_interpreter, 'replay_refs', quint.full_path(), ref_replay, lmdb_inventory,
            files('tests/ref_histories.qnt', 'tests/ref_rules.qnt')],
     timeout: 90,

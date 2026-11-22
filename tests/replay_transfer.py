@@ -177,9 +177,13 @@ def import_attempt(runner, repo, path, command):
     return dict(status=status, shape="", completion=completion, result=result, rows=[], binary="")
 
 
-def fixture_model(frames):
+def fixture_model(frames, kept):
+    def commit(frame):
+        return dict(id=frame.identifier.hex(), packed=frame.packed.hex())
+
     return dict(
-        root=frames["root"].identifier.hex(), rows=[frames[label].row for label in EDGES],
+        root=commit(frames["root"]), initialHead=commit(kept["keep"]),
+        rows=[frames[label].row for label in EDGES],
         edges=[dict(parent=frames[label].row["key"], child=frames[child].row["key"])
                for label, children in EDGES.items() for child in children],
     )
@@ -214,8 +218,12 @@ class Suite:
             raise ValueError("Initial destination must not overlap source objects")
         fixture = TransferHistory(self.runner, self.scanner, source, destination, frames, kept,
                                   self.large_bundles)
-        yield Replay({"export_commit": fixture.export_commit, "import_commit": fixture.import_commit},
-                     fixture_model(frames))
+        yield Replay({
+            "export_commit": fixture.export_commit,
+            "import_commit": fixture.import_commit,
+            "publish_imported": fixture.publish_imported,
+            "read_main": fixture.read_main,
+        }, fixture_model(frames, kept))
 
 
 @dataclass
@@ -227,6 +235,7 @@ class TransferHistory:
     frames: dict[str, Frame]
     kept: dict[str, Frame]
     large_bundles: dict[str, tuple[Path, str, Path]]
+    imported: str = "00" * 16
 
     def export_commit(self, case):
         if case not in EXPORTS:
@@ -260,8 +269,35 @@ class TransferHistory:
         path = self.bundle_for(case)
         before = scan_inventory(self.scanner, repo)
         attempt = import_attempt(self.runner, repo, path, case)
+        if case == "import_exported":
+            # Carry the actual output forward, even if import failed.
+            self.imported = attempt["result"]
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command=case, changes=changes, **attempt)
+
+    def publish_imported(self):
+        repo = self.destination
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "publish_main", repo, self.imported)
+        match = re.fullmatch(r"([a-z_]+)\n([a-z_]+)\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C publication response: {stdout!r}")
+        status, completion = match.groups()
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command="publish_imported", status=status, completion=completion, shape="",
+                    result=self.imported, binary="", rows=[], changes=changes)
+
+    def read_main(self):
+        repo = self.destination
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "read_main", repo)
+        match = re.fullmatch(r"([a-z_]+) ([0-9a-f]{32})\n([a-z_]+) ((?:[0-9a-f]{2})*)\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C readback response: {stdout!r}")
+        status, result, completion, packed = match.groups()
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command="read_main", status=status, completion=completion, shape="",
+                    result=result, binary=packed, rows=[], changes=changes)
 
     def bundle_for(self, case):
         if case in self.large_bundles:
