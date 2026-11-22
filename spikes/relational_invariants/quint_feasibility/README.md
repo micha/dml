@@ -1,12 +1,13 @@
 # Quint feasibility: DML refs and transactions
 
-Status: direct Quint evaluation and deterministic Python generation passed for the
-create-only, mixed create/update, transaction-batch, Python context-completion and explicit-ending
-context profiles on Linux ARM64. [Graph-backed checks](#graph-backed-transaction-verification)
-reopen saved transaction evidence; [measurements](#transaction-graph-repeatability-and-cost)
-found repeatable roots but did not justify a verification cache for this profile.
-[Failure artifacts](#replay-a-shrunk-transaction-failure) keep graph writes off the passing and
-shrinking paths. No Quint adoption or general compiler.
+Status: feasibility spike closed. Direct Quint evaluation and deterministic Python generation
+passed for the create-only, mixed create/update, transaction-batch, Python context-completion
+and explicit-ending context profiles on Linux ARM64. [Graph-backed checks](#graph-backed-transaction-verification)
+reopen saved transaction evidence. [Measurements](#transaction-graph-repeatability-and-cost)
+did not justify a verification cache. [Failure artifacts](#replay-a-shrunk-transaction-failure)
+keep graph writes off the passing and shrinking paths. The [final experiment](#native-fault-control)
+caught, shrank, and replayed a fault introduced in a disposable native build. No Quint adoption,
+general compiler, or maintained-gate integration.
 
 ## Authority boundary
 
@@ -703,6 +704,59 @@ Logs, exits and source hashes are ignored local artifacts under
 `build/quint-feasibility/failure-artifact/coordinator/` and
 `build/quint-feasibility/transaction-failure-artifact/worker/`. No maintained code or gate
 changed; the full maintained gate and CI were not rerun.
+
+## Native fault control
+
+The final experiment rebuilt two native extensions from copies of the same Git revision. In the
+faulted copy only, `dml_txn_abort` commits the LMDB transaction if the writer is poisoned. The
+unchanged Python binding still reports `invalid_state` when rejecting a failed commit. This is a
+fault introduced in the test build, not a defect observed in pristine DML. An initial control
+changed `dml_txn_commit` instead and produced no violation: Python aborts a failed write before
+raising, so that case does not reach the native commit entry point.
+
+After the shared setup above has populated `subprojects/packagecache/`, from the repository root
+in the same Nix shell run:
+
+```sh
+bash "$spike/run_native_fault_control.sh" "$quint"
+```
+
+The [runner](run_native_fault_control.sh) archives native sources from `HEAD`, builds clean
+and faulted copies without downloading wraps, and generates the checker once. Its
+[offline harness](check_transaction_native_fault.py) uses the same generated checker and
+unmodified observation adapter in both builds. Both properties allow all commit histories and
+only empty explicit aborts: the fault can affect both endings, and this restriction gives the
+single-failure artifact runner one rule to report while retaining all six clean witnesses. No
+operations are filtered based on whether they are expected to fail. The runner removes the
+copied sources, packages and builds on exit; it retains the patch, input hashes, build logs,
+exit code, and any evidence graph in its printed `build/quint-feasibility/native-fault.*` directory.
+
+Two agents cross-reviewed the runner and harness and independently ran the final sources on
+Linux ARM64 (Python 3.12.15, Hypothesis 6.151.10, Quint 0.33.1 for generation). The clean property
+checked 120 examples, matched all six rules, and wrote no graph. The faulted build checked 23
+examples with 11 violations. Hypothesis shrank `create(a) → create(a) → update(b)` to
+`create(a) → create(a)`, starting with no ref and finishing with a commit attempt. Both builds
+reported `invalid_state`; only the faulted one published the staged ref and marker. The harness
+saved the exact checked batch reported by Hypothesis at root `4e0b18e71b4e67b33a5b705634098dfd`.
+
+A fresh pristine process recovered the exact failing batch from the supplied pin and recipe
+and reported `commitPoisoned` as the only violation, without rerunning the recipe or opening a
+writer during replay. Separately executing the shrunk recipe on pristine DML rolled back both
+writes. Independent controls reopened the graph after removal of the disposable packages,
+rejected a wrong pin and recipe, and showed that substituting a second copy of the pristine
+package for the faulted one produced no saved failure. Offline stages had no Quint, Node or npm on `PATH`;
+they were not filesystem sandboxes.
+
+Final receipts are under `build/quint-feasibility/native-fault.RNubTK/` and
+`build/quint-feasibility/native-fault.9nUXrq/`; the initial non-detecting run is retained at
+`build/quint-feasibility/native-fault.7sssLj/`. A focused C Valgrind probe exercised poisoned abort,
+publication, and handle cleanup in both builds with zero errors and no leaks. An attempted
+full Python Valgrind run did not load Hypothesis through the interpreter wrapper. A narrower
+instrumented Python probe reported 56 bytes definitely lost with the same CPython parser stack in
+both builds. Neither Python memory check passed. Logs remain in
+`build/quint-feasibility/native-fault-valgrind.LFy7Tq/` and
+`build/quint-feasibility/native-fault-memory.HzMSLx/`, including the passing `native-c/` logs.
+No maintained code changed; the full maintained gate and CI were not rerun.
 
 ## Limits
 
