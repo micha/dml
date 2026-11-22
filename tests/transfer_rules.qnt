@@ -2,7 +2,7 @@ module transfer_rules {
   type Row = { key: str, packed: str }
   type Edge = { parent: str, child: str }
   type Change = { kind: str, key: str, before: str, after: str }
-  type DatumRead = { stage: str, id: str, kind: int, i64: int }
+  type DatumRead = { stage: str, parent: str, id: str, kind: int, i64: int }
   type Attempt = {
     command: str,
     status: str,
@@ -15,7 +15,10 @@ module transfer_rules {
     value: DatumRead
   }
   type Commit = { id: str, packed: str }
-  type Fixture = { root: Commit, initialHead: Commit, datum: str, rows: List[Row], edges: List[Edge] }
+  type Parent = { id: str, datum: str }
+  type Fixture = {
+    root: Commit, initialHead: Commit, datum: str, parent: Parent, rows: List[Row], edges: List[Edge]
+  }
   type Observation = { fixture: Fixture, attempts: List[Attempt] }
   type Expected = { present: bool, importedExport: bool, published: bool, canonical: str }
 
@@ -25,7 +28,7 @@ module transfer_rules {
     present: false, importedExport: false, published: false, canonical: ""
   }
   pure val publicationSequence = List("export", "import_exported", "read_main", "read_value",
-                                      "publish_imported", "read_main", "read_value")
+                                      "publish_imported", "read_main", "read_value", "read_parent_value")
   pure val goodExports = Set("export", "repeat", "reexport")
   pure val goodImports = Set("import", "alternative", "import_exported")
   pure val emptyExports = Set("missing_root", "missing_edge", "busy_export", "oversize_export")
@@ -61,7 +64,8 @@ module transfer_rules {
   pure def expectedStatus(command: str, published: bool): str =
     if (command == "read_value") (if (published) "ok" else "not_found")
     else if (goodExports.contains(command) or goodImports.contains(command)
-        or command == "read_main" or command == "publish_imported") "ok"
+        or command == "read_main" or command == "read_parent_value"
+        or command == "publish_imported") "ok"
     else if (busy.contains(command)) "invalid_state"
     else if (badHeaders.contains(command)) "invalid_header"
     else if (badBounds.contains(command)) "invalid_bounds"
@@ -113,13 +117,16 @@ module transfer_rules {
 
   pure def valueVerdict(attempt: Attempt, fixture: Fixture, published: bool): str = {
     val expectedTip = if (published) fixture.root.id else fixture.initialHead.id
-    // The old tree lacks `all`. The new tree binds `all` / `z-bound` to I64(45)
-    // by construction, not by decoding the source fixture's observed bytes.
+    // The initial tree lacks `all`. Through the same path, the published tip yields I64(45)
+    // and its first parent yields I64(41), by construction rather than decoding observed bytes.
     val expected: DatumRead =
-      if (published) { stage: "datum_decode", id: fixture.datum, kind: 3, i64: 45 }
-      else { stage: "tree_entry", id: sentinel, kind: 0, i64: 0 }
+      if (attempt.command == "read_parent_value")
+        { stage: "datum_decode", parent: fixture.parent.id, id: fixture.parent.datum, kind: 3, i64: 41 }
+      else if (published) { stage: "datum_decode", parent: "", id: fixture.datum, kind: 3, i64: 45 }
+      else { stage: "tree_entry", parent: "", id: sentinel, kind: 0, i64: 0 }
     if (attempt.result != expectedTip) "read_target"
     else if (attempt.value.stage != expected.stage) "read_value_stage"
+    else if (attempt.value.parent != expected.parent) "read_parent"
     else if (attempt.value.id != expected.id) "read_datum"
     else if (attempt.value.kind != expected.kind or attempt.value.i64 != expected.i64) "read_value"
     else "pass"
@@ -134,15 +141,16 @@ module transfer_rules {
     if (status == "unknown_command") "unknown_command"
     else if (attempt.status != status) "status"
     else if (attempt.completion != completion) "completion"
-    else if (command == "publish_imported" and (not(state.importedExport) or state.published))
-      "publication_order"
+    else if ((command == "publish_imported" and (not(state.importedExport) or state.published))
+             or (command == "read_parent_value" and not(state.published))) "publication_order"
     else if (changes != expectedChanges(command, fixture, state)) "inventory"
     else if (goodExports.contains(command)) exportVerdict(attempt, fixture, state.canonical)
     else if (goodImports.contains(command) and attempt.result != fixture.root.id) "import_root"
     else if (command == "publish_imported" and attempt.result != fixture.root.id) "publish_target"
     else if (command == "read_main")
       readVerdict(attempt, if (state.published) fixture.root else fixture.initialHead)
-    else if (command == "read_value") valueVerdict(attempt, fixture, state.published)
+    else if (command == "read_value" or command == "read_parent_value")
+      valueVerdict(attempt, fixture, state.published)
     else if (emptyExports.contains(command) and attempt.shape != "empty") "export_not_empty"
     else if (command == "dirty_export" and attempt.shape != "unchanged") "export_changed_buffer"
     else if (attempt.shape == "" and status != "ok" and attempt.result != sentinel)
@@ -169,9 +177,10 @@ module transfer_rules {
   pure val root = { key: "cc", packed: "dd" }
   pure val fixture = {
     root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" }, datum: "aa",
+    parent: { id: "55", datum: "77" },
     rows: List(leaf, root), edges: List({ parent: "cc", child: "aa" })
   }
-  pure val noValue: DatumRead = { stage: "", id: "", kind: 0, i64: 0 }
+  pure val noValue: DatumRead = { stage: "", parent: "", id: "", kind: 0, i64: 0 }
   pure val exported = {
     command: "export", status: "ok", completion: "none", shape: "buffer", result: "cc",
     binary: "ff", rows: List(leaf, root), changes: List(), value: noValue
@@ -197,11 +206,15 @@ module transfer_rules {
   pure val valueRead = {
     command: "read_value", status: "ok", completion: "none", shape: "", result: "cc",
     binary: "", rows: List(), changes: List(),
-    value: { stage: "datum_decode", id: "aa", kind: 3, i64: 45 }
+    value: { stage: "datum_decode", parent: "", id: "aa", kind: 3, i64: 45 }
   }
   pure val valueMiss = {
     ...valueRead, status: "not_found", result: "ee",
-    value: { stage: "tree_entry", id: sentinel, kind: 0, i64: 0 }
+    value: { stage: "tree_entry", parent: "", id: sentinel, kind: 0, i64: 0 }
+  }
+  pure val parentRead = {
+    ...valueRead, command: "read_parent_value",
+    value: { stage: "datum_decode", parent: "55", id: "77", kind: 3, i64: 41 }
   }
   pure val imported = { ...earlyPublication, changes: List(
     { kind: "added", key: "aa", before: "", after: "bb" },
@@ -234,9 +247,18 @@ module transfer_rules {
       fixture, publishedState) == "read_value",
     verdict({ ...valueRead, value: { ...valueRead.value, i64: 44 } },
       fixture, publishedState) == "read_value",
+    verdict(parentRead, fixture, publishedState) == "pass",
+    verdict(parentRead, fixture, importedState) == "publication_order",
+    verdict({ ...parentRead, value: { ...parentRead.value, parent: "cc" } },
+      fixture, publishedState) == "read_parent",
+    verdict({ ...parentRead, value: { ...valueRead.value, parent: "55" } },
+      fixture, publishedState) == "read_datum",
+    verdict({ ...parentRead, value: { ...parentRead.value, i64: 45 } },
+      fixture, publishedState) == "read_value",
     coversPublication(List(exported, imported, exported, readback, valueMiss,
-                           published, readback, valueRead, exported)),
-    not(coversPublication(List(exported, imported, valueMiss, published, readback, valueRead))),
-    not(coversPublication(List(exported, imported, readback, valueMiss, published, readback)))
+                           published, readback, valueRead, parentRead, exported)),
+    not(coversPublication(List(exported, imported, valueMiss, published, readback, valueRead, parentRead))),
+    not(coversPublication(List(exported, imported, readback, valueMiss, published, readback, parentRead))),
+    not(coversPublication(List(exported, imported, readback, valueMiss, published, readback, valueRead)))
   }
 }

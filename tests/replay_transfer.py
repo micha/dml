@@ -22,7 +22,8 @@ EDGES = {
     "literal": ("map",), "inner": ("literal",), "nested": ("inner",), "bound": ("fifth",),
     "outer": ("nested", "bound"), "main_tree": ("outer", "inner"), "empty_tree": (),
     "ancestor": ("empty_tree",), "old_head": ("empty_tree", "ancestor"),
-    "parent_tree": ("inner",), "other_parent": ("parent_tree",),
+    "historical_literal": ("first",), "historical_dag": ("historical_literal",),
+    "parent_tree": ("historical_dag",), "other_parent": ("parent_tree",),
     "root": ("main_tree", "other_parent", "old_head"),
 }
 LARGE_ORDER = ("small", "large", "list", "single_node", "single_dag", "single_tree", "root")
@@ -154,7 +155,7 @@ def variant(command, frames):
 
 
 def no_value():
-    return dict(stage="", id="", kind=0, i64=0)
+    return dict(stage="", parent="", id="", kind=0, i64=0)
 
 
 def export_attempt(runner, command, repo, root, path):
@@ -189,6 +190,7 @@ def fixture_model(frames, kept):
     return dict(
         root=commit(frames["root"]), initialHead=commit(kept["keep"]),
         datum=frames["fifth"].identifier.hex(),
+        parent=dict(id=frames["other_parent"].identifier.hex(), datum=frames["first"].identifier.hex()),
         rows=[frames[label].row for label in EDGES],
         edges=[dict(parent=frames[label].row["key"], child=frames[child].row["key"])
                for label, children in EDGES.items() for child in children],
@@ -230,6 +232,7 @@ class Suite:
             "publish_imported": fixture.publish_imported,
             "read_main": fixture.read_main,
             "read_value": fixture.read_value,
+            "read_parent_value": fixture.read_parent_value,
         }, fixture_model(frames, kept))
 
 
@@ -307,18 +310,28 @@ class TransferHistory:
                     result=result, binary=packed, rows=[], changes=changes, value=no_value())
 
     def read_value(self, entry, binding):
+        return self.read_snapshot("read_value", entry, binding)
+
+    def read_parent_value(self, index, entry, binding):
+        return self.read_snapshot("read_parent_value", index, entry, binding)
+
+    def read_snapshot(self, command, *args):
         repo = self.destination
         before = scan_inventory(self.scanner, repo)
-        stdout = run_native(self.runner, "read_value", repo, entry, binding)
-        match = re.fullmatch(r"([a-z_]+) ([a-z_]+) ([0-9a-f]{32}) ([0-9a-f]{32}) "
-                             r"([0-9]+) (-?[0-9]+)\n", stdout)
+        stdout = run_native(self.runner, command, repo, *args)
+        parent_field = r"(?P<parent>[0-9a-f]{32}) " if command == "read_parent_value" else ""
+        match = re.fullmatch(r"(?P<status>[a-z_]+) (?P<stage>[a-z_]+) (?P<head>[0-9a-f]{32}) "
+                             rf"{parent_field}(?P<datum>[0-9a-f]{{32}}) "
+                             r"(?P<kind>[0-9]+) (?P<i64>-?[0-9]+)\n", stdout)
         if not match:
-            raise ValueError(f"Unexpected C snapshot read response: {stdout!r}")
-        status, stage, head, datum, kind, value = match.groups()
+            raise ValueError(f"Unexpected C {command} response: {stdout!r}")
+        observed = match.groupdict()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
-        return dict(command="read_value", status=status, completion="none", shape="", result=head,
-                    binary="", rows=[], changes=changes,
-                    value=dict(stage=stage, id=datum, kind=int(kind), i64=int(value)))
+        return dict(command=command, status=observed["status"], completion="none", shape="",
+                    result=observed["head"], binary="", rows=[], changes=changes,
+                    value=dict(stage=observed["stage"], parent=observed.get("parent", ""),
+                               id=observed["datum"], kind=int(observed["kind"]),
+                               i64=int(observed["i64"])))
 
     def bundle_for(self, case):
         if case in self.large_bundles:

@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +118,11 @@ static void seed_source(dml_txn *txn) {
   dml_object_id empty = tree(txn, "empty_tree", NULL, 0);
   dml_object_id ancestor = commit(txn, "ancestor", empty, NULL, 0);
   dml_object_id old_head = commit(txn, "old_head", empty, &ancestor, 1);
-  dml_tree_entry parent_entry = {name("inner-only"), inner};
+  dml_object_id historical_literal = node(txn, "historical_literal", DML_NODE_LITERAL, first);
+  dml_dag_binding historical_binding = {name("z-bound"), historical_literal};
+  dml_object_id historical_dag = dag(txn, "historical_dag", historical_literal,
+                                     &historical_binding, 1);
+  dml_tree_entry parent_entry = {name("all"), historical_dag};
   dml_object_id parent_tree = tree(txn, "parent_tree", &parent_entry, 1);
   dml_object_id other_parent = commit(txn, "other_parent", parent_tree, NULL, 0);
   const dml_object_id parents[] = {other_parent, old_head};
@@ -300,16 +305,30 @@ static dml_status find_tree_entry(const dml_object_view *tree_view, dml_bytes en
 typedef struct {
   const char *stage;
   dml_object_id head;
+  dml_object_id parent;
   dml_object_id datum_id;
   dml_datum_kind kind;
   int64_t value;
 } value_observation;
 
-static dml_status read_tree_dag(dml_txn *txn, dml_bytes entry_name, dml_object_id *dag_id,
-                                value_observation *out) {
+static dml_status read_parent(dml_txn *txn, size_t index, value_observation *out) {
+  dml_buffer packed = {0};
+  dml_object_view view;
+  out->stage = "head_commit";
+  dml_status status = get_object_view(txn, DML_REC_COMMIT, &out->head, &packed, &view);
+  if (status == DML_OK) {
+    out->stage = "parent";
+    status = dml_object_view_parent(&view, index, &out->parent, NULL);
+  }
+  dml_buffer_free(&packed);
+  return status;
+}
+
+static dml_status read_tree_dag(dml_txn *txn, const dml_object_id *commit_id, dml_bytes entry_name,
+                                dml_object_id *dag_id, value_observation *out) {
   out->stage = "commit";
   dml_object_id tree_id;
-  dml_status status = read_object_reference(txn, DML_REC_COMMIT, &out->head, &tree_id, NULL);
+  dml_status status = read_object_reference(txn, DML_REC_COMMIT, commit_id, &tree_id, NULL);
   if (status != DML_OK) return status;
 
   dml_buffer packed = {0};
@@ -359,14 +378,20 @@ static dml_status read_literal_datum(dml_txn *txn, const dml_object_id *node_id,
   return status;
 }
 
-static dml_status read_value_path(dml_txn *txn, dml_bytes entry_name, dml_bytes binding_name,
-                                  value_observation *out) {
+static dml_status read_value_path(dml_txn *txn, const size_t *parent_index, dml_bytes entry_name,
+                                  dml_bytes binding_name, value_observation *out) {
   out->stage = "ref";
   dml_status status = dml_txn_ref_get(txn, name("main"), &out->head, NULL);
   if (status != DML_OK) return status;
 
+  const dml_object_id *commit_id = &out->head;
+  if (parent_index != NULL) {
+    status = read_parent(txn, *parent_index, out);
+    if (status != DML_OK) return status;
+    commit_id = &out->parent;
+  }
   dml_object_id dag_id, node_id;
-  status = read_tree_dag(txn, entry_name, &dag_id, out);
+  status = read_tree_dag(txn, commit_id, entry_name, &dag_id, out);
   if (status != DML_OK) return status;
   out->stage = "binding";
   status = dml_txn_lookup_node(txn, &dag_id, binding_name, &node_id, NULL);
@@ -374,21 +399,39 @@ static dml_status read_value_path(dml_txn *txn, dml_bytes entry_name, dml_bytes 
   return read_literal_datum(txn, &node_id, out);
 }
 
-static void read_value(dml_repo *repo, const char *entry_name, const char *binding_name) {
+static void read_value(dml_repo *repo, const size_t *parent_index, const char *entry_name,
+                       const char *binding_name) {
   value_observation observed = {.stage = "begin"};
   memset(observed.head.bytes, 0xa5, sizeof(observed.head.bytes));
+  memset(observed.parent.bytes, 0xa5, sizeof(observed.parent.bytes));
   memset(observed.datum_id.bytes, 0xa5, sizeof(observed.datum_id.bytes));
 
   dml_txn *txn = NULL;
   dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, NULL);
-  if (status == DML_OK) status = read_value_path(txn, name(entry_name), name(binding_name), &observed);
+  if (status == DML_OK) {
+    status = read_value_path(txn, parent_index, name(entry_name), name(binding_name), &observed);
+  }
   dml_txn_abort(&txn);
 
   char head_hex[DML_OBJECT_ID_HEX_SIZE + 1], datum_hex[DML_OBJECT_ID_HEX_SIZE + 1];
   format_id(observed.head, head_hex);
   format_id(observed.datum_id, datum_hex);
-  printf("%s %s %s %s %u %" PRId64 "\n", dml_status_name(status), observed.stage,
-         head_hex, datum_hex, (unsigned)observed.kind, observed.value);
+  printf("%s %s %s ", dml_status_name(status), observed.stage, head_hex);
+  if (parent_index != NULL) {
+    char parent_hex[DML_OBJECT_ID_HEX_SIZE + 1];
+    format_id(observed.parent, parent_hex);
+    printf("%s ", parent_hex);
+  }
+  printf("%s %u %" PRId64 "\n", datum_hex, (unsigned)observed.kind, observed.value);
+}
+
+static bool parse_parent_index(const char *text, size_t *index) {
+  if (*text == '\0' || text[strspn(text, "0123456789")] != '\0') return false;
+  errno = 0;
+  uintmax_t value = strtoumax(text, NULL, 10);
+  if (errno == ERANGE || value > SIZE_MAX) return false;
+  *index = (size_t)value;
+  return true;
 }
 
 /* The public DML API cannot create these corrupt-store fixtures. */
@@ -443,18 +486,26 @@ int main(int argc, char **argv) {
   bool publishing = argc == 4 && strcmp(argv[1], "publish_main") == 0;
   bool reading = argc == 3 && strcmp(argv[1], "read_main") == 0;
   bool reading_value = argc == 5 && strcmp(argv[1], "read_value") == 0;
-  if (!create && !exporting && !importing && !publishing && !reading && !reading_value) {
+  bool reading_parent = argc == 6 && strcmp(argv[1], "read_parent_value") == 0;
+  if (!create && !exporting && !importing && !publishing && !reading &&
+      !reading_value && !reading_parent) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
                     "       transfer_replay publish_main REPO TARGET\n"
                     "       transfer_replay read_main REPO\n"
                     "       transfer_replay read_value REPO TREE_ENTRY BINDING\n"
+                    "       transfer_replay read_parent_value REPO PARENT_INDEX TREE_ENTRY BINDING\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
   }
-  const char *mode = publishing || reading || reading_value ? "" : argv[argc - 1];
+  size_t parent_index;
+  if (reading_parent && !parse_parent_index(argv[3], &parent_index)) {
+    fprintf(stderr, "invalid parent index: %s\n", argv[3]);
+    return EXIT_FAILURE;
+  }
+  const char *mode = publishing || reading || reading_value || reading_parent ? "" : argv[argc - 1];
   if (create && strcmp(mode, "source") && strcmp(mode, "destination") &&
       strcmp(mode, "large") && strcmp(mode, "oversize")) {
     fprintf(stderr, "unknown fixture profile: %s\n", mode);
@@ -475,7 +526,9 @@ int main(int argc, char **argv) {
   } else if (reading) {
     read_main(repo);
   } else if (reading_value) {
-    read_value(repo, argv[3], argv[4]);
+    read_value(repo, NULL, argv[3], argv[4]);
+  } else if (reading_parent) {
+    read_value(repo, &parent_index, argv[4], argv[5]);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

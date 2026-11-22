@@ -19,7 +19,9 @@ ref alone, then moves it to the imported commit in a separate transaction and
 reopens the repository to read the new tip. A separate public API walk from
 `main` through the commit's tree entry and named DAG binding checks that the
 same path is absent before publication and resolves to the expected datum ID,
-kind, and scalar value afterward. Each read must leave the inventory unchanged.
+kind, and scalar value afterward. A fresh process then follows the published
+commit's first parent and reads the same path, which resolves to a distinct datum
+and value. Each read must leave the inventory unchanged.
 
 ## Add a request or operation
 
