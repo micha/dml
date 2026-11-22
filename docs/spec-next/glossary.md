@@ -42,9 +42,8 @@ capture the referenced external contents.
 An element of a computational DAG. In the explored recursive model, a node describes
 a sub-DAG or a primitive operation. A literal node connects a datum to the graph.
 Exact node representation and executable behavior remain iteration-specific.
-The installed [builtin value-node interface](../internal-builtins.md) is a semantic callable
-handle with copied datum access, distinct from native Literal/SubDAG storage descriptions;
-it does not turn Datum into Node or grant implicit provenance access.
+The implemented [node kinds](objects.md#typed-object-structure) describe stored
+structure, not a callable interface.
 
 ### DAG
 

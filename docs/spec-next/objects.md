@@ -119,12 +119,5 @@ snapshot. Retrieve parent commits to inspect history.
 
 - [object.c](../../src/object.c): name profile, codecs and borrowed views.
 - [object_id.c](../../src/object_id.c): common immutable-object identity.
-- [C object tests](../../tests/c/test_object.c): boundaries and round trips.
-- [Object property tests](../../tests/python/test_objects_hypothesis.py): independent
-  encoding oracles, canonical ordering and malformed records.
-- [History tests](../../tests/python/test_history.py): fresh-process snapshots,
-  branching and ordered multiple-parent persistence.
 
-Actual validation runs and outstanding gates are recorded in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
-and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).
+The [feasibility checkpoint](README.md#what-exists-today) preserves earlier tests and results.

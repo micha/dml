@@ -95,22 +95,12 @@ The as-built contracts in `docs/spec-next/` remain authoritative for technical b
   files and external resources are not LMDB entities merely because they describe them.
 - Keep the HTML a single self-contained offline file, including its styles/scripts.
   Repository-local authority/source links are allowed; no CDN/runtime dependency.
-- Keep `tests/python/test_lmdb_entity_diagram.py` current and run its focused checks
-  when changing the diagram or its storage model. These scope/link checks do not replace
-  semantic review of fields, relationships and boundary claims. Check browser behavior
-  when changing rendering or interactions.
+- Verify the diagram's scope and links when changing it or its storage model. These
+  checks do not replace semantic review of fields, relationships and boundary claims.
+  Check browser behavior when changing rendering or interactions.
 
 ## 9. Current Canonical Ownership (Spec Suite)
 
-- Packed-record model, encoding, hashing, keyspace, validation:
-  `docs/spec/object-model.md`
-- Execution lifecycle, caching/retries, in-flight policy, and execution
-  adapters: `docs/spec/execution.md`
-- Remotes, transfer protocol, and remote adapters:
-  `docs/spec/remotes.md`
-- CLI command contract and CLI-facing behavior:
-  `docs/spec/cli.md`
-- Python API surface and binding behavior:
-  `docs/spec/python-bindings.md`
-- Spec navigation and concept-to-source map:
-  `docs/spec/overview.md`
+The [as-built specification map](spec-next/README.md#concept-ownership) lists the
+owners of implemented behavior. The [old draft](spec/overview.md) is not an
+implementation contract.

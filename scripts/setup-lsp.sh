@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Keep the single core/binding editor build separate from coverage/mutation builds.
+# Keep the editor build separate from the validation build.
 root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   echo "Usage: scripts/setup-lsp.sh"
-  echo "Configure the core/binding Meson project and generate compile_commands.json for clangd."
+  echo "Configure the C core and generate compile_commands.json for clangd."
   exit 0
 fi
 if [ "$#" -ne 0 ]; then

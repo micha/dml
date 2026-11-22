@@ -1,217 +1,40 @@
-# DML: the evolving as-built specification
-
-Status: implemented subset, growing through the design spiral. The datum foundation
-was initially inspected at `638cc42`; the minimum viable repository extends it with
-literal/sub-DAG-reference nodes, named DAGs, trees, commits and transactional refs.
+# DML: as-built specification
 
 ## Authority boundary
 
-This document owns navigation and the concept-to-document map for this
-**new-direction, as-built specification**. Technical contracts belong to the
-documents below. Documented functionality defines the implemented scope; there
-is no separate inventory of future or missing features.
-
-Follow [Documentation Writing Guidelines](../documentation-guidelines.md),
-especially Sections 2–5. The existing [draft specification](../spec/overview.md)
-remains untouched. Its proposed functionality is not automatically inherited as
-implemented behavior or as a requirement of this new direction.
-
-## Start here
-
-- Humans: read this page, then the technical document relevant to your task.
-- Agents: also read [AGENTS.md](AGENTS.md).
-- Vocabulary: use the shared [glossary](glossary.md).
-  Glossary inclusion does not establish implemented behavior; technical contracts
-  remain in this specification.
-- Implementation: [C sources](../../src/) and [public headers](../../include/dml/).
-- Design discussion and iteration planning live separately in
-  [dml-design](../../../dml-design/README.md), not in normative technical sections.
-
-## Document map
-
-The diagram is informative. Arrows mean documentation references, not runtime
-object relationships.
-
-```mermaid
-flowchart TD
-    README["README.md<br/>Orientation, status and ownership map"]
-    AGENTS["AGENTS.md<br/>Agent maintenance instructions"]
-    GUIDE["../documentation-guidelines.md<br/>Shared writing rules"]
-    GLOSSARY["glossary.md<br/>Shared terminology"]
-    RECORDS["records.md<br/>Datums, encoding, record identity and errors"]
-    OBJECTS["objects.md<br/>Named/nested DAG and history fields, names and views"]
-    REPO["repository.md<br/>Local storage, refs, transactions and ownership"]
-    PY["python-api.md<br/>Python values, errors and contexts"]
-    LOCAL["local-execution.md<br/>Trusted local Python steps and ordinary execution records"]
-    TRANSFER["transfer.md<br/>Pinned commit bundles, full typed closure and atomic import"]
-    EXCHANGE["repository-execution.md<br/>Pinned local A-B-A steps and explicit validated return"]
-    REQUEST["caller-requests.md<br/>Explicit caller Q and imported-Q first attempt"]
-    ASYNC["asynchronous-execution.md<br/>Owned worker launch and immutable progress packets"]
-    SSH["ssh-execution.md<br/>Strict SSH stage/start/fetch/observe and foreground ownership"]
-    FLOCI["floci-execution.md<br/>Local Floci Batch and immutable S3 progress"]
-    CLI["cli.md<br/>Inspection grammar, presentation and traversal"]
-    PACK["../packaging-and-distribution.md<br/>Native artifacts and local builds"]
-    CODE["../../src/ + ../../include/dml/<br/>Implementation evidence"]
-    TESTS["../../tests/<br/>Behavior checks"]
-    README --> AGENTS
-    README --> RECORDS
-    README --> OBJECTS
-    README --> REPO
-    README --> PY
-    README --> LOCAL
-    README --> TRANSFER
-    README --> EXCHANGE
-    EXCHANGE --> LOCAL
-    EXCHANGE --> TRANSFER
-    EXCHANGE --> PY
-    README --> REQUEST
-    REQUEST --> LOCAL
-    REQUEST --> EXCHANGE
-    REQUEST --> ASYNC
-    README --> ASYNC
-    ASYNC --> EXCHANGE
-    ASYNC --> LOCAL
-    ASYNC --> TRANSFER
-    README --> SSH
-    SSH --> EXCHANGE
-    SSH --> REQUEST
-    SSH --> LOCAL
-    README --> FLOCI
-    FLOCI --> EXCHANGE
-    FLOCI --> REQUEST
-    FLOCI --> ASYNC
-    FLOCI --> TRANSFER
-    README --> CLI
-    README --> PACK
-    PY --> REPO
-    PY --> RECORDS
-    PY --> OBJECTS
-    LOCAL --> PY
-    LOCAL --> REPO
-    LOCAL --> OBJECTS
-    TRANSFER --> PY
-    TRANSFER --> REPO
-    TRANSFER --> OBJECTS
-    CLI --> REPO
-    CLI --> OBJECTS
-    CLI --> RECORDS
-    PACK --> PY
-    PACK --> CLI
-    AGENTS --> GUIDE
-    AGENTS --> GLOSSARY
-    RECORDS --> GLOSSARY
-    OBJECTS --> GLOSSARY
-    OBJECTS --> RECORDS
-    OBJECTS --> REPO
-    OBJECTS --> CODE
-    OBJECTS --> TESTS
-    REPO --> GLOSSARY
-    REPO --> RECORDS
-    RECORDS --> CODE
-    RECORDS --> TESTS
-    REPO --> CODE
-    REPO --> TESTS
-```
+This document owns navigation and the implemented scope. The technical contracts
+belong to the documents below. The [draft specification](../spec/overview.md)
+describes proposals, not additional implemented behavior.
 
 ## Concept ownership
 
-| Topic | Authority within this specification |
+| Topic | Authority |
 | --- | --- |
-| Navigation and documented scope | This README |
-| Agent maintenance procedure | [AGENTS.md](AGENTS.md) |
-| Shared documentation style and authority conventions | [Documentation Writing Guidelines](../documentation-guidelines.md) |
-| Shared vocabulary, not implementation contracts | [Glossary](glossary.md) |
-| Datum kinds, canonical records, record IDs, URI/text behavior and error representation | [records.md](records.md) |
-| Literal/sub-DAG-node/DAG/tree/commit bodies, name profile, ordering and codec views | [objects.md](objects.md) |
-| Repository initialization, storage keys, transactions, direct reference checks, refs and handle ownership | [repository.md](repository.md) |
-| Python conversions, owned descriptions, exceptions, thread/finalizer policy and contexts | [python-api.md](python-api.md) |
-| Fixed internal builtin dispatch, versioned NULL bindings, common value-node calls and ordinary semantic profiles | [Internal builtins](../internal-builtins.md) |
-| Trusted local Python execution, record conventions, publication and capture limits | [local-execution.md](local-execution.md) |
-| Pinned commit bundles, supported profile, complete typed reachability and atomic optional-ref import | [transfer.md](transfer.md) |
-| One pinned step across local repositories, retained workspaces and selected-completion return validation | [repository-execution.md](repository-execution.md) |
-| Explicit caller request recording, imported-Q first registration and exact Cq/Q exchange selection | [caller-requests.md](caller-requests.md) |
-| Saved observation identity, live worker ownership, coherent progress discovery and immutable P/U/F packets | [asynchronous-execution.md](asynchronous-execution.md) |
-| Caller-Q SSH transport, saved identity/foreground launch, fixed helper and immutable progress | [ssh-execution.md](ssh-execution.md) |
-| Floci-only fixed local HTTP/stage/one-shot submit, saved external identity and immutable S3 progress | [floci-execution.md](floci-execution.md) |
-| Inspection CLI grammar, traversal, previews, JSON and diagnostics | [cli.md](cli.md) |
-| Native linking, packaged executable, build/install and distribution paths | [Packaging and distribution](../packaging-and-distribution.md) |
+| Datum kinds, canonical records, content identity, buffers, and errors | [Records and datums](records.md) |
+| Nodes, DAGs, trees, commits, names, and borrowed views | [Snapshot and history objects](objects.md) |
+| Repository initialization, storage keys, transactions, refs, and handles | [Local repository and transactions](repository.md) |
+| Working vocabulary | [Glossary](glossary.md) |
+| Documentation conventions | [Writing guidelines](../documentation-guidelines.md) and [agent guide](AGENTS.md) |
 
 ## What exists today
 
-- A C codec for all ten datum kinds, deterministic record encoding and IDs.
-- UTF-8/NFC and URI validation/canonicalization helpers.
-- Literal and non-executing sub-DAG-reference nodes, rooted DAGs with scoped named
-  bindings/lookup, named trees and ordered-parent commits with full-record IDs.
-- An LMDB-backed local repository storing immutable objects and mutable refs in
-  storage transactions.
-- C tests and Python tests driving native test helpers, including fresh-process
-  snapshot/history inspection and atomic object/ref rollback.
-- A linked low-level Python API constructing and reading that state through real
-  native handles, with explicit references and atomic transaction contexts.
-- A separate explicit Python local-execution layer recording pinned requests,
-  distinct attempts, cooperative child result publication and separate computation/
-  cleanup outcomes through ordinary DAGs, commits and refs.
-- A separate explicit Python transfer layer exporting complete all-parent typed
-  immutable object closures and importing bounded bundles atomically with optional
-  create-or-same-target refs, preserving bytes/IDs/occurrences without execution.
-- An explicit Python exchange layer composing pinned transfer, one fresh step in
-  independent local B and selected-history validation before return import under a
-  caller-chosen A ref, leaving existing A heads unchanged.
-- Explicit caller request recording under atomic submission/reservation refs, optional
-  pinned-Q exchange selection and public imported-Q first registration creating only T,
-  preserving the original fresh-Q mode and unchanged caller heads/request refs.
-- Additive asynchronous launch/observe/receive with separate application-owned live
-  process and saved handle, coherent pinned P/U/F packets and independent explicit-ref
-  reception, without turning provisional publication/unknown history into final success.
-- A separately imported caller-Q SSH layer/fixed installed helper for bounded stage/execute/
-  fetch and nonwaiting foreground launch/validated immutable observation, with saved identity
-  separate from live SSHLaunch ownership, strict endpoint/host-key configuration and
-  unchanged exact-Q atomic explicit-ref reception. Docker remains fixture support.
-- An explicitly imported local Floci layer and fixed installed job program: one caller-Q
-  Batch job, service attempts1, direct bounded unsigned HTTP, create-only manifest-last
-  S3 history exchange and fresh validated P/U/F observations. Saved external identity
-  needs no live caller owner; lost acknowledgements stay uncertain without automatic
-  resubmission. Existing exact-Q/explicit-ref reception remains authoritative.
-- An explicitly imported installed Python builtin surface with closed URI/version routing,
-  strict internal NULL bindings and recorder-owned argument-map NODE -> NODE calls. Nested
-  map/list getters retain actual sources separately from datum values through ordinary DAG
-  profiles, with bounded trace positions and explicit normal result-node publication. Native
-  C/CLI invocation/general evaluation is not introduced; `dml:` references are valid data.
-- A native inspection CLI and Python console forwarding to the bundled executable,
-  with human/JSON presentation, snapshots, named lookup, nested DAG traversal and
-  all-parent history traversal.
+The [C core](../../src/) implements ten datum kinds, deterministic record encoding
+and content IDs, literal and sub-DAG-reference nodes, rooted DAGs with named
+bindings, named trees, and ordered-parent commits. An LMDB-backed repository
+stores these objects and mutable refs under local storage transactions. The
+[public headers](../../include/dml/) define the API, and the
+[entity diagram](../lmdb-entity-diagram.html) shows the implemented storage layout.
+
+The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
+contains the earlier application layers and validation evidence. It does not extend
+this branch's implemented scope or establish current test coverage.
 
 ## Development policy
 
-Until `v1.0.0`, DML repositories and development state are ephemeral. Iterations do
-not require version increments, compatibility layers or data migrations. Existing
-format/schema numbers describe the current implementation; they do not establish
-pre-1.0 persistence guarantees. Recreating incompatible development data is allowed
-by this policy; deleting unrelated data or unmanaged resources is not.
+Until `v1.0.0`, repositories and development state are ephemeral. Format and schema
+numbers describe the current implementation, not a promise to migrate older state.
+This does not authorize deleting unrelated data or unmanaged resources.
 
-Prefer minimal prototypes and frequent iterations. A turn may explore breadth or
-depth as useful; it need not finish one subsystem before exploring another. In
-this spec, distinguish shortcuts, unsupported cases and tested capabilities.
-
-As functionality lands, add its owning document and update this map in the same
-scoped change. Use the shared guideline change process, but do not publish intended
-behavior as implemented before the corresponding code exists.
-
-## Reading technical sections
-
-Technical documents describe the current implemented contract. MUST, SHOULD and
-MAY are normative when used there; examples are explicitly informative. Source and
-test links provide evidence; actual validation runs and outstanding gates are in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
-and [Iteration 2 delivery notes](../../../dml-design/iterations/02-repository-usability/RESULTS.md)
-and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md)
-and [Iteration 4 results](../../../dml-design/iterations/04-local-recorded-execution/RESULTS.md)
-and [Iteration 5 results](../../../dml-design/iterations/05-pinned-snapshot-transfer/RESULTS.md)
-and [Iteration 6 results](../../../dml-design/iterations/06-local-repository-execution/RESULTS.md)
-and [Iteration 7 results](../../../dml-design/iterations/07-asynchronous-local-execution/RESULTS.md)
-and [Iteration 8 results](../../../dml-design/iterations/08-caller-recorded-requests/RESULTS.md)
-and [Iteration 9 results](../../../dml-design/iterations/09-ssh-container-execution/RESULTS.md)
-and [Iteration 10 results](../../../dml-design/iterations/10-asynchronous-ssh-execution/RESULTS.md)
-and [Iteration 11 results](../../../dml-design/iterations/11-floci-batch-execution/RESULTS.md).
-If code, tests and this spec disagree, report the
-mismatch rather than silently treating a design proposal as implemented behavior.
+Document behavior as implemented. Use MUST, SHOULD, and MAY for normative contracts
+and identify examples as informative. For current validation, see the
+[development validation policy](../validation-policy.md).

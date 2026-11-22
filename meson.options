@@ -1,6 +1,0 @@
-option(
-  'experimental_export_walk',
-  type: 'boolean',
-  value: false,
-  description: 'Enable the private native export comparison hook in local Python builds',
-)

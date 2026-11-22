@@ -76,14 +76,11 @@ formatter or linter, defer to its rules and update this section accordingly.
 - Keep tests deterministic; avoid time-dependent flakiness.
 - Prefer unit tests for pure logic; use integration tests for boundary
   interactions.
-- Prefer Python Hypothesis property-based tests for Python bindings and CLI
-  behavior.
-- Keep C tests focused on low-level scenarios (for example fault injection or
-  internal hook validation).
-- Use Mull mutation testing to validate test effectiveness.
-- Use lcov/gcov for line, function, and branch coverage tracking; target 100%
-  coverage.
-- Use coverage.py for Python source coverage; target 100% line coverage.
+- For the new suite, use Quint to generate attempted histories and evaluate
+  observations from real C API calls. The runner must not predict outcomes.
+- Use focused C tests for low-level scenarios such as allocation failures.
+- As coverage measurement is restored, target 100% C line, function, and branch
+  coverage; use mutation testing to assess whether tests detect real changes.
 - Coverage is a means of improving assurance, not an end in itself. The user
   authorizes narrow exclusions for precise lines/branches/regions where exercising
   them adds no useful assurance (for example proven-unreachable defensive edges or
@@ -93,18 +90,11 @@ formatter or linter, defer to its rules and update this section accordingly.
   does not justify an exclusion. Do not hide real behavior or bugs, lower the
   remaining coverage thresholds, or treat skipped/failing checks as passed.
   New exclusions that do not meet this no-value policy need a user decision.
-- [Coverage scope and exclusions](tests/coverage-exclusions.md) catalogs the exact
-  markers and their invariants. The private fault-test core substitutes dependency
-  calls only in test builds; do not add fault state to the installed library.
+- Do not add fault-injection state to the installed library.
 - Use Valgrind for memory checks when requested or when touching memory-critical
   code paths.
-- Use `scripts/check.sh` as the standard end-to-end validation entrypoint.
-- Default pytest discovery covers `tests/`; isolated `spikes/` experiments require explicit
-  paths and are excluded from maintained Python coverage by user-approved scope decision.
-  See [maintained validation scope](README.md#maintained-validation-scope) and the
-  [exclusion catalog](tests/coverage-exclusions.md#explicit-experimental-scope-boundary).
-- CI uses `scripts/check.sh -c` to report coverage without percentage gates;
-  see `README.md` (Build and Test) for validation modes and Windows dependencies.
+- Use `scripts/check.sh` as the standard validation entrypoint. It is build-only
+  until the new suite lands. Do not count feasibility evidence as current tests.
 - Use descriptive test names that capture the behavior.
 - Keep fixtures small and local to the test when possible.
 
@@ -157,15 +147,9 @@ formatter or linter, defer to its rules and update this section accordingly.
 Tooling and project layout guidance is being rewritten from scratch.
 Do not treat prior command examples or directory assumptions as canonical.
 
-The optional `nix develop` environment and Linux `nix develop .#valgrind` shell are documented in
-[README — Optional Nix development shell](README.md#optional-nix-development-shell).
-They supply tools; `scripts/check.sh` remains the standard validation entrypoint.
-For the isolated Linux/Nix per-exercise spike, follow the explicit source/native/runtime
-review workflow in `spikes/relational_invariants/per_exercise/README.md`; do not substitute
-historical machine hashes or treat reused evidence as fresh test execution.
-
-The isolated [Quint feasibility spike](spikes/relational_invariants/quint_feasibility/README.md)
-records its own setup and validation. Quint is not required by the maintained gate.
+[The optional Nix development shell](README.md#optional-nix-development-shell)
+supplies build tools. Historical Python, CLI, test, and spike workflows are at
+[`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
 
 ## Updating This File
 

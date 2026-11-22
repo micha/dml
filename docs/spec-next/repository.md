@@ -185,20 +185,9 @@ abort/end read transaction
 close repository
 ```
 
-See [history_driver.c](../../tests/c/history_driver.c) for a native example of
-construction and inspection through this API.
-
 ## Implementation evidence
 
 - [repo.c](../../src/repo.c): initialization, transactions, object and ref persistence.
 - [Public repository API](../../include/dml/repo.h).
-- [C repository tests](../../tests/c/test_repo.c): lifecycle and negative cases.
-- [Native-driver repository tests](../../tests/python/test_repository_hypothesis.py):
-  fresh-process reads, abort invisibility and failed-batch rollback.
-- [History tests](../../tests/python/test_history.py): fresh-process inspection,
-  branching, ordered multiple parents, immutable content, ref edges, corruption,
-  and atomic object/ref rollback even after attempted poisoned commit.
 
-Actual validation runs and outstanding gates are recorded in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
-and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).
+The [feasibility checkpoint](README.md#what-exists-today) preserves earlier tests and results.
