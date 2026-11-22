@@ -4,8 +4,9 @@ Status: direct Quint evaluation and deterministic Python generation passed for t
 create-only, mixed create/update, transaction-batch, Python context-completion and explicit-ending
 context profiles on Linux ARM64. [Graph-backed checks](#graph-backed-transaction-verification)
 reopen saved transaction evidence; [measurements](#transaction-graph-repeatability-and-cost)
-found repeatable roots but did not justify a verification cache for this profile. No Quint
-adoption or general compiler.
+found repeatable roots but did not justify a verification cache for this profile.
+[Failure artifacts](#replay-a-shrunk-transaction-failure) keep graph writes off the passing and
+shrinking paths. No Quint adoption or general compiler.
 
 ## Authority boundary
 
@@ -638,6 +639,69 @@ and a recipe-only hit would hide the marker publication change demonstrated abov
 Raw samples, receipts, source hashes and exits are ignored local artifacts under
 `build/quint-feasibility/transaction-graph/measure-worker/` and
 `build/quint-feasibility/transaction-graph-measurement/coordinator/`. No maintained code or gate
+changed; the full maintained gate and CI were not rerun.
+
+## Replay a shrunk transaction failure
+
+[`transaction_failure_artifact.py`](transaction_failure_artifact.py) executes and checks each
+Hypothesis example live. A rule violation carries the exact checked batch as it leaves the
+example. Only after Hypothesis reports a single violation does the driver save its batch as a
+pinned evidence graph and raise `SavedFailure` with the rule, batch and root. It does not save
+passing or intermediate shrink cases, re-execute the final recipe, or publish a failure artifact
+for an adapter error or missing rule witnesses. This experiment does not select an artifact from
+multiple different failures reported together.
+
+`replay_failure` takes the evidence repository, externally supplied root and recipe, then runs the
+current generated checker on the saved observations without executing the recipe. It rejects a
+valid graph that no longer reproduces a violation. A root pins observations, not checker semantics
+or the truth of those observations. The control first checks the actual DML batch, then flips only
+`markerAfter` on a poisoned commit to test reporting and replay; it is not a DML failure.
+
+After the shared setup above, in the same Nix shell:
+
+```sh
+work="$base/transaction-failure-artifact"
+mkdir -p "$work/gen" "$work/offline/empty-bin"
+python -B "$spike/generate_transactions.py" --quint "$quint" \
+  --out "$work/gen/generated_transactions.py"
+cp "$spike/check_transaction_failure_artifact.py" "$spike/transaction_failure_artifact.py" \
+  "$spike/transaction_graph.py" "$spike/transaction_binding.py" "$spike/ref_binding.py" \
+  "$work/gen/generated_transactions.py" "$work/offline/"
+python_bin=$(command -v python)
+(cd "$work/offline" && env -i PATH="$PWD/empty-bin" PYTHONPATH="$base/python" \
+  "$python_bin" -B check_transaction_failure_artifact.py)
+```
+
+The harness removes its temporary evidence by default. Add `--out "$work/evidence"` to
+retain the graph at a new path; the harness prints the root and the two-action recipe.
+
+### Failure-artifact results
+
+Two agents cross-reviewed the runner and harness and ran separate offline stages with fresh
+native builds on Linux ARM64 (Python 3.12.15, Hypothesis 6.151.10, Quint 0.33.1 for generation).
+The honest property executed 120 batches, witnessed all six rules, and never wrote evidence.
+In the marker control, Hypothesis checked 22 live batches and found nine violating candidates.
+It shrank `create(a) → create(a) → update(b)` to `create(a) → create(a)` with an initially
+absent ref and a final commit attempt.
+
+The harness observed a single graph write after Hypothesis reported the failure. It checked
+object identity against the batch that caused the reported exception and rejected execution
+outside the property. A fresh Python process reopened root `811236bf2d9d01eae623a4d61de82662`,
+returned the exact batch and all six expected verdicts, and reproduced `commitPoisoned`. Its
+guards prohibited live execution and native write transactions. It also rejected a wrong pin
+and a mismatched recipe. Both processes ran without Quint, Node or npm on `PATH`; this was
+not a filesystem sandbox.
+
+Independent boundary checks preserved an existing destination, rejected a dangling output
+symlink and refused to replay a passing graph as a failure. A simulated adapter error, missing
+witnesses and a deliberately invalid baseline before control injection produced no artifact.
+Three mutations in staged copies made the harness fail before graph creation: saving an equal
+batch copy, re-executing after the property, and writing during shrinking. The existing offline
+transaction-rules and graph round-trip harnesses also passed.
+
+Logs, exits and source hashes are ignored local artifacts under
+`build/quint-feasibility/failure-artifact/coordinator/` and
+`build/quint-feasibility/transaction-failure-artifact/worker/`. No maintained code or gate
 changed; the full maintained gate and CI were not rerun.
 
 ## Limits
