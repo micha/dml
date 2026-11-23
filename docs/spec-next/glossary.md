@@ -7,8 +7,9 @@ Status: working vocabulary, evolving with the design spiral.
 This document owns the meanings of terms used in the current design discussion
 and maintained documentation. It does not define object layouts, APIs or execution
 protocols. Implemented behavior is specified in the
-[technical documents](README.md); design agreements and open questions are recorded
-in [the design discussion](../../../dml-design/discussion.md).
+[technical documents](README.md). See [agreed design direction](../design-decisions.md)
+and the [historical design discussion](https://github.com/micha/dml/blob/archive/dml-design/discussion.md)
+for design context.
 
 An entry here does **not** mean the concept is implemented. **Provisional** marks
 an unsettled term or distinction, not merely an unimplemented feature. Examples are

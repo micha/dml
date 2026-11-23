@@ -1,13 +1,11 @@
-# DaggerML Spec Overview
+# Historical DaggerML draft specification
 
-This directory is the source of truth for the DaggerML specification.
-This overview is a navigation guide to authoritative spec documents.
+**Status: Historical draft, not an implementation contract.** For current
+behavior, start with the [as-built specification](../spec-next/README.md). For
+agreed but unimplemented direction, see [design decisions](../design-decisions.md).
 
-Authority boundary:
-
-- This overview is authoritative for spec navigation and source-of-truth mapping.
-- Normative technical behavior is defined in the individual spec documents
-  listed below.
+The documents below describe an earlier design. Their scope and authority claims
+apply within that draft, not to the current implementation.
 
 ## Reading order
 
@@ -30,7 +28,7 @@ Authority boundary:
 - Full DAG provenance as a hard invariant.
 - Deterministic binary encoding and hash stability across platforms.
 
-## Concept ownership (source of truth)
+## Concept ownership within the historical draft
 
 - Record envelope, binary encoding, canonicalization, and object hashing:
   `docs/spec/object-model.md` (Sections 4-6)
@@ -52,7 +50,3 @@ Authority boundary:
   `docs/spec/python-bindings.md` (Sections 2-7)
 - Maintainability assessment dimensions, AI-heavy weighting, and repository
   evidence expectations: `docs/spec/maintainability.md` (Sections 1-7)
-
-## Status
-
-Draft. This spec suite is the baseline for implementation.

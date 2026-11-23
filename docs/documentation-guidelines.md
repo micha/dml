@@ -102,5 +102,7 @@ The as-built contracts in `docs/spec-next/` remain authoritative for technical b
 ## 9. Current Canonical Ownership (Spec Suite)
 
 The [as-built specification map](spec-next/README.md#concept-ownership) lists the
-owners of implemented behavior. The [old draft](spec/overview.md) is not an
-implementation contract.
+owners of implemented behavior. Record agreed but unimplemented direction in
+[design decisions](design-decisions.md). The [historical draft](spec/overview.md)
+and the [design archive](https://github.com/micha/dml/tree/archive/dml-design)
+provide context, not implementation contracts.

@@ -3,8 +3,8 @@
 ## Authority boundary
 
 This document owns navigation and the implemented scope. The technical contracts
-belong to the documents below. The [draft specification](../spec/overview.md)
-describes proposals, not additional implemented behavior.
+belong to the documents below. [Agreed design direction](../design-decisions.md)
+and the [historical draft](../spec/overview.md) do not define implemented behavior.
 
 ## Concept ownership
 
