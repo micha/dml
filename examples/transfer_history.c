@@ -7,6 +7,7 @@
 
 static const dml_bytes main_ref = {(const uint8_t *)"main", sizeof("main") - 1};
 static const dml_bytes staging_ref = {(const uint8_t *)"incoming", sizeof("incoming") - 1};
+static const dml_bytes pin_ref = {(const uint8_t *)"result-pin", sizeof("result-pin") - 1};
 static const dml_bytes snapshot_name = {(const uint8_t *)"snapshot", sizeof("snapshot") - 1};
 static const dml_bytes value_name = {(const uint8_t *)"value", sizeof("value") - 1};
 
@@ -81,20 +82,18 @@ static bool write_revision(dml_repo *repo, int64_t value, const dml_object_id *p
   return ok;
 }
 
-static bool destination_main_missing(dml_repo *repo, dml_error *error) {
+static bool ref_missing(dml_repo *repo, dml_bytes ref, dml_error *error) {
   dml_txn *txn = NULL;
-  if (!check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin pre-publication read", error)) {
-    return false;
-  }
+  if (!check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin ref check", error)) return false;
   dml_object_id observed;
-  dml_status status = dml_txn_ref_get(txn, main_ref, &observed, error);
+  dml_status status = dml_txn_ref_get(txn, ref, &observed, error);
   dml_txn_abort(&txn);
   if (status == DML_NOT_FOUND) return true;
   if (status == DML_OK) {
-    fputs("destination main exists before explicit publication\n", stderr);
+    fprintf(stderr, "unexpected ref exists: %.*s\n", (int)ref.len, (const char *)ref.data);
     return false;
   }
-  return check(status, "check destination main", error);
+  return check(status, "check ref absence", error);
 }
 
 static bool create_ref(dml_repo *repo, dml_bytes ref, const dml_object_id *tip, dml_error *error) {
@@ -153,42 +152,78 @@ static dml_status add_one(int64_t input, int64_t *output) {
   return DML_OK;
 }
 
-static bool verify_lineage(dml_repo *repo, const lineage_input *input,
-                           const lineage_candidate *candidate, dml_bytes identity, dml_error *error) {
+static dml_bytes implementation_id(void) {
+  return lineage_name("example.add-one@1");
+}
+
+/* Inspect the supplied ID directly unless a local ref is explicitly requested. */
+static bool verify_lineage(dml_repo *repo, dml_bytes ref, dml_object_id *tip, const lineage_input *input,
+                           const lineage_candidate *candidate, dml_error *error) {
   lineage_observation observed = {0};
   dml_txn *txn = NULL;
-  bool ok = check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin lineage read", error) &&
-            check(lineage_inspect(txn, snapshot_name, value_name, &observed, error), "read lineage", error);
+  bool ok = check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin lineage read", error);
+  if (ok && ref.len != 0) {
+    ok = check(dml_txn_ref_get(txn, ref, tip, error), "resolve result ref", error);
+  }
+  if (ok) {
+    ok = check(lineage_inspect(txn, tip, snapshot_name, value_name, &observed, error), "read lineage", error);
+  }
   dml_txn_abort(&txn);
   if (ok && (!same_id(&observed.commit, &candidate->commit) ||
              !same_id(&observed.input.commit, &input->commit) ||
              !same_id(&observed.input.datum, &input->datum) || observed.input.value != input->value ||
              !same_id(&observed.output_datum, &candidate->output_datum) || observed.output != 44 ||
              !same_id(&observed.implementation_datum, &candidate->implementation_datum) ||
-             !lineage_equal(observed.implementation, identity))) {
+             !lineage_equal(observed.implementation, implementation_id()))) {
     fputs("persisted result or lineage differs from the recorded computation\n", stderr);
     ok = false;
   }
+  if (ok) *tip = observed.commit;
   dml_buffer_free(&observed.implementation_record);
   return ok;
 }
 
 static bool run_lineage(dml_repo **repo, const char *path, const lineage_input *input,
-                        dml_error *error) {
-  const dml_bytes identity = lineage_name("example.add-one@1");
-  lineage_candidate candidate = {0};
-  return check(lineage_record(*repo, input, identity, add_one, &candidate, error), "record result", error) &&
-         check(candidate.completion, "commit result and pin", error) && close_repo(repo, error) &&
+                        lineage_candidate *candidate, dml_object_id *pinned, dml_error *error) {
+  return check(lineage_record(*repo, input, implementation_id(), add_one, candidate, error),
+               "record result", error) &&
+         check(candidate->completion, "commit result and pin", error) && close_repo(repo, error) &&
          check(dml_repo_open(path, NULL, repo, error), "reopen result repository", error) &&
-         verify_lineage(*repo, input, &candidate, identity, error) && destination_main_missing(*repo, error);
+         verify_lineage(*repo, pin_ref, pinned, input, candidate, error) && ref_missing(*repo, main_ref, error);
+}
+
+static bool return_result(dml_repo **source, const char *path, dml_repo *destination,
+                          const dml_object_id *pinned, const lineage_candidate *candidate,
+                          const lineage_input *input, dml_error *error) {
+  dml_buffer bundle = {0};
+  dml_object_id inspected;
+  bool ok = check(dml_repo_export_commit(destination, pinned, &bundle, error), "export pinned result", error) &&
+            check(dml_repo_open(path, NULL, source, error), "open original source", error) &&
+            check(dml_repo_import_commit(*source, (dml_bytes){bundle.data, bundle.len}, &inspected, error),
+                  "import result into source", error);
+  dml_buffer_free(&bundle);
+  if (!ok || !ref_missing(*source, pin_ref, error) ||
+      !verify_lineage(*source, (dml_bytes){0}, &inspected, input, candidate, error)) return false;
+
+  /* The original source main was the input tip. Compare and update atomically;
+   * publish the ID we inspected, not a fresh ref lookup. */
+  dml_txn *txn = NULL;
+  lineage_publication publication;
+  return check(dml_txn_begin(*source, DML_TXN_WRITE, &txn, error), "begin result publication", error) &&
+         check(lineage_publish_expected(&txn, main_ref, &input->commit, &inspected, &publication, error),
+               "publish inspected result", error) &&
+         close_repo(source, error) &&
+         check(dml_repo_open(path, NULL, source, error), "reopen published source", error) &&
+         verify_lineage(*source, main_ref, &inspected, input, candidate, error);
 }
 
 int main(int argc, char **argv) {
-  const bool record_lineage = argc > 1 && strcmp(argv[1], "--lineage") == 0;
+  const bool round_trip = argc > 1 && strcmp(argv[1], "--round-trip") == 0;
+  const bool record_lineage = round_trip || (argc > 1 && strcmp(argv[1], "--lineage") == 0);
   const int first_path = record_lineage ? 2 : 1;
   if (argc != first_path + 2 || argv[first_path][0] == '\0' || argv[first_path + 1][0] == '\0' ||
       strcmp(argv[first_path], argv[first_path + 1]) == 0) {
-    fputs("usage: transfer_history [--lineage] SOURCE_REPO DESTINATION_REPO\n"
+    fputs("usage: transfer_history [--lineage | --round-trip] SOURCE_REPO DESTINATION_REPO\n"
           "Use two distinct unused paths with existing parent directories.\n", stderr);
     return EXIT_FAILURE;
   }
@@ -215,16 +250,22 @@ int main(int argc, char **argv) {
     fputs("import returned a different commit ID\n", stderr);
     goto cleanup;
   }
+  dml_buffer_free(&bundle);
   lineage_input selected;
-  if (!destination_main_missing(destination, &error) ||
+  if (!ref_missing(destination, main_ref, &error) ||
       !create_ref(destination, staging_ref, &imported, &error) || !close_repo(&destination, &error) ||
       !check(dml_repo_open(destination_path, NULL, &destination, &error), "reopen staged destination", &error) ||
-      !destination_main_missing(destination, &error) ||
+      !ref_missing(destination, main_ref, &error) ||
       !verify_history(destination, staging_ref, &tip, &parent, newer_value, older_value, &selected, &error)) {
     goto cleanup;
   }
   if (record_lineage) {
-    if (!run_lineage(&destination, destination_path, &selected, &error)) goto cleanup;
+    lineage_candidate candidate = {0};
+    dml_object_id pinned;
+    if (!run_lineage(&destination, destination_path, &selected, &candidate, &pinned, &error) ||
+        (round_trip && !return_result(&source, source_path, destination, &pinned, &candidate, &selected, &error))) {
+      goto cleanup;
+    }
   } else {
     /* Publish the immutable commit just inspected, not a fresh lookup of the staging ref. */
     if (!create_ref(destination, main_ref, &selected.commit, &error) || !close_repo(&destination, &error) ||
@@ -240,8 +281,14 @@ cleanup:
   if (!close_repo(&source, &error)) result = EXIT_FAILURE;
   if (!close_repo(&destination, &error)) result = EXIT_FAILURE;
   if (result == EXIT_SUCCESS) {
-    int printed = record_lineage ? puts("result-pin = 44\ninput = 43\nimplementation = example.add-one@1")
-                                : printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", newer_value, older_value);
+    int printed;
+    if (round_trip) {
+      printed = puts("source main = 44\ndestination result-pin = 44\ninput = 43\nimplementation = example.add-one@1");
+    } else if (record_lineage) {
+      printed = puts("result-pin = 44\ninput = 43\nimplementation = example.add-one@1");
+    } else {
+      printed = printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", newer_value, older_value);
+    }
     if (printed < 0) return EXIT_FAILURE;
   }
   return result;

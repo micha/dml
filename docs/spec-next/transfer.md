@@ -123,4 +123,20 @@ identity and parent through `result-pin`; no computation is rerun. This is an
 application convention using ordinary commits, datums and refs. DML does not
 execute the function, attest that it ran, or store its code.
 
+### Return and publish the recorded result
+
+The example's `--round-trip` mode exports the result commit selected by the
+worker's `result-pin` and imports it back into the source repository. The bundle
+includes the lineage objects and the complete input history, even where the
+source already has those objects. The pin stays local to the worker. The
+source inspects the returned commit by ID, checking its sole parent, input,
+output, and implementation identifier without executing the computation.
+
+The source then reads `main` in a write transaction and moves it to the inspected
+result ID only if `main` still points to the expected tip. A stale expectation
+aborts publication without rolling back the already committed import. This is a
+caller-side conditional update, not a merge. After reopening, the source resolves
+`main` and checks the same lineage again. The worker's refs are unchanged by the
+return trip.
+
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).

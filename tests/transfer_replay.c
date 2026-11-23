@@ -246,6 +246,23 @@ static void write_ref(dml_repo *repo, bool create, const char *ref_name, const c
   printf("%s\n%s\n", dml_status_name(written), dml_status_name(committed));
 }
 
+static void publish_expected(dml_repo *repo, const char *ref, const char *expected_hex,
+                             const char *target_hex) {
+  dml_object_id expected, target;
+  require_ok(dml_object_id_parse(expected_hex, strlen(expected_hex), &expected, NULL), "parse expected ID");
+  require_ok(dml_object_id_parse(target_hex, strlen(target_hex), &target, NULL), "parse inspected ID");
+  dml_txn *txn = NULL;
+  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "begin conditional publication");
+  lineage_publication observed;
+  lineage_publish_expected(&txn, name(ref), &expected, &target, &observed, NULL);
+  char hex[DML_OBJECT_ID_HEX_SIZE + 1];
+  format_id(observed.actual, hex);
+  printf("%s %s\n%s %s\n", dml_status_name(observed.get), hex,
+         observed.attempted_update ? dml_status_name(observed.update) : "none",
+         observed.attempted_update ? dml_status_name(observed.completion) : txn == NULL ? "aborted" : "active");
+  dml_txn_abort(&txn);
+}
+
 static void read_ref(dml_repo *repo, const char *ref_name) {
   dml_txn *txn = NULL;
   require_ok(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL), "beginning readback transaction");
@@ -468,11 +485,18 @@ static void record_lineage(dml_repo *repo, const char *input_hex, const char *mo
   }
 }
 
-static void read_lineage(dml_repo *repo) {
+static void read_lineage(dml_repo *repo, bool by_ref, const char *selector) {
   lineage_observation observed = {0};
+  dml_object_id commit;
+  if (!by_ref) {
+    require_ok(dml_object_id_parse(selector, strlen(selector), &commit, NULL), "parse result ID");
+  }
   dml_txn *txn = NULL;
   dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, NULL);
-  if (status == DML_OK) status = lineage_inspect(txn, name("all"), name("z-bound"), &observed, NULL);
+  if (status == DML_OK && by_ref) status = dml_txn_ref_get(txn, name(selector), &commit, NULL);
+  if (status == DML_OK) {
+    status = lineage_inspect(txn, &commit, name("all"), name("z-bound"), &observed, NULL);
+  }
   dml_txn_abort(&txn);
 
   printf("%s\n", dml_status_name(status));
@@ -557,9 +581,11 @@ int main(int argc, char **argv) {
   bool reading_parent = argc == 7 && strcmp(argv[1], "read_parent_value") == 0;
   bool recording = argc == 5 && strcmp(argv[1], "record_lineage") == 0 &&
                    (strcmp(argv[4], "add-one") == 0 || strcmp(argv[4], "add-two") == 0);
-  bool reading_lineage = argc == 3 && strcmp(argv[1], "read_lineage") == 0;
+  bool reading_lineage = (argc == 3 || (argc == 5 && (!strcmp(argv[3], "id") || !strcmp(argv[3], "ref")))) &&
+                         strcmp(argv[1], "read_lineage") == 0;
+  bool publishing = argc == 6 && strcmp(argv[1], "publish_expected") == 0;
   if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading &&
-      !reading_value && !reading_parent && !recording && !reading_lineage) {
+      !reading_value && !reading_parent && !recording && !reading_lineage && !publishing) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
@@ -568,7 +594,8 @@ int main(int argc, char **argv) {
                     "       transfer_replay read_value REPO REF TREE_ENTRY BINDING\n"
                     "       transfer_replay read_parent_value REPO REF PARENT_INDEX TREE_ENTRY BINDING\n"
                     "       transfer_replay record_lineage REPO INPUT_ID {add-one|add-two}\n"
-                    "       transfer_replay read_lineage REPO\n"
+                    "       transfer_replay read_lineage REPO [id COMMIT_ID | ref REF]\n"
+                    "       transfer_replay publish_expected REPO REF EXPECTED_ID TARGET_ID\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
@@ -605,7 +632,9 @@ int main(int argc, char **argv) {
   } else if (recording) {
     record_lineage(repo, argv[3], argv[4]);
   } else if (reading_lineage) {
-    read_lineage(repo);
+    read_lineage(repo, argc == 3 || strcmp(argv[3], "ref") == 0, argc == 3 ? "result-pin" : argv[4]);
+  } else if (publishing) {
+    publish_expected(repo, argv[3], argv[4], argv[5]);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

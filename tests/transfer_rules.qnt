@@ -7,6 +7,7 @@ module transfer_rules {
     parent: str, inputDatum: str, outputDatum: str, implementationDatum: str,
     inputValue: int, outputValue: int, implementation: str
   }
+  type Publication = { expected: str, actual: str, update: str }
   type Attempt = {
     command: str,
     status: str,
@@ -16,18 +17,23 @@ module transfer_rules {
     binary: str,
     rows: List[Row],
     changes: List[Change],
+    otherChanges: List[Change],
     value: DatumRead,
-    lineage: Lineage
+    lineage: Lineage,
+    publication: Publication
   }
   type Commit = { id: str, packed: str }
   type Parent = { id: str, datum: str }
   type Fixture = {
-    root: Commit, initialHead: Commit, datum: str, parent: Parent, rows: List[Row], edges: List[Edge]
+    root: Commit, initialHead: Commit, sourceHead: Commit, rootKey: str,
+    datum: str, parent: Parent, rows: List[Row], edges: List[Edge]
   }
   type Observation = { fixture: Fixture, attempts: List[Attempt] }
   type Expected = {
     present: bool, importedExport: bool, staged: bool, published: bool, canonical: str,
-    selected: bool, result: str, outputDatum: str, implementationDatum: str
+    selected: bool, result: str, outputDatum: str, implementationDatum: str, resultRows: List[Row],
+    captured: bool, returnExported: bool, returned: bool, inspected: bool,
+    staleRejected: bool, returnPublished: bool
   }
 
   pure val sentinel = "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
@@ -36,13 +42,21 @@ module transfer_rules {
   pure val resultKey = "726566732f68656164732f726573756c742d70696e" // refs/heads/result-pin
   pure val initial: Expected = {
     present: false, importedExport: false, staged: false, published: false, canonical: "",
-    selected: false, result: "", outputDatum: "", implementationDatum: ""
+    selected: false, result: "", outputDatum: "", implementationDatum: "", resultRows: List(),
+    captured: false, returnExported: false, returned: false, inspected: false,
+    staleRejected: false, returnPublished: false
   }
   pure val publicationSequence = List("export", "import_exported", "read_main", "read_value",
     "read_staged", "stage_imported", "read_staged", "read_staged_value", "read_staged_parent_value",
     "read_main", "publish_imported", "read_main", "read_value", "read_parent_value")
   pure val lineageSequence = List("export", "import_exported", "stage_imported", "read_staged_value",
     "record_add_one", "read_lineage", "record_add_two", "read_lineage", "read_main", "read_staged")
+  pure val returnSequence = lineageSequence.concat(List("capture_source_main", "export_return", "import_return",
+    "repeat_return", "read_source_main", "inspect_return", "reject_stale_return", "read_source_main",
+    "publish_return", "read_returned_main", "read_source_pin", "read_main", "read_staged", "read_lineage"))
+  // Both publication attempts report the ref-get status here; their update and completion are separate.
+  pure val returnOkStatuses = Set("capture_source_main", "export_return", "import_return", "repeat_return",
+    "read_source_main", "inspect_return", "reject_stale_return", "publish_return", "read_returned_main")
   pure val refWrites = Set("stage_imported", "publish_imported")
   pure val lineageWrites = Set("record_add_one", "record_add_two")
   pure val stagedValues = Set("read_staged_value", "read_staged_parent_value")
@@ -79,13 +93,14 @@ module transfer_rules {
       row.attempts.foldl(allSeen, (seen, attempt) => seen.union(Set(attempt.command))))
     requiredCases.subseteq(seen)
       and evidence.foldl(false, (covered, row) => covered or coversPublication(row.attempts))
-      and evidence.foldl(false, (covered, row) => covered or coversSequence(row.attempts, lineageSequence))
+      and evidence.foldl(false, (covered, row) => covered or coversSequence(row.attempts, returnSequence))
   }
 
   pure def expectedStatus(command: str, state: Expected): str =
     if (command == "read_value") (if (state.published) "ok" else "not_found")
     else if (command == "read_staged") (if (state.staged) "ok" else "not_found")
-    else if (goodExports.contains(command) or goodImports.contains(command)
+    else if (command == "read_source_pin") "not_found"
+    else if (goodExports.contains(command) or goodImports.contains(command) or returnOkStatuses.contains(command)
         or command == "read_main" or command == "read_parent_value" or command == "record_add_one"
         or command == "read_lineage" or stagedValues.contains(command) or refWrites.contains(command)) "ok"
     else if (busy.contains(command) or command == "record_add_two") "invalid_state"
@@ -123,8 +138,26 @@ module transfer_rules {
     else if (canonical != "" and canonical != attempt.binary) "export_unstable"
     else "pass"
 
+  pure def returnExportVerdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
+    val rows = state.resultRows
+    if (attempt.shape != "buffer" or attempt.result != state.result) "return_export_root"
+    else if (rows.length() != 7 or not(exactRows(attempt.rows, fixture.rows.concat(rows)))) "return_export_rows"
+    else {
+      // Candidate rows are declared in output datum/node, identity datum/node, DAG, tree, commit order.
+      val edges = List({ parent: rows[1].key, child: rows[0].key },
+        { parent: rows[3].key, child: rows[2].key }, { parent: rows[4].key, child: rows[1].key },
+        { parent: rows[4].key, child: rows[3].key }, { parent: rows[5].key, child: rows[4].key },
+        { parent: rows[6].key, child: rows[5].key }, { parent: rows[6].key, child: fixture.rootKey })
+      if (dependencyOrder(attempt.rows, fixture.edges.concat(edges))) "pass" else "return_export_order"
+    }
+  }
+
   pure def mainMoved(fixture: Fixture): Change = {
     kind: "modified", key: mainKey, before: fixture.initialHead.id, after: fixture.root.id
+  }
+
+  pure def sourceMainMoved(fixture: Fixture, state: Expected): Change = {
+    kind: "modified", key: mainKey, before: fixture.sourceHead.id, after: state.result
   }
 
   pure def stagedAdded(fixture: Fixture): Change = {
@@ -140,6 +173,9 @@ module transfer_rules {
     if (goodImports.contains(command) and not(state.present)) additions(fixture.rows)
     else if (command == "stage_imported") Set(stagedAdded(fixture))
     else if (command == "publish_imported") Set(mainMoved(fixture))
+    else if (command == "publish_return") Set(sourceMainMoved(fixture, state))
+    // A already contains the whole input closure; only the result snapshot and commit are new.
+    else if (command == "import_return") additions(state.resultRows)
     // For lineage writes, rows were packed independently, using reported IDs only as links/keys.
     else if (command == "record_add_one") additions(attempt.rows).union(Set(resultAdded(attempt.result)))
     else Set()
@@ -187,12 +223,36 @@ module transfer_rules {
     else "pass"
   }
 
+  pure def returnInOrder(command: str, state: Expected): bool =
+    if (command == "capture_source_main") state.result != "" and not(state.captured)
+    else if (command == "export_return") state.captured and not(state.returnExported)
+    else if (command == "import_return") state.returnExported and not(state.returned)
+    else if (command == "repeat_return" or command == "read_source_main") state.returned and not(state.returnPublished)
+    else if (command == "inspect_return") state.returned and not(state.inspected)
+    else if (command == "reject_stale_return") state.inspected and not(state.staleRejected)
+    else if (command == "publish_return") state.staleRejected and not(state.returnPublished)
+    else if (command == "read_returned_main" or command == "read_source_pin") state.returnPublished
+    else true
+
+  pure def returnPublicationVerdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
+    val stale = attempt.command == "reject_stale_return"
+    val compared = attempt.publication
+    if (compared.expected != (if (stale) fixture.root.id else fixture.sourceHead.id)) "return_expected_tip"
+    else if (compared.actual != fixture.sourceHead.id) "return_actual_tip"
+    else if (compared.update != (if (stale) "none" else "ok")) "return_update"
+    else if (attempt.result != state.result) "return_target"
+    else "pass"
+  }
+
   pure def verdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
     val command = attempt.command
     val status = expectedStatus(command, state)
     val completion = if (command == "record_add_two") "invalid_state"
+      else if (command == "reject_stale_return") "aborted"
       else if (busy.contains(command) or refWrites.contains(command) or command == "record_add_one"
-                or command == "read_main" or (command == "read_staged" and state.staged)) "ok"
+                or command == "read_main" or (command == "read_staged" and state.staged)
+                or command == "capture_source_main" or command == "read_source_main"
+                or command == "publish_return") "ok"
       else "none"
     val changes = attempt.changes.foldl(Set(), (seen, change) => seen.union(Set(change)))
     if (status == "unknown_command") "unknown_command"
@@ -206,9 +266,19 @@ module transfer_rules {
              (not(state.staged) or not(state.selected) or state.published
               or (command == "record_add_one") != (state.result == ""))) "lineage_order"
     else if (command == "read_lineage" and state.result == "") "lineage_order"
+    else if (not(returnInOrder(command, state))) "return_order"
+    else if (attempt.otherChanges.length() != 0) "other_inventory"
     else if (changes != expectedChanges(attempt, fixture, state)) "inventory"
     else if (lineageWrites.contains(command)) lineageWriteVerdict(attempt, fixture)
-    else if (command == "read_lineage") lineageReadVerdict(attempt, fixture, state)
+    else if (command == "read_lineage" or command == "inspect_return" or command == "read_returned_main")
+      lineageReadVerdict(attempt, fixture, state)
+    else if (command == "export_return") returnExportVerdict(attempt, fixture, state)
+    else if (command == "import_return" or command == "repeat_return")
+      (if (attempt.result == state.result) "pass" else "return_import_root")
+    else if (command == "capture_source_main" or command == "read_source_main") readVerdict(attempt, fixture.sourceHead)
+    else if (command == "read_source_pin") readVerdict(attempt, { id: sentinel, packed: "" })
+    else if (command == "reject_stale_return" or command == "publish_return")
+      returnPublicationVerdict(attempt, fixture, state)
     else if (goodExports.contains(command)) exportVerdict(attempt, fixture, state.canonical)
     else if (goodImports.contains(command) and attempt.result != fixture.root.id) "import_root"
     else if (command == "stage_imported" and attempt.result != fixture.root.id) "stage_target"
@@ -242,7 +312,14 @@ module transfer_rules {
         outputDatum: if (attempt.command == "record_add_one") attempt.lineage.outputDatum
                      else state.expected.outputDatum,
         implementationDatum: if (attempt.command == "record_add_one") attempt.lineage.implementationDatum
-                             else state.expected.implementationDatum
+                             else state.expected.implementationDatum,
+        resultRows: if (attempt.command == "record_add_one") attempt.rows else state.expected.resultRows,
+        captured: state.expected.captured or attempt.command == "capture_source_main",
+        returnExported: state.expected.returnExported or attempt.command == "export_return",
+        returned: state.expected.returned or attempt.command == "import_return",
+        inspected: state.expected.inspected or attempt.command == "inspect_return",
+        staleRejected: state.expected.staleRejected or attempt.command == "reject_stale_return",
+        returnPublished: state.expected.returnPublished or attempt.command == "publish_return"
       },
       verdicts: state.verdicts.append(verdict(attempt, observed.fixture, state.expected))
     }).verdicts
@@ -252,8 +329,8 @@ module transfer_rules {
   pure val leaf = { key: "aa", packed: "bb" }
   pure val root = { key: "cc", packed: "dd" }
   pure val fixture = {
-    root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" }, datum: "aa",
-    parent: { id: "55", datum: "77" },
+    root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" },
+    sourceHead: { id: "44", packed: "22" }, rootKey: "cc", datum: "aa", parent: { id: "55", datum: "77" },
     rows: List(leaf, root), edges: List({ parent: "cc", child: "aa" })
   }
   pure val noValue: DatumRead = { stage: "", parent: "", id: "", kind: 0, i64: 0 }
@@ -261,14 +338,15 @@ module transfer_rules {
     parent: "", inputDatum: "", outputDatum: "", implementationDatum: "",
     inputValue: 0, outputValue: 0, implementation: ""
   }
+  pure val noPublication: Publication = { expected: "", actual: "", update: "" }
+  pure val emptyAttempt: Attempt = {
+    command: "", status: "ok", completion: "none", shape: "", result: "", binary: "", rows: List(),
+    changes: List(), otherChanges: List(), value: noValue, lineage: noLineage, publication: noPublication
+  }
   pure val exported = {
-    command: "export", status: "ok", completion: "none", shape: "buffer", result: "cc",
-    binary: "ff", rows: List(leaf, root), changes: List(), value: noValue, lineage: noLineage
+    ...emptyAttempt, command: "export", shape: "buffer", result: "cc", binary: "ff", rows: List(leaf, root)
   }
-  pure val rejected = {
-    command: "extra", status: "invalid_payload", completion: "none", shape: "", result: sentinel,
-    binary: "", rows: List(), changes: List(), value: noValue, lineage: noLineage
-  }
+  pure val rejected = { ...emptyAttempt, command: "extra", status: "invalid_payload", result: sentinel }
   pure val earlyPublication = {
     ...rejected, command: "import_exported", status: "ok", result: "cc", changes: List(
       { kind: "added", key: "aa", before: "", after: "bb" },
@@ -323,6 +401,33 @@ module transfer_rules {
     shape: "new_keys", result: "a7", rows: newCandidateRows,
     lineage: { ...noLineage, parent: "cc", outputDatum: "a1", implementationDatum: "a3" }
   }
+  pure val capturedState = { ...pinnedState, captured: true, resultRows: newCandidateRows }
+  pure val exportedReturnState = { ...capturedState, returnExported: true }
+  pure val importedReturnState = { ...exportedReturnState, returned: true }
+  pure val inspectedReturnState = { ...importedReturnState, inspected: true }
+  pure val rejectedStaleState = { ...inspectedReturnState, staleRejected: true }
+  pure val publishedReturnState = { ...rejectedStaleState, returnPublished: true }
+  pure val returnExport = {
+    ...exported, command: "export_return", result: "99", rows: fixture.rows.concat(newCandidateRows)
+  }
+  pure val returnImport = {
+    ...emptyAttempt, command: "import_return", result: "99",
+    changes: newCandidateRows.foldl(List(), (out, row) =>
+      out.append({ kind: "added", key: row.key, before: "", after: row.packed }))
+  }
+  pure val originalSourceMain = { ...readback, command: "read_source_main", result: "44", binary: "22" }
+  pure val inspectedReturn = { ...lineageRead, command: "inspect_return" }
+  pure val staleReturn = {
+    ...emptyAttempt, command: "reject_stale_return", completion: "aborted", result: "99",
+    publication: { expected: "cc", actual: "44", update: "none" }
+  }
+  pure val publishedReturn = {
+    ...staleReturn, command: "publish_return", completion: "ok",
+    publication: { expected: "44", actual: "44", update: "ok" },
+    changes: List(sourceMainMoved(fixture, rejectedStaleState))
+  }
+  pure val reopenedReturn = { ...lineageRead, command: "read_returned_main" }
+  pure val missingSourcePin = { ...unstagedReadback, command: "read_source_pin" }
   pure val controlsPass = all {
     verdict({ ...exported, rows: List(root) }, fixture, initial) == "export_rows",
     verdict({ ...exported, rows: List(root, leaf) }, fixture, initial) == "export_order",
@@ -378,6 +483,42 @@ module transfer_rules {
     verdict({ ...duplicateLineage, shape: "existing_keys" }, fixture, pinnedState) == "lineage_candidate",
     verdict({ ...duplicateLineage, changes: List({ kind: "added", key: "a1", before: "", after: "bb" }) },
       fixture, pinnedState) == "inventory",
+    verdict(returnExport, fixture, capturedState) == "pass",
+    verdict({ ...returnExport, result: "cc" }, fixture, capturedState) == "return_export_root",
+    verdict({ ...returnExport, rows: newCandidateRows }, fixture, capturedState) == "return_export_rows",
+    verdict({ ...returnExport, rows: newCandidateRows.concat(fixture.rows) },
+      fixture, capturedState) == "return_export_order",
+    verdict(returnImport, fixture, exportedReturnState) == "pass",
+    verdict({ ...returnImport, result: "cc" }, fixture, exportedReturnState) == "return_import_root",
+    verdict({ ...returnImport, changes: List() }, fixture, exportedReturnState) == "inventory",
+    verdict({ ...returnImport, changes: returnImport.changes.append(resultAdded("99")) },
+      fixture, exportedReturnState) == "inventory",
+    verdict({ ...returnImport, otherChanges: List(stagedAdded(fixture)) },
+      fixture, exportedReturnState) == "other_inventory",
+    verdict(originalSourceMain, fixture, importedReturnState) == "pass",
+    verdict({ ...originalSourceMain, result: "99" }, fixture, importedReturnState) == "read_target",
+    verdict({ ...originalSourceMain, binary: "11" }, fixture, importedReturnState) == "read_commit",
+    verdict(inspectedReturn, fixture, importedReturnState) == "pass",
+    verdict({ ...inspectedReturn, result: "cc" }, fixture, importedReturnState) == "lineage_tip",
+    verdict({ ...inspectedReturn, lineage: { ...inspectedReturn.lineage, inputValue: 44 } },
+      fixture, importedReturnState) == "lineage_input",
+    verdict(staleReturn, fixture, inspectedReturnState) == "pass",
+    verdict({ ...staleReturn, completion: "ok" }, fixture, inspectedReturnState) == "completion",
+    verdict({ ...staleReturn, publication: { ...staleReturn.publication, update: "ok" } },
+      fixture, inspectedReturnState) == "return_update",
+    verdict({ ...staleReturn, changes: publishedReturn.changes }, fixture, inspectedReturnState) == "inventory",
+    verdict(publishedReturn, fixture, rejectedStaleState) == "pass",
+    verdict(publishedReturn, fixture, importedReturnState) == "return_order",
+    verdict({ ...publishedReturn, changes: List() }, fixture, rejectedStaleState) == "inventory",
+    verdict({ ...publishedReturn, publication: { ...publishedReturn.publication, expected: "cc" } },
+      fixture, rejectedStaleState) == "return_expected_tip",
+    verdict({ ...publishedReturn, publication: { ...publishedReturn.publication, actual: "cc" } },
+      fixture, rejectedStaleState) == "return_actual_tip",
+    verdict({ ...publishedReturn, result: "cc" }, fixture, rejectedStaleState) == "return_target",
+    verdict(reopenedReturn, fixture, publishedReturnState) == "pass",
+    verdict({ ...reopenedReturn, result: "44" }, fixture, publishedReturnState) == "lineage_tip",
+    verdict(missingSourcePin, fixture, publishedReturnState) == "pass",
+    verdict({ ...missingSourcePin, status: "ok" }, fixture, publishedReturnState) == "status",
     coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent)).concat(afterStaging)),
     not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue)).concat(afterStaging))),
     not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent))

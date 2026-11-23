@@ -15,6 +15,10 @@ module transfer_histories {
     op: "record_lineage", args: List(implementation)
   }
   pure val readLineage: Request = { op: "read_lineage", args: List() }
+  pure val returnLineage: List[Request] = List("capture_source_main", "export_return", "import_return",
+    "repeat_return", "read_source_main", "inspect_return", "reject_stale_return", "read_source_main",
+    "publish_return", "read_returned_main", "read_source_pin")
+    .foldl(List(), (out, op) => out.append({ op: op, args: List() }))
 
   var histories: List[List[Request]]
 
@@ -31,7 +35,8 @@ module transfer_histories {
     List(exportCommit("export"), importCommit("import_exported"),
          { op: "stage_imported", args: List() }, readStagedValue,
          recordLineage("add-one"), readLineage,
-         recordLineage("add-two"), readLineage, readMain, readStaged),
+         recordLineage("add-two"), readLineage, readMain, readStaged)
+      .concat(returnLineage).concat(List(readMain, readStaged, readLineage)),
     List("busy_import", "bad_magic", "bad_version", "reserved", "short_header", "short_frame",
          "short_record", "trailing", "wrong_kind", "embedded_kind", "wrong_id", "wrong_root",
          "wrong_root_type", "bad_packed", "duplicate", "extra", "thin", "forward", "import")

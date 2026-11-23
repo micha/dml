@@ -230,17 +230,14 @@ static dml_status lineage_read_result(dml_txn *txn, const dml_object_id *tree,
     lineage_error(DML_INVALID_PAYLOAD, "lineage implementation ID is not nonempty ASCII", error);
 }
 
-/* The caller supplies the input path for this workflow. Reading is not execution. */
-static dml_status lineage_inspect(dml_txn *txn, dml_bytes entry, dml_bytes binding,
-                                  lineage_observation *out, dml_error *error) {
-  lineage_observation observed = {0};
+/* The caller supplies the exact commit and input path. Reading is not execution. */
+static dml_status lineage_inspect(dml_txn *txn, const dml_object_id *commit, dml_bytes entry,
+                                  dml_bytes binding, lineage_observation *out, dml_error *error) {
+  lineage_observation observed = {.commit = *commit};
   dml_buffer packed = {0};
   dml_object_view revision;
   dml_object_id parent;
-  dml_status status = dml_txn_ref_get(txn, lineage_name("result-pin"), &observed.commit, error);
-  if (status == DML_OK) {
-    status = lineage_get_object(txn, DML_REC_COMMIT, &observed.commit, &packed, &revision, error);
-  }
+  dml_status status = lineage_get_object(txn, DML_REC_COMMIT, commit, &packed, &revision, error);
   if (status == DML_OK && revision.count != 1) {
     status = lineage_error(DML_INVALID_PAYLOAD, "expected exactly one lineage input commit", error);
   }
@@ -251,6 +248,29 @@ static dml_status lineage_inspect(dml_txn *txn, dml_bytes entry, dml_bytes bindi
   if (status == DML_OK) *out = observed;
   else dml_buffer_free(&observed.implementation_record);
   return status;
+}
+
+typedef struct {
+  dml_object_id actual;
+  dml_status get, update, completion;
+  bool attempted_update;
+} lineage_publication;
+
+/* Caller-side conditional update; the supplied write transaction is consumed. */
+static dml_status lineage_publish_expected(dml_txn **txn, dml_bytes ref,
+                                           const dml_object_id *expected, const dml_object_id *target,
+                                           lineage_publication *out, dml_error *error) {
+  *out = (lineage_publication){0};
+  out->get = dml_txn_ref_get(*txn, ref, &out->actual, error);
+  if (out->get != DML_OK || memcmp(out->actual.bytes, expected->bytes, sizeof(expected->bytes)) != 0) {
+    dml_txn_abort(txn);
+    return out->get != DML_OK ? out->get :
+      lineage_error(DML_INVALID_STATE, "ref no longer points to the expected commit", error);
+  }
+  out->attempted_update = true;
+  out->update = dml_txn_ref_update(*txn, ref, target, error);
+  out->completion = dml_txn_commit(txn, out->update == DML_OK ? error : NULL);
+  return out->update == DML_OK ? out->completion : out->update;
 }
 
 #endif

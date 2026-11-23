@@ -227,6 +227,7 @@ def fixture_model(frames, kept):
 
     return dict(
         root=commit(frames["root"]), initialHead=commit(kept["keep"]),
+        sourceHead=commit(frames["other"]), rootKey=frames["root"].row["key"],
         datum=frames["fifth"].identifier.hex(),
         parent=dict(id=frames["other_parent"].identifier.hex(), datum=frames["first"].identifier.hex()),
         rows=[frames[label].row for label in EDGES],
@@ -264,7 +265,7 @@ class Suite:
             raise ValueError("Initial destination must not overlap source objects")
         fixture = TransferHistory(self.runner, self.scanner, source, destination, frames, kept,
                                   self.large_bundles)
-        yield Replay({
+        operations = {
             "export_commit": fixture.export_commit,
             "import_commit": fixture.import_commit,
             "stage_imported": partial(fixture.write_ref, "stage_imported", "create_ref", "incoming"),
@@ -277,8 +278,26 @@ class Suite:
             "read_staged_parent_value": partial(fixture.read_snapshot, "read_staged_parent_value",
                                                 "incoming", True),
             "record_lineage": fixture.record_lineage,
-            "read_lineage": fixture.read_lineage,
-        }, fixture_model(frames, kept))
+            "read_lineage": partial(fixture.read_lineage, destination, "read_lineage"),
+        }
+        returning = {
+            "capture_source_main": (source, fixture.capture_source_main),
+            "export_return": (destination, fixture.export_return),
+            "import_return": (source, partial(fixture.import_return, "import_return")),
+            "repeat_return": (source, partial(fixture.import_return, "repeat_return")),
+            "read_source_main": (source, partial(fixture.read_ref_at, source, "read_source_main", "main")),
+            "inspect_return": (source, fixture.inspect_return),
+            "reject_stale_return": (source, partial(fixture.publish_return, "reject_stale_return")),
+            "publish_return": (source, partial(fixture.publish_return, "publish_return")),
+            "read_returned_main": (source, partial(fixture.read_lineage, source, "read_returned_main",
+                                                  "ref", "main")),
+            "read_source_pin": (source, partial(fixture.read_ref_at, source, "read_source_pin", "result-pin")),
+        }
+        traced = {name: partial(fixture.observe, operation) for name, operation in operations.items()}
+        for name, (repo, operation) in returning.items():
+            other = source if repo == destination else destination
+            traced[name] = partial(fixture.observe, operation, other=other)
+        yield Replay(traced, fixture_model(frames, kept))
 
 
 @dataclass
@@ -292,6 +311,18 @@ class TransferHistory:
     large_bundles: dict[str, tuple[Path, str, Path]]
     imported: str = ZERO_ID
     selected: str = ZERO_ID
+    pinned: str = ZERO_ID
+    source_head: str = ZERO_ID
+    returned: str = ZERO_ID
+    inspected: str = ZERO_ID
+
+    def observe(self, operation, *args, other=None):
+        before = scan_inventory(self.scanner, other) if other is not None else None
+        attempt = operation(*args)
+        attempt.setdefault("publication", dict(expected="", actual="", update=""))
+        attempt["otherChanges"] = [] if before is None else inventory_diff(
+            before, scan_inventory(self.scanner, other))
+        return attempt
 
     def export_commit(self, case):
         if case not in EXPORTS:
@@ -345,7 +376,9 @@ class TransferHistory:
                     lineage=no_lineage())
 
     def read_ref(self, command, ref):
-        repo = self.destination
+        return self.read_ref_at(self.destination, command, ref)
+
+    def read_ref_at(self, repo, command, ref):
         before = scan_inventory(self.scanner, repo)
         stdout = run_native(self.runner, "read_ref", repo, ref)
         match = re.fullmatch(r"([a-z_]+) ([0-9a-f]{32})\n([a-z_]+) ((?:[0-9a-f]{2})*)\n", stdout)
@@ -388,10 +421,9 @@ class TransferHistory:
                     shape=shape, result=candidate[-1], binary="", rows=rows, changes=changes,
                     value=no_value(), lineage=lineage)
 
-    def read_lineage(self):
-        repo = self.destination
+    def read_lineage(self, repo, command, *args):
         before = scan_inventory(self.scanner, repo)
-        stdout = run_native(self.runner, "read_lineage", repo)
+        stdout = run_native(self.runner, "read_lineage", repo, *args)
         match = re.fullmatch(r"([a-z_]+)\n((?:[0-9a-f]{32} ){4}[0-9a-f]{32}) "
                              r"(-?[0-9]+) (-?[0-9]+) ((?:[0-9a-f]{2})+|-)\n", stdout)
         if not match:
@@ -402,8 +434,54 @@ class TransferHistory:
                        implementationDatum=impl_datum, inputValue=int(input_value),
                        outputValue=int(output_value), implementation=implementation)
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
-        return dict(command="read_lineage", status=status, completion="none", shape="", result=result,
+        if command == "read_lineage":
+            self.pinned = result
+        return dict(command=command, status=status, completion="none", shape="", result=result,
                     binary="", rows=[], changes=changes, value=no_value(), lineage=lineage)
+
+    def capture_source_main(self):
+        attempt = self.read_ref_at(self.source, "capture_source_main", "main")
+        self.source_head = attempt["result"]
+        return attempt
+
+    def export_return(self):
+        path = self.source.parent / "returned.dmlb"
+        before = scan_inventory(self.scanner, self.destination)
+        attempt = export_attempt(self.runner, "export_return", self.destination, self.pinned, path)
+        if not path.exists():
+            path.write_bytes(b"")  # Keep replaying attempted calls after a failed export.
+        changes = inventory_diff(before, scan_inventory(self.scanner, self.destination))
+        return dict(command="export_return", changes=changes, **attempt)
+
+    def import_return(self, command):
+        before = scan_inventory(self.scanner, self.source)
+        path = self.source.parent / "returned.dmlb"
+        attempt = import_attempt(self.runner, self.source, path, command)
+        if command == "import_return":
+            self.returned = attempt["result"]
+        changes = inventory_diff(before, scan_inventory(self.scanner, self.source))
+        return dict(command=command, changes=changes, **attempt)
+
+    def inspect_return(self):
+        attempt = self.read_lineage(self.source, "inspect_return", "id", self.returned)
+        self.inspected = attempt["result"]
+        return attempt
+
+    def publish_return(self, command):
+        repo = self.source
+        # The stale expectation is a real commit in A, just not its current main.
+        stale = command == "reject_stale_return"
+        expected = self.frames["root"].identifier.hex() if stale else self.source_head
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "publish_expected", repo, "main", expected, self.inspected)
+        match = re.fullmatch(r"([a-z_]+) ([0-9a-f]{32})\n([a-z_]+) ([a-z_]+)\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C {command} response: {stdout!r}")
+        status, actual, update, completion = match.groups()
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command=command, status=status, completion=completion, shape="",
+                    result=self.inspected, binary="", rows=[], changes=changes, value=no_value(),
+                    lineage=no_lineage(), publication=dict(expected=expected, actual=actual, update=update))
 
     def read_value(self, entry, binding):
         return self.read_snapshot("read_value", "main", False, entry, binding)
