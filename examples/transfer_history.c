@@ -125,7 +125,7 @@ static bool verify_lineage(dml_repo *repo, dml_bytes ref, dml_object_id *tip, co
 
 static bool run_lineage(dml_repo **repo, const char *path, const lineage_input *input,
                         lineage_candidate *candidate, dml_object_id *pinned, dml_error *error) {
-  return check(lineage_record(*repo, input, implementation_id(), add_one, candidate, error),
+  return check(lineage_record(*repo, &input->commit, input->value, implementation_id(), add_one, candidate, error),
                "record result", error) &&
          check(candidate->completion, "commit result and pin", error) && close_repo(repo, error) &&
          check(dml_repo_open(path, NULL, repo, error), "reopen result repository", error) &&

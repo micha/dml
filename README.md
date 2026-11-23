@@ -124,20 +124,26 @@ three separate processes:
 ```sh
 cc -std=c11 -Ibuild/install/include examples/provenance_handoff.c \
   build/install/lib/libdml.a -pthread -o "$run_dir/provenance_handoff"
-"$run_dir/provenance_handoff" request "$run_dir/source" "$run_dir/request.dml"
+"$run_dir/provenance_handoff" request "$run_dir/source" "$run_dir/request.dml" \
+  example.add-one@1 snapshot value
 "$run_dir/provenance_handoff" work "$run_dir/handoff-worker" "$run_dir/result.dml" "$run_dir/request.dml"
 "$run_dir/provenance_handoff" publish "$run_dir/source" "$run_dir/result.dml"
 "$run_dir/provenance_handoff" release-input "$run_dir/handoff-worker"
 ```
 
+The request arguments are the versioned operation (`example.add-one@1` or
+`example.subtract-one@1`), tree entry and DAG binding. The request commit records
+all three and points back to the source snapshot. Only the bundle files cross
+between roles.
+
 The fourth command is optional worker cleanup. Use a fresh worker path when
 supplying a request bundle. This example uses fixed ref names for one handoff
 at a time; don't reuse or retarget those refs while that handoff is active.
-Only the files cross between roles. Keep `request-pin` until publication succeeds
-and leave `result-pin` in place to retain the worker's result and its input.
+Keep `request-pin` until publication succeeds and leave `result-pin` in place
+to retain the worker's result, request and input snapshot.
 
-- Run `request` again with a new output path to export the existing `request-pin`,
-  even if `main` has moved.
+- Run `request SOURCE NEW_REQUEST` without the operation and selector to export
+  the existing `request-pin`, even if `main` has moved.
 - Run `work WORKER NEW_RESULT` without the request path to resume from `incoming`
   or re-export an already committed `result-pin`.
 - Run `stage-result SOURCE RESULT` to stop after staging. Run `publish SOURCE`

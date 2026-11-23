@@ -150,7 +150,7 @@ static bool lineage_identity_valid(dml_bytes identity) {
   return true;
 }
 
-static dml_status lineage_write_candidate(dml_txn *txn, const lineage_input *input, int64_t output,
+static dml_status lineage_write_candidate(dml_txn *txn, const dml_object_id *parent, int64_t output,
                                           dml_bytes identity, lineage_candidate *out, dml_error *error) {
   const dml_datum_input number = {.kind = DML_DATUM_I64, .value.i64 = output};
   const dml_datum_input implementation = {.kind = DML_DATUM_STRING, .value.bytes = identity};
@@ -170,25 +170,26 @@ static dml_status lineage_write_candidate(dml_txn *txn, const lineage_input *inp
   const dml_object_input tree = {.type = DML_REC_TREE, .value.tree = {&entry, 1}};
   status = lineage_put_object(txn, &tree, &out->tree, error);
   if (status != DML_OK) return status;
-  const dml_object_input commit = {.type = DML_REC_COMMIT, .value.commit = {out->tree, {&input->commit, 1}}};
+  const dml_object_input commit = {.type = DML_REC_COMMIT, .value.commit = {out->tree, {parent, 1}}};
   return lineage_put_object(txn, &commit, &out->commit, error);
 }
 
-/* The caller has already selected and read the immutable input. Do not resolve
- * incoming again. Compute before acquiring the write transaction. On success,
- * also check out->completion for the final storage transaction status. */
-static inline dml_status lineage_record(dml_repo *repo, const lineage_input *input, dml_bytes identity,
-                                        lineage_compute compute, lineage_candidate *out, dml_error *error) {
+/* The caller has already selected the immutable parent and read the input.
+ * Compute before acquiring the write transaction. On success, also check
+ * out->completion for the final storage transaction status. */
+static inline dml_status lineage_record(dml_repo *repo, const dml_object_id *parent, int64_t input,
+                                        dml_bytes identity, lineage_compute compute, lineage_candidate *out,
+                                        dml_error *error) {
   if (!lineage_identity_valid(identity)) {
     return lineage_error(DML_INVALID_ARGUMENT, "expected a nonempty ASCII implementation ID", error);
   }
   int64_t output;
-  dml_status status = compute(input->value, &output);
+  dml_status status = compute(input, &output);
   if (status != DML_OK) return lineage_error(status, "caller computation failed", error);
 
   dml_txn *txn = NULL;
   status = dml_txn_begin(repo, DML_TXN_WRITE, &txn, error);
-  if (status == DML_OK) status = lineage_write_candidate(txn, input, output, identity, out, error);
+  if (status == DML_OK) status = lineage_write_candidate(txn, parent, output, identity, out, error);
   if (status == DML_OK) {
     status = dml_txn_ref_create(txn, lineage_name("result-pin"), &out->commit, error);
     out->attempted_commit = true;
@@ -230,21 +231,28 @@ static dml_status lineage_read_result(dml_txn *txn, const dml_object_id *tree,
     lineage_error(DML_INVALID_PAYLOAD, "lineage implementation ID is not nonempty ASCII", error);
 }
 
-/* The caller supplies the exact commit and input path. Reading is not execution. */
-static dml_status lineage_inspect(dml_txn *txn, const dml_object_id *commit, dml_bytes entry,
-                                  dml_bytes binding, lineage_observation *out, dml_error *error) {
-  lineage_observation observed = {.commit = *commit};
+static dml_status lineage_read_revision(dml_txn *txn, const dml_object_id *commit,
+                                       dml_object_id *tree, dml_object_id *parent, dml_error *error) {
   dml_buffer packed = {0};
   dml_object_view revision;
-  dml_object_id parent;
   dml_status status = lineage_get_object(txn, DML_REC_COMMIT, commit, &packed, &revision, error);
   if (status == DML_OK && revision.count != 1) {
-    status = lineage_error(DML_INVALID_PAYLOAD, "expected exactly one lineage input commit", error);
+    status = lineage_error(DML_INVALID_PAYLOAD, "expected exactly one parent commit", error);
   }
-  if (status == DML_OK) status = dml_object_view_parent(&revision, 0, &parent, error);
-  if (status == DML_OK) status = lineage_read_input(txn, &parent, entry, binding, &observed.input, error);
-  if (status == DML_OK) status = lineage_read_result(txn, &revision.reference, &observed, error);
+  if (status == DML_OK) status = dml_object_view_parent(&revision, 0, parent, error);
+  if (status == DML_OK) *tree = revision.reference;
   dml_buffer_free(&packed);
+  return status;
+}
+
+/* The caller supplies the exact commit and input path. Reading is not execution. */
+static inline dml_status lineage_inspect(dml_txn *txn, const dml_object_id *commit, dml_bytes entry,
+                                        dml_bytes binding, lineage_observation *out, dml_error *error) {
+  lineage_observation observed = {.commit = *commit};
+  dml_object_id tree, parent;
+  dml_status status = lineage_read_revision(txn, commit, &tree, &parent, error);
+  if (status == DML_OK) status = lineage_read_input(txn, &parent, entry, binding, &observed.input, error);
+  if (status == DML_OK) status = lineage_read_result(txn, &tree, &observed, error);
   if (status == DML_OK) *out = observed;
   else dml_buffer_free(&observed.implementation_record);
   return status;

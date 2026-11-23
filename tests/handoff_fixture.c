@@ -12,6 +12,39 @@ static bool print_id(const dml_object_id *id, const char *end, dml_error *error)
          printf("%s%s", text, end) >= 0;
 }
 
+static dml_status write_input_dag(dml_txn *txn, int64_t value, dml_object_id *dag, dml_error *error) {
+  const dml_datum_input primary = {.kind = DML_DATUM_I64, .value.i64 = value};
+  const dml_datum_input alternate = {.kind = DML_DATUM_I64, .value.i64 = value + 100};
+  dml_object_id datum, root, other;
+  dml_status status = lineage_put_literal(txn, &primary, &datum, &root, error);
+  if (status == DML_OK) status = lineage_put_literal(txn, &alternate, &datum, &other, error);
+  if (status != DML_OK) return status;
+  const dml_dag_binding bindings[] = {{lineage_name("alternate-value"), other}, {value_name, root}};
+  const dml_object_input graph = {.type = DML_REC_DAG, .value.dag = {root, bindings, 2}};
+  return lineage_put_object(txn, &graph, dag, error);
+}
+
+static bool write_input_tip(dml_repo *repo, const dml_object_id *parent, dml_object_id *tip, dml_error *error) {
+  dml_txn *txn = NULL;
+  dml_object_id primary, alternate, tree;
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin fixture tip write", error) &&
+            check(write_input_dag(txn, 43, &primary, error), "write primary input DAG", error) &&
+            check(write_input_dag(txn, 243, &alternate, error), "write alternate input DAG", error);
+  if (ok) {
+    const dml_tree_entry entries[] = {{lineage_name("alternate-snapshot"), alternate}, {snapshot_name, primary}};
+    const dml_object_input snapshot = {.type = DML_REC_TREE, .value.tree = {entries, 2}};
+    ok = check(lineage_put_object(txn, &snapshot, &tree, error), "write fixture input tree", error);
+  }
+  if (ok) {
+    const dml_object_input revision = {.type = DML_REC_COMMIT, .value.commit = {tree, {parent, 1}}};
+    ok = check(lineage_put_object(txn, &revision, tip, error), "write fixture tip", error) &&
+         check(dml_txn_ref_update(txn, main_ref, tip, error), "advance fixture main", error) &&
+         check(dml_txn_commit(&txn, error), "commit fixture tip", error);
+  }
+  dml_txn_abort(&txn);
+  return ok;
+}
+
 static bool stage_input(dml_repo *repo, const char *path, dml_error *error) {
   uint8_t bytes[4096]; /* The tiny, fixed seed history must fit in this array. */
   FILE *file = fopen(path, "rb");
@@ -39,19 +72,85 @@ static bool compete(dml_repo *repo, dml_error *error) {
   return ok && write_revision(repo, 47, &parent, &competitor, error) && print_id(&competitor, "\n", error);
 }
 
-static bool observe_result(dml_txn *txn, dml_bytes ref, dml_error *error) {
+enum { INPUT_BINDING, INPUT_ENTRY, OPERATION, REQUEST_FIELD_COUNT };
+static const char *const request_names[] = {"input-binding", "input-entry", "operation"};
+
+typedef struct {
+  dml_buffer records[REQUEST_FIELD_COUNT];
+  dml_bytes fields[REQUEST_FIELD_COUNT]; /* Borrow the records above. */
+  lineage_input input;
+} fixture_request;
+
+static void free_request(fixture_request *request) {
+  for (size_t i = 0; i < REQUEST_FIELD_COUNT; ++i) dml_buffer_free(&request->records[i]);
+}
+
+/* Inspect the stored objects without invoking the workflow's request decoder. */
+static dml_status read_request(dml_txn *txn, const dml_object_id *id, fixture_request *request,
+                               dml_error *error) {
+  dml_buffer packed = {0};
+  dml_object_view graph;
+  dml_object_id tree, parent, dag;
+  dml_status status = lineage_read_revision(txn, id, &tree, &parent, error);
+  if (status == DML_OK) status = lineage_find_dag(txn, &tree, lineage_name("request-v1"), true, &dag, error);
+  if (status == DML_OK) status = lineage_get_object(txn, DML_REC_DAG, &dag, &packed, &graph, error);
+  if (status == DML_OK && graph.count != REQUEST_FIELD_COUNT) {
+    status = lineage_error(DML_INVALID_PAYLOAD, "expected three fixture request bindings", error);
+  }
+  for (size_t i = 0; status == DML_OK && i < REQUEST_FIELD_COUNT; ++i) {
+    dml_object_id node, datum;
+    dml_datum_view view;
+    status = dml_txn_lookup_node(txn, &dag, lineage_name(request_names[i]), &node, error);
+    if (status == DML_OK && i == OPERATION && !same_id(&node, &graph.reference)) {
+      status = lineage_error(DML_INVALID_PAYLOAD, "request operation is not the fixture DAG root", error);
+    }
+    if (status == DML_OK) {
+      status = lineage_get_literal(txn, &node, DML_DATUM_STRING, &datum, &request->records[i], &view, error);
+      if (status == DML_OK) request->fields[i] = (dml_bytes){view.payload, view.payload_len};
+    }
+  }
+  dml_buffer_free(&packed);
+  if (status == DML_OK) {
+    status = lineage_read_input(txn, &parent, request->fields[INPUT_ENTRY], request->fields[INPUT_BINDING],
+                                &request->input, error);
+  }
+  return status;
+}
+
+static bool observe_request(dml_txn *txn, dml_bytes ref, dml_error *error) {
   dml_object_id id;
+  fixture_request observed = {0};
+  bool ok = check(dml_txn_ref_get(txn, ref, &id, error), "read fixture request ref", error) &&
+            check(read_request(txn, &id, &observed, error), "read fixture request", error);
+  if (ok) {
+    const dml_bytes operation = observed.fields[OPERATION], entry = observed.fields[INPUT_ENTRY],
+                    binding = observed.fields[INPUT_BINDING];
+    ok = print_id(&id, " ", error) && print_id(&observed.input.commit, " ", error) &&
+         print_id(&observed.input.datum, " ", error) &&
+         printf("%" PRId64 " %.*s %.*s %.*s\n", observed.input.value,
+                (int)operation.len, (const char *)operation.data, (int)entry.len, (const char *)entry.data,
+                (int)binding.len, (const char *)binding.data) >= 0;
+  }
+  free_request(&observed);
+  return ok;
+}
+
+static bool observe_result(dml_txn *txn, dml_bytes ref, dml_error *error) {
+  dml_object_id id, tree, request;
+  fixture_request requested = {0};
   lineage_observation observed = {0};
   bool ok = check(dml_txn_ref_get(txn, ref, &id, error), "read fixture result ref", error) &&
-            check(lineage_inspect(txn, &id, snapshot_name, value_name, &observed, error),
-                  "read fixture result", error);
+            check(lineage_read_revision(txn, &id, &tree, &request, error), "read fixture result commit", error) &&
+            check(read_request(txn, &request, &requested, error), "read fixture result request", error) &&
+            check(lineage_read_result(txn, &tree, &observed, error), "read fixture lineage", error);
   if (ok) {
-    ok = print_id(&observed.commit, " ", error) && print_id(&observed.input.commit, " ", error) &&
-         print_id(&observed.input.datum, " ", error) && print_id(&observed.output_datum, " ", error) &&
-         print_id(&observed.implementation_datum, " ", error) &&
-         printf("%" PRId64 " %" PRId64 " %.*s\n", observed.input.value, observed.output,
+    ok = print_id(&id, " ", error) && print_id(&request, " ", error) &&
+         print_id(&requested.input.commit, " ", error) && print_id(&requested.input.datum, " ", error) &&
+         print_id(&observed.output_datum, " ", error) && print_id(&observed.implementation_datum, " ", error) &&
+         printf("%" PRId64 " %" PRId64 " %.*s\n", requested.input.value, observed.output,
                 (int)observed.implementation.len, (const char *)observed.implementation.data) >= 0;
   }
+  free_request(&requested);
   dml_buffer_free(&observed.implementation_record);
   return ok;
 }
@@ -75,6 +174,8 @@ static bool read_fixture(dml_repo *repo, const char *command, const char *argume
            check(status, "read fixture datum", error) && puts("present") >= 0;
     }
     dml_buffer_free(&packed);
+  } else if (strcmp(command, "request") == 0) {
+    ok = observe_request(txn, lineage_name(argument), error);
   } else {
     ok = observe_result(txn, lineage_name(argument), error);
   }
@@ -109,16 +210,90 @@ static bool mutate_fixture(dml_repo *repo, const char *command, char **args, dml
   return ok;
 }
 
+static bool export_fixture(dml_repo *repo, const dml_object_id *id, const char *path, dml_error *error) {
+  dml_buffer bundle = {0};
+  bool ok = check(dml_repo_export_commit(repo, id, &bundle, error), "export fixture bundle", error);
+  if (ok) {
+    FILE *file = fopen(path, "wbx");
+    if (file == NULL) {
+      perror(path);
+      ok = false;
+    } else {
+      ok = fwrite(bundle.data, 1, bundle.len, file) == bundle.len;
+      if (fclose(file) != 0) ok = false;
+      if (!ok) fprintf(stderr, "cannot write fixture bundle: %s\n", path);
+    }
+  }
+  dml_buffer_free(&bundle);
+  return ok && print_id(id, "\n", error);
+}
+
+static bool forge_result(dml_repo *repo, const char *path, dml_error *error) {
+  dml_txn *txn = NULL;
+  dml_object_id parent;
+  lineage_candidate candidate = {0};
+  /* The scalar output is correct for the default request, but the claimed operation is not. */
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin fixture result write", error) &&
+            check(dml_txn_ref_get(txn, lineage_name("incoming"), &parent, error), "read fixture request parent", error) &&
+            check(lineage_write_candidate(txn, &parent, 44, lineage_name("example.subtract-one@1"),
+                                          &candidate, error), "write fixture result", error) &&
+            check(dml_txn_ref_create(txn, lineage_name("fixture-result"), &candidate.commit, error),
+                  "pin fixture result", error) &&
+            check(dml_txn_commit(&txn, error), "commit fixture result", error);
+  dml_txn_abort(&txn);
+  return ok && export_fixture(repo, &candidate.commit, path, error);
+}
+
+static dml_status write_unsupported_request(dml_txn *txn, const dml_object_id *parent,
+                                            dml_object_id *commit, dml_error *error) {
+  const char *values[] = {"value", "snapshot", "example.unknown@1"};
+  dml_dag_binding bindings[REQUEST_FIELD_COUNT];
+  for (size_t i = 0; i < REQUEST_FIELD_COUNT; ++i) {
+    const dml_datum_input text = {.kind = DML_DATUM_STRING, .value.bytes = lineage_name(values[i])};
+    dml_object_id datum;
+    bindings[i].name = lineage_name(request_names[i]);
+    dml_status status = lineage_put_literal(txn, &text, &datum, &bindings[i].node, error);
+    if (status != DML_OK) return status;
+  }
+  dml_object_id dag, tree;
+  const dml_object_input graph = {
+    .type = DML_REC_DAG, .value.dag = {bindings[OPERATION].node, bindings, REQUEST_FIELD_COUNT}
+  };
+  dml_status status = lineage_put_object(txn, &graph, &dag, error);
+  if (status != DML_OK) return status;
+  const dml_tree_entry entry = {lineage_name("request-v1"), dag};
+  const dml_object_input snapshot = {.type = DML_REC_TREE, .value.tree = {&entry, 1}};
+  status = lineage_put_object(txn, &snapshot, &tree, error);
+  if (status != DML_OK) return status;
+  const dml_object_input revision = {.type = DML_REC_COMMIT, .value.commit = {tree, {parent, 1}}};
+  return lineage_put_object(txn, &revision, commit, error);
+}
+
+static bool forge_request(dml_repo *repo, const char *path, dml_error *error) {
+  dml_txn *txn = NULL;
+  dml_object_id parent, id;
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin fixture request write", error) &&
+            check(dml_txn_ref_get(txn, main_ref, &parent, error), "read fixture input parent", error) &&
+            check(write_unsupported_request(txn, &parent, &id, error), "write fixture request", error) &&
+            check(dml_txn_ref_create(txn, lineage_name("fixture-request"), &id, error), "pin fixture request", error) &&
+            check(dml_txn_commit(&txn, error), "commit fixture request", error);
+  dml_txn_abort(&txn);
+  return ok && export_fixture(repo, &id, path, error);
+}
+
 int main(int argc, char **argv) {
   if (argc < 3) return EXIT_FAILURE;
   const char *cmd = argv[1], *path = argv[2];
   const bool seed = argc == 4 && strcmp(cmd, "seed") == 0;
   const bool stage = argc == 4 && strcmp(cmd, "stage-input") == 0;
-  const bool read = argc == 4 && (strcmp(cmd, "ref") == 0 || strcmp(cmd, "datum") == 0 || strcmp(cmd, "result") == 0);
+  const bool read = argc == 4 && (strcmp(cmd, "ref") == 0 || strcmp(cmd, "datum") == 0 ||
+                                  strcmp(cmd, "request") == 0 || strcmp(cmd, "result") == 0);
+  const bool fake_request = argc == 4 && strcmp(cmd, "forge-request") == 0;
+  const bool fake_result = argc == 4 && strcmp(cmd, "forge-result") == 0;
   const bool mutate = (argc == 3 && (strcmp(cmd, "collect") == 0 || strcmp(cmd, "orphan") == 0)) ||
                       (argc == 5 && strcmp(cmd, "retarget") == 0);
   const bool change = argc == 3 && strcmp(cmd, "compete") == 0;
-  if (!seed && !stage && !read && !mutate && !change) return EXIT_FAILURE;
+  if (!seed && !stage && !read && !mutate && !change && !fake_request && !fake_result) return EXIT_FAILURE;
 
   dml_repo *repo = NULL;
   dml_error error = {0};
@@ -127,7 +302,7 @@ int main(int argc, char **argv) {
   if (ok && seed) {
     dml_object_id parent, tip;
     ok = write_revision(repo, strcmp(argv[3], "alternate") == 0 ? 41 : 42, NULL, &parent, &error) &&
-         write_revision(repo, 43, &parent, &tip, &error) && print_id(&tip, "\n", &error) &&
+         write_input_tip(repo, &parent, &tip, &error) && print_id(&tip, "\n", &error) &&
          print_id(&parent, "\n", &error);
   } else if (ok && stage) {
     ok = stage_input(repo, argv[3], &error);
@@ -135,6 +310,10 @@ int main(int argc, char **argv) {
     ok = read_fixture(repo, cmd, argv[3], &error);
   } else if (ok && mutate) {
     ok = mutate_fixture(repo, cmd, argv + 3, &error);
+  } else if (ok && fake_request) {
+    ok = forge_request(repo, argv[3], &error);
+  } else if (ok && fake_result) {
+    ok = forge_result(repo, argv[3], &error);
   } else if (ok) {
     ok = compete(repo, &error);
   }

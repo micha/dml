@@ -164,26 +164,39 @@ result's parent link. See [retention roots](repository.md#retention-roots).
 ### Resume a handoff across processes
 
 The [provenance handoff example](../../examples/provenance_handoff.c) separates the
-requester, worker and publisher into invocations. Here the request is the input
-commit selected by the requester, not a new core record type. The source saves
-its original `main` under `request-pin` before exporting it. The worker stages
-that bundle under `incoming`, commits the result and `result-pin` together, and
-exports the result. Each bundle is an ordinary commit bundle; refs stay local.
+requester, worker and publisher into invocations. Each bundle is an ordinary
+commit bundle; refs stay local. The lineage is **result → request → input snapshot**,
+where each arrow is a sole parent link.
 
-The publisher stages the result under `returned` and inspects that exact commit.
-Its sole parent must match the source's saved request, independently of the
-current `main`. The example checks the result shape, datum kinds and claimed
-implementation ID. It does not recompute the output or verify its correctness
-or origin. The publisher compares `main` with the saved request and, in the
-same write transaction, publishes the inspected ID and deletes `returned` and
-`request-pin` only at their inspected targets. On a wrong parent or stale tip,
-`main` stays unchanged and both `returned` and `request-pin` remain available for
-inspection. If the guarded cleanup fails, the publication rolls back with it.
+- **Request.** The requester selects the source's current `main` as the input
+  snapshot. The request's tree has one entry, `request-v1`. Its DAG has three
+  STRING literal bindings: `input-entry` and `input-binding` select an I64
+  literal in the input snapshot, and `operation` (also the DAG root) names a
+  versioned operation. The requester stores the request commit and creates
+  `request-pin` in one write transaction before exporting it. Selecting a
+  different operation or input path changes the request ID even when the input
+  snapshot is unchanged. This is an example convention, not a new core record
+  type or execution API.
+- **Work.** The worker stages the request bundle under `incoming`. It reads the
+  operation and selector from that exact request and dispatches only
+  `example.add-one@1` or `example.subtract-one@1`. It commits the `lineage-v1`
+  result and `result-pin` together, then exports the result. The result's claimed
+  implementation ID is the selected operation ID.
+- **Publish.** The publisher stages the result under `returned` and compares
+  its parent with the source's independently pinned request. It checks the
+  input selector, result shape, datum kinds and claimed implementation ID; it
+  does not recompute the output or verify its correctness or origin. In one
+  write transaction it checks that `main` still points to the request's input
+  snapshot, publishes the inspected result, and deletes `returned` and
+  `request-pin` only at their inspected targets. A mismatched request, stale
+  tip, or failed guarded deletion leaves publication unapplied and the staged
+  result available for inspection unless another caller has moved or removed it.
 
 The worker can release `incoming` in a separate command. In one write
-transaction it verifies the parent of `result-pin` and releases `incoming` only
-at that parent ID. `result-pin` remains a retention root, so both the result and
-its input survive collection. See [running and resuming the example](../../README.md#three-process-provenance-handoff)
+transaction it inspects `result-pin` and releases `incoming` only if it points
+at the result's exact request parent. `result-pin` still retains the result,
+request and input snapshot through collection. See
+[running and resuming the example](../../README.md#three-process-provenance-handoff)
 for supported checkpoints and file-handling limits.
 
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).

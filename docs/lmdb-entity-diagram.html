@@ -339,7 +339,7 @@ function select(id = '') {
       heading('Packed fields'), paragraph('Object records have a 20-byte envelope. Entries, bindings, and parent lists are embedded arrays; they have no separate keys or secondary indexes.'),
       heading('Validation & publication'), paragraph('Ordinary object operations check direct references, types, and IDs. Insert referenced objects first. One write transaction can publish objects and a ref atomically. Commit bundles contain no refs. Import validates the full dependency closure and can create a local staging ref in the same write transaction.'),
       heading('Retention & integrity'), paragraph('Every ref roots the full history and object dependencies it reaches. A read-only integrity scan changes nothing. Explicit garbage collection rechecks the graph in a write transaction and removes detached object rows only if the scan finds no damage.'),
-      heading('Scope'), paragraph('Execution requests, attempts, and results use ordinary DAGs built from these object types, not additional native LMDB entities. Commit bundles are external transfer data, not stored entity types. Tombstone recognition exists on reads, but no public tombstone writer or excision operation is implemented.', 'note'));
+      heading('Scope'), paragraph('The handoff example records computation requests and results with ordinary commits and DAGs, not additional native LMDB entities. Commit bundles are external transfer data, not stored entity types. Tombstone recognition exists on reads, but no public tombstone writer or excision operation is implemented.', 'note'));
     return;
   }
   renderEntityLayout(entity);
