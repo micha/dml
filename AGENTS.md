@@ -150,6 +150,22 @@ supplies build tools. The opt-in `.#quint` shell supplies the pinned CLI for
 Historical Python, CLI, test, and spike workflows are at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
 
+### Build outputs and experiment evidence
+
+- Treat `build/` as disposable. Use it for rebuildable outputs, caches, and
+  scratch runs. Create temporary Git worktrees outside `build/` and remove them
+  with `git worktree remove` when done.
+- Decide what evidence to keep before running an experiment. Before handing it
+  off, move the report, source revision or patch, rerun instructions, and any
+  results or diagnostic logs needed to support its conclusions out of `build/`.
+  Use the `archive/experiments` branch for completed historical studies (see
+  `git show archive/experiments:experiments/README.md`). Put large irreplaceable
+  artifacts in backed-up storage and record their location and checksum.
+- Keep routine logs, binaries, and regenerable fixtures out of the archive.
+  Review retained logs for secrets before sharing. Report historical runs as
+  evidence, not as current validation, per the
+  [validation policy](docs/validation-policy.md#report-actual-results).
+
 ## Updating This File
 
 Keep this guide current whenever you add tooling or conventions. Add new
