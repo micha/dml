@@ -15,7 +15,8 @@ changes to the replay suite or to covered behavior: ref creation, atomic snapsho
 publication and rollback, caller-side conditional publication, binary commit
 transfer and the staged result round trip, read-only integrity and reachability
 checks, and explicit transactional garbage collection. This also runs focused
-interpreter, native integrity and collection fault checks, and transfer fault tests.
+interpreter tests, native integrity and collection fault checks, and native
+transfer boundary and fault tests.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
 currently run these runtime checks.
 

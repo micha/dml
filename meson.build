@@ -70,43 +70,37 @@ dml_dep = declare_dependency(
 meson.override_dependency('dml', dml_dep)
 
 if get_option('quint_tests')
-  python = find_program('python3', version: '>=3.10')
+  python = import('python').find_installation('python3')
+  if not python.language_version().version_compare('>=3.10')
+    error('Quint checks require CPython 3.10 or newer')
+  endif
   quint = find_program('quint')
   trace_interpreter = files('tests/run_histories.py')
   test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
-  ref_replay = executable('ref_replay', 'tests/ref_replay.c', dependencies: dml_dep)
+  python_core = python.extension_module(
+    '_dml_core', 'python/dml_core.c',
+    dependencies: [python.dependency(), dml_dep],
+    install: false,
+  )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
   )
-  test(
-    'quint-refs', python,
-    args: ['-B', trace_interpreter, 'replay_refs', quint.full_path(), ref_replay, lmdb_inventory,
-           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt')],
-    timeout: 90,
-  )
-  transfer_replay = executable(
-    'transfer_replay', 'tests/transfer_replay.c',
-    dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
-  )
-  test(
-    'quint-transfer', python,
-    args: ['-B', trace_interpreter, 'replay_transfer', quint.full_path(), transfer_replay, lmdb_inventory,
-           files('tests/transfer_histories.qnt', 'tests/transfer_rules.qnt')],
-    timeout: 90,
-  )
-  test(
-    'quint-staged-import', python,
-    args: ['-B', trace_interpreter, 'replay_staged_import', quint.full_path(), transfer_replay, lmdb_inventory,
-           files('tests/staged_import_histories.qnt', 'tests/staged_import_rules.qnt')],
-    timeout: 90,
-  )
-  test(
-    'quint-gc', python,
-    args: ['-B', trace_interpreter, 'replay_gc', quint.full_path(), transfer_replay, lmdb_inventory,
-           files('tests/gc_histories.qnt', 'tests/gc_rules.qnt')],
-    timeout: 90,
-  )
+  retention_modules = ['--quint-module', files('tests/retention_fixture.qnt'),
+                       '--quint-module', files('tests/retention_rules.qnt')]
+  foreach suite : [
+    ['refs', 'ref', ['--init', 'init', '--init', 'changedInit']],
+    ['transfer', 'transfer', ['--quint-module', files('tests/transfer_fixture.qnt')]],
+    ['staged-import', 'staged_import', retention_modules],
+    ['gc', 'gc', retention_modules],
+  ]
+    test(
+      'quint-' + suite[0], python,
+      args: ['-B', trace_interpreter, quint.full_path(), python_core, lmdb_inventory,
+             files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2],
+      timeout: 150,
+    )
+  endforeach
 
   # Instrument the test copies only, never the installed library.
   repo_check_fault_subject = static_library(
@@ -132,6 +126,23 @@ import tempfile
 with tempfile.TemporaryDirectory() as tmp:
     subprocess.run([sys.argv[1], Path(tmp)], check=True)
 ''', repo_check],
+  )
+
+  transfer_boundaries = executable(
+    'transfer_boundaries', 'tests/transfer_boundaries.c',
+    dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
+  )
+  test(
+    'native-transfer-boundaries', python,
+    args: ['-c', '''
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    subprocess.run([sys.argv[1], *(Path(tmp) / name for name in ('source', 'oversize', 'dest'))], check=True)
+''', transfer_boundaries],
   )
 
   transfer_fault_subject = static_library(

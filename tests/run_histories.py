@@ -1,7 +1,6 @@
 """Interpret Quint request histories against native DML and report Quint's verdicts."""
 
 import argparse
-from importlib import import_module
 import json
 from pathlib import Path
 import re
@@ -10,10 +9,12 @@ from shutil import copyfile
 import subprocess
 from tempfile import TemporaryDirectory
 
+from replay_core import Suite
 
-# The bundled transfer evidence (including packed rows) can take more than 15 s
-# to parse and judge on slower workers. Meson still bounds the whole suite.
-TIMEOUT = 35
+
+# The transfer model checks hundreds of steps with exact packed rows. Meson
+# also bounds the total replay and verdict time.
+TIMEOUT = 60
 
 
 def quint_state(quint, source, output, fields, init="init"):
@@ -76,10 +77,7 @@ def replay_history(suite, directory, requests):
             if not isinstance(attempt, dict):
                 raise ValueError(f"{context}: operation must return an observation record")
             attempts.append(attempt)
-        evidence = {"attempts": attempts}
-        if replay.fixture is not None:
-            evidence["fixture"] = replay.fixture
-        return evidence
+        return {"attempts": attempts}
 
 
 def quint_literal(value):
@@ -98,11 +96,15 @@ def quint_literal(value):
     raise ValueError(f"Cannot encode Quint evidence value: {short_repr(value)}")
 
 
-def evaluate(quint, rules, directory, observations):
+def evaluate(quint, rules, directory, observations, imports=()):
     # The rule module exports a common interface; Observation is suite-specific.
     if not re.fullmatch(r"[a-z][a-z0-9_]*", rules.stem):
         raise ValueError(f"Invalid Quint rules module name: {rules.stem!r}")
-    copyfile(rules, directory / rules.name)
+    for source in (rules, *imports):
+        destination = directory / source.name
+        if destination.exists() or source.name == "trace_observations.qnt":
+            raise ValueError(f"Duplicate or reserved Quint module path: {source.name}")
+        copyfile(source, destination)
     module = directory / "trace_observations.qnt"
     rows = ",\n    ".join(map(quint_literal, observations))
     module.write_text(
@@ -150,7 +152,8 @@ def check_verdicts(histories, observations, state):
             context = f"history {index}, step {step}: {short_repr(request)}"
             if accepted is not True:
                 raise ValueError(f"{context}: Quint verdict {verdict}; observed {short_repr(attempt)}")
-            label = f'{request["op"]}({", ".join(request["args"])})'
+            args = ", ".join(arg if len(arg) <= 80 else short_repr(arg) for arg in request["args"])
+            label = f'{request["op"]}({args})'
             status = attempt.get("status", verdict)
             labels.append(f"{label}={status}")
         print(f"history {index}: {', '.join(labels)}")
@@ -161,20 +164,20 @@ def check_verdicts(histories, observations, state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("adapter", help="test adapter module exporting Suite")
-    for argument in ("quint", "runner", "scanner", "histories", "rules"):
-        # Meson may pass ./ref_replay; Path alone would drop the ./ and use PATH.
+    parser.add_argument("--init", action="append", help="history initializer (default: init)")
+    parser.add_argument("--quint-module", type=Path, action="append", default=[], help="local Quint rules import")
+    for argument in ("quint", "binding", "scanner", "histories", "rules"):
+        # Preserve the intended path if Meson passes a relative build artifact.
         parser.add_argument(argument, type=lambda path: Path(path).absolute())
     args = parser.parse_args()
-    adapter = import_module(args.adapter)
     with TemporaryDirectory(prefix="dml-histories-") as tmp:
         directory = Path(tmp)
-        histories = read_histories(args.quint, args.histories, directory / "histories.itf.json",
-                                   adapter.Suite.initializers)
-        suite = adapter.Suite(args.runner, args.scanner, directory)
+        histories = read_histories(args.quint, args.histories, directory / "histories.itf.json", args.init or ["init"])
+        suite = Suite(args.binding, args.scanner)
         observations = [replay_history(suite, directory / f"history-{index}", history)
                         for index, history in enumerate(histories, 1)]
-        check_verdicts(histories, observations, evaluate(args.quint, args.rules, directory, observations))
+        state = evaluate(args.quint, args.rules, directory, observations, args.quint_module)
+        check_verdicts(histories, observations, state)
 
 
 if __name__ == "__main__":

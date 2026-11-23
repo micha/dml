@@ -1,4 +1,4 @@
-"""Shared native observation helpers for trace adapters."""
+"""Shared dispatch and independent LMDB observations for trace replay."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -14,7 +14,6 @@ class Replay:
     """A live fixture and its registered operation handlers for one history."""
 
     operations: Mapping[str, Callable[..., dict]]
-    fixture: dict | None = None
 
 
 def run_native(*args):

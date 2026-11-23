@@ -6,9 +6,10 @@ See the [as-built specification](docs/spec-next/README.md)
 for the implemented contracts and [architecture](docs/architecture.md) for the module
 boundaries.
 
-The Python layers, CLI, previous test suites, and spike evidence are preserved at
+The earlier Python package, CLI, test suites, and spike evidence are preserved at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
-They are not maintained or run on the C consolidation branch.
+They are not maintained or run on this branch. The opt-in Quint suites use a
+private Python binding to the current C core.
 
 ## Build and validation
 
@@ -24,8 +25,9 @@ runs this build-only check; it does not run behavioral tests or measure coverage
 
 ### Quint behavior checks
 
-Use Python 3.10+ and [Quint](https://quint.sh/) 0.33.1 (TypeScript backend). With Node.js
-and npm, you can install Quint locally without changing the project dependencies:
+Use CPython 3.10+ with its development headers and [Quint](https://quint.sh/) 0.33.1
+(TypeScript backend). With Node.js and npm, you can install Quint locally without
+changing the project dependencies:
 
 ```sh
 npm install --prefix build/quint-tool --no-save --ignore-scripts @informalsystems/quint@0.33.1
@@ -34,12 +36,12 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 
 This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, and focused
-interpreter, integrity, and native fault tests.
-The [shared trace interpreter](tests/README.md) replays requests from Quint against
-native C executables. Quint checks observations against the
+interpreter, integrity, native boundary, and fault tests.
+The [shared trace interpreter](tests/README.md) replays one core function per
+Quint request through the Python binding. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs), [transfer contract](docs/spec-next/transfer.md),
 and [garbage collection contract](docs/spec-next/repository.md#explicit-garbage-collection).
-Fresh native reads and separate read-only LMDB scans check snapshot publication,
+Reopened read transactions and independent LMDB scans check snapshot publication,
 rollback, datum readback from imported history, and recording, transferring back,
 conditionally publishing a caller's result, and guarded staging-ref release.
 The transfer history also checks exact unreachable IDs before staging an import and

@@ -400,7 +400,7 @@ static void check_collection(const char *path, const fixture *ids) {
   OK(dml_repo_close(&repo, NULL));
 }
 
-static void expect_collection_blocked(const char *path) {
+static void expect_collection_blocked(const char *path, const dml_object_id *pin) {
   dml_buffer before = read_data_file(path);
   dml_repo *repo = NULL;
   dml_txn *txn = NULL;
@@ -408,6 +408,8 @@ static void expect_collection_blocked(const char *path) {
   size_t removed = SIZE_MAX;
   OK(dml_repo_open(path, NULL, &repo, NULL));
   OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  /* An earlier successful ref edit must also roll back when collection fails. */
+  if (pin != NULL) OK(dml_txn_ref_create(txn, bytes("temporary-pin"), pin, NULL));
   delete_count = 0;
   CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_INTEGRITY_ERROR);
   CHECK(error.code == DML_INTEGRITY_ERROR && removed == SIZE_MAX && delete_count == 0);
@@ -448,13 +450,13 @@ static void check_single_damage(const char *path, damage_kind kind) {
   dml_repo *repo = NULL;
   dml_txn *txn = NULL;
   OK(dml_repo_open(path, &(dml_repo_options){.create = true}, &repo, NULL));
-  dml_object_id rooted = {0}, detached = {0}, loose = {0};
+  dml_object_id rooted = {0}, detached = {0}, loose = {0}, commit = {0};
   if (kind != BAD_FLAGS) {
     OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
     rooted = put_number(txn, 1);
     dml_object_id node = put_node(txn, DML_NODE_LITERAL, rooted);
     dml_tree_entry entry = {bytes("input"), put_dag(txn, node, NULL, 0)};
-    dml_object_id commit = put_commit(txn, put_tree(txn, &entry, 1), NULL);
+    commit = put_commit(txn, put_tree(txn, &entry, 1), NULL);
     OK(dml_txn_ref_create(txn, bytes("main"), &commit, NULL));
     detached = put_number(txn, 2);
     (void)put_node(txn, DML_NODE_LITERAL, detached);
@@ -494,7 +496,7 @@ static void check_single_damage(const char *path, damage_kind kind) {
   }
   CHECK(mdb_txn_commit(raw) == MDB_SUCCESS);
   mdb_env_close(env);
-  expect_collection_blocked(path);
+  expect_collection_blocked(path, kind == DETACHED_EDGE ? &commit : NULL);
 }
 
 static void subpath(char out[4096], const char *root, const char *name) {

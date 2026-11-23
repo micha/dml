@@ -22,6 +22,8 @@ persist immutable objects and atomically create, update, or release refs to comm
 xxHash, LMDB, utf8proc, and uriparser are private dependencies of the [C library](../README.md#install-and-link-the-c-library).
 The [LMDB entity diagram](lmdb-entity-diagram.html) shows the implemented storage model.
 
-There is no maintained binding, CLI, execution layer, or remote adapter on this
-branch. The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
+The [opt-in Quint suites](../tests/README.md) call the C core through a private
+Python binding. There is no installed Python package, CLI, execution layer, or
+remote adapter on this branch. The
+[feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
 preserves the earlier implementations and evidence without defining current behavior.
