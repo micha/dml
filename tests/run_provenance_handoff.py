@@ -11,6 +11,9 @@ ADD_ONE = "example.add-one@1"
 SUBTRACT_ONE = "example.subtract-one@1"
 UNKNOWN = "example.unknown@1"
 WRONG_PARENT = "result parent does not match the original request"
+WRONG_IMPLEMENTATION = "result implementation does not match the requested operation"
+STALE_TIP = "main no longer points to the original input snapshot"
+NOT_FOUND = "not found"
 
 
 class Request(NamedTuple):
@@ -73,6 +76,20 @@ class Handoff:
             ref = key.replace("_", "-")
             actual = self.probe("ref", repository, ref)
             require(actual == value, (repository, ref, actual, value))
+
+    def inspect(self, role, repo, checkpoint, request=None, rejected=None, **fields):
+        # Include the objects and refs in the no-write check, not LMDB's reader locks.
+        data = repo / "data.mdb"
+        before = data.read_bytes()
+        report = self.call("inspect", role, repo, rejected=rejected)
+        require(data.read_bytes() == before, (role, repo, "inspection changed repository data"))
+        expected = {key.replace("_", "-"): value for key, value in fields.items()}
+        expected["checkpoint"] = checkpoint
+        if request is not None:
+            expected.update(request=request.commit, input=request.input_commit, operation=request.operation)
+            expected.update({"input-entry": request.entry, "input-binding": request.binding})
+        actual = [tuple(line.split(": ", 1)) for line in report.splitlines()]
+        require(sorted(actual) == sorted(expected.items()), (role, repo, report, expected))
 
     def collect_orphan(self, repository):
         orphan = self.probe("orphan", repository)
@@ -139,20 +156,36 @@ class Handoff:
         self.call("publish", self.source, subtract_result, rejected=WRONG_PARENT)
         self.refs(self.source, main=self.input, request_pin=add.commit, returned=result.commit)
         self.same_result(self.source, "returned", result)
+        # A stale main does not mask the earlier wrong-parent guard in either command.
+        competitor = self.probe("compete", self.source)
+        self.inspect("source", self.source, "result-staged", add, rejected=WRONG_PARENT,
+                     main=competitor, request_pin=add.commit, returned=result.commit, publication="blocked")
+        self.call("publish", self.source, rejected=WRONG_PARENT)
 
     def restart_and_collect(self):
-        request = self.new_request(self.source, self.request, self.input)
+        self.call("inspect", "worker", self.worker, rejected="repository path does not exist")
+        self.call("inspect", "other", self.worker, rejected="usage:")
+        require(not self.worker.exists(), self.worker)
+        self.inspect("source", self.source, "inactive", main=self.input, request_pin=NOT_FOUND,
+                     returned=NOT_FOUND, publication="not staged")
+        request = self.new_request(self.source, self.request, self.input, SUBTRACT_ONE,
+                                   "alternate-snapshot", "alternate-value", 343)
         self.refs(self.source, main=self.input, request_pin=request.commit, returned="missing")
+        self.inspect("source", self.source, "request-pinned", request, main=self.input,
+                     request_pin=request.commit, returned=NOT_FOUND, publication="not staged")
         self.collect_orphan(self.source)
 
         self.probe("stage-input", self.worker, self.request)  # Stop immediately after committed import.
         self.request.unlink()
         self.refs(self.worker, incoming=request.commit, result_pin="missing", main="missing")
+        self.inspect("worker", self.worker, "request-staged", request, incoming=request.commit, result_pin=NOT_FOUND)
         self.collect_orphan(self.worker)
         self.result.write_bytes(b"do not overwrite")
         self.call("work", self.worker, self.result, rejected=self.result.name)
         require(self.result.read_bytes() == b"do not overwrite", self.result)
-        result = self.observe(self.worker, "result-pin", request, 44)
+        result = self.observe(self.worker, "result-pin", request, 342)
+        self.inspect("worker", self.worker, "result-pinned", request, incoming=request.commit,
+                     result_pin=result.commit)
         self.collect_orphan(self.worker)
         retry = self.path / "retry.dml"
         self.call("work", self.worker, retry)
@@ -163,18 +196,25 @@ class Handoff:
         self.refs(self.source, main=self.input, request_pin=request.commit, returned=result.commit)
         self.collect_orphan(self.source)
         self.same_result(self.source, "returned", result)
+        self.inspect("source", self.source, "result-staged", request, main=self.input, request_pin=request.commit,
+                     returned=result.commit, publication="ready in this snapshot")
         self.call("publish", self.source)
         self.refs(self.source, main=result.commit, request_pin="missing", returned="missing")
+        self.inspect("source", self.source, "inactive", main=result.commit, request_pin=NOT_FOUND,
+                     returned=NOT_FOUND, publication="not staged")
         self.collect_orphan(self.source)
         self.same_result(self.source, "main", result)
 
         self.probe("retarget", self.worker, "incoming", request.input_commit)
+        self.inspect("worker", self.worker, "result-pinned", request, incoming=request.input_commit,
+                     result_pin=result.commit, rejected="cannot release input")
         self.call("release-input", self.worker, rejected="release inspected staging ref")
         self.refs(self.worker, main="missing", incoming=request.input_commit, result_pin=result.commit)
         self.same_result(self.worker, "result-pin", result)
         self.probe("retarget", self.worker, "incoming", request.commit)
         self.call("release-input", self.worker)
         self.refs(self.worker, main="missing", incoming="missing", result_pin=result.commit)
+        self.inspect("worker", self.worker, "result-pinned", request, incoming=NOT_FOUND, result_pin=result.commit)
         self.collect_orphan(self.worker)
         self.same_result(self.worker, "result-pin", result)
 
@@ -205,8 +245,10 @@ class Handoff:
         forged = self.probe("forge-result", self.worker, self.result)
         result = self.observe(self.worker, "fixture-result", request, 44, SUBTRACT_ONE)
         require(result.commit == forged, (result, forged))
-        self.call("publish", self.source, self.result,
-                  rejected="result implementation does not match the requested operation")
+        self.call("stage-result", self.source, self.result)
+        self.inspect("source", self.source, "result-staged", request, rejected=WRONG_IMPLEMENTATION,
+                     main=self.input, request_pin=request.commit, returned=result.commit, publication="blocked")
+        self.call("publish", self.source, rejected=WRONG_IMPLEMENTATION)
         self.refs(self.source, main=self.input, request_pin=request.commit, returned=result.commit)
         self.same_result(self.source, "returned", result)
 
@@ -226,6 +268,19 @@ class Handoff:
         self.call("work", self.worker, self.result, self.request, rejected="unsupported request operation")
         require(not self.result.exists(), self.result)
         self.refs(self.worker, main="missing", incoming=request.commit, result_pin="missing")
+        self.inspect("worker", self.worker, "request-staged", incoming=request.commit, result_pin=NOT_FOUND,
+                     rejected="unsupported request operation")
+
+    def no_request_pin(self):
+        request = self.new_request(self.source, self.request, self.input)
+        self.call("work", self.worker, self.result, self.request)
+        result = self.observe(self.worker, "result-pin", request, 44)
+        replica = self.path / "replica"
+        tip, _ = self.probe("seed", replica, "original").splitlines()
+        self.call("stage-result", replica, self.result)
+        self.inspect("source", replica, "result-staged", rejected="resolve original request pin",
+                     main=tip, request_pin=NOT_FOUND, returned=result.commit, publication="blocked")
+        self.call("publish", replica, rejected="resolve original request pin")
 
     def stale_tip(self):
         occupied = self.path / "occupied.dml"
@@ -247,17 +302,26 @@ class Handoff:
         self.call("work", self.worker, self.result, self.request)
         result = self.observe(self.worker, "result-pin", request, 44)
         self.call("stage-result", self.source, self.result)
-        self.call("publish", self.source, rejected="main no longer points to the original input snapshot")
+        self.inspect("source", self.source, "result-staged", request, rejected=STALE_TIP,
+                     main=competitor, request_pin=request.commit, returned=result.commit, publication="blocked")
+        self.call("publish", self.source, rejected=STALE_TIP)
         self.refs(self.source, main=competitor, request_pin=request.commit, returned=result.commit)
         self.collect_orphan(self.source)
         self.same_result(self.source, "returned", result)
+
+        self.probe("drop-ref", self.source, "main", competitor)
+        missing_main = "resolve main for publication"
+        self.inspect("source", self.source, "result-staged", request, rejected=missing_main,
+                     main=NOT_FOUND, request_pin=request.commit, returned=result.commit, publication="blocked")
+        self.call("publish", self.source, rejected=missing_main)
+        self.refs(self.source, main="missing", request_pin=request.commit, returned=result.commit)
 
 
 def main():
     example, fixture = (Path(arg).resolve() for arg in sys.argv[1:])
     with tempfile.TemporaryDirectory(prefix="dml-handoff-") as temp:
         for case in ("direct", "distinct_operations", "restart_and_collect", "wrong_parent",
-                     "wrong_implementation", "unsupported_operation", "stale_tip"):
+                     "wrong_implementation", "unsupported_operation", "no_request_pin", "stale_tip"):
             handoff = Handoff(Path(temp) / case, example, fixture)
             getattr(handoff, case)()
             print(f"{case}: passed")

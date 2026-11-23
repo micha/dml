@@ -79,8 +79,11 @@ observe exact persisted refs and lineage, and collect a known orphan before
 resuming. The test checks operation and input selection from the request,
 normal and restarted transfers, no-clobber export, rejection of a result for a
 different request on the same input snapshot, stale-tip rejection, and guarded
-cleanup. This test complements Quint's operation-level checks; it does not add
-workflow requests to replay.
+cleanup. It also compares the read-only checkpoint reports with fixture-known
+IDs, checks publication blockers and the worker's retained request after
+cleanup, and verifies that inspection leaves the LMDB data file unchanged.
+This test complements Quint's operation-level checks; it does not add workflow
+requests to replay.
 
 `provenance-handoff` runs in the opt-in Meson suite. To verify the installed
 boundary, [install the C library](../README.md#install-and-link-the-c-library)

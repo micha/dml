@@ -199,4 +199,29 @@ request and input snapshot through collection. See
 [running and resuming the example](../../README.md#three-process-provenance-handoff)
 for supported checkpoints and file-handling limits.
 
+#### Inspect a committed checkpoint
+
+`inspect source SOURCE` and `inspect worker WORKER` report the selected role's
+refs and checkpoint in a single read transaction. When the request can be
+read, the report includes its ID, input snapshot ID, operation, and selector.
+Inspection does not run a computation, use bundle files, or write repository
+objects or refs.
+
+- **Source:** `request-pin` marks a pinned request; `returned` marks a staged
+  result. For a staged result, inspection checks the same request, result, and
+  input-tip conditions as publication. A blocker is reported on stderr and
+  causes a nonzero exit. A ready report applies only to the read snapshot;
+  `publish` still checks `main` and the staging refs in its write transaction.
+  `inactive` means neither handoff ref resolved. It does not say whether an
+  earlier handoff was published.
+- **Worker:** `incoming` marks a staged request; `result-pin` marks a recorded
+  result. The report follows the pinned result's parent even after `incoming`
+  is released. If a resolved `incoming` points elsewhere, inspection reports
+  why it cannot be released and exits nonzero. It does not predict whether
+  execution, export, or publication can succeed.
+
+A ref reported as `not found` could be absent or have an unresolvable target.
+This example opens the repository normally; inspection is not a filesystem
+read-only mode, an integrity scan, or evidence of execution correctness.
+
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).

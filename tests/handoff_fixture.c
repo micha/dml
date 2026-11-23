@@ -202,9 +202,15 @@ static bool mutate_fixture(dml_repo *repo, const char *command, char **args, dml
     dml_buffer_free(&packed);
   } else {
     dml_object_id id;
-    ok = check(dml_object_id_parse(args[1], strlen(args[1]), &id, error), "parse replacement ref target", error) &&
-         check(dml_txn_ref_update(txn, lineage_name(args[0]), &id, error), "retarget fixture ref", error) &&
-         check(dml_txn_commit(&txn, error), "commit fixture retarget", error);
+    ok = check(dml_object_id_parse(args[1], strlen(args[1]), &id, error), "parse fixture ref target", error);
+    if (ok) {
+      dml_bytes name = lineage_name(args[0]);
+      dml_status status = strcmp(command, "drop-ref") == 0
+        ? dml_txn_ref_delete_expected(txn, name, &id, error)
+        : dml_txn_ref_update(txn, name, &id, error);
+      ok = check(status, "change fixture ref", error) &&
+           check(dml_txn_commit(&txn, error), "commit fixture ref change", error);
+    }
   }
   dml_txn_abort(&txn);
   return ok;
@@ -291,7 +297,7 @@ int main(int argc, char **argv) {
   const bool fake_request = argc == 4 && strcmp(cmd, "forge-request") == 0;
   const bool fake_result = argc == 4 && strcmp(cmd, "forge-result") == 0;
   const bool mutate = (argc == 3 && (strcmp(cmd, "collect") == 0 || strcmp(cmd, "orphan") == 0)) ||
-                      (argc == 5 && strcmp(cmd, "retarget") == 0);
+                      (argc == 5 && (strcmp(cmd, "retarget") == 0 || strcmp(cmd, "drop-ref") == 0));
   const bool change = argc == 3 && strcmp(cmd, "compete") == 0;
   if (!seed && !stage && !read && !mutate && !change && !fake_request && !fake_result) return EXIT_FAILURE;
 

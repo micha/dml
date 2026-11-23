@@ -12,6 +12,8 @@ typedef struct {
 typedef struct {
   const handoff_operation *operation;
   lineage_input input;
+  char entry[DML_NAME_MAX_SIZE + 1];
+  char binding[DML_NAME_MAX_SIZE + 1];
 } handoff_request;
 
 static dml_status subtract_one(int64_t input, int64_t *output) {
@@ -107,7 +109,7 @@ static dml_status read_request(dml_txn *txn, const dml_object_id *id, handoff_re
 
   dml_buffer records[REQUEST_FIELDS] = {0};
   dml_bytes fields[REQUEST_FIELDS];
-  handoff_request request;
+  handoff_request request = {0};
   status = read_request_fields(txn, &tree, records, fields, error);
   if (status == DML_OK) {
     request.operation = find_operation(fields[REQUEST_OPERATION]);
@@ -119,8 +121,13 @@ static dml_status read_request(dml_txn *txn, const dml_object_id *id, handoff_re
     status = read_selected_input(txn, &parent, fields[REQUEST_ENTRY], fields[REQUEST_BINDING],
                                  &request.input, error);
   }
+  if (status == DML_OK) {
+    /* read_selected_input checked the name lengths and ASCII profile. */
+    memcpy(request.entry, fields[REQUEST_ENTRY].data, fields[REQUEST_ENTRY].len);
+    memcpy(request.binding, fields[REQUEST_BINDING].data, fields[REQUEST_BINDING].len);
+    *out = request;
+  }
   for (size_t i = 0; i < REQUEST_FIELDS; ++i) dml_buffer_free(&records[i]);
-  if (status == DML_OK) *out = request;
   return status;
 }
 

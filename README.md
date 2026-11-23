@@ -149,6 +149,18 @@ to retain the worker's result, request and input snapshot.
 - Run `stage-result SOURCE RESULT` to stop after staging. Run `publish SOURCE`
   without the result path to resume from the committed `returned` ref.
 
+At any committed checkpoint, inspect either repository without rerunning the
+operation or changing refs:
+
+```sh
+"$run_dir/provenance_handoff" inspect source "$run_dir/source"
+"$run_dir/provenance_handoff" inspect worker "$run_dir/handoff-worker"
+```
+
+The source view reports why a staged result is blocked or whether it passes
+publication checks in the current snapshot. See the
+[inspection semantics](docs/spec-next/transfer.md#inspect-a-committed-checkpoint).
+
 These are committed repository checkpoints, not arbitrary crash recovery or
 idempotent retries of the entire workflow. Bundle paths are regular binary files.
 Export never overwrites an existing file, but an interrupted write can leave a

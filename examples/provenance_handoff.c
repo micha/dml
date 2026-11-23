@@ -134,23 +134,31 @@ static bool work(dml_repo *repo, const char *request_path, const char *result_pa
          export_file(repo, &result, result_path, error);
 }
 
-static bool inspect_result_tree(dml_txn *txn, const dml_object_id *tree, const dml_object_id *request_id,
-                                lineage_observation *observation, dml_error *error) {
-  handoff_request request;
-  if (!check(read_request(txn, request_id, &request, error), "inspect computation request", error) ||
-      !check(lineage_read_result(txn, tree, observation, error), "inspect result tree", error)) return false;
-  if (!lineage_equal(observation->implementation, lineage_name(request.operation->id))) {
+/* Read the actual lineage; an expected parent is supplied only by the source. */
+static bool inspect_result(dml_txn *txn, const dml_object_id *expected_parent, dml_object_id *parent,
+                           handoff_request *request, lineage_observation *observation, dml_error *error) {
+  dml_object_id tree;
+  if (!check(lineage_read_revision(txn, &observation->commit, &tree, parent, error),
+             "inspect exact result commit", error)) return false;
+  if (expected_parent != NULL && !same_id(parent, expected_parent)) {
+    fputs("result parent does not match the original request\n", stderr);
+    return false;
+  }
+  if (!check(read_request(txn, parent, request, error), "inspect computation request", error) ||
+      !check(lineage_read_result(txn, &tree, observation, error), "inspect result tree", error)) return false;
+  if (!lineage_equal(observation->implementation, lineage_name(request->operation->id))) {
     fputs("result implementation does not match the requested operation\n", stderr);
     return false;
   }
-  observation->input = request.input;
+  observation->input = request->input;
   return true;
 }
 
 static bool inspect_return(dml_repo *repo, const dml_object_id *imported, dml_object_id *request,
                            lineage_observation *observation, dml_error *error) {
   dml_txn *txn = NULL;
-  dml_object_id tree, parent;
+  dml_object_id parent;
+  handoff_request selected;
   bool ok = check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin result inspection", error) &&
             check(dml_txn_ref_get(txn, request_pin, request, error), "resolve original request pin", error) &&
             check(dml_txn_ref_get(txn, returned, &observation->commit, error), "resolve staged result", error);
@@ -158,28 +166,29 @@ static bool inspect_return(dml_repo *repo, const dml_object_id *imported, dml_ob
     fputs("returned ref changed after staging\n", stderr);
     ok = false;
   }
-  if (ok) {
-    ok = check(lineage_read_revision(txn, &observation->commit, &tree, &parent, error),
-               "inspect exact result commit", error);
-  }
-  if (ok && !same_id(&parent, request)) {
-    fputs("result parent does not match the original request\n", stderr);
-    ok = false;
-  }
-  if (ok) ok = inspect_result_tree(txn, &tree, request, observation, error);
+  if (ok) ok = inspect_result(txn, request, &parent, &selected, observation, error);
   dml_txn_abort(&txn);
   return ok;
+}
+
+static bool check_input_tip(dml_status status, const dml_object_id *actual,
+                            const dml_object_id *input, const dml_error *error) {
+  if (!check(status, "resolve main for publication", error)) return false;
+  if (!same_id(actual, input)) {
+    fputs("main no longer points to the original input snapshot\n", stderr);
+    return false;
+  }
+  return true;
 }
 
 static bool publish_inspected(dml_repo *repo, const dml_object_id *input,
                               const dml_object_id *request, const dml_object_id *result, dml_error *error) {
   dml_txn *txn = NULL;
   dml_object_id actual;
-  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin publication", error) &&
-            check(dml_txn_ref_get(txn, main_ref, &actual, error), "resolve main for publication", error);
-  if (ok && !same_id(&actual, input)) {
-    fputs("main no longer points to the original input snapshot\n", stderr);
-    ok = false;
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin publication", error);
+  if (ok) {
+    dml_status status = dml_txn_ref_get(txn, main_ref, &actual, error);
+    ok = check_input_tip(status, &actual, input, error);
   }
   if (ok) {
     /* A moved or missing staging ref aborts the update too. No separate source
@@ -209,18 +218,129 @@ static bool publish(dml_repo *repo, const char *result_path, dml_error *error) {
 
 static bool release_input(dml_repo *repo, dml_error *error) {
   dml_txn *txn = NULL;
-  dml_object_id pinned, tree, request;
+  dml_object_id request;
+  handoff_request selected;
   lineage_observation observation = {0};
   /* Keep the result's retention root stable from inspection through release. */
   bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin input cleanup", error) &&
-            check(dml_txn_ref_get(txn, result_pin, &pinned, error), "resolve result pin", error) &&
-            check(lineage_read_revision(txn, &pinned, &tree, &request, error), "read result parent", error) &&
-            inspect_result_tree(txn, &tree, &request, &observation, error) &&
+            check(dml_txn_ref_get(txn, result_pin, &observation.commit, error), "resolve result pin", error) &&
+            inspect_result(txn, NULL, &request, &selected, &observation, error) &&
             check(dml_txn_ref_delete_expected(txn, incoming, &request, error),
                   "release inspected staging ref", error) &&
             check(dml_txn_commit(&txn, error), "commit input cleanup", error);
   dml_txn_abort(&txn);
   dml_buffer_free(&observation.implementation_record);
+  return ok;
+}
+
+typedef struct {
+  dml_object_id target;
+  dml_status status;
+  dml_error error;
+} inspected_ref;
+
+static void show_id(dml_bytes label, const dml_object_id *id) {
+  char text[DML_OBJECT_ID_HEX_SIZE + 1];
+  (void)dml_object_id_format(id, text, NULL);
+  printf("%.*s: %s\n", (int)label.len, (const char *)label.data, text);
+}
+
+static inspected_ref show_ref(dml_txn *txn, dml_bytes name) {
+  inspected_ref ref = {0};
+  ref.status = dml_txn_ref_get(txn, name, &ref.target, &ref.error);
+  if (ref.status == DML_OK) show_id(name, &ref.target);
+  else printf("%.*s: %s\n", (int)name.len, (const char *)name.data,
+              ref.status == DML_NOT_FOUND ? "not found" : "unreadable");
+  return ref;
+}
+
+static bool check_optional_ref(const inspected_ref *ref, const char *context) {
+  return ref->status == DML_NOT_FOUND || check(ref->status, context, &ref->error);
+}
+
+static void show_request(const dml_object_id *id, const handoff_request *request) {
+  show_id(lineage_name("request"), id);
+  show_id(lineage_name("input"), &request->input.commit);
+  printf("operation: %s\ninput-entry: %s\ninput-binding: %s\n",
+         request->operation->id, request->entry, request->binding);
+}
+
+static bool inspect_source(dml_txn *txn, dml_error *error) {
+  inspected_ref main = show_ref(txn, main_ref);
+  inspected_ref pinned = show_ref(txn, request_pin);
+  inspected_ref staged = show_ref(txn, returned);
+  const bool has_request = pinned.status == DML_OK;
+  handoff_request request = {0};
+  if (staged.status != DML_OK) {
+    if (!check_optional_ref(&pinned, "resolve request-pin") || !check_optional_ref(&staged, "resolve returned")) {
+      return false;
+    }
+    printf("checkpoint: %s\n", has_request ? "request-pinned" : "inactive");
+    puts("publication: not staged");
+    if (has_request) {
+      if (!check(read_request(txn, &pinned.target, &request, error), "inspect computation request", error)) return false;
+      show_request(&pinned.target, &request);
+    }
+    return check_optional_ref(&main, "resolve main");
+  }
+  puts("checkpoint: result-staged");
+  if (!has_request) {
+    puts("publication: blocked");
+    return check(pinned.status, "resolve original request pin", &pinned.error);
+  }
+
+  dml_object_id parent;
+  lineage_observation observation = {.commit = staged.target};
+  bool ok = inspect_result(txn, &pinned.target, &parent, &request, &observation, error) &&
+            check_input_tip(main.status, &main.target, &request.input.commit, &main.error);
+  dml_buffer_free(&observation.implementation_record);
+  /* A wrong parent must not hide the original request or change the first
+   * publication diagnostic. A display-only lookup may still recover the details. */
+  if (request.operation != NULL || read_request(txn, &pinned.target, &request, NULL) == DML_OK) {
+    show_request(&pinned.target, &request);
+  }
+  puts(ok ? "publication: ready in this snapshot" : "publication: blocked");
+  return ok;
+}
+
+static bool inspect_worker(dml_txn *txn, dml_error *error) {
+  inspected_ref staged = show_ref(txn, incoming);
+  inspected_ref pinned = show_ref(txn, result_pin);
+  if (!check_optional_ref(&staged, "resolve incoming") || !check_optional_ref(&pinned, "resolve result-pin")) {
+    return false;
+  }
+  const bool has_input = staged.status == DML_OK;
+  printf("checkpoint: %s\n", pinned.status == DML_OK ? "result-pinned" : has_input ? "request-staged" : "inactive");
+
+  handoff_request request = {0};
+  if (pinned.status == DML_NOT_FOUND) {
+    if (!has_input) return true;
+    if (!check(read_request(txn, &staged.target, &request, error), "inspect computation request", error)) return false;
+    show_request(&staged.target, &request);
+    return true;
+  }
+
+  dml_object_id parent;
+  lineage_observation observation = {.commit = pinned.target};
+  bool ok = inspect_result(txn, NULL, &parent, &request, &observation, error);
+  dml_buffer_free(&observation.implementation_record);
+  if (request.operation != NULL) show_request(&parent, &request);
+  if (ok && has_input && !same_id(&staged.target, &parent)) {
+    fputs("incoming does not point to the pinned result's request; cannot release input\n", stderr);
+    return false;
+  }
+  return ok;
+}
+
+static bool inspect(dml_repo *repo, bool source, dml_error *error) {
+  dml_txn *txn = NULL;
+  if (!check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin handoff inspection", error)) return false;
+  bool ok = source ? inspect_source(txn, error) : inspect_worker(txn, error);
+  dml_txn_abort(&txn);
+  if (fflush(stdout) != 0 || ferror(stdout)) {
+    fputs("could not write handoff inspection report\n", stderr);
+    return false;
+  }
   return ok;
 }
 
@@ -231,16 +351,21 @@ int main(int argc, char **argv) {
   const bool stage = strcmp(command, "stage-result") == 0 && argc == 4;
   const bool publisher = strcmp(command, "publish") == 0 && (argc == 3 || argc == 4);
   const bool release = strcmp(command, "release-input") == 0 && argc == 3;
-  if (!requester && !worker && !stage && !publisher && !release) {
+  const bool inspecting = strcmp(command, "inspect") == 0 && argc == 4;
+  const bool source_view = inspecting && strcmp(argv[2], "source") == 0;
+  const bool worker_view = inspecting && strcmp(argv[2], "worker") == 0;
+  if (!requester && !worker && !stage && !publisher && !release && !source_view && !worker_view) {
     fputs("usage:\n"
           "  provenance_handoff request SOURCE REQUEST [OPERATION TREE-ENTRY BINDING]\n"
           "  provenance_handoff work WORKER RESULT [REQUEST]\n"
           "  provenance_handoff stage-result SOURCE RESULT\n"
           "  provenance_handoff publish SOURCE [RESULT]\n"
-          "  provenance_handoff release-input WORKER\n", stderr);
+          "  provenance_handoff release-input WORKER\n"
+          "  provenance_handoff inspect source SOURCE\n"
+          "  provenance_handoff inspect worker WORKER\n", stderr);
     return EXIT_FAILURE;
   }
-  const char *path = argv[2];
+  const char *path = inspecting ? argv[3] : argv[2];
   dml_repo *repo = NULL;
   dml_error error = {0};
   bool ok = worker && argc == 5 ? create_repo(path, &repo, &error) :
@@ -252,7 +377,8 @@ int main(int argc, char **argv) {
     else if (worker) ok = work(repo, argc == 5 ? argv[4] : NULL, argv[3], &error);
     else if (stage) ok = stage_file(repo, argv[3], returned, &root, &error);
     else if (publisher) ok = publish(repo, argc == 4 ? argv[3] : NULL, &error);
-    else ok = release_input(repo, &error);
+    else if (release) ok = release_input(repo, &error);
+    else ok = inspect(repo, source_view, &error);
   }
   if (!close_repo(&repo, &error)) ok = false;
   return ok ? EXIT_SUCCESS : EXIT_FAILURE;
