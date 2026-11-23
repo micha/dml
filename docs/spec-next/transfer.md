@@ -106,4 +106,21 @@ unchanged. If the candidate is accepted, publish the commit ID that was actually
 inspected in a separate write transaction. The
 [standalone C example](../../examples/transfer_history.c) demonstrates this flow.
 
+### Record a result without publishing to `main`
+
+The standalone example's `--lineage` mode passes the staged input value to a
+caller-supplied C function. The caller keeps the commit ID it inspected rather
+than resolving `incoming` again. It writes a result commit with that input as its
+sole parent and creates `result-pin` in the same write transaction. A duplicate
+pin rejects the transaction, including any new result objects. `main` and
+`incoming` are untouched.
+
+The result tree has one entry, `lineage-v1`. Its DAG has an `output` I64 literal
+(which is also the root) and an `implementation` STRING literal holding the
+caller's versioned implementation identifier. The caller knows the input datum
+path within the parent snapshot. After reopening, it reads the recorded result,
+identity and parent through `result-pin`; no computation is rerun. This is an
+application convention using ordinary commits, datums and refs. DML does not
+execute the function, attest that it ran, or store its code.
+
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).

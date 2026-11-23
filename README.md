@@ -38,7 +38,8 @@ The [shared trace interpreter](tests/README.md) replays requests from Quint agai
 native C executables. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
 Fresh native reads and separate read-only LMDB scans check snapshot publication,
-rollback, and datum readback at a staged or published import and its first parent.
+rollback, datum readback from imported history, and atomic recording and pinning
+of a caller's result.
 The native fault test checks transfer allocation failures without adding hooks to the library.
 These checks are local and opt-in; they do not measure coverage.
 
@@ -70,6 +71,16 @@ absent. It then explicitly publishes the inspected commit to `main` and reopens
 again. Through both refs it verifies that the tip reads `43` and its first parent
 reads `42`. Use two distinct paths that do not yet exist, with existing parent
 directories. The program leaves both repositories and the staging ref for inspection.
+
+Alternatively, use two fresh paths to [record a result without publishing to `main`](docs/spec-next/transfer.md#record-a-result-without-publishing-to-main):
+
+```sh
+"$run_dir/transfer_history" --lineage "$run_dir/input" "$run_dir/worker"
+```
+
+The worker reopens and verifies that `result-pin` yields `44`, that its sole parent
+is the exact staged input (`43`), and that the recorded implementation ID is
+`example.add-one@1`. The worker's `main` remains absent.
 
 ### Optional Nix development shell
 

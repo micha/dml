@@ -11,6 +11,10 @@ module transfer_histories {
   pure val readStagedParent: Request = {
     op: "read_staged_parent_value", args: List("0", "all", "z-bound")
   }
+  pure def recordLineage(implementation: str): Request = {
+    op: "record_lineage", args: List(implementation)
+  }
+  pure val readLineage: Request = { op: "read_lineage", args: List() }
 
   var histories: List[List[Request]]
 
@@ -24,6 +28,10 @@ module transfer_histories {
          readStaged, { op: "stage_imported", args: List() }, readStaged, readStagedValue,
          readStagedParent, readMain, { op: "publish_imported", args: List() }, readMain,
          readValue, readParentValue),
+    List(exportCommit("export"), importCommit("import_exported"),
+         { op: "stage_imported", args: List() }, readStagedValue,
+         recordLineage("add-one"), readLineage,
+         recordLineage("add-two"), readLineage, readMain, readStaged),
     List("busy_import", "bad_magic", "bad_version", "reserved", "short_header", "short_frame",
          "short_record", "trailing", "wrong_kind", "embedded_kind", "wrong_id", "wrong_root",
          "wrong_root_type", "bad_packed", "duplicate", "extra", "thin", "forward", "import")

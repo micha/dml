@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <dml/dml.h>
+#include "lineage.h"
 
 static const dml_bytes main_ref = {(const uint8_t *)"main", sizeof("main") - 1};
 static const dml_bytes staging_ref = {(const uint8_t *)"incoming", sizeof("incoming") - 1};
@@ -41,29 +41,16 @@ static bool create_repo(const char *path, dml_repo **repo, dml_error *error) {
 
 static bool put_object(dml_txn *txn, const dml_object_input *input, dml_object_id *id,
                        const char *operation, dml_error *error) {
-  dml_buffer packed = {0};
-  bool ok = check(dml_object_encode(input, &packed, error), "encode object", error) &&
-            check(dml_txn_put_object(txn, input->type, packed.data, packed.len, id, error),
-                  operation, error);
-  dml_buffer_free(&packed);
-  return ok;
-}
-
-static bool put_i64(dml_txn *txn, int64_t value, dml_object_id *id, dml_error *error) {
-  const dml_datum_input input = {.kind = DML_DATUM_I64, .value.i64 = value};
-  dml_buffer packed = {0};
-  bool ok = check(dml_datum_encode(&input, &packed, error), "encode I64", error) &&
-            check(dml_txn_put_datum(txn, packed.data, packed.len, id, error), "store datum", error);
-  dml_buffer_free(&packed);
-  return ok;
+  return check(lineage_put_object(txn, input, id, error), operation, error);
 }
 
 static bool write_snapshot(dml_txn *txn, int64_t value, const dml_object_id *parent,
                            dml_object_id *commit, dml_error *error) {
   dml_object_id datum, node, dag, tree;
-  if (!put_i64(txn, value, &datum, error)) return false;
-  const dml_object_input literal = {.type = DML_REC_NODE, .value.node = {DML_NODE_LITERAL, datum}};
-  if (!put_object(txn, &literal, &node, "store literal node", error)) return false;
+  const dml_datum_input number = {.kind = DML_DATUM_I64, .value.i64 = value};
+  if (!check(lineage_put_literal(txn, &number, &datum, &node, error), "store input literal", error)) {
+    return false;
+  }
 
   const dml_dag_binding binding = {value_name, node};
   const dml_object_input graph = {.type = DML_REC_DAG, .value.dag = {node, &binding, 1}};
@@ -119,118 +106,89 @@ static bool create_ref(dml_repo *repo, dml_bytes ref, const dml_object_id *tip, 
   return ok;
 }
 
-static bool load_object(dml_txn *txn, dml_record_type type, const dml_object_id *id,
-                        dml_buffer *packed, dml_object_view *view, dml_error *error) {
-  return check(dml_txn_get_object(txn, type, id, packed, error), "load object", error) &&
-         check(dml_object_decode(packed->data, packed->len, view, error), "decode object", error);
-}
-
-static bool read_commit(dml_txn *txn, const dml_object_id *id, dml_object_id *tree,
-                        dml_object_id *parent, dml_error *error) {
+static bool read_first_parent(dml_txn *txn, const dml_object_id *id, dml_object_id *parent,
+                              dml_error *error) {
   dml_buffer packed = {0};
   dml_object_view view;
-  bool ok = load_object(txn, DML_REC_COMMIT, id, &packed, &view, error);
-  if (ok) {
-    *tree = view.reference;
-    if (parent != NULL) {
-      ok = check(dml_object_view_parent(&view, 0, parent, error), "read first parent", error);
-    }
-  }
+  bool ok = check(lineage_get_object(txn, DML_REC_COMMIT, id, &packed, &view, error),
+                  "read commit", error) &&
+            check(dml_object_view_parent(&view, 0, parent, error), "read first parent", error);
   dml_buffer_free(&packed);
   return ok;
-}
-
-static bool find_dag(dml_txn *txn, const dml_object_id *tree, dml_object_id *dag, dml_error *error) {
-  dml_buffer packed = {0};
-  dml_object_view view;
-  bool found = false;
-  if (load_object(txn, DML_REC_TREE, tree, &packed, &view, error)) {
-    for (size_t i = 0; i < view.count; ++i) {
-      dml_tree_entry entry;
-      if (!check(dml_object_view_entry(&view, i, &entry, error), "decode tree entry", error)) break;
-      if (entry.name.len == snapshot_name.len &&
-          memcmp(entry.name.data, snapshot_name.data, snapshot_name.len) == 0) {
-        *dag = entry.dag;
-        found = true;
-        break;
-      }
-    }
-    if (!found) fputs("tree has no readable snapshot entry\n", stderr);
-  }
-  dml_buffer_free(&packed);
-  return found;
-}
-
-static bool read_literal(dml_txn *txn, const dml_object_id *id, dml_object_id *datum,
-                         dml_error *error) {
-  dml_buffer packed = {0};
-  dml_object_view view;
-  bool ok = load_object(txn, DML_REC_NODE, id, &packed, &view, error);
-  if (ok && view.node_kind != DML_NODE_LITERAL) {
-    fputs("value binding does not select a literal node\n", stderr);
-    ok = false;
-  }
-  if (ok) *datum = view.reference;
-  dml_buffer_free(&packed);
-  return ok;
-}
-
-static bool read_i64(dml_txn *txn, const dml_object_id *id, int64_t *out, dml_error *error) {
-  dml_buffer packed = {0};
-  dml_datum_view view;
-  bool ok = check(dml_txn_get_datum(txn, id, &packed, error), "load datum", error) &&
-            check(dml_datum_decode(packed.data, packed.len, &view, error), "decode datum", error);
-  if (ok && view.kind != DML_DATUM_I64) {
-    fputs("value datum is not I64\n", stderr);
-    ok = false;
-  }
-  if (ok) {
-    /* The validated payload is an eight-byte little-endian signed integer. */
-    uint64_t bits = 0;
-    for (size_t i = 0; i < sizeof(bits); ++i) bits |= (uint64_t)view.payload[i] << (8 * i);
-    *out = bits <= INT64_MAX ? (int64_t)bits : -1 - (int64_t)(UINT64_MAX - bits);
-  }
-  dml_buffer_free(&packed);
-  return ok;
-}
-
-static bool read_value(dml_txn *txn, const dml_object_id *tree, int64_t *out, dml_error *error) {
-  dml_object_id dag, node, datum;
-  return find_dag(txn, tree, &dag, error) &&
-         check(dml_txn_lookup_node(txn, &dag, value_name, &node, error), "look up value", error) &&
-         read_literal(txn, &node, &datum, error) && read_i64(txn, &datum, out, error);
 }
 
 static bool verify_history(dml_repo *repo, dml_bytes ref, const dml_object_id *expected_tip,
                             const dml_object_id *expected_parent, int64_t expected_tip_value,
-                            int64_t expected_parent_value, dml_error *error) {
+                            int64_t expected_parent_value, lineage_input *selected,
+                            dml_error *error) {
   dml_txn *txn = NULL;
-  dml_object_id tip, tip_tree, parent, parent_tree;
+  dml_object_id tip, parent;
   bool ok = check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin history read", error) &&
             check(dml_txn_ref_get(txn, ref, &tip, error), "resolve destination ref", error) &&
-            read_commit(txn, &tip, &tip_tree, &parent, error);
+            read_first_parent(txn, &tip, &parent, error);
   if (ok && (!same_id(&tip, expected_tip) || !same_id(&parent, expected_parent))) {
     fputs("destination tip or first parent differs from the source\n", stderr);
     ok = false;
   }
-  int64_t tip_value, parent_value;
+  lineage_input observed_tip, observed_parent;
   if (ok) {
-    ok = read_value(txn, &tip_tree, &tip_value, error) &&
-         read_commit(txn, &parent, &parent_tree, NULL, error) &&
-         read_value(txn, &parent_tree, &parent_value, error);
+    ok = check(lineage_read_input(txn, &tip, snapshot_name, value_name, &observed_tip, error),
+               "read tip value", error) &&
+         check(lineage_read_input(txn, &parent, snapshot_name, value_name, &observed_parent, error),
+               "read parent value", error);
   }
   dml_txn_abort(&txn);
-  if (ok && (tip_value != expected_tip_value || parent_value != expected_parent_value)) {
+  if (ok && (observed_tip.value != expected_tip_value || observed_parent.value != expected_parent_value)) {
     fprintf(stderr, "unexpected values: tip = %" PRId64 ", first parent = %" PRId64 "\n",
-            tip_value, parent_value);
+            observed_tip.value, observed_parent.value);
     return false;
   }
+  if (ok && selected != NULL) *selected = observed_tip;
   return ok;
 }
 
+static dml_status add_one(int64_t input, int64_t *output) {
+  if (input == INT64_MAX) return DML_INVALID_BOUNDS;
+  *output = input + 1;
+  return DML_OK;
+}
+
+static bool verify_lineage(dml_repo *repo, const lineage_input *input,
+                           const lineage_candidate *candidate, dml_bytes identity, dml_error *error) {
+  lineage_observation observed = {0};
+  dml_txn *txn = NULL;
+  bool ok = check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin lineage read", error) &&
+            check(lineage_inspect(txn, snapshot_name, value_name, &observed, error), "read lineage", error);
+  dml_txn_abort(&txn);
+  if (ok && (!same_id(&observed.commit, &candidate->commit) ||
+             !same_id(&observed.input.commit, &input->commit) ||
+             !same_id(&observed.input.datum, &input->datum) || observed.input.value != input->value ||
+             !same_id(&observed.output_datum, &candidate->output_datum) || observed.output != 44 ||
+             !same_id(&observed.implementation_datum, &candidate->implementation_datum) ||
+             !lineage_equal(observed.implementation, identity))) {
+    fputs("persisted result or lineage differs from the recorded computation\n", stderr);
+    ok = false;
+  }
+  dml_buffer_free(&observed.implementation_record);
+  return ok;
+}
+
+static bool run_lineage(dml_repo **repo, const char *path, const lineage_input *input,
+                        dml_error *error) {
+  const dml_bytes identity = lineage_name("example.add-one@1");
+  lineage_candidate candidate = {0};
+  return check(lineage_record(*repo, input, identity, add_one, &candidate, error), "record result", error) &&
+         check(candidate.completion, "commit result and pin", error) && close_repo(repo, error) &&
+         check(dml_repo_open(path, NULL, repo, error), "reopen result repository", error) &&
+         verify_lineage(*repo, input, &candidate, identity, error) && destination_main_missing(*repo, error);
+}
+
 int main(int argc, char **argv) {
-  if (argc != 3 || argv[1][0] == '\0' || argv[2][0] == '\0' || strcmp(argv[1], argv[2]) == 0) {
-    fputs("usage: transfer_history SOURCE_REPO DESTINATION_REPO\n"
+  const bool record_lineage = argc > 1 && strcmp(argv[1], "--lineage") == 0;
+  const int first_path = record_lineage ? 2 : 1;
+  if (argc != first_path + 2 || argv[first_path][0] == '\0' || argv[first_path + 1][0] == '\0' ||
+      strcmp(argv[first_path], argv[first_path + 1]) == 0) {
+    fputs("usage: transfer_history [--lineage] SOURCE_REPO DESTINATION_REPO\n"
           "Use two distinct unused paths with existing parent directories.\n", stderr);
     return EXIT_FAILURE;
   }
@@ -242,11 +200,12 @@ int main(int argc, char **argv) {
   const int64_t older_value = 42, newer_value = 43;
   int result = EXIT_FAILURE;
 
-  if (!create_repo(argv[1], &source, &error) ||
+  const char *source_path = argv[first_path], *destination_path = argv[first_path + 1];
+  if (!create_repo(source_path, &source, &error) ||
       !write_revision(source, older_value, NULL, &parent, &error) ||
       !write_revision(source, newer_value, &parent, &tip, &error) ||
       !check(dml_repo_export_commit(source, &tip, &bundle, &error), "export tip", &error) ||
-      !close_repo(&source, &error) || !create_repo(argv[2], &destination, &error)) goto cleanup;
+      !close_repo(&source, &error) || !create_repo(destination_path, &destination, &error)) goto cleanup;
 
   const dml_bytes input = {bundle.data, bundle.len};
   if (!check(dml_repo_import_commit(destination, input, &imported, &error), "import tip", &error)) {
@@ -256,18 +215,23 @@ int main(int argc, char **argv) {
     fputs("import returned a different commit ID\n", stderr);
     goto cleanup;
   }
+  lineage_input selected;
   if (!destination_main_missing(destination, &error) ||
       !create_ref(destination, staging_ref, &imported, &error) || !close_repo(&destination, &error) ||
-      !check(dml_repo_open(argv[2], NULL, &destination, &error), "reopen staged destination", &error) ||
+      !check(dml_repo_open(destination_path, NULL, &destination, &error), "reopen staged destination", &error) ||
       !destination_main_missing(destination, &error) ||
-      !verify_history(destination, staging_ref, &tip, &parent, newer_value, older_value, &error)) {
+      !verify_history(destination, staging_ref, &tip, &parent, newer_value, older_value, &selected, &error)) {
     goto cleanup;
   }
-  /* Publish the immutable commit just inspected, not a fresh lookup of the staging ref. */
-  if (!create_ref(destination, main_ref, &imported, &error) || !close_repo(&destination, &error) ||
-      !check(dml_repo_open(argv[2], NULL, &destination, &error), "reopen published destination", &error) ||
-      !verify_history(destination, main_ref, &tip, &parent, newer_value, older_value, &error)) {
-    goto cleanup;
+  if (record_lineage) {
+    if (!run_lineage(&destination, destination_path, &selected, &error)) goto cleanup;
+  } else {
+    /* Publish the immutable commit just inspected, not a fresh lookup of the staging ref. */
+    if (!create_ref(destination, main_ref, &selected.commit, &error) || !close_repo(&destination, &error) ||
+        !check(dml_repo_open(destination_path, NULL, &destination, &error), "reopen published destination", &error) ||
+        !verify_history(destination, main_ref, &tip, &parent, newer_value, older_value, NULL, &error)) {
+      goto cleanup;
+    }
   }
   result = EXIT_SUCCESS;
 
@@ -275,9 +239,10 @@ cleanup:
   dml_buffer_free(&bundle);
   if (!close_repo(&source, &error)) result = EXIT_FAILURE;
   if (!close_repo(&destination, &error)) result = EXIT_FAILURE;
-  if (result == EXIT_SUCCESS &&
-      printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", newer_value, older_value) < 0) {
-    return EXIT_FAILURE;
+  if (result == EXIT_SUCCESS) {
+    int printed = record_lineage ? puts("result-pin = 44\ninput = 43\nimplementation = example.add-one@1")
+                                : printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", newer_value, older_value);
+    if (printed < 0) return EXIT_FAILURE;
   }
   return result;
 }

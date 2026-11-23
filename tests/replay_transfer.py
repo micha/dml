@@ -14,6 +14,8 @@ HEADER = struct.Struct("<4sI16sI")
 FRAME = struct.Struct("<HHI16s")
 KINDS = {2: "datums", 3: "nodes", 4: "dags", 5: "trees", 6: "commits"}
 TAGS = {name: tag for tag, name in KINDS.items()}
+ZERO_ID = "00" * 16
+LINEAGE_EXAMPLES = {"add-one": (46, b"example.add-one@1"), "add-two": (47, b"example.add-two@1")}
 
 # This intentionally describes the construction, not decoded edges from export.
 # Insertion order also supplies one valid input order independently of C export.
@@ -159,6 +161,41 @@ def no_value():
     return dict(stage="", parent="", id="", kind=0, i64=0)
 
 
+def no_lineage():
+    return dict(parent="", inputDatum="", outputDatum="", implementationDatum="",
+                inputValue=0, outputValue=0, implementation="")
+
+
+def lineage_rows(variant, parent, candidate):
+    # Independent packing of the proposed v1 snapshot; never use bytes read back from B.
+    # The C command's returned IDs locate the expected rows and link them together.
+    def row(kind, identifier, body):
+        envelope = struct.pack("<4sHHIII", b"DML1", 1, kind, 20 + len(body), 0, 0)
+        return Frame(kind, identifier, envelope + body).row
+
+    def datum(kind, payload):
+        return struct.pack("<IQQ", kind, len(payload), 40) + payload
+
+    def literal(target):
+        return struct.pack("<I", 1) + target
+
+    def named(name, target):
+        return struct.pack("<I", len(name)) + name + target
+
+    value, identity = LINEAGE_EXAMPLES[variant]
+    output_datum, output_node, impl_datum, impl_node, dag, tree, commit = candidate
+    return [
+        row(2, output_datum, datum(3, struct.pack("<q", value))),
+        row(3, output_node, literal(output_datum)),
+        row(2, impl_datum, datum(6, identity)),
+        row(3, impl_node, literal(impl_datum)),
+        row(4, dag, output_node + struct.pack("<I", 2)
+            + named(b"implementation", impl_node) + named(b"output", output_node)),
+        row(5, tree, struct.pack("<I", 1) + named(b"lineage-v1", dag)),
+        row(6, commit, tree + struct.pack("<I", 1) + bytes.fromhex(parent)),
+    ]
+
+
 def export_attempt(runner, command, repo, root, path):
     mode = {"busy_export": "busy", "dirty_export": "dirty"}.get(command, "normal")
     path.unlink(missing_ok=True)
@@ -170,7 +207,7 @@ def export_attempt(runner, command, repo, root, path):
     raw = path.read_bytes() if path.exists() else b""
     result, rows = decode(raw) if raw else ("", [])
     return dict(status=status, shape=shape, completion=completion, result=result,
-                rows=rows, binary=raw.hex(), value=no_value())
+                rows=rows, binary=raw.hex(), value=no_value(), lineage=no_lineage())
 
 
 def import_attempt(runner, repo, path, command):
@@ -181,7 +218,7 @@ def import_attempt(runner, repo, path, command):
         raise ValueError(f"Unexpected C import response: {stdout!r}")
     status, result, completion = match.groups()
     return dict(status=status, shape="", completion=completion, result=result,
-                rows=[], binary="", value=no_value())
+                rows=[], binary="", value=no_value(), lineage=no_lineage())
 
 
 def fixture_model(frames, kept):
@@ -236,9 +273,11 @@ class Suite:
             "read_staged": partial(fixture.read_ref, "read_staged", "incoming"),
             "read_value": fixture.read_value,
             "read_parent_value": fixture.read_parent_value,
-            "read_staged_value": partial(fixture.read_snapshot, "read_staged_value", "incoming", False),
+            "read_staged_value": fixture.select_input,
             "read_staged_parent_value": partial(fixture.read_snapshot, "read_staged_parent_value",
                                                 "incoming", True),
+            "record_lineage": fixture.record_lineage,
+            "read_lineage": fixture.read_lineage,
         }, fixture_model(frames, kept))
 
 
@@ -251,7 +290,8 @@ class TransferHistory:
     frames: dict[str, Frame]
     kept: dict[str, Frame]
     large_bundles: dict[str, tuple[Path, str, Path]]
-    imported: str = "00" * 16
+    imported: str = ZERO_ID
+    selected: str = ZERO_ID
 
     def export_commit(self, case):
         if case not in EXPORTS:
@@ -301,7 +341,8 @@ class TransferHistory:
         status, completion = match.groups()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command=command, status=status, completion=completion, shape="",
-                    result=self.imported, binary="", rows=[], changes=changes, value=no_value())
+                    result=self.imported, binary="", rows=[], changes=changes, value=no_value(),
+                    lineage=no_lineage())
 
     def read_ref(self, command, ref):
         repo = self.destination
@@ -313,7 +354,56 @@ class TransferHistory:
         status, result, completion, packed = match.groups()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command=command, status=status, completion=completion, shape="",
-                    result=result, binary=packed, rows=[], changes=changes, value=no_value())
+                    result=result, binary=packed, rows=[], changes=changes, value=no_value(),
+                    lineage=no_lineage())
+
+    def select_input(self, entry, binding):
+        attempt = self.read_snapshot("read_staged_value", "incoming", False, entry, binding)
+        # Carry the actual selected head forward, not the fixture ID or a second ref lookup.
+        self.selected = attempt["result"]
+        return attempt
+
+    def record_lineage(self, variant):
+        if variant not in LINEAGE_EXAMPLES:
+            raise ValueError(f"Unknown lineage example: {variant!r}")
+        repo = self.destination
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "record_lineage", repo, self.selected, variant)
+        match = re.fullmatch(r"([a-z_]+) ([a-z_]+)\n((?:[0-9a-f]{32} ){6}[0-9a-f]{32})\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C record_lineage response: {stdout!r}")
+        status, completion, identifiers = match.groups()
+        candidate = identifiers.split()
+        rows = lineage_rows(variant, self.selected, [bytes.fromhex(item) for item in candidate])
+        if ZERO_ID in candidate:
+            shape = "incomplete"
+        elif any(row["key"] in before for row in rows):
+            shape = "existing_keys"
+        else:
+            shape = "new_keys"
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        lineage = dict(no_lineage(), parent=self.selected, outputDatum=candidate[0],
+                       implementationDatum=candidate[2])
+        return dict(command=f"record_{variant.replace('-', '_')}", status=status, completion=completion,
+                    shape=shape, result=candidate[-1], binary="", rows=rows, changes=changes,
+                    value=no_value(), lineage=lineage)
+
+    def read_lineage(self):
+        repo = self.destination
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "read_lineage", repo)
+        match = re.fullmatch(r"([a-z_]+)\n((?:[0-9a-f]{32} ){4}[0-9a-f]{32}) "
+                             r"(-?[0-9]+) (-?[0-9]+) ((?:[0-9a-f]{2})+|-)\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C read_lineage response: {stdout!r}")
+        status, identifiers, input_value, output_value, implementation = match.groups()
+        result, parent, input_datum, output_datum, impl_datum = identifiers.split()
+        lineage = dict(parent=parent, inputDatum=input_datum, outputDatum=output_datum,
+                       implementationDatum=impl_datum, inputValue=int(input_value),
+                       outputValue=int(output_value), implementation=implementation)
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command="read_lineage", status=status, completion="none", shape="", result=result,
+                    binary="", rows=[], changes=changes, value=no_value(), lineage=lineage)
 
     def read_value(self, entry, binding):
         return self.read_snapshot("read_value", "main", False, entry, binding)
@@ -335,7 +425,7 @@ class TransferHistory:
         observed = match.groupdict()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command=command, status=observed["status"], completion="none", shape="",
-                    result=observed["head"], binary="", rows=[], changes=changes,
+                    result=observed["head"], binary="", rows=[], changes=changes, lineage=no_lineage(),
                     value=dict(stage=observed["stage"], parent=observed.get("parent", ""),
                                id=observed["datum"], kind=int(observed["kind"]),
                                i64=int(observed["i64"])))

@@ -6,7 +6,7 @@
 
 #include <lmdb.h>
 
-#include "dml/dml.h"
+#include "../examples/lineage.h"
 
 #define SMALL_MAP (1024u * 1024u)
 
@@ -428,6 +428,70 @@ static void read_value(dml_repo *repo, const char *ref_name, const size_t *paren
   printf("%s %u %" PRId64 "\n", datum_hex, (unsigned)observed.kind, observed.value);
 }
 
+static dml_status add_one(int64_t input, int64_t *output) {
+  if (input == INT64_MAX) return DML_INVALID_BOUNDS;
+  *output = input + 1;
+  return DML_OK;
+}
+
+static dml_status add_two(int64_t input, int64_t *output) {
+  if (input > INT64_MAX - 2) return DML_INVALID_BOUNDS;
+  *output = input + 2;
+  return DML_OK;
+}
+
+static void record_lineage(dml_repo *repo, const char *input_hex, const char *mode) {
+  dml_object_id selected;
+  require_ok(dml_object_id_parse(input_hex, strlen(input_hex), &selected, NULL), "parse input ID");
+  bool first = strcmp(mode, "add-one") == 0;
+  const dml_bytes identity = name(first ? "example.add-one@1" : "example.add-two@1");
+  lineage_input input;
+  dml_txn *txn = NULL;
+  dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, NULL);
+  if (status == DML_OK) {
+    status = lineage_read_input(txn, &selected, name("all"), name("z-bound"), &input, NULL);
+  }
+  dml_txn_abort(&txn);
+  lineage_candidate candidate = {0};
+  if (status == DML_OK) {
+    status = lineage_record(repo, &input, identity, first ? add_one : add_two, &candidate, NULL);
+  }
+  printf("%s %s\n", dml_status_name(status),
+         candidate.attempted_commit ? dml_status_name(candidate.completion) : "none");
+  const dml_object_id ids[] = {candidate.output_datum, candidate.output_node,
+                              candidate.implementation_datum, candidate.implementation_node,
+                              candidate.dag, candidate.tree, candidate.commit};
+  for (size_t i = 0; i < sizeof(ids) / sizeof(*ids); ++i) {
+    char hex[DML_OBJECT_ID_HEX_SIZE + 1];
+    format_id(ids[i], hex);
+    printf("%s%c", hex, i == sizeof(ids) / sizeof(*ids) - 1 ? '\n' : ' ');
+  }
+}
+
+static void read_lineage(dml_repo *repo) {
+  lineage_observation observed = {0};
+  dml_txn *txn = NULL;
+  dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, NULL);
+  if (status == DML_OK) status = lineage_inspect(txn, name("all"), name("z-bound"), &observed, NULL);
+  dml_txn_abort(&txn);
+
+  printf("%s\n", dml_status_name(status));
+  const dml_object_id ids[] = {observed.commit, observed.input.commit, observed.input.datum,
+                              observed.output_datum, observed.implementation_datum};
+  for (size_t i = 0; i < sizeof(ids) / sizeof(*ids); ++i) {
+    char hex[DML_OBJECT_ID_HEX_SIZE + 1];
+    format_id(ids[i], hex);
+    printf("%s ", hex);
+  }
+  printf("%" PRId64 " %" PRId64 " ", observed.input.value, observed.output);
+  if (observed.implementation.len == 0) putchar('-');
+  for (size_t i = 0; i < observed.implementation.len; ++i) {
+    printf("%02x", (unsigned)observed.implementation.data[i]);
+  }
+  putchar('\n');
+  dml_buffer_free(&observed.implementation_record);
+}
+
 static bool parse_parent_index(const char *text, size_t *index) {
   if (*text == '\0' || text[strspn(text, "0123456789")] != '\0') return false;
   errno = 0;
@@ -491,8 +555,11 @@ int main(int argc, char **argv) {
   bool reading = argc == 4 && strcmp(argv[1], "read_ref") == 0;
   bool reading_value = argc == 6 && strcmp(argv[1], "read_value") == 0;
   bool reading_parent = argc == 7 && strcmp(argv[1], "read_parent_value") == 0;
+  bool recording = argc == 5 && strcmp(argv[1], "record_lineage") == 0 &&
+                   (strcmp(argv[4], "add-one") == 0 || strcmp(argv[4], "add-two") == 0);
+  bool reading_lineage = argc == 3 && strcmp(argv[1], "read_lineage") == 0;
   if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading &&
-      !reading_value && !reading_parent) {
+      !reading_value && !reading_parent && !recording && !reading_lineage) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
@@ -500,6 +567,8 @@ int main(int argc, char **argv) {
                     "       transfer_replay read_ref REPO REF\n"
                     "       transfer_replay read_value REPO REF TREE_ENTRY BINDING\n"
                     "       transfer_replay read_parent_value REPO REF PARENT_INDEX TREE_ENTRY BINDING\n"
+                    "       transfer_replay record_lineage REPO INPUT_ID {add-one|add-two}\n"
+                    "       transfer_replay read_lineage REPO\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
@@ -533,6 +602,10 @@ int main(int argc, char **argv) {
     read_value(repo, argv[3], NULL, argv[4], argv[5]);
   } else if (reading_parent) {
     read_value(repo, argv[3], &parent_index, argv[5], argv[6]);
+  } else if (recording) {
+    record_lineage(repo, argv[3], argv[4]);
+  } else if (reading_lineage) {
+    read_lineage(repo);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

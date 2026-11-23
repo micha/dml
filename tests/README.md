@@ -28,6 +28,14 @@ at the initial `main` but yields the expected datum ID, kind, and scalar value a
 the staged and published tips and their first parent. Each read must leave the
 inventory unchanged.
 
+A separate transfer history exercises [the caller's result format](../docs/spec-next/transfer.md#record-a-result-without-publishing-to-main).
+The native caller calculates a result from the exact selected commit, then records
+and pins it in one transaction. Quint checks the exact new LMDB rows and verifies the
+stored value, implementation ID and parent through a fresh native process. A second
+computation uses the same pin but stages distinct objects; its duplicate-pin
+failure must roll back all of them without disturbing the existing pin, `main`, or
+`incoming`.
+
 ## Add a request or operation
 
 - To exercise an existing operation, add a request to its `*_histories.qnt`
