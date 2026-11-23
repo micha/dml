@@ -17,7 +17,7 @@ persist immutable objects and atomically create, update, or release refs to comm
   transactional garbage collection. Checking and collection share the same typed
   graph scan from ref roots.
 - [transfer.h](../include/dml/transfer.h): buffered commit export/import with an
-  exact dependency closure and atomic import.
+  exact dependency closure and optional [atomic staging](spec-next/transfer.md#atomic-staging).
 
 xxHash, LMDB, utf8proc, and uriparser are private dependencies of the [C library](../README.md#install-and-link-the-c-library).
 The [LMDB entity diagram](lmdb-entity-diagram.html) shows the implemented storage model.

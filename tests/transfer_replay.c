@@ -266,11 +266,13 @@ static void export_bundle(dml_repo *repo, const char *root_hex, const char *path
   printf("%s %s\n", dml_status_name(status), shape);
 }
 
-static void import_bundle(dml_repo *repo, const char *path) {
+static void import_bundle(dml_repo *repo, const char *path, const char *ref_name) {
   dml_buffer bundle = read_bundle(path);
+  dml_bytes bytes = {bundle.data, bundle.len};
   dml_object_id out;
   memset(out.bytes, 0xa5, sizeof(out.bytes));
-  dml_status status = dml_repo_import_commit(repo, (dml_bytes){bundle.data, bundle.len}, &out, NULL);
+  dml_status status = ref_name == NULL ? dml_repo_import_commit(repo, bytes, &out, NULL)
+    : dml_repo_import_commit_staged(repo, bytes, name(ref_name), &out, NULL);
   dml_buffer_free(&bundle);
   char text[DML_OBJECT_ID_HEX_SIZE + 1];
   format_id(out, text);
@@ -676,6 +678,7 @@ int main(int argc, char **argv) {
   bool create = argc == 4 && strcmp(argv[1], "seed") == 0;
   bool exporting = argc == 6 && strcmp(argv[1], "export") == 0;
   bool importing = argc == 5 && strcmp(argv[1], "import") == 0;
+  bool importing_staged = argc == 6 && strcmp(argv[1], "import_staged") == 0;
   bool creating_ref = argc == 5 && strcmp(argv[1], "create_ref") == 0;
   bool updating_ref = argc == 5 && strcmp(argv[1], "update_ref") == 0;
   bool reading = argc == 4 && strcmp(argv[1], "read_ref") == 0;
@@ -694,11 +697,13 @@ int main(int argc, char **argv) {
                      ((!strcmp(argv[3], "before") || !strcmp(argv[3], "after") || !strcmp(argv[3], "only")) &&
                       (!strcmp(argv[4], "create") || !strcmp(argv[4], "update") || !strcmp(argv[4], "delete")))) &&
                     (!strcmp(argv[7], "commit") || !strcmp(argv[7], "abort"));
-  if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading && !reading_value &&
-      !reading_parent && !recording && !reading_lineage && !publishing && !releasing && !checking && !collecting) {
+  if (!create && !exporting && !importing && !importing_staged && !creating_ref && !updating_ref &&
+      !reading && !reading_value && !reading_parent && !recording && !reading_lineage &&
+      !publishing && !releasing && !checking && !collecting) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize|retention|empty}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
+                    "       transfer_replay import_staged REPO FILE REF {normal|busy|limited}\n"
                     "       transfer_replay {create_ref|update_ref} REPO REF TARGET\n"
                     "       transfer_replay read_ref REPO REF\n"
                     "       transfer_replay read_value REPO REF TREE_ENTRY BINDING\n"
@@ -718,7 +723,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "invalid parent index: %s\n", argv[4]);
     return EXIT_FAILURE;
   }
-  const char *mode = create || exporting || importing ? argv[argc - 1] : "";
+  const char *mode = create || exporting || importing || importing_staged ? argv[argc - 1] : "";
   if (create && strcmp(mode, "source") && strcmp(mode, "destination") &&
       strcmp(mode, "large") && strcmp(mode, "oversize") && strcmp(mode, "retention") && strcmp(mode, "empty")) {
     fprintf(stderr, "unknown fixture profile: %s\n", mode);
@@ -756,7 +761,7 @@ int main(int argc, char **argv) {
     run_gc_transaction(repo, argv[3], argv[4], argv[5], argv[6], !strcmp(argv[7], "commit"));
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
-    else import_bundle(repo, argv[3]);
+    else import_bundle(repo, argv[3], importing_staged ? argv[4] : NULL);
     printf("%s\n", busy ? dml_status_name(dml_txn_commit(&txn, NULL)) : "none");
   }
   require_ok(dml_repo_close(&repo, NULL), "closing fixture repository");

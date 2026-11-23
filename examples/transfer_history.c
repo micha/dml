@@ -7,6 +7,7 @@
 
 static const dml_bytes main_ref = {(const uint8_t *)"main", sizeof("main") - 1};
 static const dml_bytes staging_ref = {(const uint8_t *)"incoming", sizeof("incoming") - 1};
+static const dml_bytes returned_ref = {(const uint8_t *)"returned", sizeof("returned") - 1};
 static const dml_bytes pin_ref = {(const uint8_t *)"result-pin", sizeof("result-pin") - 1};
 static const dml_bytes snapshot_name = {(const uint8_t *)"snapshot", sizeof("snapshot") - 1};
 static const dml_bytes value_name = {(const uint8_t *)"value", sizeof("value") - 1};
@@ -105,6 +106,29 @@ static bool create_ref(dml_repo *repo, dml_bytes ref, const dml_object_id *tip, 
   return ok;
 }
 
+static bool release_ref(dml_repo *repo, dml_bytes ref, const dml_object_id *expected, dml_error *error) {
+  dml_txn *txn = NULL;
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin staging release", error) &&
+            check(dml_txn_ref_delete_expected(txn, ref, expected, error), "release inspected staging ref", error) &&
+            check(dml_txn_commit(&txn, error), "commit staging release", error);
+  dml_txn_abort(&txn);
+  return ok;
+}
+
+static bool collect_retained(dml_repo *repo, const char *path, dml_error *error) {
+  dml_txn *txn = NULL;
+  size_t removed;
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin collection", error) &&
+            check(dml_txn_collect_garbage(txn, &removed, error), "collect unreachable objects", error);
+  if (ok && removed != 0) {
+    fprintf(stderr, "%s: expected a fully retained repository, found %zu unreachable objects\n", path, removed);
+    ok = false;
+  }
+  if (ok) ok = check(dml_txn_commit(&txn, error), "commit collection", error);
+  dml_txn_abort(&txn);
+  return ok;
+}
+
 static bool read_first_parent(dml_txn *txn, const dml_object_id *id, dml_object_id *parent,
                               dml_error *error) {
   dml_buffer packed = {0};
@@ -194,15 +218,16 @@ static bool run_lineage(dml_repo **repo, const char *path, const lineage_input *
 
 static bool return_result(dml_repo **source, const char *path, dml_repo *destination,
                           const dml_object_id *pinned, const lineage_candidate *candidate,
-                          const lineage_input *input, dml_error *error) {
+                          const lineage_input *input, bool collect, dml_error *error) {
   dml_buffer bundle = {0};
   dml_object_id inspected;
   bool ok = check(dml_repo_export_commit(destination, pinned, &bundle, error), "export pinned result", error) &&
             check(dml_repo_open(path, NULL, source, error), "open original source", error) &&
-            check(dml_repo_import_commit(*source, (dml_bytes){bundle.data, bundle.len}, &inspected, error),
-                  "import result into source", error);
+            check(dml_repo_import_commit_staged(*source, (dml_bytes){bundle.data, bundle.len},
+                                                returned_ref, &inspected, error),
+                  "import and stage result in source", error);
   dml_buffer_free(&bundle);
-  if (!ok || !ref_missing(*source, pin_ref, error) ||
+  if (!ok || (collect && !collect_retained(*source, path, error)) || !ref_missing(*source, pin_ref, error) ||
       !verify_lineage(*source, (dml_bytes){0}, &inspected, input, candidate, error)) return false;
 
   /* The original source main was the input tip. Compare and update atomically;
@@ -212,21 +237,16 @@ static bool return_result(dml_repo **source, const char *path, dml_repo *destina
   return check(dml_txn_begin(*source, DML_TXN_WRITE, &txn, error), "begin result publication", error) &&
          check(lineage_publish_expected(&txn, main_ref, &input->commit, &inspected, &publication, error),
                "publish inspected result", error) &&
-         close_repo(source, error) &&
+         release_ref(*source, returned_ref, &inspected, error) && close_repo(source, error) &&
          check(dml_repo_open(path, NULL, source, error), "reopen published source", error) &&
+         ref_missing(*source, returned_ref, error) &&
          verify_lineage(*source, main_ref, &inspected, input, candidate, error);
 }
 
 static bool release_staging(dml_repo **repo, const char *path, const lineage_input *input,
                             const lineage_candidate *candidate, dml_error *error) {
-  dml_txn *txn = NULL;
-  bool ok = check(dml_txn_begin(*repo, DML_TXN_WRITE, &txn, error), "begin staging release", error) &&
-            check(dml_txn_ref_delete_expected(txn, staging_ref, &input->commit, error),
-                  "release inspected staging ref", error) &&
-            check(dml_txn_commit(&txn, error), "commit staging release", error);
-  dml_txn_abort(&txn);
   dml_object_id pinned;
-  return ok && close_repo(repo, error) &&
+  return release_ref(*repo, staging_ref, &input->commit, error) && close_repo(repo, error) &&
          check(dml_repo_open(path, NULL, repo, error), "reopen after staging release", error) &&
          ref_missing(*repo, staging_ref, error) && ref_missing(*repo, main_ref, error) &&
          verify_lineage(*repo, pin_ref, &pinned, input, candidate, error);
@@ -235,18 +255,8 @@ static bool release_staging(dml_repo **repo, const char *path, const lineage_inp
 static bool collect_and_verify(dml_repo **repo, const char *path, dml_bytes ref,
                                const lineage_input *input, const lineage_candidate *candidate,
                                dml_error *error) {
-  dml_txn *txn = NULL;
-  size_t removed;
-  bool ok = check(dml_txn_begin(*repo, DML_TXN_WRITE, &txn, error), "begin collection", error) &&
-            check(dml_txn_collect_garbage(txn, &removed, error), "collect unreachable objects", error);
-  if (ok && removed != 0) {
-    fprintf(stderr, "%s: expected a fully retained repository, found %zu unreachable objects\n", path, removed);
-    ok = false;
-  }
-  if (ok) ok = check(dml_txn_commit(&txn, error), "commit collection", error);
-  dml_txn_abort(&txn);
   dml_object_id tip;
-  return ok && close_repo(repo, error) &&
+  return collect_retained(*repo, path, error) && close_repo(repo, error) &&
          check(dml_repo_open(path, NULL, repo, error), "reopen after collection", error) &&
          verify_lineage(*repo, ref, &tip, input, candidate, error);
 }
@@ -278,7 +288,8 @@ int main(int argc, char **argv) {
       !close_repo(&source, &error) || !create_repo(destination_path, &destination, &error)) goto cleanup;
 
   const dml_bytes input = {bundle.data, bundle.len};
-  if (!check(dml_repo_import_commit(destination, input, &imported, &error), "import tip", &error)) {
+  if (!check(dml_repo_import_commit_staged(destination, input, staging_ref, &imported, &error),
+             "import and stage tip", &error)) {
     goto cleanup;
   }
   if (!same_id(&tip, &imported)) {
@@ -287,8 +298,7 @@ int main(int argc, char **argv) {
   }
   dml_buffer_free(&bundle);
   lineage_input selected;
-  if (!ref_missing(destination, main_ref, &error) ||
-      !create_ref(destination, staging_ref, &imported, &error) || !close_repo(&destination, &error) ||
+  if ((collect && !collect_retained(destination, destination_path, &error)) || !close_repo(&destination, &error) ||
       !check(dml_repo_open(destination_path, NULL, &destination, &error), "reopen staged destination", &error) ||
       !ref_missing(destination, main_ref, &error) ||
       !verify_history(destination, staging_ref, &tip, &parent, newer_value, older_value, &selected, &error)) {
@@ -299,7 +309,7 @@ int main(int argc, char **argv) {
     dml_object_id pinned;
     if (!run_lineage(&destination, destination_path, &selected, &candidate, &pinned, &error) ||
         (round_trip &&
-         (!return_result(&source, source_path, destination, &pinned, &candidate, &selected, &error) ||
+         (!return_result(&source, source_path, destination, &pinned, &candidate, &selected, collect, &error) ||
           !release_staging(&destination, destination_path, &selected, &candidate, &error)))) {
       goto cleanup;
     }
@@ -325,7 +335,8 @@ cleanup:
   if (result == EXIT_SUCCESS) {
     int printed;
     if (round_trip) {
-      printed = puts("source main = 44\ndestination result-pin = 44\ndestination incoming released\n"
+      printed = puts("source main = 44\ndestination result-pin = 44\n"
+                     "source returned and destination incoming released\n"
                      "input = 43\nimplementation = example.add-one@1");
     } else if (record_lineage) {
       printed = puts("result-pin = 44\ninput = 43\nimplementation = example.add-one@1");

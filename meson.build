@@ -96,6 +96,12 @@ if get_option('quint_tests')
     timeout: 90,
   )
   test(
+    'quint-staged-import', python,
+    args: ['-B', trace_interpreter, 'replay_staged_import', quint.full_path(), transfer_replay, lmdb_inventory,
+           files('tests/staged_import_histories.qnt', 'tests/staged_import_rules.qnt')],
+    timeout: 90,
+  )
+  test(
     'quint-gc', python,
     args: ['-B', trace_interpreter, 'replay_gc', quint.full_path(), transfer_replay, lmdb_inventory,
            files('tests/gc_histories.qnt', 'tests/gc_rules.qnt')],

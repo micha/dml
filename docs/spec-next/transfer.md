@@ -25,12 +25,29 @@ refers to them. The final frame MUST be the commit named in the bundle header.
   destination unchanged on failure. Existing byte-identical objects are reused;
   conflicting stored values are not replaced. Importing the same bundle again
   succeeds when the stored data still agrees with it.
-- Neither operation creates, moves, or transfers refs. A bundle is external
-  data, not a stored LMDB record. It does not capture resources addressed by URIs.
-- The repository handle MUST have no active transactions for either call.
-  Export takes an empty `dml_buffer`; on success the caller owns it and frees it
-  with `dml_buffer_free()`. Import borrows its input bytes for the duration of the
-  call and writes the returned root ID only after committing successfully.
+- Export and unpinned import do not change refs. A bundle includes no refs and
+  is external data, not a stored LMDB record. It does not capture resources
+  addressed by URIs.
+- The repository handle MUST have no active transactions for export or either
+  form of import. Export takes an empty `dml_buffer`; on success the caller owns
+  it and frees it with `dml_buffer_free()`. Import borrows its input bytes for the
+  duration of the call and writes the returned root ID only after committing
+  successfully.
+
+### Atomic staging
+
+`dml_repo_import_commit_staged()` MUST apply the same bundle validation and
+object insertion rules as unpinned import and create a local [ref](repository.md#refs)
+to the bundle root in the same write transaction. The caller supplies a short
+ref name such as `incoming`. An existing ref MUST be rejected even if it already
+points to the bundle root. Failure leaves the repository and root ID output
+unchanged. No other ref is created or moved, and the bundle format is unchanged.
+
+A staging ref is an ordinary [retention root](repository.md#retention-roots), not
+an approval of the commit. With atomic staging, [garbage collection](repository.md#explicit-garbage-collection)
+cannot run between the insertion and creation of the ref. The ref retains the
+bundle closure while it targets the root. Unpinned import followed by a separate
+ref creation has no such guarantee.
 
 ## Binary format version 1
 
@@ -66,8 +83,8 @@ origin or authenticity.
 
 | Condition | Status |
 | --- | --- |
-| Null required argument or nonempty export output | `invalid_argument` |
-| Active repository transaction | `invalid_state` |
+| Null required argument, nonempty export output, or invalid staging ref name | `invalid_argument` |
+| Active repository transaction or existing staging ref | `invalid_state` |
 | Wrong bundle magic/version or nonzero frame reserved field | `invalid_header` |
 | Truncation, invalid framing length/count, size limit, or trailing bytes | `invalid_bounds` |
 | Unsupported frame type or mismatch with its packed type | `invalid_kind` |
@@ -78,8 +95,7 @@ origin or authenticity.
 Packed-record and repository failures otherwise preserve their underlying status
 (for example `map_full` on import). Apart from the order of checks specified
 above, applications MUST NOT rely on precedence when multiple checks would fail.
-A failed export with a valid empty output leaves it empty. A failed import does
-not change the root ID output.
+A failed export with a valid empty output leaves it empty.
 
 ## Informative example
 
@@ -88,22 +104,20 @@ With two open repository handles and no active transactions:
 ```c
 dml_buffer bundle = {0};
 dml_object_id imported;
+const dml_bytes incoming = {(const uint8_t *)"incoming", sizeof("incoming") - 1};
 dml_status status = dml_repo_export_commit(source, &root, &bundle, &error);
 if (status == DML_OK) {
-  status = dml_repo_import_commit(dest, (dml_bytes){bundle.data, bundle.len},
-                                  &imported, &error);
+  status = dml_repo_import_commit_staged(dest, (dml_bytes){bundle.data, bundle.len},
+                                         incoming, &imported, &error);
 }
 dml_buffer_free(&bundle);
-/* On success, imported equals root. The caller may create or move a ref separately. */
+/* On success, imported equals root and incoming retains it. */
 ```
 
-To inspect an import before publishing it to `main`, create an ordinary
-[ref](repository.md#refs) such as `incoming` targeting the returned commit ID in
-its own write transaction. After reopening, resolve `incoming` in a read
-transaction, then read the commit and follow its ordered parent IDs. `incoming`
-is a caller-chosen name, not a separate namespace, and creating it leaves `main`
-unchanged. If the candidate is accepted, publish the commit ID that was actually
-inspected in a separate write transaction. The
+Stage an import under `incoming` to inspect it without changing `main`. After
+reopening, resolve `incoming` in a read transaction, then read the commit and
+follow its ordered parent IDs. If the candidate is accepted, publish the commit
+ID that was actually inspected in a separate write transaction. The
 [standalone C example](../../examples/transfer_history.c) demonstrates this flow.
 
 ### Record a result without publishing to `main`
@@ -126,18 +140,21 @@ execute the function, attest that it ran, or store its code.
 ### Return and publish the recorded result
 
 The example's `--round-trip` mode exports the result commit selected by the
-worker's `result-pin` and imports it back into the source repository. The bundle
-includes the lineage objects and the complete input history, even where the
-source already has those objects. The pin stays local to the worker. The
-source inspects the returned commit by ID, checking its sole parent, input,
-output, and implementation identifier without executing the computation.
+worker's `result-pin` and atomically stages it under `returned` in the source
+repository. The bundle includes the lineage objects and the complete input
+history, even where the source already has those objects. The pin stays local to
+the worker. The source inspects the staged commit by ID, checking its sole
+parent, input, output, and implementation identifier without executing the
+computation.
 
 The source then reads `main` in a write transaction and moves it to the inspected
 result ID only if `main` still points to the expected tip. A stale expectation
-aborts publication without rolling back the already committed import. This is a
-caller-side conditional update, not a merge. After reopening, the source resolves
-`main` and checks the same lineage again. Returning and publishing the result do
-not change the worker's refs.
+aborts publication and leaves `returned` in place for further inspection or
+explicit release. This is a caller-side conditional update, not a merge. After
+successful publication, the example releases `returned` only if it still points
+to the inspected result. It reopens the source and checks the same lineage
+through `main`. Returning and publishing the result do not change the worker's
+refs.
 
 The example then releases the worker's `incoming` in a separate write transaction,
 only if it still points to the input it inspected. After reopening, `incoming`

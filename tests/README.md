@@ -1,7 +1,8 @@
 # Quint trace interpreter
 
 [`run_histories.py`](run_histories.py) is the shared entry point for the ref,
-transfer, and garbage collection suites. Run it through [`scripts/check.sh --quint`](../README.md#quint-behavior-checks).
+transfer, staged import, and garbage collection suites. Run it through
+[`scripts/check.sh --quint`](../README.md#quint-behavior-checks).
 Meson supplies the adapter, native executables, and Quint history and rule modules.
 
 Quint emits ordered histories of `{ op: str, args: List[str] }` requests. The
@@ -36,10 +37,10 @@ computation uses the same pin but stages distinct objects; its duplicate-pin
 failure must roll back all of them without disturbing the existing pin, `main`, or
 `incoming`.
 
-The [return-trip history](../docs/spec-next/transfer.md#return-and-publish-the-recorded-result)
-checks the full exported closure, exact import delta without ref changes, and
-inspection by returned commit ID. A stale conditional publication must change
-nothing. A matching expectation moves only the original repository's `main`,
+The transfer suite's [unpinned return history](transfer_histories.qnt) checks the
+full exported closure, exact import delta without ref changes, and inspection by
+returned commit ID. A stale conditional publication must change nothing. A
+matching expectation moves only the original repository's `main`,
 which a fresh process resolves to inspect the same stored lineage again. The
 worker then rejects a stale release, aborts a matching release, and commits a
 matching release of `incoming`. The scan requires exactly one ref row removed
@@ -52,6 +53,17 @@ source, the old `main` closure becomes unreachable after publication. Quint
 compares exact typed object IDs and independent LMDB scans require unchanged
 inventories during checks. The focused native integrity test covers broken
 refs, records, and graph edges.
+
+The [staged import suite](staged_import_histories.qnt) compares exact LMDB keys and
+values after every operation. It collects an unpinned bundle, then confirms that
+atomic staging restores and roots a closure. A repeated import to the same ref
+fails even for the same commit; a different bundle targeting that ref proposes
+seven new records, none of which may survive rejection. Invalid names and a
+truncated bundle must also leave the inventory and output unchanged. After a
+separate writer moves `main`, a stale publication attempt leaves `returned`
+readable. Releasing it and collecting removes only the result rows. Another
+history stages an already present closure and verifies that successful
+publication keeps it reachable after releasing the staging ref.
 
 The [garbage collection suite](gc_histories.qnt) uses an imported result and
 its input history. Quint predicts the exact persisted rows from the ref set and

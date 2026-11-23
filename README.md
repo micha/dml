@@ -33,7 +33,8 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
 This builds the test executables in `build/core-check-quint/` and runs
-`quint-refs`, `quint-transfer`, `quint-gc`, and focused interpreter, integrity, and native fault tests.
+`quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, and focused
+interpreter, integrity, and native fault tests.
 The [shared trace interpreter](tests/README.md) replays requests from Quint against
 native C executables. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs), [transfer contract](docs/spec-next/transfer.md),
@@ -42,7 +43,9 @@ Fresh native reads and separate read-only LMDB scans check snapshot publication,
 rollback, datum readback from imported history, and recording, transferring back,
 conditionally publishing a caller's result, and guarded staging-ref release.
 The transfer history also checks exact unreachable IDs before staging an import and
-retention after releasing `incoming`. The collection suite checks ref ordering,
+retention after releasing `incoming`. The staging suite checks that a staged
+result survives collection even when publication is stale, and that a rejected
+import leaves no new objects or refs. The collection suite checks ref ordering,
 rollback, and exact persisted removals. Native checks exercise damaged repositories,
 allocation failures, and deletion failures. These checks are local and opt-in; they
 do not measure coverage.
@@ -69,7 +72,7 @@ cc -std=c11 -Ibuild/install/include examples/transfer_history.c \
 ```
 
 The program creates two revisions in the source repository and transfers the tip
-and its history. It [stages the import](docs/spec-next/transfer.md#informative-example)
+and its history. It [atomically stages the import](docs/spec-next/transfer.md#atomic-staging)
 under `incoming` and reopens the destination to inspect it while `main` is still
 absent. It then explicitly publishes the inspected commit to `main` and reopens
 again. Through both refs it verifies that the tip reads `43` and its first parent
@@ -93,16 +96,16 @@ run the full workflow from two new paths:
 "$run_dir/transfer_history" --round-trip "$run_dir/original" "$run_dir/compute"
 ```
 
-The original repository imports and inspects the result without recomputing it,
-then conditionally moves its `main` to the inspected commit. After reopening,
-its `main` yields `44`. The worker releases `incoming` only if it still points
-at the inspected input, then reopens and reads the same result and input through
-`result-pin`.
+The original repository stages the result under `returned` and inspects it without
+recomputing it. It conditionally moves `main` to the inspected commit and releases
+`returned` only after successful publication. After reopening, its `main` yields
+`44`. The worker releases `incoming` only if it still points at the inspected
+input, then reopens and reads the same result and input through `result-pin`.
 
-To also run [explicit garbage collection](docs/spec-next/repository.md#explicit-garbage-collection)
-after the release, use `--round-trip --collect` with two fresh paths. The example
-expects zero removals and reopens both repositories to verify the pinned and
-published lineage again.
+To run [explicit garbage collection](docs/spec-next/repository.md#explicit-garbage-collection)
+after each staged import and again after releasing the staging refs, use
+`--round-trip --collect` with two fresh paths. The example expects zero removals
+and verifies the pinned and published lineage again.
 
 To diagnose a repository without modifying it, use the
 [read-only integrity and reachability API](docs/spec-next/repository.md#snapshot-integrity-and-reachability).

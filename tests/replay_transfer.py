@@ -216,9 +216,12 @@ def export_attempt(runner, command, repo, root, path):
                 rows=rows, binary=raw.hex(), value=no_value(), lineage=no_lineage())
 
 
-def import_attempt(runner, repo, path, command):
+def import_attempt(runner, repo, path, command, *, ref=None):
     mode = {"busy_import": "busy", "map_full": "limited"}.get(command, "normal")
-    stdout = run_native(runner, "import", repo, path, mode)
+    if ref is None:
+        stdout = run_native(runner, "import", repo, path, mode)
+    else:
+        stdout = run_native(runner, "import_staged", repo, path, ref, mode)
     match = re.fullmatch(r"([a-z_]+) ([0-9a-f]{32})\n([a-z_]+)\n", stdout)
     if not match:
         raise ValueError(f"Unexpected C import response: {stdout!r}")

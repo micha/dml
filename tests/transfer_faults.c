@@ -6,6 +6,7 @@
 
 static size_t fail_at;
 static size_t allocation_count;
+static const dml_bytes stage_ref = {(const uint8_t *)"incoming", sizeof("incoming") - 1};
 
 static bool fail_allocation(void) {
   return fail_at != 0 && ++allocation_count == fail_at;
@@ -105,6 +106,20 @@ static void require_object(dml_repo *repo, dml_record_type type, const dml_objec
   dml_txn_abort(&txn);
 }
 
+static void require_ref(dml_repo *repo, const dml_object_id *root, dml_status expected) {
+  dml_error error = {0};
+  dml_txn *txn = NULL;
+  dml_object_id target;
+  require_status(dml_txn_begin(repo, DML_TXN_READ, &txn, &error), DML_OK, &error,
+                 "starting ref verification");
+  require_status(dml_txn_ref_get(txn, stage_ref, &target, &error), expected, &error,
+                 "verifying staging ref");
+  if (expected == DML_OK) {
+    require(memcmp(target.bytes, root->bytes, sizeof(target.bytes)) == 0, "staging ref has wrong target");
+  }
+  dml_txn_abort(&txn);
+}
+
 static dml_buffer check_export_failures(dml_repo *source, const dml_object_id *root) {
   dml_error error = {0};
   dml_buffer bundle = {0};
@@ -126,31 +141,56 @@ static dml_buffer check_export_failures(dml_repo *source, const dml_object_id *r
   return bundle;
 }
 
-static void check_import_failures(dml_repo *dest, dml_bytes bundle, const dml_object_id *root,
-                                  const dml_object_id *tree) {
+static void check_stage_arguments(dml_repo *dest, dml_bytes bundle) {
+  dml_error error = {0};
+  dml_object_id out, sentinel;
+  memset(sentinel.bytes, 0xa5, sizeof(sentinel.bytes));
+  out = sentinel;
+  const dml_bytes invalid_names[] = {{0}, {(const uint8_t *)"in\0coming", sizeof("in\0coming") - 1}};
+  for (size_t i = 0; i < sizeof(invalid_names) / sizeof(*invalid_names); i++) {
+    require_status(dml_repo_import_commit_staged(dest, bundle, invalid_names[i], &out, &error),
+                   DML_INVALID_ARGUMENT, &error, "rejecting invalid staging ref name");
+  }
+  require_status(dml_repo_import_commit_staged(dest, bundle, stage_ref, NULL, &error),
+                 DML_INVALID_ARGUMENT, &error, "rejecting null staged import output");
+  require_status(dml_repo_import_commit_staged(dest, (dml_bytes){bundle.data, bundle.len - 1},
+                                              stage_ref, &out, &error),
+                 DML_INVALID_BOUNDS, &error, "rejecting truncated staged bundle");
+  dml_txn *txn = NULL;
+  require_status(dml_txn_begin(dest, DML_TXN_READ, &txn, &error), DML_OK, &error, "starting active reader");
+  require_status(dml_repo_import_commit_staged(dest, bundle, stage_ref, &out, &error),
+                 DML_INVALID_STATE, &error, "rejecting staged import with active reader");
+  dml_txn_abort(&txn);
+  require(memcmp(out.bytes, sentinel.bytes, sizeof(out.bytes)) == 0, "rejected staged import changed the ID");
+}
+
+static void check_stage_failures(dml_repo *dest, dml_bytes bundle, const dml_object_id *root,
+                                 const dml_object_id *tree) {
   dml_error error = {0};
   dml_object_id sentinel;
   memset(sentinel.bytes, 0xa5, sizeof(sentinel.bytes));
+  /* The wide root allocates during both bundle parsing and ref-target validation. */
   for (size_t attempt = 1; attempt < 32; attempt++) {
     allocation_count = 0;
     dml_object_id imported = sentinel;
     fail_at = attempt;
-    dml_status status = dml_repo_import_commit(dest, bundle, &imported, &error);
+    dml_status status = dml_repo_import_commit_staged(dest, bundle, stage_ref, &imported, &error);
     fail_at = 0;
     if (status == DML_OK) {
       require(attempt > 1 && allocation_count == attempt - 1,
-              "import fault loop did not cover the expected allocation sequence");
+              "staged import fault loop did not cover the expected allocation sequence");
       require(memcmp(imported.bytes, root->bytes, sizeof(imported.bytes)) == 0, "import changed root ID");
-      require_object(dest, DML_REC_COMMIT, root, DML_OK);
+      require_ref(dest, root, DML_OK);
       return;
     }
-    require_status(status, DML_OUT_OF_MEMORY, &error, "injecting import allocation failure");
+    require_status(status, DML_OUT_OF_MEMORY, &error, "injecting staged import allocation failure");
     require(memcmp(imported.bytes, sentinel.bytes, sizeof(imported.bytes)) == 0,
-            "failed import changed the result ID");
+            "failed staged import changed the result ID");
     require_object(dest, DML_REC_COMMIT, root, DML_NOT_FOUND);
     require_object(dest, DML_REC_TREE, tree, DML_NOT_FOUND);
+    require_ref(dest, root, DML_NOT_FOUND);
   }
-  require(false, "import did not eventually succeed");
+  require(false, "staged import did not eventually succeed");
 }
 
 int main(int argc, char **argv) {
@@ -164,7 +204,9 @@ int main(int argc, char **argv) {
   dml_object_id tree;
   dml_object_id root = populate(source, &tree);
   dml_buffer bundle = check_export_failures(source, &root);
-  check_import_failures(dest, (dml_bytes){bundle.data, bundle.len}, &root, &tree);
+  const dml_bytes input = {bundle.data, bundle.len};
+  check_stage_arguments(dest, input);
+  check_stage_failures(dest, input, &root, &tree);
   dml_buffer_free(&bundle);
   require_status(dml_repo_close(&dest, &error), DML_OK, &error, "closing destination");
   require_status(dml_repo_close(&source, &error), DML_OK, &error, "closing source");

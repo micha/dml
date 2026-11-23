@@ -301,34 +301,47 @@ static dml_status parse_bundle(dml_bytes bundle, bundle_index *index, dml_object
   return validate_closure(index, root, error);
 }
 
-static dml_status publish_bundle(dml_repo *repo, const bundle_index *index, dml_error *error) {
+static dml_status store_bundle(dml_repo *repo, const bundle_index *index,
+                                const dml_object_id *root, const dml_bytes *ref_name,
+                                dml_error *error) {
   dml_txn *txn = NULL;
   dml_status status = dml_txn_begin(repo, DML_TXN_WRITE, &txn, error);
-  if (status != DML_OK) return status;
-  for (size_t i = 0; i < index->count; i++) {
+  for (size_t i = 0; status == DML_OK && i < index->count; i++) {
     const bundle_entry *entry = &index->entries[i];
     status = dml_txn_store_validated_object(txn, entry->type, &entry->id, entry->record, error);
-    if (status != DML_OK) {
-      dml_txn_abort(&txn);
-      return status;
-    }
   }
-  return dml_txn_commit(&txn, error);
+  if (status == DML_OK && ref_name != NULL) {
+    status = dml_txn_ref_create(txn, *ref_name, root, error);
+  }
+  if (status == DML_OK) return dml_txn_commit(&txn, error);
+  dml_txn_abort(&txn);
+  return status;
 }
 
-dml_status dml_repo_import_commit(dml_repo *repo, dml_bytes bundle,
-                                  dml_object_id *out, dml_error *error) {
+static dml_status import_bundle(dml_repo *repo, dml_bytes bundle, const dml_bytes *ref_name,
+                                 dml_object_id *out, dml_error *error) {
   if (bundle.data == NULL || out == NULL) {
     return fail(error, DML_INVALID_ARGUMENT, "import requires bundle bytes and root ID output");
   }
   dml_error_clear(error);
   dml_status status = dml_repo_transfer_ready(repo, error);
+  if (status == DML_OK && ref_name != NULL) status = dml_name_validate(*ref_name, error);
   if (status != DML_OK) return status;
   bundle_index index = {0};
   dml_object_id root;
   status = parse_bundle(bundle, &index, &root, error);
-  if (status == DML_OK) status = publish_bundle(repo, &index, error);
+  if (status == DML_OK) status = store_bundle(repo, &index, &root, ref_name, error);
   if (status == DML_OK) *out = root;
   index_free(&index);
   return status;
+}
+
+dml_status dml_repo_import_commit(dml_repo *repo, dml_bytes bundle,
+                                  dml_object_id *out, dml_error *error) {
+  return import_bundle(repo, bundle, NULL, out, error);
+}
+
+dml_status dml_repo_import_commit_staged(dml_repo *repo, dml_bytes bundle, dml_bytes ref_name,
+                                         dml_object_id *out, dml_error *error) {
+  return import_bundle(repo, bundle, &ref_name, out, error);
 }
