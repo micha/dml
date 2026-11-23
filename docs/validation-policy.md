@@ -16,7 +16,7 @@ publication and rollback, caller-side conditional publication, binary commit
 transfer and the staged result round trip, read-only integrity and reachability
 checks, and explicit transactional garbage collection. This also runs focused
 interpreter tests, native integrity and collection fault checks, and native
-transfer boundary and fault tests.
+transfer boundary and fault tests, plus the process-based provenance handoff.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
 currently run these runtime checks.
 
@@ -30,7 +30,9 @@ are historical evidence, not a passing gate for current code.
   the current core. Cover relevant failure paths. Mocks do not substitute for real
   runtime checks of a changed mechanism.
 - Use an installed consumer or equivalent boundary check when changing native
-  build or installation behavior. Use Valgrind when touching memory-critical paths.
+  build or installation behavior. For handoff changes, also run the
+  [process integration against the installed C library](../tests/README.md#process-integration).
+  Use Valgrind when touching memory-critical paths.
 - Use Quint as the primary behavioral check for repository contracts. Keep
   model rules independent of observed implementation outcomes, and check that
   important success and rejection scenarios are exercised. Use focused native

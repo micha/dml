@@ -161,4 +161,29 @@ only if it still points to the input it inspected. After reopening, `incoming`
 is absent and `result-pin` still yields the result and its original input via the
 result's parent link. See [retention roots](repository.md#retention-roots).
 
+### Resume a handoff across processes
+
+The [provenance handoff example](../../examples/provenance_handoff.c) separates the
+requester, worker and publisher into invocations. Here the request is the input
+commit selected by the requester, not a new core record type. The source saves
+its original `main` under `request-pin` before exporting it. The worker stages
+that bundle under `incoming`, commits the result and `result-pin` together, and
+exports the result. Each bundle is an ordinary commit bundle; refs stay local.
+
+The publisher stages the result under `returned` and inspects that exact commit.
+Its sole parent must match the source's saved request, independently of the
+current `main`. The example checks the result shape, datum kinds and claimed
+implementation ID. It does not recompute the output or verify its correctness
+or origin. The publisher compares `main` with the saved request and, in the
+same write transaction, publishes the inspected ID and deletes `returned` and
+`request-pin` only at their inspected targets. On a wrong parent or stale tip,
+`main` stays unchanged and both `returned` and `request-pin` remain available for
+inspection. If the guarded cleanup fails, the publication rolls back with it.
+
+The worker can release `incoming` in a separate command. In one write
+transaction it verifies the parent of `result-pin` and releases `incoming` only
+at that parent ID. `result-pin` remains a retention root, so both the result and
+its input survive collection. See [running and resuming the example](../../README.md#three-process-provenance-handoff)
+for supported checkpoints and file-handling limits.
+
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).

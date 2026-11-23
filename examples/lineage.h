@@ -177,8 +177,8 @@ static dml_status lineage_write_candidate(dml_txn *txn, const lineage_input *inp
 /* The caller has already selected and read the immutable input. Do not resolve
  * incoming again. Compute before acquiring the write transaction. On success,
  * also check out->completion for the final storage transaction status. */
-static dml_status lineage_record(dml_repo *repo, const lineage_input *input, dml_bytes identity,
-                                 lineage_compute compute, lineage_candidate *out, dml_error *error) {
+static inline dml_status lineage_record(dml_repo *repo, const lineage_input *input, dml_bytes identity,
+                                        lineage_compute compute, lineage_candidate *out, dml_error *error) {
   if (!lineage_identity_valid(identity)) {
     return lineage_error(DML_INVALID_ARGUMENT, "expected a nonempty ASCII implementation ID", error);
   }
@@ -257,9 +257,9 @@ typedef struct {
 } lineage_publication;
 
 /* Caller-side conditional update; the supplied write transaction is consumed. */
-static dml_status lineage_publish_expected(dml_txn **txn, dml_bytes ref,
-                                           const dml_object_id *expected, const dml_object_id *target,
-                                           lineage_publication *out, dml_error *error) {
+static inline dml_status lineage_publish_expected(dml_txn **txn, dml_bytes ref,
+                                                  const dml_object_id *expected, const dml_object_id *target,
+                                                  lineage_publication *out, dml_error *error) {
   *out = (lineage_publication){0};
   out->get = dml_txn_ref_get(*txn, ref, &out->actual, error);
   if (out->get != DML_OK || memcmp(out->actual.bytes, expected->bytes, sizeof(expected->bytes)) != 0) {

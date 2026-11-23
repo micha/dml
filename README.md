@@ -35,7 +35,8 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
 This builds the test executables in `build/core-check-quint/` and runs
-`quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, and focused
+`quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
+[provenance handoff integration](tests/README.md#process-integration), and focused
 interpreter, integrity, native boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
 Quint request through the Python binding. Quint checks observations against the
@@ -113,6 +114,39 @@ To diagnose a repository without modifying it, use the
 [read-only integrity and reachability API](docs/spec-next/repository.md#snapshot-integrity-and-reachability).
 It distinguishes damage from intact objects that no ref retains. It does not
 perform garbage collection.
+
+### Three-process provenance handoff
+
+Using the installed library and `$run_dir/source` from the first example above,
+run the [handoff](docs/spec-next/transfer.md#resume-a-handoff-across-processes) as
+three separate processes:
+
+```sh
+cc -std=c11 -Ibuild/install/include examples/provenance_handoff.c \
+  build/install/lib/libdml.a -pthread -o "$run_dir/provenance_handoff"
+"$run_dir/provenance_handoff" request "$run_dir/source" "$run_dir/request.dml"
+"$run_dir/provenance_handoff" work "$run_dir/handoff-worker" "$run_dir/result.dml" "$run_dir/request.dml"
+"$run_dir/provenance_handoff" publish "$run_dir/source" "$run_dir/result.dml"
+"$run_dir/provenance_handoff" release-input "$run_dir/handoff-worker"
+```
+
+The fourth command is optional worker cleanup. Use a fresh worker path when
+supplying a request bundle. This example uses fixed ref names for one handoff
+at a time; don't reuse or retarget those refs while that handoff is active.
+Only the files cross between roles. Keep `request-pin` until publication succeeds
+and leave `result-pin` in place to retain the worker's result and its input.
+
+- Run `request` again with a new output path to export the existing `request-pin`,
+  even if `main` has moved.
+- Run `work WORKER NEW_RESULT` without the request path to resume from `incoming`
+  or re-export an already committed `result-pin`.
+- Run `stage-result SOURCE RESULT` to stop after staging. Run `publish SOURCE`
+  without the result path to resume from the committed `returned` ref.
+
+These are committed repository checkpoints, not arbitrary crash recovery or
+idempotent retries of the entire workflow. Bundle paths are regular binary files.
+Export never overwrites an existing file, but an interrupted write can leave a
+partial file. Discard incomplete exports and retry to a fresh output path.
 
 ### Optional Nix development shell
 

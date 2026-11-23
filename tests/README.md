@@ -68,3 +68,28 @@ Check exact changes rather than counts where practical, require the histories
 that exercise rejection, and retain synthetic controls that reject fabricated
 success. Meson can pass local rule imports with `--quint-module`. Encode
 arbitrary bytes as lowercase hex in evidence.
+
+## Process integration
+
+[`run_provenance_handoff.py`](run_provenance_handoff.py) drives the standalone C
+example through separate requester, worker, and publisher processes. It passes
+paths to the example, not commit IDs from previous invocations. A separate
+[C fixture](handoff_fixture.c) uses only public APIs to create checkpoints,
+observe exact persisted refs and lineage, and collect a known orphan before
+resuming. The test checks normal and restarted transfers, no-clobber export,
+wrong-parent and stale-tip rejection, and guarded cleanup. This test complements
+Quint's operation-level checks; it does not add workflow requests to replay.
+
+`provenance-handoff` runs in the opt-in Meson suite. To verify the installed
+boundary, [install the C library](../README.md#install-and-link-the-c-library)
+and run the same test using only the installed headers and archive, for example
+with a Unix compiler driver:
+
+```sh
+run_dir=$(mktemp -d "$PWD/build/handoff-test.XXXXXX")
+cc -std=c11 -Ibuild/install/include examples/provenance_handoff.c \
+  build/install/lib/libdml.a -pthread -o "$run_dir/provenance_handoff"
+cc -std=c11 -Ibuild/install/include tests/handoff_fixture.c \
+  build/install/lib/libdml.a -pthread -o "$run_dir/handoff_fixture"
+python3 -B tests/run_provenance_handoff.py "$run_dir/provenance_handoff" "$run_dir/handoff_fixture"
+```

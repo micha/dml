@@ -145,6 +145,20 @@ with tempfile.TemporaryDirectory() as tmp:
 ''', transfer_boundaries],
   )
 
+  provenance_handoff = executable(
+    'provenance_handoff', 'examples/provenance_handoff.c',
+    dependencies: dml_dep,
+  )
+  handoff_fixture = executable(
+    'handoff_fixture', 'tests/handoff_fixture.c',
+    dependencies: dml_dep,
+  )
+  test(
+    'provenance-handoff', python,
+    args: ['-B', files('tests/run_provenance_handoff.py'), provenance_handoff, handoff_fixture],
+    timeout: 60,
+  )
+
   transfer_fault_subject = static_library(
     'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
     include_directories: dml_inc,
