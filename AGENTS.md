@@ -142,7 +142,9 @@ Tooling and project layout guidance is being rewritten from scratch.
 Do not treat prior command examples or directory assumptions as canonical.
 
 [The optional Nix development shell](README.md#optional-nix-development-shell)
-supplies build tools. Historical Python, CLI, test, and spike workflows are at
+supplies build tools. The opt-in `.#quint` shell supplies the pinned CLI for
+[Quint behavior checks](README.md#quint-behavior-checks).
+Historical Python, CLI, test, and spike workflows are at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
 
 ## Updating This File

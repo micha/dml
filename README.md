@@ -25,9 +25,15 @@ runs this build-only check; it does not run behavioral tests or measure coverage
 
 ### Quint behavior checks
 
-Use CPython 3.10+ with its development headers and [Quint](https://quint.sh/) 0.33.1
-(TypeScript backend). With Node.js and npm, you can install Quint locally without
-changing the project dependencies:
+The opt-in Nix shell supplies Python and pins [Quint](https://quint.sh/) 0.33.1
+for the TypeScript backend:
+
+```sh
+nix develop .#quint -c ./scripts/check.sh --quint
+```
+
+Without Nix, use CPython 3.10+ with its development headers and install Quint
+locally with Node.js and npm:
 
 ```sh
 npm install --prefix build/quint-tool --no-save --ignore-scripts @informalsystems/quint@0.33.1
@@ -169,8 +175,9 @@ partial file. Discard incomplete exports and retry to a fresh output path.
 ### Optional Nix development shell
 
 On x86_64 and aarch64 Linux/macOS, `nix develop` supplies the compiler, Meson, and
-Ninja. On Linux it also supplies Valgrind for manual memory checks. The shell does
-not run builds or checks automatically.
+Ninja. On Linux it also supplies Valgrind for manual memory checks. Use the
+separate `.#quint` shell for [Quint behavior checks](#quint-behavior-checks).
+Neither shell runs builds or checks automatically.
 
 ```sh
 nix develop -c scripts/check.sh
