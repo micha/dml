@@ -11,7 +11,9 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 
-TIMEOUT = 15
+# The bundled transfer evidence (including packed rows) can take more than 15 s
+# to parse and judge on slower workers. Meson still bounds the whole suite.
+TIMEOUT = 35
 
 
 def quint_state(quint, source, output, fields, init="init"):

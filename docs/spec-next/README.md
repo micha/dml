@@ -12,7 +12,7 @@ describes proposals, not additional implemented behavior.
 | --- | --- |
 | Datum kinds, canonical records, content identity, buffers, and errors | [Records and datums](records.md) |
 | Nodes, DAGs, trees, commits, names, and borrowed views | [Snapshot and history objects](objects.md) |
-| Repository initialization, storage keys, transactions, refs, and handles | [Local repository and transactions](repository.md) |
+| Repository initialization, storage keys, transactions, refs, retention, and integrity checks | [Local repository and transactions](repository.md) |
 | Binary commit bundle, export, and atomic import | [Commit transfer](transfer.md) |
 | Working vocabulary | [Glossary](glossary.md) |
 | Documentation conventions | [Writing guidelines](../documentation-guidelines.md) and [agent guide](AGENTS.md) |
@@ -22,9 +22,10 @@ describes proposals, not additional implemented behavior.
 The [C core](../../src/) implements ten datum kinds, deterministic record encoding
 and content IDs, literal and sub-DAG-reference nodes, rooted DAGs with named
 bindings, named trees, and ordered-parent commits. An LMDB-backed repository
-stores these objects and mutable refs under local storage transactions. The library
-can also export and atomically import self-contained binary commit bundles without
-changing refs. The [public headers](../../include/dml/) define the API, and the
+stores these objects and mutable refs under local storage transactions. It can
+[check integrity and reachability](repository.md#snapshot-integrity-and-reachability)
+without collecting objects. It can also export and atomically import self-contained
+binary commit bundles without changing refs. The [public headers](../../include/dml/) define the API, and the
 [entity diagram](../lmdb-entity-diagram.html) shows the implemented storage layout.
 
 The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)

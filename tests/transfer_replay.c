@@ -274,6 +274,25 @@ static void publish_expected(dml_repo *repo, const char *ref, const char *expect
   dml_txn_abort(&txn);
 }
 
+static void print_unreachable(void *context, dml_record_type type, const dml_object_id *id) {
+  (void)context;
+  char text[DML_OBJECT_ID_HEX_SIZE + 1];
+  format_id(*id, text);
+  printf("%u %s\n", (unsigned)type, text);
+}
+
+static void check_integrity(dml_repo *repo) {
+  dml_txn *txn = NULL;
+  require_ok(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL), "beginning integrity scan");
+  dml_repo_integrity report = {0};
+  dml_status status = dml_txn_check_integrity(txn, &report, print_unreachable, NULL, NULL);
+  dml_txn_abort(&txn);
+  printf("%s %zu %zu %zu %zu %zu %zu %zu %zu %zu\n", dml_status_name(status),
+         report.refs, report.broken_refs, report.invalid_entries, report.invalid_objects, report.reachable_objects,
+         report.broken_reachable_edges, report.broken_unreachable_edges, report.intact_unreachable_objects,
+         report.broken_unreachable_objects);
+}
+
 static void read_ref(dml_repo *repo, const char *ref_name) {
   dml_txn *txn = NULL;
   require_ok(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL), "beginning readback transaction");
@@ -597,8 +616,9 @@ int main(int argc, char **argv) {
   bool publishing = argc == 6 && strcmp(argv[1], "publish_expected") == 0;
   bool releasing = argc == 6 && strcmp(argv[1], "release_expected") == 0 &&
                    (!strcmp(argv[5], "commit") || !strcmp(argv[5], "abort"));
+  bool checking = argc == 3 && strcmp(argv[1], "check_integrity") == 0;
   if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading &&
-      !reading_value && !reading_parent && !recording && !reading_lineage && !publishing && !releasing) {
+      !reading_value && !reading_parent && !recording && !reading_lineage && !publishing && !releasing && !checking) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
@@ -610,6 +630,7 @@ int main(int argc, char **argv) {
                     "       transfer_replay read_lineage REPO [id COMMIT_ID | ref REF]\n"
                     "       transfer_replay publish_expected REPO REF EXPECTED_ID TARGET_ID\n"
                     "       transfer_replay release_expected REPO REF EXPECTED_ID {commit|abort}\n"
+                    "       transfer_replay check_integrity REPO\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
@@ -651,6 +672,8 @@ int main(int argc, char **argv) {
     publish_expected(repo, argv[3], argv[4], argv[5]);
   } else if (releasing) {
     release_expected(repo, argv[3], argv[4], strcmp(argv[5], "commit") == 0);
+  } else if (checking) {
+    check_integrity(repo);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

@@ -45,6 +45,13 @@ worker then rejects a stale release, aborts a matching release, and commits a
 matching release of `incoming`. The scan requires exactly one ref row removed
 and no object changes. A repeated release fails, and fresh native processes
 verify the same stored lineage through the worker's pin and the source's `main`.
+The [integrity scan](../docs/spec-next/repository.md#snapshot-integrity-and-reachability)
+reports those imported objects as intact but unreachable before staging, and as
+reachable once staged and again after release while the pin remains. On the
+source, the old `main` closure becomes unreachable after publication. Quint
+compares exact typed object IDs and independent LMDB scans require unchanged
+inventories during checks. The focused native integrity test covers broken
+refs, records, and graph edges.
 
 ## Add a request or operation
 

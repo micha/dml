@@ -22,7 +22,7 @@ module transfer_histories {
 
   pure val releaseStaging: List[Request] = List("reject_stale_release", "read_staged", "abort_release",
     "read_staged", "release_staged", "read_staged", "reject_missing_release", "read_lineage",
-    "read_returned_main")
+    "read_returned_main", "check_released", "check_published_source")
     .foldl(List(), (out, op) => out.append({ op: op, args: List() }))
 
   var histories: List[List[Request]]
@@ -37,8 +37,8 @@ module transfer_histories {
          readStaged, { op: "stage_imported", args: List() }, readStaged, readStagedValue,
          readStagedParent, readMain, { op: "publish_imported", args: List() }, readMain,
          readValue, readParentValue),
-    List(exportCommit("export"), importCommit("import_exported"),
-         { op: "stage_imported", args: List() }, readStagedValue,
+    List(exportCommit("export"), importCommit("import_exported"), { op: "check_unpinned", args: List() },
+         { op: "stage_imported", args: List() }, { op: "check_staged", args: List() }, readStagedValue,
          recordLineage("add-one"), readLineage,
          recordLineage("add-two"), readLineage, readMain, readStaged)
       .concat(returnLineage).concat(List(readMain, readStaged, readLineage)).concat(releaseStaging),

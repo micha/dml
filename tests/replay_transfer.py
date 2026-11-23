@@ -166,6 +166,12 @@ def no_lineage():
                 inputValue=0, outputValue=0, implementation="")
 
 
+def no_integrity():
+    return dict(refs=0, brokenRefs=0, invalidEntries=0, invalidObjects=0, reachable=0,
+                brokenReachableEdges=0, brokenUnreachableEdges=0, intactUnreachable=0,
+                brokenUnreachable=0, unreachable=[])
+
+
 def lineage_rows(variant, parent, candidate):
     # Independent packing of the proposed v1 snapshot; never use bytes read back from B.
     # The C command's returned IDs locate the expected rows and link them together.
@@ -231,6 +237,8 @@ def fixture_model(frames, kept):
         datum=frames["fifth"].identifier.hex(),
         parent=dict(id=frames["other_parent"].identifier.hex(), datum=frames["first"].identifier.hex()),
         rows=[frames[label].row for label in EDGES],
+        destinationCount=len(kept),
+        sourceDetached=[frame.row["key"] for label, frame in frames.items() if label not in EDGES],
         edges=[dict(parent=frames[label].row["key"], child=frames[child].row["key"])
                for label, children in EDGES.items() for child in children],
     )
@@ -299,6 +307,9 @@ class Suite:
             traced[name] = partial(fixture.observe, operation, other=other)
         for name in ("reject_stale_release", "abort_release", "release_staged", "reject_missing_release"):
             traced[name] = partial(fixture.observe, partial(fixture.release_staged, name), other=source)
+        for name in ("check_unpinned", "check_staged", "check_released", "check_published_source"):
+            repo, other = (source, destination) if name == "check_published_source" else (destination, source)
+            traced[name] = partial(fixture.observe, fixture.check_integrity, repo, name, other=other)
         yield Replay(traced, fixture_model(frames, kept))
 
 
@@ -322,6 +333,7 @@ class TransferHistory:
         before = scan_inventory(self.scanner, other) if other is not None else None
         attempt = operation(*args)
         attempt.setdefault("publication", dict(expected="", actual="", update=""))
+        attempt.setdefault("integrity", no_integrity())
         attempt["otherChanges"] = [] if before is None else inventory_diff(
             before, scan_inventory(self.scanner, other))
         return attempt
@@ -499,6 +511,26 @@ class TransferHistory:
         return dict(command=command, status=status, completion=completion, shape="",
                     result=expected, binary="", rows=[], changes=changes, value=no_value(),
                     lineage=no_lineage())
+
+    def check_integrity(self, repo, command):
+        before = scan_inventory(self.scanner, repo)
+        *visited, summary = run_native(self.runner, "check_integrity", repo).splitlines()
+        match = re.fullmatch(r"([a-z_]+)((?: [0-9]+){9})", summary)
+        if not match:
+            raise ValueError(f"Unexpected C integrity report: {summary!r}")
+        counts = [int(count) for count in match[2].split()]
+        keys = []
+        for line in visited:
+            match_key = re.fullmatch(r"([2-6]) ([0-9a-f]{32})", line)
+            if not match_key:
+                raise ValueError(f"Unexpected C unreachable entry: {line!r}")
+            kind = KINDS[int(match_key[1])]
+            keys.append(f"objects/{kind}/{match_key[2]}".encode("ascii").hex())
+        integrity = dict(zip(no_integrity(), [*counts, keys], strict=True))
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command=command, status=match[1], completion="none", shape="", result="",
+                    binary="", rows=[], changes=changes, value=no_value(), lineage=no_lineage(),
+                    integrity=integrity)
 
     def read_value(self, entry, binding):
         return self.read_snapshot("read_value", "main", False, entry, binding)

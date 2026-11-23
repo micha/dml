@@ -33,15 +33,16 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
 This builds the test executables in `build/core-check-quint/` and runs
-`quint-refs`, `quint-transfer`, and focused interpreter and native fault tests.
+`quint-refs`, `quint-transfer`, and focused interpreter, integrity, and native fault tests.
 The [shared trace interpreter](tests/README.md) replays requests from Quint against
 native C executables. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
 Fresh native reads and separate read-only LMDB scans check snapshot publication,
 rollback, datum readback from imported history, and recording, transferring back,
 conditionally publishing a caller's result, and guarded staging-ref release.
-The native fault test checks transfer allocation failures without adding hooks to the library.
-These checks are local and opt-in; they do not measure coverage.
+The transfer history also checks exact unreachable IDs before staging an import and
+retention after releasing `incoming`. Native checks exercise damaged repositories
+and allocation failures. These checks are local and opt-in; they do not measure coverage.
 
 ### Install and link the C library
 
@@ -94,6 +95,11 @@ then conditionally moves its `main` to the inspected commit. After reopening,
 its `main` yields `44`. The worker releases `incoming` only if it still points
 at the inspected input, then reopens and reads the same result and input through
 `result-pin`.
+
+To diagnose a repository without modifying it, use the
+[read-only integrity and reachability API](docs/spec-next/repository.md#snapshot-integrity-and-reachability).
+It distinguishes damage from intact objects that no ref retains. It does not
+perform garbage collection.
 
 ### Optional Nix development shell
 

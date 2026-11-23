@@ -8,6 +8,11 @@ module transfer_rules {
     inputValue: int, outputValue: int, implementation: str
   }
   type Publication = { expected: str, actual: str, update: str }
+  type Integrity = {
+    refs: int, brokenRefs: int, invalidEntries: int, invalidObjects: int, reachable: int,
+    brokenReachableEdges: int, brokenUnreachableEdges: int, intactUnreachable: int,
+    brokenUnreachable: int, unreachable: List[str]
+  }
   type Attempt = {
     command: str,
     status: str,
@@ -20,13 +25,15 @@ module transfer_rules {
     otherChanges: List[Change],
     value: DatumRead,
     lineage: Lineage,
-    publication: Publication
+    publication: Publication,
+    integrity: Integrity
   }
   type Commit = { id: str, packed: str }
   type Parent = { id: str, datum: str }
   type Fixture = {
     root: Commit, initialHead: Commit, sourceHead: Commit, rootKey: str,
-    datum: str, parent: Parent, rows: List[Row], edges: List[Edge]
+    datum: str, parent: Parent, rows: List[Row], edges: List[Edge],
+    destinationCount: int, sourceDetached: List[str]
   }
   type Observation = { fixture: Fixture, attempts: List[Attempt] }
   type Expected = {
@@ -60,6 +67,9 @@ module transfer_rules {
   pure val releaseSequence = returnSequence.concat(List("reject_stale_release", "read_staged", "abort_release",
     "read_staged", "release_staged", "read_staged", "reject_missing_release", "read_lineage", "read_returned_main"))
   pure val releases = Set("reject_stale_release", "abort_release", "release_staged", "reject_missing_release")
+  pure val checkSequence = List("import_exported", "check_unpinned", "stage_imported", "check_staged",
+    "record_add_one", "publish_return", "release_staged", "check_released", "check_published_source")
+  pure val checks = Set("check_unpinned", "check_staged", "check_released", "check_published_source")
   pure val refWrites = Set("stage_imported", "publish_imported")
   pure val lineageWrites = Set("record_add_one", "record_add_two")
   pure val stagedValues = Set("read_staged_value", "read_staged_parent_value")
@@ -96,7 +106,8 @@ module transfer_rules {
       row.attempts.foldl(allSeen, (seen, attempt) => seen.union(Set(attempt.command))))
     requiredCases.subseteq(seen)
       and evidence.foldl(false, (covered, row) => covered or coversPublication(row.attempts))
-      and evidence.foldl(false, (covered, row) => covered or coversSequence(row.attempts, releaseSequence))
+      and evidence.foldl(false, (covered, row) => covered or
+        (coversSequence(row.attempts, releaseSequence) and coversSequence(row.attempts, checkSequence)))
   }
 
   pure def expectedStatus(command: str, state: Expected): str =
@@ -104,7 +115,7 @@ module transfer_rules {
     else if (command == "read_staged") (if (state.staged) "ok" else "not_found")
     else if (command == "read_source_pin" or command == "reject_missing_release") "not_found"
     else if (command == "reject_stale_release") "invalid_state"
-    else if (releases.contains(command)) "ok"
+    else if (releases.contains(command) or checks.contains(command)) "ok"
     else if (goodExports.contains(command) or goodImports.contains(command) or returnOkStatuses.contains(command)
         or command == "read_main" or command == "read_parent_value" or command == "record_add_one"
         or command == "read_lineage" or stagedValues.contains(command) or refWrites.contains(command)) "ok"
@@ -254,6 +265,32 @@ module transfer_rules {
     else "pass"
   }
 
+  pure def integrityVerdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
+    val command = attempt.command
+    val unpinned = command == "check_unpinned"
+    val staged = command == "check_staged"
+    val source = command == "check_published_source"
+    val graphSize = fixture.rows.length()
+    val resultSize = state.resultRows.length()
+    val kept = fixture.destinationCount
+    val reachable = if (unpinned) kept else if (staged) graphSize + kept
+                    else if (source) graphSize + resultSize else graphSize + resultSize + kept
+    val detached = if (unpinned) fixture.rows.foldl(List(), (out, row) => out.append(row.key))
+                   else if (source) fixture.sourceDetached else List()
+    val report = attempt.integrity
+    if ((unpinned and (not(state.importedExport) or state.staged or state.result != ""))
+        or (staged and (not(state.staged) or state.result != ""))
+        or (not(unpinned or staged) and (state.staged or not(state.returnPublished)))) "integrity_order"
+    else if (report.refs != (if (unpinned) 1 else 2) or report.reachable != reachable) "integrity_roots"
+    else if (report.brokenRefs != 0 or report.invalidEntries != 0 or report.invalidObjects != 0
+             or report.brokenReachableEdges != 0 or report.brokenUnreachableEdges != 0
+             or report.brokenUnreachable != 0) "integrity_damage"
+    else if (report.intactUnreachable != detached.length() or report.unreachable.length() != detached.length()
+             or report.unreachable.foldl(Set(), (out, key) => out.union(Set(key)))
+                != detached.foldl(Set(), (out, key) => out.union(Set(key)))) "integrity_unreachable"
+    else "pass"
+  }
+
   pure def verdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
     val command = attempt.command
     val status = expectedStatus(command, state)
@@ -282,6 +319,7 @@ module transfer_rules {
              (not(state.returnPublished) or state.staged == (command == "reject_missing_release"))) "release_order"
     else if (attempt.otherChanges.length() != 0) "other_inventory"
     else if (changes != expectedChanges(attempt, fixture, state)) "inventory"
+    else if (checks.contains(command)) integrityVerdict(attempt, fixture, state)
     else if (lineageWrites.contains(command)) lineageWriteVerdict(attempt, fixture)
     else if (command == "read_lineage" or command == "inspect_return" or command == "read_returned_main")
       lineageReadVerdict(attempt, fixture, state)
@@ -347,7 +385,8 @@ module transfer_rules {
   pure val fixture = {
     root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" },
     sourceHead: { id: "44", packed: "22" }, rootKey: "cc", datum: "aa", parent: { id: "55", datum: "77" },
-    rows: List(leaf, root), edges: List({ parent: "cc", child: "aa" })
+    rows: List(leaf, root), edges: List({ parent: "cc", child: "aa" }),
+    destinationCount: 1, sourceDetached: List("33")
   }
   pure val noValue: DatumRead = { stage: "", parent: "", id: "", kind: 0, i64: 0 }
   pure val noLineage: Lineage = {
@@ -355,9 +394,14 @@ module transfer_rules {
     inputValue: 0, outputValue: 0, implementation: ""
   }
   pure val noPublication: Publication = { expected: "", actual: "", update: "" }
+  pure val noIntegrity: Integrity = {
+    refs: 0, brokenRefs: 0, invalidEntries: 0, invalidObjects: 0, reachable: 0, brokenReachableEdges: 0,
+    brokenUnreachableEdges: 0, intactUnreachable: 0, brokenUnreachable: 0, unreachable: List()
+  }
   pure val emptyAttempt: Attempt = {
     command: "", status: "ok", completion: "none", shape: "", result: "", binary: "", rows: List(),
-    changes: List(), otherChanges: List(), value: noValue, lineage: noLineage, publication: noPublication
+    changes: List(), otherChanges: List(), value: noValue, lineage: noLineage, publication: noPublication,
+    integrity: noIntegrity
   }
   pure val exported = {
     ...emptyAttempt, command: "export", shape: "buffer", result: "cc", binary: "ff", rows: List(leaf, root)
@@ -451,6 +495,10 @@ module transfer_rules {
   pure val staleRelease = {
     ...emptyAttempt, command: "reject_stale_release", status: "invalid_state", completion: "invalid_state", result: "99"
   }
+  pure val checkUnpinned = {
+    ...emptyAttempt, command: "check_unpinned",
+    integrity: { ...noIntegrity, refs: 1, reachable: 1, intactUnreachable: 2, unreachable: List("aa", "cc") }
+  }
   pure val controlsPass = all {
     verdict({ ...exported, rows: List(root) }, fixture, initial) == "export_rows",
     verdict({ ...exported, rows: List(root, leaf) }, fixture, initial) == "export_order",
@@ -542,6 +590,14 @@ module transfer_rules {
     verdict({ ...reopenedReturn, result: "44" }, fixture, publishedReturnState) == "lineage_tip",
     verdict(missingSourcePin, fixture, publishedReturnState) == "pass",
     verdict({ ...missingSourcePin, status: "ok" }, fixture, publishedReturnState) == "status",
+    verdict(checkUnpinned, fixture, importedState) == "pass",
+    verdict(checkUnpinned, fixture, stagedState) == "integrity_order",
+    verdict({ ...checkUnpinned, integrity: { ...checkUnpinned.integrity, reachable: 3 } },
+      fixture, importedState) == "integrity_roots",
+    verdict({ ...checkUnpinned, integrity: { ...checkUnpinned.integrity, brokenReachableEdges: 1 } },
+      fixture, importedState) == "integrity_damage",
+    verdict({ ...checkUnpinned, integrity: { ...checkUnpinned.integrity, unreachable: List("aa", "aa") } },
+      fixture, importedState) == "integrity_unreachable",
     verdict(released, fixture, publishedReturnState) == "pass",
     verdict(released, fixture, pinnedState) == "release_order",
     verdict({ ...released, changes: released.changes.append({ kind: "removed", key: "cc", before: "dd", after: "" }) },

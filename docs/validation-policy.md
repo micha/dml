@@ -15,8 +15,8 @@ changes to the replay suite or to covered behavior (ref creation, atomic snapsho
 publication and rollback, caller-side conditional publication, and binary commit
 transfer with staging, inspection and explicit publication, including the example's
 atomic result-and-pin write, conditional publication after return transfer, and
-staging-ref release).
-This also runs focused interpreter and native transfer fault tests.
+staging-ref release, and read-only integrity and reachability checks).
+This also runs focused interpreter, native integrity, and transfer fault tests.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
 currently run these runtime checks.
 

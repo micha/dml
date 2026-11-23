@@ -1,12 +1,13 @@
 # Local repository and transactions
 
-Status: implemented immutable-object storage and transactional refs, repository schema 1.
+Status: implemented immutable-object storage, transactional refs, and read-only
+integrity checks; repository schema 1.
 
 ## Authority boundary
 
 This document owns local repository initialization, persisted object/ref keys,
-direct reference checks, transaction behavior and repository/transaction handle
-ownership in this as-built specification. For encoding, IDs, value buffers and
+direct reference checks, snapshot integrity and reachability checks, transaction
+behavior and repository/transaction handle ownership in this as-built specification. For encoding, IDs, value buffers and
 errors, see [records.md](records.md). For snapshot/history fields and the shared
 name profile, see [objects.md](objects.md). For binary bundles and their transitive
 validation, see [Commit transfer](transfer.md). For documented scope, see [README.md](README.md).
@@ -165,6 +166,53 @@ closure of its stored object references, including all parents. An object still
 reachable through another ref remains retained after release. An imported commit
 ID in the caller's memory is not a ref and does not itself retain any objects.
 Releasing a ref does not collect objects.
+
+## Snapshot integrity and reachability
+
+`dml_txn_check_integrity()` scans the repository in one caller-owned read
+transaction. It MUST NOT write or end the transaction. `ok` means the scan
+completed, not that the repository is intact. If the scan fails (for example,
+because allocation fails), the report is unchanged and the visitor is not called.
+
+The scan checks known keys, schema, ref names and widths, and object encodings,
+types, and content IDs. It follows typed references from all valid ref targets,
+then checks the remaining locally valid objects. The report distinguishes:
+
+- `refs` and `broken_refs`: ref rows and the subset with malformed names or
+  values or a missing or invalid target commit. A valid target with a broken
+  dependency is diagnosed through edges instead.
+- `invalid_entries` and `invalid_objects`: unknown or malformed non-ref keys or
+  a bad or missing schema, and invalid records at canonical object keys,
+  respectively.
+- `reachable_objects`: locally valid objects reached from refs, counted once
+  even when several refs share them.
+- `broken_reachable_edges` and `broken_unreachable_edges`: references to absent
+  or invalid targets and traversal back edges that detect cycles, grouped by
+  whether the source object was reached from a ref. These do not count indirect
+  ancestors of a broken edge.
+- `intact_unreachable_objects` and `broken_unreachable_objects`: locally valid
+  objects not reached from any ref, distinguished by whether their full
+  dependency closure is intact.
+
+On completion, the optional visitor receives each intact unreachable `(type, ID)`
+once. Copy the ID to keep it after the call. The visitor MUST NOT use the
+repository or its transactions. Findings describe only that snapshot and the
+references the checker could validate; a damaged graph may hide intended
+reachability. The report is not a deletion plan and no object is collected.
+
+Informative example, with an open repository handle:
+
+```c
+dml_txn *txn = NULL;
+dml_repo_integrity report;
+dml_error error = {0};
+dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, &error);
+if (status == DML_OK) {
+  status = dml_txn_check_integrity(txn, &report, NULL, NULL, &error);
+  dml_txn_abort(&txn);
+}
+/* Only if status == DML_OK, inspect the report for damage and detached objects. */
+```
 
 ## Handle ownership and concurrency
 
