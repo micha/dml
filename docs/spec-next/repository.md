@@ -122,7 +122,7 @@ An invalid name returns `invalid_argument`; an absent local name returns `not_fo
 The operation does not descend into nested DAGs, resolve a ref, execute a node or
 load its value. Errors are read failures and MUST NOT poison a write transaction.
 Explicit descent reads a sub-DAG node and supplies its DAG ID to another lookup.
-The current lookup scans indexed bindings and is quadratic in the binding count.
+The current lookup scans the packed bindings sequentially.
 
 ## Refs
 
