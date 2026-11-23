@@ -20,7 +20,8 @@ fi
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 build_dir="$root_dir/build/core-check"
-setup_args=()
+# Bash 3.2 treats empty arrays as unset under nounset.
+setup_args=(--wrap-mode=forcefallback -Dbuildtype=debug)
 if [ "$quint_tests" = true ]; then
   build_dir="$root_dir/build/core-check-quint"
   setup_args+=(-Dquint_tests=true)
@@ -29,7 +30,7 @@ if [ -f "$build_dir/meson-private/coredata.dat" ]; then
   setup_args+=(--reconfigure)
 fi
 
-meson setup "${setup_args[@]}" "$build_dir" "$root_dir" --wrap-mode=forcefallback -Dbuildtype=debug
+meson setup "${setup_args[@]}" "$build_dir" "$root_dir"
 meson compile -C "$build_dir"
 if [ "$quint_tests" = true ]; then
   meson test -C "$build_dir" --print-errorlogs
