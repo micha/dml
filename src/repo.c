@@ -102,9 +102,10 @@ static dml_status validate_schema_value(const MDB_val *value, uint32_t *schema,
   return DML_OK;
 }
 
+static const char schema_key[] = "meta/schema";
+
 static dml_status initialize_or_check(dml_repo *repo, int create,
                                       dml_error *error) {
-  static const char schema_key[] = "meta/schema";
   uint8_t schema_record[DML_META_SIZE];
   MDB_txn *txn = NULL;
   MDB_val key = {sizeof(schema_key) - 1, (void *)schema_key};
@@ -277,17 +278,61 @@ dml_status dml_txn_begin(dml_repo *repo, dml_txn_mode mode, dml_txn **out,
   return DML_OK;
 }
 
+static const char *const object_prefixes[] = {
+  "objects/datums/", "objects/nodes/", "objects/dags/", "objects/trees/", "objects/commits/"
+};
+static const char ref_prefix[] = "refs/heads/";
+#define REF_PREFIX_LEN (sizeof(ref_prefix) - 1)
+
 static size_t object_key(dml_record_type type, const dml_object_id *id, char key[48]) {
-  static const char *const prefixes[] = {
-    "objects/datums/", "objects/nodes/", "objects/dags/", "objects/trees/", "objects/commits/"
-  };
-  const char *prefix = prefixes[type - DML_REC_DATUM];
+  const char *prefix = object_prefixes[type - DML_REC_DATUM];
   size_t prefix_len = strlen(prefix);
   char hex[DML_OBJECT_ID_HEX_SIZE + 1];
   (void)dml_object_id_format(id, hex, NULL);
   memcpy(key, prefix, prefix_len);
   memcpy(key + prefix_len, hex, 32);
   return prefix_len + 32;
+}
+
+static bool strip_prefix(dml_bytes *key, const char *prefix, size_t len) {
+  if (key->len < len || memcmp(key->data, prefix, len) != 0) return false;
+  key->data += len;
+  key->len -= len;
+  return true;
+}
+
+static dml_record_type classify_entry_key(dml_bytes *key) {
+  if (key->len == sizeof(schema_key) - 1 && memcmp(key->data, schema_key, key->len) == 0) {
+    return DML_REC_META;
+  }
+  if (strip_prefix(key, ref_prefix, REF_PREFIX_LEN)) return DML_REC_REF;
+  for (dml_record_type type = DML_REC_DATUM; type <= DML_REC_COMMIT; type++) {
+    const char *prefix = object_prefixes[type - DML_REC_DATUM];
+    if (strip_prefix(key, prefix, strlen(prefix))) return type;
+  }
+  return 0;
+}
+
+dml_status dml_txn_scan_entries(dml_txn *txn, dml_entry_visitor visitor, void *context,
+                                 dml_error *error) {
+  if (txn == NULL || txn->mode != DML_TXN_READ) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "integrity check requires a read transaction");
+  }
+  MDB_cursor *cursor;
+  int code = mdb_cursor_open(txn->native, txn->repo->dbi, &cursor);
+  if (code != MDB_SUCCESS) return storage_error(error, code, "opening integrity scan cursor");
+  MDB_val key, value;
+  dml_status status = DML_OK;
+  for (code = mdb_cursor_get(cursor, &key, &value, MDB_FIRST); code == MDB_SUCCESS;
+       code = mdb_cursor_get(cursor, &key, &value, MDB_NEXT)) {
+    dml_bytes suffix = {key.mv_data, key.mv_size};
+    dml_record_type type = classify_entry_key(&suffix);
+    status = visitor(context, type, suffix, (dml_bytes){value.mv_data, value.mv_size}, error);
+    if (status != DML_OK) break;
+  }
+  mdb_cursor_close(cursor);
+  if (status != DML_OK || code == MDB_NOTFOUND) return status;
+  return storage_error(error, code, "scanning repository integrity entries");
 }
 
 static dml_status lookup_bounded_object(dml_txn *txn, dml_record_type expected,
@@ -508,10 +553,10 @@ dml_status dml_txn_lookup_node(dml_txn *txn, const dml_object_id *dag,
 static dml_status ref_key(dml_bytes name, char bytes[139], MDB_val *key, dml_error *error) {
   dml_status status = dml_name_validate(name, error);
   if (status != DML_OK) return status;
-  memcpy(bytes, "refs/heads/", 11);
-  memcpy(bytes + 11, name.data, name.len);
+  memcpy(bytes, ref_prefix, REF_PREFIX_LEN);
+  memcpy(bytes + REF_PREFIX_LEN, name.data, name.len);
   key->mv_data = bytes;
-  key->mv_size = 11 + name.len;
+  key->mv_size = REF_PREFIX_LEN + name.len;
   return DML_OK;
 }
 

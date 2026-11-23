@@ -40,6 +40,7 @@ libdml = static_library(
     'src/object_id.c',
     'src/record.c',
     'src/repo.c',
+    'src/repo_check.c',
     'src/text.c',
     'src/transfer.c',
     'src/uri.c',
@@ -96,6 +97,30 @@ if get_option('quint_tests')
   )
 
   # Instrument the test copies only, never the installed library.
+  repo_check_fault_subject = static_library(
+    'repo_check_fault_subject', 'src/repo_check.c', 'src/object_id.c',
+    include_directories: dml_inc,
+    dependencies: vendor_headers,
+    c_args: ['-Dmalloc=dml_check_fault_malloc', '-Drealloc=dml_check_fault_realloc'],
+  )
+  repo_check = executable(
+    'repo_check', 'tests/repo_check.c',
+    objects: repo_check_fault_subject.extract_all_objects(recursive: false),
+    dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
+  )
+  test(
+    'native-repo-integrity', python,
+    args: ['-c', '''
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    subprocess.run([sys.argv[1], Path(tmp)], check=True)
+''', repo_check],
+  )
+
   transfer_fault_subject = static_library(
     'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
     include_directories: dml_inc,

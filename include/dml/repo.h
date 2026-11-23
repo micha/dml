@@ -21,6 +21,21 @@ typedef enum {
   DML_TXN_WRITE = 2
 } dml_txn_mode;
 
+typedef struct {
+  size_t refs;
+  size_t broken_refs;                /* Malformed refs or invalid/missing commit targets. */
+  size_t invalid_entries;            /* Unknown/malformed keys (excluding refs), or bad/missing schema. */
+  size_t invalid_objects;            /* Canonical object keys with invalid values. */
+  size_t reachable_objects;          /* Locally valid records reached from refs. */
+  size_t broken_reachable_edges;      /* Direct invalid/missing targets or DFS cycle back edges. */
+  size_t broken_unreachable_edges;    /* Same, from locally valid detached records. */
+  size_t intact_unreachable_objects; /* Detached records with intact transitive closure. */
+  size_t broken_unreachable_objects; /* Locally valid detached records with broken closure. */
+} dml_repo_integrity;
+
+typedef void (*dml_unreachable_visitor)(void *context, dml_record_type type,
+                                       const dml_object_id *id);
+
 /* Calls using one repository and its transactions require external
  * synchronization. A transaction must be used and ended by its creating
  * thread. Separate processes may open the same repository. */
@@ -33,6 +48,15 @@ dml_status dml_repo_open(const char *path, const dml_repo_options *options,
 dml_status dml_repo_schema(dml_repo *repo, uint32_t *out, dml_error *error);
 dml_status dml_txn_begin(dml_repo *repo, dml_txn_mode mode, dml_txn **out,
                          dml_error *error);
+/* Scan a read transaction's snapshot; does not end the transaction or write.
+ * DML_OK means the scan completed, not that the findings are clean. On error,
+ * out is unchanged and no visitor calls are made. On success the optional
+ * visitor receives each intact unreachable typed ID once; IDs are borrowed for
+ * the call and the visitor must not use the repository or its transactions.
+ * The report describes this snapshot only and is not a deletion plan. */
+dml_status dml_txn_check_integrity(dml_txn *txn, dml_repo_integrity *out,
+                                   dml_unreachable_visitor visitor, void *context,
+                                   dml_error *error);
 dml_status dml_txn_put_datum(dml_txn *txn, const uint8_t *data, size_t len,
                              dml_object_id *out, dml_error *error);
 dml_status dml_txn_get_datum(dml_txn *txn, const dml_object_id *id,
