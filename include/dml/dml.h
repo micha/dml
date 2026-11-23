@@ -7,6 +7,7 @@
 #include "dml/object.h"
 #include "dml/record.h"
 #include "dml/repo.h"
+#include "dml/transfer.h"
 
 const char *dml_version(void);
 

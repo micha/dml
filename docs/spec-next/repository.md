@@ -8,7 +8,8 @@ This document owns local repository initialization, persisted object/ref keys,
 direct reference checks, transaction behavior and repository/transaction handle
 ownership in this as-built specification. For encoding, IDs, value buffers and
 errors, see [records.md](records.md). For snapshot/history fields and the shared
-name profile, see [objects.md](objects.md). For documented scope, see [README.md](README.md).
+name profile, see [objects.md](objects.md). For binary bundles and their transitive
+validation, see [Commit transfer](transfer.md). For documented scope, see [README.md](README.md).
 Terms follow the shared [glossary](glossary.md).
 
 Normative sections describe current code. Committing a **storage transaction** is
@@ -121,7 +122,7 @@ An invalid name returns `invalid_argument`; an absent local name returns `not_fo
 The operation does not descend into nested DAGs, resolve a ref, execute a node or
 load its value. Errors are read failures and MUST NOT poison a write transaction.
 Explicit descent reads a sub-DAG node and supplies its DAG ID to another lookup.
-The current lookup scans indexed bindings and is quadratic in the binding count.
+The current lookup scans the packed bindings sequentially.
 
 ## Refs
 
@@ -185,20 +186,9 @@ abort/end read transaction
 close repository
 ```
 
-See [history_driver.c](../../tests/c/history_driver.c) for a native example of
-construction and inspection through this API.
-
 ## Implementation evidence
 
 - [repo.c](../../src/repo.c): initialization, transactions, object and ref persistence.
 - [Public repository API](../../include/dml/repo.h).
-- [C repository tests](../../tests/c/test_repo.c): lifecycle and negative cases.
-- [Native-driver repository tests](../../tests/python/test_repository_hypothesis.py):
-  fresh-process reads, abort invisibility and failed-batch rollback.
-- [History tests](../../tests/python/test_history.py): fresh-process inspection,
-  branching, ordered multiple parents, immutable content, ref edges, corruption,
-  and atomic object/ref rollback even after attempted poisoned commit.
 
-Actual validation runs and outstanding gates are recorded in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md)
-and [Iteration 3 results](../../../dml-design/iterations/03-composable-dags/RESULTS.md).
+The [feasibility checkpoint](README.md#what-exists-today) preserves earlier tests and results.

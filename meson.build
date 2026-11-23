@@ -3,46 +3,51 @@ project(
   'c',
   version: '0.1.0',
   meson_version: '>=1.4',
-  default_options: [
-    'c_std=c11',
-    'default_library=static',
-    'warning_level=3',
-  ],
+  default_options: ['c_std=c11', 'warning_level=3'],
 )
 
-py = import('python').find_installation(pure: false)
+xxhash_proj = subproject('xxhash')
+lmdb_proj = subproject('lmdb')
+utf8proc_proj = subproject('utf8proc')
+uriparser_proj = subproject('uriparser')
 
-xxhash_proj = subproject('xxhash', default_options: ['default_library=static'])
-xxhash_dep = xxhash_proj.get_variable('xxhash_dep')
+vendor_libraries = [
+  xxhash_proj.get_variable('libxxhash'),
+  lmdb_proj.get_variable('liblmdb'),
+  utf8proc_proj.get_variable('utf8proc_lib'),
+  uriparser_proj.get_variable('uriparser_lib'),
+]
+vendor_headers = []
+foreach dep : [
+  xxhash_proj.get_variable('xxhash_dep'),
+  lmdb_proj.get_variable('lmdb_dep'),
+  utf8proc_proj.get_variable('utf8proc_dep'),
+  uriparser_proj.get_variable('uriparser_dep'),
+]
+  vendor_headers += [dep.partial_dependency(compile_args: true, includes: true)]
+endforeach
 
-lmdb_proj = subproject('lmdb', default_options: ['default_library=static'])
-lmdb_dep = lmdb_proj.get_variable('lmdb_dep')
-
-utf8proc_proj = subproject('utf8proc', default_options: ['default_library=static'])
-utf8proc_dep = utf8proc_proj.get_variable('utf8proc_dep')
-
-uriparser_proj = subproject('uriparser', default_options: ['default_library=static'])
-uriparser_dep = uriparser_proj.get_variable('uriparser_dep')
-
+threads_dep = dependency('threads')
 dml_inc = include_directories('include')
-
-dml_sources = files(
-  'src/dml.c',
-  'src/encoding.c',
-  'src/error.c',
-  'src/object.c',
-  'src/object_id.c',
-  'src/record.c',
-  'src/repo.c',
-  'src/text.c',
-  'src/uri.c',
-)
 
 libdml = static_library(
   'dml',
-  dml_sources,
+  files(
+    'src/dml.c',
+    'src/encoding.c',
+    'src/error.c',
+    'src/object.c',
+    'src/object_id.c',
+    'src/record.c',
+    'src/repo.c',
+    'src/text.c',
+    'src/transfer.c',
+    'src/uri.c',
+  ),
   include_directories: dml_inc,
-  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
+  # Install a complete archive without requiring separate vendor libraries.
+  link_whole: vendor_libraries,
+  dependencies: vendor_headers + [threads_dep],
   install: true,
 )
 
@@ -52,142 +57,66 @@ install_headers(
   'include/dml/object.h',
   'include/dml/record.h',
   'include/dml/repo.h',
+  'include/dml/transfer.h',
   subdir: 'dml',
 )
 
 dml_dep = declare_dependency(
   link_with: libdml,
   include_directories: dml_inc,
-  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
+  dependencies: threads_dep,
 )
-
-dml_cli = executable(
-  'dml',
-  'src/cli.c',
-  include_directories: dml_inc,
-  dependencies: dml_dep,
-  install: true,
-  install_dir: py.get_install_dir() / 'daggerml' / '_bin',
-  install_tag: 'python-runtime',
-)
-
-test_version = executable(
-  'test_version',
-  'tests/c/test_version.c',
-  include_directories: dml_inc,
-  dependencies: dml_dep,
-)
-
-test('test_version', test_version)
-
-test_record = executable(
-  'test_record',
-  'tests/c/test_record.c',
-  include_directories: dml_inc,
-  dependencies: dml_dep,
-)
-
-test('test_record', test_record)
-
-test_record_failure = executable(
-  'test_record_failure',
-  'tests/c/test_record_failure.c',
-  include_directories: dml_inc,
-  dependencies: dml_dep,
-)
-
-test('test_record_failure', test_record_failure)
-
-test_repo = executable(
-  'test_repo',
-  'tests/c/test_repo.c',
-  include_directories: dml_inc,
-  dependencies: dml_dep,
-)
-
-test('test_repo', test_repo, is_parallel: false)
-
-test_core_driver = executable(
-  'test_core_driver',
-  'tests/c/core_driver.c',
-  include_directories: dml_inc,
-  dependencies: dml_dep,
-)
-
-test_object = executable(
-  'test_object', 'tests/c/test_object.c',
-  include_directories: dml_inc, dependencies: dml_dep,
-)
-test('test_object', test_object)
-
-executable(
-  'test_history_driver', 'tests/c/history_driver.c',
-  include_directories: dml_inc, dependencies: dml_dep,
-)
-
-boundary_test = executable(
-  'test_boundaries', 'tests/c/test_boundaries.c',
-  include_directories: dml_inc, dependencies: dml_dep,
-)
-test('test_boundaries', boundary_test)
-
-# Compile the same sources with dependency-call substitution only in this
-# private test core. The installed library has no hooks or mutable fault state.
-fault_core = static_library(
-  'dml_test_fault_core', dml_sources,
-  include_directories: dml_inc,
-  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
-  c_args: ['-include', meson.current_source_dir() / 'tests/c/fault_injection.h'],
-  install: false,
-)
-fault_test = executable(
-  'test_faults', 'tests/c/test_faults.c', 'tests/c/fault_injection.c',
-  include_directories: dml_inc,
-  link_with: fault_core,
-  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
-)
-test('test_faults', fault_test, is_parallel: false)
-
-py.extension_module(
-  '_core', 'python/daggerml/src/_core_module.c',
-  dependencies: dml_dep,
-  subdir: 'daggerml',
-  install: true,
-  install_tag: 'python-runtime',
-  limited_api: '3.8',
-)
-executable(
-  'test_cli_fault_driver', 'tests/c/cli_fault_driver.c', 'tests/c/fault_injection.c',
-  include_directories: dml_inc,
-  link_with: fault_core,
-  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
-  install: false,
-)
-
-py.extension_module(
-  '_core_fault', 'python/daggerml/src/_core_module.c', 'tests/c/fault_injection.c',
-  include_directories: [dml_inc, include_directories('tests/c')],
-  link_with: fault_core,
-  dependencies: [xxhash_dep, lmdb_dep, utf8proc_dep, uriparser_dep],
-  c_args: ['-DDML_PY_FAULTS'],
-  limited_api: '3.8', install: false,
-)
-
-py.install_sources(
-  'python/daggerml/daggerml/__init__.py',
-  'python/daggerml/daggerml/local.py',
-  'python/daggerml/daggerml/builtin.py',
-  'python/daggerml/daggerml/transfer.py',
-  'python/daggerml/daggerml/exchange.py',
-  'python/daggerml/daggerml/exchange_worker.py',
-  'python/daggerml/daggerml/ssh.py',
-  'python/daggerml/daggerml/ssh_worker.py',
-  'python/daggerml/daggerml/floci.py',
-  'python/daggerml/daggerml/floci_http.py',
-  'python/daggerml/daggerml/floci_worker.py',
-  'python/daggerml/daggerml/_core.pyi',
-  'python/daggerml/daggerml/py.typed',
-  subdir: 'daggerml', install_tag: 'python-runtime',
-)
-
 meson.override_dependency('dml', dml_dep)
+
+if get_option('quint_tests')
+  python = find_program('python3', version: '>=3.10')
+  quint = find_program('quint')
+  trace_interpreter = files('tests/run_histories.py')
+  test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
+  ref_replay = executable('ref_replay', 'tests/ref_replay.c', dependencies: dml_dep)
+  lmdb_inventory = executable(
+    'lmdb_inventory', 'tests/lmdb_inventory.c',
+    dependencies: lmdb_proj.get_variable('lmdb_dep'),
+  )
+  test(
+    'quint-refs', python,
+    args: ['-B', trace_interpreter, 'replay_refs', quint.full_path(), ref_replay, lmdb_inventory,
+           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt')],
+    timeout: 90,
+  )
+  transfer_replay = executable(
+    'transfer_replay', 'tests/transfer_replay.c',
+    dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
+  )
+  test(
+    'quint-transfer', python,
+    args: ['-B', trace_interpreter, 'replay_transfer', quint.full_path(), transfer_replay, lmdb_inventory,
+           files('tests/transfer_histories.qnt', 'tests/transfer_rules.qnt')],
+    timeout: 90,
+  )
+
+  # Instrument the test copies only, never the installed library.
+  transfer_fault_subject = static_library(
+    'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
+    include_directories: dml_inc,
+    dependencies: vendor_headers,
+    c_args: ['-Dmalloc=dml_fault_malloc', '-Dcalloc=dml_fault_calloc', '-Drealloc=dml_fault_realloc'],
+  )
+  transfer_faults = executable(
+    'transfer_faults', 'tests/transfer_faults.c',
+    objects: transfer_fault_subject.extract_all_objects(recursive: false),
+    dependencies: dml_dep,
+  )
+  test(
+    'native-transfer-faults', python,
+    args: ['-c', '''
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    subprocess.run([sys.argv[1], Path(tmp) / 'source', Path(tmp) / 'dest'], check=True)
+''', transfer_faults],
+  )
+endif

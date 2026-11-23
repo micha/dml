@@ -29,9 +29,9 @@ Read the shared [glossary](glossary.md) for terminology.
   term or explicitly qualify a local one instead of silently changing meanings.
   Glossary entries, including provisional ones, do not establish implementation.
 - Use RFC 2119 keywords only for implemented technical contracts, not plans.
-- Maintain the README's concept map, documented scope and Mermaid diagram when
-  adding or changing document ownership. The README is for human orientation; do
-  not make humans depend on these agent instructions for technical understanding.
+- Maintain the README's concept ownership table and documented scope when adding
+  or changing document ownership. The README is for human orientation; do not make
+  humans depend on these agent instructions for technical understanding.
 - For an authorized implementation change, update its authoritative documentation
   with the new contract, following the shared guideline sequence. Before closing
   the change, verify code and documentation agree. Planned text is not an as-built

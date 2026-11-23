@@ -83,8 +83,7 @@ plus a u32 schema version, currently 1.
   `0x7ff8000000000000`. Packed validation MUST reject noncanonical forms.
 - URI input MUST be absolute RFC 3986 syntax, ASCII and free of NUL. Raw non-ASCII
   input and relative references are rejected. `dml:` references are valid data; storing
-  a URI does not grant execution permission. [Internal builtins](../internal-builtins.md)
-  own closed executable definitions, while external Python drivers reject `dml:` intents.
+  a URI does not grant execution permission. The core does not execute URI values.
 - `dml_uri_canonicalize()` provides canonicalization. It lowercases scheme/host,
   normalizes percent escapes and hierarchical dot segments, while preserving
   significant delimiters, query order, fragments and explicit ports. It does not
@@ -140,9 +139,5 @@ not use that form. Unknown general record types report an unsupported-type error
 - [record.c](../../src/record.c): encoding, decoding and validation.
 - [object_id.c](../../src/object_id.c): hashing and ID text conversion.
 - [text.c](../../src/text.c) and [uri.c](../../src/uri.c): normalization boundaries.
-- [C record tests](../../tests/c/test_record.c) and
-  [failure tests](../../tests/c/test_record_failure.c).
-- [Native-driver property tests and golden vectors](../../tests/python/test_records_hypothesis.py).
 
-Actual validation runs and outstanding gates are recorded in the
-[Iteration 1 delivery notes](../../../dml-design/iterations/01-minimum-viable-repository/RESULTS.md).
+The [feasibility checkpoint](README.md#what-exists-today) preserves earlier tests and results.
