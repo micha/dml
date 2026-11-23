@@ -234,15 +234,17 @@ static bool export_fixture(dml_repo *repo, const dml_object_id *id, const char *
   return ok && print_id(id, "\n", error);
 }
 
-static bool forge_result(dml_repo *repo, const char *path, dml_error *error) {
+static bool forge_result(dml_repo *repo, const char *path, bool wrong_value, dml_error *error) {
   dml_txn *txn = NULL;
   dml_object_id parent;
   lineage_candidate candidate = {0};
-  /* The scalar output is correct for the default request, but the claimed operation is not. */
+  /* Break exactly one claim for the default add-one request. */
+  const int64_t output = wrong_value ? 900 : 44;
+  const dml_bytes operation = lineage_name(wrong_value ? "example.add-one@1" : "example.subtract-one@1");
   bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin fixture result write", error) &&
             check(dml_txn_ref_get(txn, lineage_name("incoming"), &parent, error), "read fixture request parent", error) &&
-            check(lineage_write_candidate(txn, &parent, 44, lineage_name("example.subtract-one@1"),
-                                          &candidate, error), "write fixture result", error) &&
+            check(lineage_write_candidate(txn, &parent, output, operation, &candidate, error),
+                  "write fixture result", error) &&
             check(dml_txn_ref_create(txn, lineage_name("fixture-result"), &candidate.commit, error),
                   "pin fixture result", error) &&
             check(dml_txn_commit(&txn, error), "commit fixture result", error);
@@ -295,7 +297,8 @@ int main(int argc, char **argv) {
   const bool read = argc == 4 && (strcmp(cmd, "ref") == 0 || strcmp(cmd, "datum") == 0 ||
                                   strcmp(cmd, "request") == 0 || strcmp(cmd, "result") == 0);
   const bool fake_request = argc == 4 && strcmp(cmd, "forge-request") == 0;
-  const bool fake_result = argc == 4 && strcmp(cmd, "forge-result") == 0;
+  const bool wrong_value = strcmp(cmd, "forge-output") == 0;
+  const bool fake_result = argc == 4 && (wrong_value || strcmp(cmd, "forge-result") == 0);
   const bool mutate = (argc == 3 && (strcmp(cmd, "collect") == 0 || strcmp(cmd, "orphan") == 0)) ||
                       (argc == 5 && (strcmp(cmd, "retarget") == 0 || strcmp(cmd, "drop-ref") == 0));
   const bool change = argc == 3 && strcmp(cmd, "compete") == 0;
@@ -319,7 +322,7 @@ int main(int argc, char **argv) {
   } else if (ok && fake_request) {
     ok = forge_request(repo, argv[3], &error);
   } else if (ok && fake_result) {
-    ok = forge_result(repo, argv[3], &error);
+    ok = forge_result(repo, argv[3], wrong_value, &error);
   } else if (ok) {
     ok = compete(repo, &error);
   }

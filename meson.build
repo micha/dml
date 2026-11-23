@@ -155,8 +155,9 @@ with tempfile.TemporaryDirectory() as tmp:
   )
   test(
     'provenance-handoff', python,
-    args: ['-B', files('tests/run_provenance_handoff.py'), provenance_handoff, handoff_fixture],
-    timeout: 60,
+    args: ['-B', files('tests/run_provenance_handoff.py'), quint.full_path(), provenance_handoff, handoff_fixture,
+           files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')],
+    timeout: 150,
   )
 
   transfer_fault_subject = static_library(

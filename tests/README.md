@@ -71,24 +71,28 @@ arbitrary bytes as lowercase hex in evidence.
 
 ## Process integration
 
-[`run_provenance_handoff.py`](run_provenance_handoff.py) drives the standalone C
-example through separate requester, worker, and publisher processes. It passes
-paths to the example, not commit IDs from previous invocations. A separate
-[C fixture](handoff_fixture.c) uses only public APIs to create checkpoints,
-observe exact persisted refs and lineage, and collect a known orphan before
-resuming. The test checks operation and input selection from the request,
-normal and restarted transfers, no-clobber export, rejection of a result for a
-different request on the same input snapshot, stale-tip rejection, and guarded
-cleanup. It also compares the read-only checkpoint reports with fixture-known
-IDs, checks publication blockers and the worker's retained request after
-cleanup, and verifies that inspection leaves the LMDB data file unchanged.
-This test complements Quint's operation-level checks; it does not add workflow
-requests to replay.
+Start with [the Quint handoff histories](handoff_histories.qnt) for the expected
+workflow and [the evidence rules](handoff_rules.qnt) for how a run is judged.
+The histories cover request selection, transfer and restart, no-clobber export,
+publication guards and their precedence, and retention through cleanup and
+collection. Inspection must report the expected checkpoint and request, and
+leave the LMDB data file unchanged even when it rejects a staged result. A
+fixture result with a matching lineage but a deliberately wrong scalar shows
+that these checks do not recompute the output.
+
+The [process runner](run_provenance_handoff.py) executes the requested steps and
+records exit codes, report lines, diagnostics, and filesystem observations. The
+[C fixture](handoff_fixture.c) uses public APIs to seed and observe committed
+refs and lineage independently of the report. Only bundle paths pass between
+handoff roles. Quint—not the runner—checks the observations and requires the
+inspection scenarios to be exercised. This is a separate workflow suite; the
+core replay above still dispatches one public API call per step.
 
 `provenance-handoff` runs in the opt-in Meson suite. To verify the installed
 boundary, [install the C library](../README.md#install-and-link-the-c-library)
-and run the same test using only the installed headers and archive, for example
-with a Unix compiler driver:
+and run the same test using only the installed headers and archive. Use the
+Python and Quint from the [opt-in environment](../README.md#quint-behavior-checks).
+For example, with a Unix compiler driver:
 
 ```sh
 run_dir=$(mktemp -d "$PWD/build/handoff-test.XXXXXX")
@@ -96,5 +100,7 @@ cc -std=c11 -Ibuild/install/include examples/provenance_handoff.c \
   build/install/lib/libdml.a -pthread -o "$run_dir/provenance_handoff"
 cc -std=c11 -Ibuild/install/include tests/handoff_fixture.c \
   build/install/lib/libdml.a -pthread -o "$run_dir/handoff_fixture"
-python3 -B tests/run_provenance_handoff.py "$run_dir/provenance_handoff" "$run_dir/handoff_fixture"
+python3 -B tests/run_provenance_handoff.py "$(command -v quint)" \
+  "$run_dir/provenance_handoff" "$run_dir/handoff_fixture" \
+  tests/handoff_histories.qnt tests/handoff_rules.qnt
 ```
