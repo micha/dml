@@ -14,7 +14,8 @@ neither test coverage nor runtime correctness. Run `scripts/check.sh --quint` fo
 changes to the replay suite or to covered behavior (ref creation, atomic snapshot
 publication and rollback, caller-side conditional publication, and binary commit
 transfer with staging, inspection and explicit publication, including the example's
-atomic result-and-pin write and conditional publication after return transfer).
+atomic result-and-pin write, conditional publication after return transfer, and
+staging-ref release).
 This also runs focused interpreter and native transfer fault tests.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
 currently run these runtime checks.

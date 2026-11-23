@@ -40,7 +40,11 @@ The [return-trip history](../docs/spec-next/transfer.md#return-and-publish-the-r
 checks the full exported closure, exact import delta without ref changes, and
 inspection by returned commit ID. A stale conditional publication must change
 nothing. A matching expectation moves only the original repository's `main`,
-which a fresh process resolves to inspect the same stored lineage again.
+which a fresh process resolves to inspect the same stored lineage again. The
+worker then rejects a stale release, aborts a matching release, and commits a
+matching release of `incoming`. The scan requires exactly one ref row removed
+and no object changes. A repeated release fails, and fresh native processes
+verify the same stored lineage through the worker's pin and the source's `main`.
 
 ## Add a request or operation
 

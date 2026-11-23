@@ -246,6 +246,17 @@ static void write_ref(dml_repo *repo, bool create, const char *ref_name, const c
   printf("%s\n%s\n", dml_status_name(written), dml_status_name(committed));
 }
 
+static void release_expected(dml_repo *repo, const char *ref, const char *expected_hex, bool commit) {
+  dml_object_id expected;
+  require_ok(dml_object_id_parse(expected_hex, strlen(expected_hex), &expected, NULL), "parse expected ID");
+  dml_txn *txn = NULL;
+  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "begin conditional release");
+  dml_status removed = dml_txn_ref_delete_expected(txn, name(ref), &expected, NULL);
+  const char *completion = commit ? dml_status_name(dml_txn_commit(&txn, NULL)) : "aborted";
+  dml_txn_abort(&txn);
+  printf("%s\n%s\n", dml_status_name(removed), completion);
+}
+
 static void publish_expected(dml_repo *repo, const char *ref, const char *expected_hex,
                              const char *target_hex) {
   dml_object_id expected, target;
@@ -584,8 +595,10 @@ int main(int argc, char **argv) {
   bool reading_lineage = (argc == 3 || (argc == 5 && (!strcmp(argv[3], "id") || !strcmp(argv[3], "ref")))) &&
                          strcmp(argv[1], "read_lineage") == 0;
   bool publishing = argc == 6 && strcmp(argv[1], "publish_expected") == 0;
+  bool releasing = argc == 6 && strcmp(argv[1], "release_expected") == 0 &&
+                   (!strcmp(argv[5], "commit") || !strcmp(argv[5], "abort"));
   if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading &&
-      !reading_value && !reading_parent && !recording && !reading_lineage && !publishing) {
+      !reading_value && !reading_parent && !recording && !reading_lineage && !publishing && !releasing) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
@@ -596,6 +609,7 @@ int main(int argc, char **argv) {
                     "       transfer_replay record_lineage REPO INPUT_ID {add-one|add-two}\n"
                     "       transfer_replay read_lineage REPO [id COMMIT_ID | ref REF]\n"
                     "       transfer_replay publish_expected REPO REF EXPECTED_ID TARGET_ID\n"
+                    "       transfer_replay release_expected REPO REF EXPECTED_ID {commit|abort}\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
@@ -635,6 +649,8 @@ int main(int argc, char **argv) {
     read_lineage(repo, argc == 3 || strcmp(argv[3], "ref") == 0, argc == 3 ? "result-pin" : argv[4]);
   } else if (publishing) {
     publish_expected(repo, argv[3], argv[4], argv[5]);
+  } else if (releasing) {
+    release_expected(repo, argv[3], argv[4], strcmp(argv[5], "commit") == 0);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

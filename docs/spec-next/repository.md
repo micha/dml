@@ -144,9 +144,27 @@ Names are case-sensitive repository data, not filesystem paths.
 - Updating validates the new target, not the previous target's existence/integrity;
   a correctly sized dangling ref can therefore be explicitly repaired.
 
+- `dml_txn_ref_delete_expected()` MUST compare the stored target ID against a
+  non-null expected ID and delete the ref only on a match in the same write
+  transaction. A missing ref returns `not_found`, a wrong-width value returns
+  `integrity_error`, and a mismatch returns `invalid_state`. Like other ref write
+  failures, these errors poison a writable transaction. The comparison uses the
+  stored ID, not the commit bytes, so a correctly sized dangling ref can be
+  removed explicitly. The guard compares IDs, not ref generations.
+
 A storage transaction can publish an entire snapshot and its ref target atomically.
-Moving a ref does not change historical object bytes or IDs. Update does not impose
-ancestry/fast-forward policy or compare-and-swap semantics.
+Moving or deleting a ref does not change historical object bytes or IDs. Update does
+not impose ancestry/fast-forward policy or compare-and-swap semantics.
+
+### Retention roots
+
+Every ref is a retention root, regardless of its name or application role. A head,
+a staging ref such as `incoming`, and a provenance pin such as `result-pin` have the
+same retention semantics: each retains its target commit and the full transitive
+closure of its stored object references, including all parents. An object still
+reachable through another ref remains retained after release. An imported commit
+ID in the caller's memory is not a ref and does not itself retain any objects.
+Releasing a ref does not collect objects.
 
 ## Handle ownership and concurrency
 

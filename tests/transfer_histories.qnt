@@ -20,6 +20,11 @@ module transfer_histories {
     "publish_return", "read_returned_main", "read_source_pin")
     .foldl(List(), (out, op) => out.append({ op: op, args: List() }))
 
+  pure val releaseStaging: List[Request] = List("reject_stale_release", "read_staged", "abort_release",
+    "read_staged", "release_staged", "read_staged", "reject_missing_release", "read_lineage",
+    "read_returned_main")
+    .foldl(List(), (out, op) => out.append({ op: op, args: List() }))
+
   var histories: List[List[Request]]
 
   // The replay must execute these attempts regardless of the statuses it observes.
@@ -36,7 +41,7 @@ module transfer_histories {
          { op: "stage_imported", args: List() }, readStagedValue,
          recordLineage("add-one"), readLineage,
          recordLineage("add-two"), readLineage, readMain, readStaged)
-      .concat(returnLineage).concat(List(readMain, readStaged, readLineage)),
+      .concat(returnLineage).concat(List(readMain, readStaged, readLineage)).concat(releaseStaging),
     List("busy_import", "bad_magic", "bad_version", "reserved", "short_header", "short_frame",
          "short_record", "trailing", "wrong_kind", "embedded_kind", "wrong_id", "wrong_root",
          "wrong_root_type", "bad_packed", "duplicate", "extra", "thin", "forward", "import")

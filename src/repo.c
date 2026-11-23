@@ -524,23 +524,29 @@ static dml_status validate_ref_target(dml_txn *txn, const dml_object_id *id, dml
   return status;
 }
 
+static dml_status read_ref_id(dml_txn *txn, MDB_val *key, dml_object_id *out, dml_error *error) {
+  MDB_val value;
+  int code = mdb_get(txn->native, txn->repo->dbi, key, &value);
+  if (code == MDB_NOTFOUND) return dml_set_error(error, DML_NOT_FOUND, code, "ref was not found");
+  if (code != MDB_SUCCESS) return storage_error(error, code, "reading ref");
+  if (value.mv_size != sizeof(out->bytes)) {
+    return dml_set_error(error, DML_INTEGRITY_ERROR, 0, "invalid ref target size");
+  }
+  memcpy(out->bytes, value.mv_data, sizeof(out->bytes));
+  return DML_OK;
+}
+
 dml_status dml_txn_ref_get(dml_txn *txn, dml_bytes name, dml_object_id *out,
                             dml_error *error) {
   char bytes[139];
   MDB_val key;
-  MDB_val value;
+  dml_object_id target;
   if (txn == NULL || out == NULL) {
     return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid ref get arguments");
   }
   dml_status status = ref_key(name, bytes, &key, error);
-  if (status != DML_OK) return status;
-  int code = mdb_get(txn->native, txn->repo->dbi, &key, &value);
-  if (code == MDB_NOTFOUND) return dml_set_error(error, DML_NOT_FOUND, code, "ref was not found");
-  if (code != MDB_SUCCESS) return storage_error(error, code, "reading ref");
-  if (value.mv_size != 16) return dml_set_error(error, DML_INTEGRITY_ERROR, 0, "invalid ref target size");
-  dml_object_id target;
-  memcpy(target.bytes, value.mv_data, 16);
-  status = validate_ref_target(txn, &target, error);
+  if (status == DML_OK) status = read_ref_id(txn, &key, &target, error);
+  if (status == DML_OK) status = validate_ref_target(txn, &target, error);
   if (status == DML_OK) *out = target;
   return status;
 }
@@ -582,6 +588,30 @@ dml_status dml_txn_ref_create(dml_txn *txn, dml_bytes name, const dml_object_id 
 dml_status dml_txn_ref_update(dml_txn *txn, dml_bytes name, const dml_object_id *target,
                                dml_error *error) {
   return write_ref(txn, name, target, 0, error);
+}
+
+dml_status dml_txn_ref_delete_expected(dml_txn *txn, dml_bytes name, const dml_object_id *expected,
+                                       dml_error *error) {
+  if (txn == NULL || txn->mode != DML_TXN_WRITE || txn->poisoned) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "transaction is not writable");
+  }
+  char bytes[139];
+  MDB_val key;
+  dml_object_id actual;
+  dml_status status = ref_key(name, bytes, &key, error);
+  if (status == DML_OK && expected == NULL) {
+    status = dml_set_error(error, DML_INVALID_ARGUMENT, 0, "expected ref target is null");
+  }
+  if (status == DML_OK) status = read_ref_id(txn, &key, &actual, error);
+  if (status == DML_OK && memcmp(actual.bytes, expected->bytes, sizeof(actual.bytes)) != 0) {
+    status = dml_set_error(error, DML_INVALID_STATE, 0, "ref target differs from the expected ID");
+  }
+  if (status == DML_OK) {
+    int code = mdb_del(txn->native, txn->repo->dbi, &key, NULL);
+    if (code != MDB_SUCCESS) status = storage_error(error, code, "deleting ref");
+  }
+  if (status != DML_OK) txn->poisoned = 1;
+  return status;
 }
 
 dml_status dml_txn_commit(dml_txn **txn_ptr, dml_error *error) {

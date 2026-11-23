@@ -105,7 +105,7 @@ const entities = [
     key: 'refs/heads/<name>', size: '16 raw bytes · no envelope',
     fields: ['name : ASCII key suffix', 'target : Commit ID'],
     summary: 'A mutable, case-sensitive name pointing to an immutable history commit.',
-    rules: ['Create requires an absent ref; update requires an existing ref.', 'Target commit and its direct references are validated. Moving a ref does not rewrite any historical object.', 'No fast-forward, ancestry, or compare-and-swap policy is imposed.'],
+    rules: ['Create requires an absent ref; update requires an existing ref. Both validate the new target and its direct references.', 'Guarded deletion compares the stored ID and removes only the ref row.', 'Every ref is a retention root, including staging refs and provenance pins.'],
     links: ['Exactly one target commit per ref; any commit can have zero or many refs.'], source: 'repository.md#refs' },
   { id: 'commit', hashedFields: true, title: 'Commit', x: 420, y: 130, key: 'objects/commits/<id>', size: '40 + 16 × parent count bytes',
     fields: ['tree : Tree ID', 'parents[] : Commit IDs', 'parent_count : u32'],

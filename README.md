@@ -39,7 +39,7 @@ native C executables. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
 Fresh native reads and separate read-only LMDB scans check snapshot publication,
 rollback, datum readback from imported history, and recording, transferring back,
-and conditionally publishing a caller's result.
+conditionally publishing a caller's result, and guarded staging-ref release.
 The native fault test checks transfer allocation failures without adding hooks to the library.
 These checks are local and opt-in; they do not measure coverage.
 
@@ -91,7 +91,9 @@ run the full workflow from two new paths:
 
 The original repository imports and inspects the result without recomputing it,
 then conditionally moves its `main` to the inspected commit. After reopening,
-its `main` yields `44`; the worker keeps `result-pin` and `incoming`.
+its `main` yields `44`. The worker releases `incoming` only if it still points
+at the inspected input, then reopens and reads the same result and input through
+`result-pin`.
 
 ### Optional Nix development shell
 

@@ -297,6 +297,8 @@ class Suite:
         for name, (repo, operation) in returning.items():
             other = source if repo == destination else destination
             traced[name] = partial(fixture.observe, operation, other=other)
+        for name in ("reject_stale_release", "abort_release", "release_staged", "reject_missing_release"):
+            traced[name] = partial(fixture.observe, partial(fixture.release_staged, name), other=source)
         yield Replay(traced, fixture_model(frames, kept))
 
 
@@ -482,6 +484,21 @@ class TransferHistory:
         return dict(command=command, status=status, completion=completion, shape="",
                     result=self.inspected, binary="", rows=[], changes=changes, value=no_value(),
                     lineage=no_lineage(), publication=dict(expected=expected, actual=actual, update=update))
+
+    def release_staged(self, command):
+        repo = self.destination
+        expected = self.pinned if command == "reject_stale_release" else self.selected
+        mode = "abort" if command == "abort_release" else "commit"
+        before = scan_inventory(self.scanner, repo)
+        stdout = run_native(self.runner, "release_expected", repo, "incoming", expected, mode)
+        match = re.fullmatch(r"([a-z_]+)\n([a-z_]+)\n", stdout)
+        if not match:
+            raise ValueError(f"Unexpected C {command} response: {stdout!r}")
+        status, completion = match.groups()
+        changes = inventory_diff(before, scan_inventory(self.scanner, repo))
+        return dict(command=command, status=status, completion=completion, shape="",
+                    result=expected, binary="", rows=[], changes=changes, value=no_value(),
+                    lineage=no_lineage())
 
     def read_value(self, entry, binding):
         return self.read_snapshot("read_value", "main", False, entry, binding)

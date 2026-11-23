@@ -57,6 +57,9 @@ module transfer_rules {
   // Both publication attempts report the ref-get status here; their update and completion are separate.
   pure val returnOkStatuses = Set("capture_source_main", "export_return", "import_return", "repeat_return",
     "read_source_main", "inspect_return", "reject_stale_return", "publish_return", "read_returned_main")
+  pure val releaseSequence = returnSequence.concat(List("reject_stale_release", "read_staged", "abort_release",
+    "read_staged", "release_staged", "read_staged", "reject_missing_release", "read_lineage", "read_returned_main"))
+  pure val releases = Set("reject_stale_release", "abort_release", "release_staged", "reject_missing_release")
   pure val refWrites = Set("stage_imported", "publish_imported")
   pure val lineageWrites = Set("record_add_one", "record_add_two")
   pure val stagedValues = Set("read_staged_value", "read_staged_parent_value")
@@ -93,13 +96,15 @@ module transfer_rules {
       row.attempts.foldl(allSeen, (seen, attempt) => seen.union(Set(attempt.command))))
     requiredCases.subseteq(seen)
       and evidence.foldl(false, (covered, row) => covered or coversPublication(row.attempts))
-      and evidence.foldl(false, (covered, row) => covered or coversSequence(row.attempts, returnSequence))
+      and evidence.foldl(false, (covered, row) => covered or coversSequence(row.attempts, releaseSequence))
   }
 
   pure def expectedStatus(command: str, state: Expected): str =
     if (command == "read_value") (if (state.published) "ok" else "not_found")
     else if (command == "read_staged") (if (state.staged) "ok" else "not_found")
-    else if (command == "read_source_pin") "not_found"
+    else if (command == "read_source_pin" or command == "reject_missing_release") "not_found"
+    else if (command == "reject_stale_release") "invalid_state"
+    else if (releases.contains(command)) "ok"
     else if (goodExports.contains(command) or goodImports.contains(command) or returnOkStatuses.contains(command)
         or command == "read_main" or command == "read_parent_value" or command == "record_add_one"
         or command == "read_lineage" or stagedValues.contains(command) or refWrites.contains(command)) "ok"
@@ -164,6 +169,10 @@ module transfer_rules {
     kind: "added", key: stagedKey, before: "", after: fixture.root.id
   }
 
+  pure def stagedRemoved(fixture: Fixture): Change = {
+    kind: "removed", key: stagedKey, before: fixture.root.id, after: ""
+  }
+
   pure def resultAdded(commit: str): Change = {
     kind: "added", key: resultKey, before: "", after: commit
   }
@@ -172,6 +181,7 @@ module transfer_rules {
     val command = attempt.command
     if (goodImports.contains(command) and not(state.present)) additions(fixture.rows)
     else if (command == "stage_imported") Set(stagedAdded(fixture))
+    else if (command == "release_staged") Set(stagedRemoved(fixture))
     else if (command == "publish_imported") Set(mainMoved(fixture))
     else if (command == "publish_return") Set(sourceMainMoved(fixture, state))
     // A already contains the whole input closure; only the result snapshot and commit are new.
@@ -247,12 +257,13 @@ module transfer_rules {
   pure def verdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
     val command = attempt.command
     val status = expectedStatus(command, state)
-    val completion = if (command == "record_add_two") "invalid_state"
-      else if (command == "reject_stale_return") "aborted"
+    val completion = if (command == "record_add_two" or command == "reject_stale_release"
+                         or command == "reject_missing_release") "invalid_state"
+      else if (command == "reject_stale_return" or command == "abort_release") "aborted"
       else if (busy.contains(command) or refWrites.contains(command) or command == "record_add_one"
                 or command == "read_main" or (command == "read_staged" and state.staged)
                 or command == "capture_source_main" or command == "read_source_main"
-                or command == "publish_return") "ok"
+                or command == "publish_return" or command == "release_staged") "ok"
       else "none"
     val changes = attempt.changes.foldl(Set(), (seen, change) => seen.union(Set(change)))
     if (status == "unknown_command") "unknown_command"
@@ -267,6 +278,8 @@ module transfer_rules {
               or (command == "record_add_one") != (state.result == ""))) "lineage_order"
     else if (command == "read_lineage" and state.result == "") "lineage_order"
     else if (not(returnInOrder(command, state))) "return_order"
+    else if (releases.contains(command) and
+             (not(state.returnPublished) or state.staged == (command == "reject_missing_release"))) "release_order"
     else if (attempt.otherChanges.length() != 0) "other_inventory"
     else if (changes != expectedChanges(attempt, fixture, state)) "inventory"
     else if (lineageWrites.contains(command)) lineageWriteVerdict(attempt, fixture)
@@ -279,6 +292,9 @@ module transfer_rules {
     else if (command == "read_source_pin") readVerdict(attempt, { id: sentinel, packed: "" })
     else if (command == "reject_stale_return" or command == "publish_return")
       returnPublicationVerdict(attempt, fixture, state)
+    else if (releases.contains(command))
+      (if (attempt.result == (if (command == "reject_stale_release") state.result else fixture.root.id))
+        "pass" else "release_expected_tip")
     else if (goodExports.contains(command)) exportVerdict(attempt, fixture, state.canonical)
     else if (goodImports.contains(command) and attempt.result != fixture.root.id) "import_root"
     else if (command == "stage_imported" and attempt.result != fixture.root.id) "stage_target"
@@ -303,7 +319,7 @@ module transfer_rules {
       expected: {
         present: state.expected.present or goodImports.contains(attempt.command),
         importedExport: state.expected.importedExport or attempt.command == "import_exported",
-        staged: state.expected.staged or attempt.command == "stage_imported",
+        staged: attempt.command != "release_staged" and (state.expected.staged or attempt.command == "stage_imported"),
         published: state.expected.published or attempt.command == "publish_imported",
         canonical: if (state.expected.canonical == "" and goodExports.contains(attempt.command))
                      attempt.binary else state.expected.canonical,
@@ -428,6 +444,13 @@ module transfer_rules {
   }
   pure val reopenedReturn = { ...lineageRead, command: "read_returned_main" }
   pure val missingSourcePin = { ...unstagedReadback, command: "read_source_pin" }
+  pure val released = {
+    ...emptyAttempt, command: "release_staged", completion: "ok", result: "cc",
+    changes: List(stagedRemoved(fixture))
+  }
+  pure val staleRelease = {
+    ...emptyAttempt, command: "reject_stale_release", status: "invalid_state", completion: "invalid_state", result: "99"
+  }
   pure val controlsPass = all {
     verdict({ ...exported, rows: List(root) }, fixture, initial) == "export_rows",
     verdict({ ...exported, rows: List(root, leaf) }, fixture, initial) == "export_order",
@@ -519,6 +542,13 @@ module transfer_rules {
     verdict({ ...reopenedReturn, result: "44" }, fixture, publishedReturnState) == "lineage_tip",
     verdict(missingSourcePin, fixture, publishedReturnState) == "pass",
     verdict({ ...missingSourcePin, status: "ok" }, fixture, publishedReturnState) == "status",
+    verdict(released, fixture, publishedReturnState) == "pass",
+    verdict(released, fixture, pinnedState) == "release_order",
+    verdict({ ...released, changes: released.changes.append({ kind: "removed", key: "cc", before: "dd", after: "" }) },
+      fixture, publishedReturnState) == "inventory",
+    verdict(staleRelease, fixture, publishedReturnState) == "pass",
+    verdict({ ...staleRelease, completion: "ok" }, fixture, publishedReturnState) == "completion",
+    verdict({ ...staleRelease, result: "cc" }, fixture, publishedReturnState) == "release_expected_tip",
     coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent)).concat(afterStaging)),
     not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue)).concat(afterStaging))),
     not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent))

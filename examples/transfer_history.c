@@ -217,6 +217,21 @@ static bool return_result(dml_repo **source, const char *path, dml_repo *destina
          verify_lineage(*source, main_ref, &inspected, input, candidate, error);
 }
 
+static bool release_staging(dml_repo **repo, const char *path, const lineage_input *input,
+                            const lineage_candidate *candidate, dml_error *error) {
+  dml_txn *txn = NULL;
+  bool ok = check(dml_txn_begin(*repo, DML_TXN_WRITE, &txn, error), "begin staging release", error) &&
+            check(dml_txn_ref_delete_expected(txn, staging_ref, &input->commit, error),
+                  "release inspected staging ref", error) &&
+            check(dml_txn_commit(&txn, error), "commit staging release", error);
+  dml_txn_abort(&txn);
+  dml_object_id pinned;
+  return ok && close_repo(repo, error) &&
+         check(dml_repo_open(path, NULL, repo, error), "reopen after staging release", error) &&
+         ref_missing(*repo, staging_ref, error) && ref_missing(*repo, main_ref, error) &&
+         verify_lineage(*repo, pin_ref, &pinned, input, candidate, error);
+}
+
 int main(int argc, char **argv) {
   const bool round_trip = argc > 1 && strcmp(argv[1], "--round-trip") == 0;
   const bool record_lineage = round_trip || (argc > 1 && strcmp(argv[1], "--lineage") == 0);
@@ -263,7 +278,9 @@ int main(int argc, char **argv) {
     lineage_candidate candidate = {0};
     dml_object_id pinned;
     if (!run_lineage(&destination, destination_path, &selected, &candidate, &pinned, &error) ||
-        (round_trip && !return_result(&source, source_path, destination, &pinned, &candidate, &selected, &error))) {
+        (round_trip &&
+         (!return_result(&source, source_path, destination, &pinned, &candidate, &selected, &error) ||
+          !release_staging(&destination, destination_path, &selected, &candidate, &error)))) {
       goto cleanup;
     }
   } else {
@@ -283,7 +300,8 @@ cleanup:
   if (result == EXIT_SUCCESS) {
     int printed;
     if (round_trip) {
-      printed = puts("source main = 44\ndestination result-pin = 44\ninput = 43\nimplementation = example.add-one@1");
+      printed = puts("source main = 44\ndestination result-pin = 44\ndestination incoming released\n"
+                     "input = 43\nimplementation = example.add-one@1");
     } else if (record_lineage) {
       printed = puts("result-pin = 44\ninput = 43\nimplementation = example.add-one@1");
     } else {

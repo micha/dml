@@ -54,6 +54,10 @@ dml_status dml_txn_ref_update(dml_txn *txn, dml_bytes name, const dml_object_id 
                                dml_error *error);
 dml_status dml_txn_ref_get(dml_txn *txn, dml_bytes name, dml_object_id *out,
                             dml_error *error);
+/* Delete only if the stored target ID matches expected. Does not validate or
+ * delete objects. Failure poisons a writable transaction, like create/update. */
+dml_status dml_txn_ref_delete_expected(dml_txn *txn, dml_bytes name, const dml_object_id *expected,
+                                       dml_error *error);
 /* Commit consumes the handle on success or failure; abort is null-safe. */
 dml_status dml_txn_commit(dml_txn **txn, dml_error *error);
 void dml_txn_abort(dml_txn **txn);

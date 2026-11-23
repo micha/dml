@@ -136,7 +136,12 @@ The source then reads `main` in a write transaction and moves it to the inspecte
 result ID only if `main` still points to the expected tip. A stale expectation
 aborts publication without rolling back the already committed import. This is a
 caller-side conditional update, not a merge. After reopening, the source resolves
-`main` and checks the same lineage again. The worker's refs are unchanged by the
-return trip.
+`main` and checks the same lineage again. Returning and publishing the result do
+not change the worker's refs.
+
+The example then releases the worker's `incoming` in a separate write transaction,
+only if it still points to the input it inspected. After reopening, `incoming`
+is absent and `result-pin` still yields the result and its original input via the
+result's parent link. See [retention roots](repository.md#retention-roots).
 
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).
