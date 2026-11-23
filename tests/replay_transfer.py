@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 import re
 import struct
@@ -229,10 +230,15 @@ class Suite:
         yield Replay({
             "export_commit": fixture.export_commit,
             "import_commit": fixture.import_commit,
-            "publish_imported": fixture.publish_imported,
-            "read_main": fixture.read_main,
+            "stage_imported": partial(fixture.write_ref, "stage_imported", "create_ref", "incoming"),
+            "publish_imported": partial(fixture.write_ref, "publish_imported", "update_ref", "main"),
+            "read_main": partial(fixture.read_ref, "read_main", "main"),
+            "read_staged": partial(fixture.read_ref, "read_staged", "incoming"),
             "read_value": fixture.read_value,
             "read_parent_value": fixture.read_parent_value,
+            "read_staged_value": partial(fixture.read_snapshot, "read_staged_value", "incoming", False),
+            "read_staged_parent_value": partial(fixture.read_snapshot, "read_staged_parent_value",
+                                                "incoming", True),
         }, fixture_model(frames, kept))
 
 
@@ -285,41 +291,42 @@ class TransferHistory:
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
         return dict(command=case, changes=changes, **attempt)
 
-    def publish_imported(self):
+    def write_ref(self, command, native_op, ref):
         repo = self.destination
         before = scan_inventory(self.scanner, repo)
-        stdout = run_native(self.runner, "publish_main", repo, self.imported)
+        stdout = run_native(self.runner, native_op, repo, ref, self.imported)
         match = re.fullmatch(r"([a-z_]+)\n([a-z_]+)\n", stdout)
         if not match:
-            raise ValueError(f"Unexpected C publication response: {stdout!r}")
+            raise ValueError(f"Unexpected C {command} response: {stdout!r}")
         status, completion = match.groups()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
-        return dict(command="publish_imported", status=status, completion=completion, shape="",
+        return dict(command=command, status=status, completion=completion, shape="",
                     result=self.imported, binary="", rows=[], changes=changes, value=no_value())
 
-    def read_main(self):
+    def read_ref(self, command, ref):
         repo = self.destination
         before = scan_inventory(self.scanner, repo)
-        stdout = run_native(self.runner, "read_main", repo)
+        stdout = run_native(self.runner, "read_ref", repo, ref)
         match = re.fullmatch(r"([a-z_]+) ([0-9a-f]{32})\n([a-z_]+) ((?:[0-9a-f]{2})*)\n", stdout)
         if not match:
             raise ValueError(f"Unexpected C readback response: {stdout!r}")
         status, result, completion, packed = match.groups()
         changes = inventory_diff(before, scan_inventory(self.scanner, repo))
-        return dict(command="read_main", status=status, completion=completion, shape="",
+        return dict(command=command, status=status, completion=completion, shape="",
                     result=result, binary=packed, rows=[], changes=changes, value=no_value())
 
     def read_value(self, entry, binding):
-        return self.read_snapshot("read_value", entry, binding)
+        return self.read_snapshot("read_value", "main", False, entry, binding)
 
     def read_parent_value(self, index, entry, binding):
-        return self.read_snapshot("read_parent_value", index, entry, binding)
+        return self.read_snapshot("read_parent_value", "main", True, index, entry, binding)
 
-    def read_snapshot(self, command, *args):
+    def read_snapshot(self, command, ref, parent, *args):
         repo = self.destination
         before = scan_inventory(self.scanner, repo)
-        stdout = run_native(self.runner, command, repo, *args)
-        parent_field = r"(?P<parent>[0-9a-f]{32}) " if command == "read_parent_value" else ""
+        native_op = "read_parent_value" if parent else "read_value"
+        stdout = run_native(self.runner, native_op, repo, ref, *args)
+        parent_field = r"(?P<parent>[0-9a-f]{32}) " if parent else ""
         match = re.fullmatch(r"(?P<status>[a-z_]+) (?P<stage>[a-z_]+) (?P<head>[0-9a-f]{32}) "
                              rf"{parent_field}(?P<datum>[0-9a-f]{{32}}) "
                              r"(?P<kind>[0-9]+) (?P<i64>-?[0-9]+)\n", stdout)

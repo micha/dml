@@ -20,15 +20,22 @@ module transfer_rules {
     root: Commit, initialHead: Commit, datum: str, parent: Parent, rows: List[Row], edges: List[Edge]
   }
   type Observation = { fixture: Fixture, attempts: List[Attempt] }
-  type Expected = { present: bool, importedExport: bool, published: bool, canonical: str }
+  type Expected = {
+    present: bool, importedExport: bool, staged: bool, published: bool, canonical: str
+  }
 
   pure val sentinel = "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
   pure val mainKey = "726566732f68656164732f6d61696e" // refs/heads/main
+  pure val stagedKey = "726566732f68656164732f696e636f6d696e67" // refs/heads/incoming
   pure val initial: Expected = {
-    present: false, importedExport: false, published: false, canonical: ""
+    present: false, importedExport: false, staged: false, published: false, canonical: ""
   }
   pure val publicationSequence = List("export", "import_exported", "read_main", "read_value",
-                                      "publish_imported", "read_main", "read_value", "read_parent_value")
+    "read_staged", "stage_imported", "read_staged", "read_staged_value", "read_staged_parent_value",
+    "read_main", "publish_imported", "read_main", "read_value", "read_parent_value")
+  pure val refWrites = Set("stage_imported", "publish_imported")
+  pure val stagedValues = Set("read_staged_value", "read_staged_parent_value")
+  pure val parentValues = Set("read_parent_value", "read_staged_parent_value")
   pure val goodExports = Set("export", "repeat", "reexport")
   pure val goodImports = Set("import", "alternative", "import_exported")
   pure val emptyExports = Set("missing_root", "missing_edge", "busy_export", "oversize_export")
@@ -61,11 +68,12 @@ module transfer_rules {
       covered or coversPublication(row.attempts))
   }
 
-  pure def expectedStatus(command: str, published: bool): str =
-    if (command == "read_value") (if (published) "ok" else "not_found")
+  pure def expectedStatus(command: str, state: Expected): str =
+    if (command == "read_value") (if (state.published) "ok" else "not_found")
+    else if (command == "read_staged") (if (state.staged) "ok" else "not_found")
     else if (goodExports.contains(command) or goodImports.contains(command)
         or command == "read_main" or command == "read_parent_value"
-        or command == "publish_imported") "ok"
+        or stagedValues.contains(command) or refWrites.contains(command)) "ok"
     else if (busy.contains(command)) "invalid_state"
     else if (badHeaders.contains(command)) "invalid_header"
     else if (badBounds.contains(command)) "invalid_bounds"
@@ -105,8 +113,13 @@ module transfer_rules {
     kind: "modified", key: mainKey, before: fixture.initialHead.id, after: fixture.root.id
   }
 
+  pure def stagedAdded(fixture: Fixture): Change = {
+    kind: "added", key: stagedKey, before: "", after: fixture.root.id
+  }
+
   pure def expectedChanges(command: str, fixture: Fixture, state: Expected): Set[Change] =
     if (goodImports.contains(command) and not(state.present)) additions(fixture.rows)
+    else if (command == "stage_imported") Set(stagedAdded(fixture))
     else if (command == "publish_imported") Set(mainMoved(fixture))
     else Set()
 
@@ -115,14 +128,14 @@ module transfer_rules {
     else if (attempt.binary != target.packed) "read_commit"
     else "pass"
 
-  pure def valueVerdict(attempt: Attempt, fixture: Fixture, published: bool): str = {
-    val expectedTip = if (published) fixture.root.id else fixture.initialHead.id
-    // The initial tree lacks `all`. Through the same path, the published tip yields I64(45)
+  pure def valueVerdict(attempt: Attempt, fixture: Fixture, atImportedRoot: bool): str = {
+    val expectedTip = if (atImportedRoot) fixture.root.id else fixture.initialHead.id
+    // The initial tree lacks `all`. The imported tip yields I64(45) through the same path
     // and its first parent yields I64(41), by construction rather than decoding observed bytes.
     val expected: DatumRead =
-      if (attempt.command == "read_parent_value")
+      if (parentValues.contains(attempt.command))
         { stage: "datum_decode", parent: fixture.parent.id, id: fixture.parent.datum, kind: 3, i64: 41 }
-      else if (published) { stage: "datum_decode", parent: "", id: fixture.datum, kind: 3, i64: 45 }
+      else if (atImportedRoot) { stage: "datum_decode", parent: "", id: fixture.datum, kind: 3, i64: 45 }
       else { stage: "tree_entry", parent: "", id: sentinel, kind: 0, i64: 0 }
     if (attempt.result != expectedTip) "read_target"
     else if (attempt.value.stage != expected.stage) "read_value_stage"
@@ -134,21 +147,28 @@ module transfer_rules {
 
   pure def verdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
     val command = attempt.command
-    val status = expectedStatus(command, state.published)
-    val completion = if (busy.contains(command) or command == "publish_imported"
-                         or command == "read_main") "ok" else "none"
+    val status = expectedStatus(command, state)
+    val completion = if (busy.contains(command) or refWrites.contains(command)
+                         or command == "read_main" or (command == "read_staged" and state.staged))
+                       "ok" else "none"
     val changes = attempt.changes.foldl(Set(), (seen, change) => seen.union(Set(change)))
     if (status == "unknown_command") "unknown_command"
     else if (attempt.status != status) "status"
     else if (attempt.completion != completion) "completion"
+    else if ((command == "stage_imported" and (not(state.importedExport) or state.staged or state.published))
+             or (stagedValues.contains(command) and (not(state.staged) or state.published))) "staging_order"
     else if ((command == "publish_imported" and (not(state.importedExport) or state.published))
              or (command == "read_parent_value" and not(state.published))) "publication_order"
     else if (changes != expectedChanges(command, fixture, state)) "inventory"
     else if (goodExports.contains(command)) exportVerdict(attempt, fixture, state.canonical)
     else if (goodImports.contains(command) and attempt.result != fixture.root.id) "import_root"
+    else if (command == "stage_imported" and attempt.result != fixture.root.id) "stage_target"
     else if (command == "publish_imported" and attempt.result != fixture.root.id) "publish_target"
     else if (command == "read_main")
       readVerdict(attempt, if (state.published) fixture.root else fixture.initialHead)
+    else if (command == "read_staged")
+      readVerdict(attempt, if (state.staged) fixture.root else { id: sentinel, packed: "" })
+    else if (stagedValues.contains(command)) valueVerdict(attempt, fixture, true)
     else if (command == "read_value" or command == "read_parent_value")
       valueVerdict(attempt, fixture, state.published)
     else if (emptyExports.contains(command) and attempt.shape != "empty") "export_not_empty"
@@ -158,12 +178,13 @@ module transfer_rules {
     else "pass"
   }
 
-  // Expected state follows requested imports and publication, not observed C statuses or IDs.
+  // Expected state follows requested imports, staging and publication, not observed C outcomes.
   pure def historyVerdicts(observed: Observation): List[str] =
     observed.attempts.foldl({ expected: initial, verdicts: List() }, (state, attempt) => {
       expected: {
         present: state.expected.present or goodImports.contains(attempt.command),
         importedExport: state.expected.importedExport or attempt.command == "import_exported",
+        staged: state.expected.staged or attempt.command == "stage_imported",
         published: state.expected.published or attempt.command == "publish_imported",
         canonical: if (state.expected.canonical == "" and goodExports.contains(attempt.command))
                      attempt.binary else state.expected.canonical
@@ -220,7 +241,17 @@ module transfer_rules {
     { kind: "added", key: "aa", before: "", after: "bb" },
     { kind: "added", key: "cc", before: "", after: "dd" }) }
   pure val importedState = { ...initial, present: true, importedExport: true }
-  pure val publishedState = { ...importedState, published: true }
+  pure val stagedState = { ...importedState, staged: true }
+  pure val publishedState = { ...stagedState, published: true }
+  pure val staged = { ...published, command: "stage_imported", changes: List(stagedAdded(fixture)) }
+  pure val stagedReadback = { ...readback, command: "read_staged" }
+  pure val unstagedReadback = {
+    ...stagedReadback, status: "not_found", completion: "none", result: sentinel, binary: ""
+  }
+  pure val stagedValue = { ...valueRead, command: "read_staged_value" }
+  pure val stagedParent = { ...parentRead, command: "read_staged_parent_value" }
+  pure val beforeStaging = List(exported, imported, readback, valueMiss, unstagedReadback, staged)
+  pure val afterStaging = List(readback, published, readback, valueRead, parentRead)
   pure val controlsPass = all {
     verdict({ ...exported, rows: List(root) }, fixture, initial) == "export_rows",
     verdict({ ...exported, rows: List(root, leaf) }, fixture, initial) == "export_order",
@@ -255,10 +286,18 @@ module transfer_rules {
       fixture, publishedState) == "read_datum",
     verdict({ ...parentRead, value: { ...parentRead.value, i64: 45 } },
       fixture, publishedState) == "read_value",
-    coversPublication(List(exported, imported, exported, readback, valueMiss,
-                           published, readback, valueRead, parentRead, exported)),
-    not(coversPublication(List(exported, imported, valueMiss, published, readback, valueRead, parentRead))),
-    not(coversPublication(List(exported, imported, readback, valueMiss, published, readback, parentRead))),
-    not(coversPublication(List(exported, imported, readback, valueMiss, published, readback, valueRead)))
+    verdict(staged, fixture, importedState) == "pass",
+    verdict(staged, fixture, initial) == "staging_order",
+    verdict({ ...staged, changes: List(stagedAdded(fixture), mainMoved(fixture)) },
+      fixture, importedState) == "inventory",
+    verdict(stagedReadback, fixture, importedState) == "status",
+    verdict(stagedReadback, fixture, stagedState) == "pass",
+    verdict(stagedParent, fixture, importedState) == "staging_order",
+    verdict(stagedParent, fixture, stagedState) == "pass",
+    verdict(readback, fixture, stagedState) == "read_target",
+    coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent)).concat(afterStaging)),
+    not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue)).concat(afterStaging))),
+    not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent))
+      .concat(List(published, readback, valueRead, parentRead))))
   }
 }

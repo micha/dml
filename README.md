@@ -38,7 +38,7 @@ The [shared trace interpreter](tests/README.md) replays requests from Quint agai
 native C executables. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
 Fresh native reads and separate read-only LMDB scans check snapshot publication,
-rollback, and datum readback at an explicitly published import and its first parent.
+rollback, and datum readback at a staged or published import and its first parent.
 The native fault test checks transfer allocation failures without adding hooks to the library.
 These checks are local and opt-in; they do not measure coverage.
 
@@ -64,10 +64,12 @@ cc -std=c11 -Ibuild/install/include examples/transfer_history.c \
 ```
 
 The program creates two revisions in the source repository and transfers the tip
-and its history. It checks that import does not create `main`, then publishes it
-explicitly. After reopening the destination, it verifies that the tip reads `43`
-and its parent reads `42`. Use two distinct paths that do not yet exist, with
-existing parent directories. The program leaves both repositories for inspection.
+and its history. It [stages the import](docs/spec-next/transfer.md#informative-example)
+under `incoming` and reopens the destination to inspect it while `main` is still
+absent. It then explicitly publishes the inspected commit to `main` and reopens
+again. Through both refs it verifies that the tip reads `43` and its first parent
+reads `42`. Use two distinct paths that do not yet exist, with existing parent
+directories. The program leaves both repositories and the staging ref for inspection.
 
 ### Optional Nix development shell
 

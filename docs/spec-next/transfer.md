@@ -94,7 +94,16 @@ if (status == DML_OK) {
                                   &imported, &error);
 }
 dml_buffer_free(&bundle);
-/* On success, imported equals root. The caller may publish a ref separately. */
+/* On success, imported equals root. The caller may create or move a ref separately. */
 ```
+
+To inspect an import before publishing it to `main`, create an ordinary
+[ref](repository.md#refs) such as `incoming` targeting the returned commit ID in
+its own write transaction. After reopening, resolve `incoming` in a read
+transaction, then read the commit and follow its ordered parent IDs. `incoming`
+is a caller-chosen name, not a separate namespace, and creating it leaves `main`
+unchanged. If the candidate is accepted, publish the commit ID that was actually
+inspected in a separate write transaction. The
+[standalone C example](../../examples/transfer_history.c) demonstrates this flow.
 
 See [transfer.h](../../include/dml/transfer.h) and [transfer.c](../../src/transfer.c).

@@ -19,14 +19,14 @@ longer matches. Each writer compares and updates within one write transaction.
 An independent LMDB scan checks exact persisted changes, and a fresh native
 process resolves the ref and decodes its commit and parent IDs.
 
-The transfer suite checks that import leaves the destination
-ref alone, then moves it to the imported commit in a separate transaction and
-reopens the repository to read the new tip. A separate public API walk from
-`main` through the commit's tree entry and named DAG binding checks that the
-same path is absent before publication and resolves to the expected datum ID,
-kind, and scalar value afterward. A fresh process then follows the published
-commit's first parent and reads the same path, which resolves to a distinct datum
-and value. Each read must leave the inventory unchanged.
+The transfer suite checks that import leaves refs alone. A separate write
+transaction creates `incoming`, and the LMDB scan checks that only that ref was
+added. Fresh native processes resolve `incoming`, read its commit and first
+parent, and verify that `main` is unchanged. Explicit publication then moves
+`main` in its own transaction. The same tree entry and DAG binding path is absent
+at the initial `main` but yields the expected datum ID, kind, and scalar value at
+the staged and published tips and their first parent. Each read must leave the
+inventory unchanged.
 
 ## Add a request or operation
 

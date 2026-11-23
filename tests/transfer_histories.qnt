@@ -5,6 +5,12 @@ module transfer_histories {
   pure def importCommit(testCase: str): Request = { op: "import_commit", args: List(testCase) }
   pure val readValue: Request = { op: "read_value", args: List("all", "z-bound") }
   pure val readParentValue: Request = { op: "read_parent_value", args: List("0", "all", "z-bound") }
+  pure val readMain: Request = { op: "read_main", args: List() }
+  pure val readStaged: Request = { op: "read_staged", args: List() }
+  pure val readStagedValue: Request = { op: "read_staged_value", args: List("all", "z-bound") }
+  pure val readStagedParent: Request = {
+    op: "read_staged_parent_value", args: List("0", "all", "z-bound")
+  }
 
   var histories: List[List[Request]]
 
@@ -14,8 +20,9 @@ module transfer_histories {
          importCommit("import"), importCommit("thin"), importCommit("forward")),
     List(exportCommit("export"), importCommit("alternative"), exportCommit("reexport"),
          exportCommit("repeat")),
-    List(exportCommit("export"), importCommit("import_exported"), { op: "read_main", args: List() },
-         readValue, { op: "publish_imported", args: List() }, { op: "read_main", args: List() },
+    List(exportCommit("export"), importCommit("import_exported"), readMain, readValue,
+         readStaged, { op: "stage_imported", args: List() }, readStaged, readStagedValue,
+         readStagedParent, readMain, { op: "publish_imported", args: List() }, readMain,
          readValue, readParentValue),
     List("busy_import", "bad_magic", "bad_version", "reserved", "short_header", "short_frame",
          "short_record", "trailing", "wrong_kind", "embedded_kind", "wrong_id", "wrong_root",

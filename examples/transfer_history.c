@@ -6,6 +6,7 @@
 #include <dml/dml.h>
 
 static const dml_bytes main_ref = {(const uint8_t *)"main", sizeof("main") - 1};
+static const dml_bytes staging_ref = {(const uint8_t *)"incoming", sizeof("incoming") - 1};
 static const dml_bytes snapshot_name = {(const uint8_t *)"snapshot", sizeof("snapshot") - 1};
 static const dml_bytes value_name = {(const uint8_t *)"value", sizeof("value") - 1};
 
@@ -109,11 +110,11 @@ static bool destination_main_missing(dml_repo *repo, dml_error *error) {
   return check(status, "check destination main", error);
 }
 
-static bool publish(dml_repo *repo, const dml_object_id *tip, dml_error *error) {
+static bool create_ref(dml_repo *repo, dml_bytes ref, const dml_object_id *tip, dml_error *error) {
   dml_txn *txn = NULL;
-  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin publication", error) &&
-            check(dml_txn_ref_create(txn, main_ref, tip, error), "create destination main", error) &&
-            check(dml_txn_commit(&txn, error), "commit publication", error);
+  bool ok = check(dml_txn_begin(repo, DML_TXN_WRITE, &txn, error), "begin destination write", error) &&
+            check(dml_txn_ref_create(txn, ref, tip, error), "create destination ref", error) &&
+            check(dml_txn_commit(&txn, error), "commit destination write", error);
   dml_txn_abort(&txn);
   return ok;
 }
@@ -200,24 +201,30 @@ static bool read_value(dml_txn *txn, const dml_object_id *tree, int64_t *out, dm
          read_literal(txn, &node, &datum, error) && read_i64(txn, &datum, out, error);
 }
 
-static bool read_history(dml_repo *repo, const dml_object_id *expected_tip,
-                         const dml_object_id *expected_parent, int64_t *tip_value,
-                         int64_t *parent_value, dml_error *error) {
+static bool verify_history(dml_repo *repo, dml_bytes ref, const dml_object_id *expected_tip,
+                            const dml_object_id *expected_parent, int64_t expected_tip_value,
+                            int64_t expected_parent_value, dml_error *error) {
   dml_txn *txn = NULL;
   dml_object_id tip, tip_tree, parent, parent_tree;
   bool ok = check(dml_txn_begin(repo, DML_TXN_READ, &txn, error), "begin history read", error) &&
-            check(dml_txn_ref_get(txn, main_ref, &tip, error), "resolve destination main", error) &&
+            check(dml_txn_ref_get(txn, ref, &tip, error), "resolve destination ref", error) &&
             read_commit(txn, &tip, &tip_tree, &parent, error);
   if (ok && (!same_id(&tip, expected_tip) || !same_id(&parent, expected_parent))) {
     fputs("destination tip or first parent differs from the source\n", stderr);
     ok = false;
   }
+  int64_t tip_value, parent_value;
   if (ok) {
-    ok = read_value(txn, &tip_tree, tip_value, error) &&
+    ok = read_value(txn, &tip_tree, &tip_value, error) &&
          read_commit(txn, &parent, &parent_tree, NULL, error) &&
-         read_value(txn, &parent_tree, parent_value, error);
+         read_value(txn, &parent_tree, &parent_value, error);
   }
   dml_txn_abort(&txn);
+  if (ok && (tip_value != expected_tip_value || parent_value != expected_parent_value)) {
+    fprintf(stderr, "unexpected values: tip = %" PRId64 ", first parent = %" PRId64 "\n",
+            tip_value, parent_value);
+    return false;
+  }
   return ok;
 }
 
@@ -233,7 +240,6 @@ int main(int argc, char **argv) {
   dml_buffer bundle = {0};
   dml_object_id parent, tip, imported;
   const int64_t older_value = 42, newer_value = 43;
-  int64_t tip_value, parent_value;
   int result = EXIT_FAILURE;
 
   if (!create_repo(argv[1], &source, &error) ||
@@ -250,14 +256,17 @@ int main(int argc, char **argv) {
     fputs("import returned a different commit ID\n", stderr);
     goto cleanup;
   }
-  if (!destination_main_missing(destination, &error) || !publish(destination, &imported, &error) ||
-      !close_repo(&destination, &error) ||
-      !check(dml_repo_open(argv[2], NULL, &destination, &error), "reopen destination", &error) ||
-      !read_history(destination, &tip, &parent, &tip_value, &parent_value, &error)) goto cleanup;
-
-  if (tip_value != newer_value || parent_value != older_value) {
-    fprintf(stderr, "unexpected values: main = %" PRId64 ", first parent = %" PRId64 "\n",
-            tip_value, parent_value);
+  if (!destination_main_missing(destination, &error) ||
+      !create_ref(destination, staging_ref, &imported, &error) || !close_repo(&destination, &error) ||
+      !check(dml_repo_open(argv[2], NULL, &destination, &error), "reopen staged destination", &error) ||
+      !destination_main_missing(destination, &error) ||
+      !verify_history(destination, staging_ref, &tip, &parent, newer_value, older_value, &error)) {
+    goto cleanup;
+  }
+  /* Publish the immutable commit just inspected, not a fresh lookup of the staging ref. */
+  if (!create_ref(destination, main_ref, &imported, &error) || !close_repo(&destination, &error) ||
+      !check(dml_repo_open(argv[2], NULL, &destination, &error), "reopen published destination", &error) ||
+      !verify_history(destination, main_ref, &tip, &parent, newer_value, older_value, &error)) {
     goto cleanup;
   }
   result = EXIT_SUCCESS;
@@ -267,7 +276,7 @@ cleanup:
   if (!close_repo(&source, &error)) result = EXIT_FAILURE;
   if (!close_repo(&destination, &error)) result = EXIT_FAILURE;
   if (result == EXIT_SUCCESS &&
-      printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", tip_value, parent_value) < 0) {
+      printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", newer_value, older_value) < 0) {
     return EXIT_FAILURE;
   }
   return result;

@@ -234,23 +234,24 @@ static void import_bundle(dml_repo *repo, const char *path) {
   printf("%s %s\n", dml_status_name(status), text);
 }
 
-static void publish_main(dml_repo *repo, const char *target_hex) {
+static void write_ref(dml_repo *repo, bool create, const char *ref_name, const char *target_hex) {
   dml_object_id target;
   require_ok(dml_object_id_parse(target_hex, strlen(target_hex), &target, NULL),
              "parsing imported commit ID");
   dml_txn *txn = NULL;
-  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning publication transaction");
-  dml_status updated = dml_txn_ref_update(txn, name("main"), &target, NULL);
+  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning ref write transaction");
+  dml_status written = create ? dml_txn_ref_create(txn, name(ref_name), &target, NULL)
+                              : dml_txn_ref_update(txn, name(ref_name), &target, NULL);
   dml_status committed = dml_txn_commit(&txn, NULL);
-  printf("%s\n%s\n", dml_status_name(updated), dml_status_name(committed));
+  printf("%s\n%s\n", dml_status_name(written), dml_status_name(committed));
 }
 
-static void read_main(dml_repo *repo) {
+static void read_ref(dml_repo *repo, const char *ref_name) {
   dml_txn *txn = NULL;
   require_ok(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL), "beginning readback transaction");
   dml_object_id target;
   memset(target.bytes, 0xa5, sizeof(target.bytes));
-  dml_status resolved = dml_txn_ref_get(txn, name("main"), &target, NULL);
+  dml_status resolved = dml_txn_ref_get(txn, name(ref_name), &target, NULL);
   char text[DML_OBJECT_ID_HEX_SIZE + 1];
   format_id(target, text);
   printf("%s %s\n", dml_status_name(resolved), text);
@@ -378,10 +379,11 @@ static dml_status read_literal_datum(dml_txn *txn, const dml_object_id *node_id,
   return status;
 }
 
-static dml_status read_value_path(dml_txn *txn, const size_t *parent_index, dml_bytes entry_name,
-                                  dml_bytes binding_name, value_observation *out) {
+static dml_status read_value_path(dml_txn *txn, dml_bytes ref_name, const size_t *parent_index,
+                                  dml_bytes entry_name, dml_bytes binding_name,
+                                  value_observation *out) {
   out->stage = "ref";
-  dml_status status = dml_txn_ref_get(txn, name("main"), &out->head, NULL);
+  dml_status status = dml_txn_ref_get(txn, ref_name, &out->head, NULL);
   if (status != DML_OK) return status;
 
   const dml_object_id *commit_id = &out->head;
@@ -399,8 +401,8 @@ static dml_status read_value_path(dml_txn *txn, const size_t *parent_index, dml_
   return read_literal_datum(txn, &node_id, out);
 }
 
-static void read_value(dml_repo *repo, const size_t *parent_index, const char *entry_name,
-                       const char *binding_name) {
+static void read_value(dml_repo *repo, const char *ref_name, const size_t *parent_index,
+                       const char *entry_name, const char *binding_name) {
   value_observation observed = {.stage = "begin"};
   memset(observed.head.bytes, 0xa5, sizeof(observed.head.bytes));
   memset(observed.parent.bytes, 0xa5, sizeof(observed.parent.bytes));
@@ -409,7 +411,8 @@ static void read_value(dml_repo *repo, const size_t *parent_index, const char *e
   dml_txn *txn = NULL;
   dml_status status = dml_txn_begin(repo, DML_TXN_READ, &txn, NULL);
   if (status == DML_OK) {
-    status = read_value_path(txn, parent_index, name(entry_name), name(binding_name), &observed);
+    status = read_value_path(txn, name(ref_name), parent_index, name(entry_name), name(binding_name),
+                             &observed);
   }
   dml_txn_abort(&txn);
 
@@ -483,29 +486,30 @@ int main(int argc, char **argv) {
   bool create = argc == 4 && strcmp(argv[1], "seed") == 0;
   bool exporting = argc == 6 && strcmp(argv[1], "export") == 0;
   bool importing = argc == 5 && strcmp(argv[1], "import") == 0;
-  bool publishing = argc == 4 && strcmp(argv[1], "publish_main") == 0;
-  bool reading = argc == 3 && strcmp(argv[1], "read_main") == 0;
-  bool reading_value = argc == 5 && strcmp(argv[1], "read_value") == 0;
-  bool reading_parent = argc == 6 && strcmp(argv[1], "read_parent_value") == 0;
-  if (!create && !exporting && !importing && !publishing && !reading &&
+  bool creating_ref = argc == 5 && strcmp(argv[1], "create_ref") == 0;
+  bool updating_ref = argc == 5 && strcmp(argv[1], "update_ref") == 0;
+  bool reading = argc == 4 && strcmp(argv[1], "read_ref") == 0;
+  bool reading_value = argc == 6 && strcmp(argv[1], "read_value") == 0;
+  bool reading_parent = argc == 7 && strcmp(argv[1], "read_parent_value") == 0;
+  if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading &&
       !reading_value && !reading_parent) {
     fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
-                    "       transfer_replay publish_main REPO TARGET\n"
-                    "       transfer_replay read_main REPO\n"
-                    "       transfer_replay read_value REPO TREE_ENTRY BINDING\n"
-                    "       transfer_replay read_parent_value REPO PARENT_INDEX TREE_ENTRY BINDING\n"
+                    "       transfer_replay {create_ref|update_ref} REPO REF TARGET\n"
+                    "       transfer_replay read_ref REPO REF\n"
+                    "       transfer_replay read_value REPO REF TREE_ENTRY BINDING\n"
+                    "       transfer_replay read_parent_value REPO REF PARENT_INDEX TREE_ENTRY BINDING\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
   }
   size_t parent_index;
-  if (reading_parent && !parse_parent_index(argv[3], &parent_index)) {
-    fprintf(stderr, "invalid parent index: %s\n", argv[3]);
+  if (reading_parent && !parse_parent_index(argv[4], &parent_index)) {
+    fprintf(stderr, "invalid parent index: %s\n", argv[4]);
     return EXIT_FAILURE;
   }
-  const char *mode = publishing || reading || reading_value || reading_parent ? "" : argv[argc - 1];
+  const char *mode = create || exporting || importing ? argv[argc - 1] : "";
   if (create && strcmp(mode, "source") && strcmp(mode, "destination") &&
       strcmp(mode, "large") && strcmp(mode, "oversize")) {
     fprintf(stderr, "unknown fixture profile: %s\n", mode);
@@ -521,14 +525,14 @@ int main(int argc, char **argv) {
   if (busy) require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning busy transaction");
   if (create) {
     seed(repo, mode);
-  } else if (publishing) {
-    publish_main(repo, argv[3]);
+  } else if (creating_ref || updating_ref) {
+    write_ref(repo, creating_ref, argv[3], argv[4]);
   } else if (reading) {
-    read_main(repo);
+    read_ref(repo, argv[3]);
   } else if (reading_value) {
-    read_value(repo, NULL, argv[3], argv[4]);
+    read_value(repo, argv[3], NULL, argv[4], argv[5]);
   } else if (reading_parent) {
-    read_value(repo, &parent_index, argv[4], argv[5]);
+    read_value(repo, argv[3], &parent_index, argv[5], argv[6]);
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);
