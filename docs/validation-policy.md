@@ -11,12 +11,11 @@ branch. [Build and validation](../README.md#build-and-validation) owns commands;
 Run `scripts/check.sh` on the final relevant sources. CI runs the same build on
 Linux, macOS, and Windows and retains Meson logs. This build-only gate establishes
 neither test coverage nor runtime correctness. Run `scripts/check.sh --quint` for
-changes to the replay suite or to covered behavior (ref creation, atomic snapshot
-publication and rollback, caller-side conditional publication, and binary commit
-transfer with staging, inspection and explicit publication, including the example's
-atomic result-and-pin write, conditional publication after return transfer, and
-staging-ref release, and read-only integrity and reachability checks).
-This also runs focused interpreter, native integrity, and transfer fault tests.
+changes to the replay suite or to covered behavior: ref creation, atomic snapshot
+publication and rollback, caller-side conditional publication, binary commit
+transfer and the staged result round trip, read-only integrity and reachability
+checks, and explicit transactional garbage collection. This also runs focused
+interpreter, native integrity and collection fault checks, and transfer fault tests.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
 currently run these runtime checks.
 

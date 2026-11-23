@@ -232,13 +232,33 @@ static bool release_staging(dml_repo **repo, const char *path, const lineage_inp
          verify_lineage(*repo, pin_ref, &pinned, input, candidate, error);
 }
 
+static bool collect_and_verify(dml_repo **repo, const char *path, dml_bytes ref,
+                               const lineage_input *input, const lineage_candidate *candidate,
+                               dml_error *error) {
+  dml_txn *txn = NULL;
+  size_t removed;
+  bool ok = check(dml_txn_begin(*repo, DML_TXN_WRITE, &txn, error), "begin collection", error) &&
+            check(dml_txn_collect_garbage(txn, &removed, error), "collect unreachable objects", error);
+  if (ok && removed != 0) {
+    fprintf(stderr, "%s: expected a fully retained repository, found %zu unreachable objects\n", path, removed);
+    ok = false;
+  }
+  if (ok) ok = check(dml_txn_commit(&txn, error), "commit collection", error);
+  dml_txn_abort(&txn);
+  dml_object_id tip;
+  return ok && close_repo(repo, error) &&
+         check(dml_repo_open(path, NULL, repo, error), "reopen after collection", error) &&
+         verify_lineage(*repo, ref, &tip, input, candidate, error);
+}
+
 int main(int argc, char **argv) {
   const bool round_trip = argc > 1 && strcmp(argv[1], "--round-trip") == 0;
+  const bool collect = round_trip && argc > 2 && strcmp(argv[2], "--collect") == 0;
   const bool record_lineage = round_trip || (argc > 1 && strcmp(argv[1], "--lineage") == 0);
-  const int first_path = record_lineage ? 2 : 1;
+  const int first_path = collect ? 3 : record_lineage ? 2 : 1;
   if (argc != first_path + 2 || argv[first_path][0] == '\0' || argv[first_path + 1][0] == '\0' ||
       strcmp(argv[first_path], argv[first_path + 1]) == 0) {
-    fputs("usage: transfer_history [--lineage | --round-trip] SOURCE_REPO DESTINATION_REPO\n"
+    fputs("usage: transfer_history [--lineage | --round-trip [--collect]] SOURCE_REPO DESTINATION_REPO\n"
           "Use two distinct unused paths with existing parent directories.\n", stderr);
     return EXIT_FAILURE;
   }
@@ -283,6 +303,11 @@ int main(int argc, char **argv) {
           !release_staging(&destination, destination_path, &selected, &candidate, &error)))) {
       goto cleanup;
     }
+    if (collect &&
+        (!collect_and_verify(&source, source_path, main_ref, &selected, &candidate, &error) ||
+         !collect_and_verify(&destination, destination_path, pin_ref, &selected, &candidate, &error))) {
+      goto cleanup;
+    }
   } else {
     /* Publish the immutable commit just inspected, not a fresh lookup of the staging ref. */
     if (!create_ref(destination, main_ref, &selected.commit, &error) || !close_repo(&destination, &error) ||
@@ -307,7 +332,9 @@ cleanup:
     } else {
       printed = printf("main = %" PRId64 "\nfirst parent = %" PRId64 "\n", newer_value, older_value);
     }
-    if (printed < 0) return EXIT_FAILURE;
+    if (printed < 0 || (collect && puts("collection removed 0 objects from each repository") < 0)) {
+      return EXIT_FAILURE;
+    }
   }
   return result;
 }

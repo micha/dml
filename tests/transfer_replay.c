@@ -150,7 +150,50 @@ static void seed_large(dml_txn *txn, size_t size) {
   one_value_commit(txn, "root", list);
 }
 
+static dml_status add_one(int64_t input, int64_t *output);
+
+static dml_object_id retention_snapshot(dml_txn *txn, const dml_object_id *parent) {
+  bool selected = parent != NULL;
+  dml_object_id scalar = number(txn, selected ? "selected_datum" : "base_datum", selected ? 45 : 41);
+  dml_object_id literal = node(txn, selected ? "selected_node" : "base_node", DML_NODE_LITERAL, scalar);
+  dml_dag_binding binding = {name("z-bound"), literal};
+  dml_tree_entry entry = {name("all"), dag(txn, selected ? "selected_dag" : "base_dag", literal, &binding, 1)};
+  dml_object_id snapshot = tree(txn, selected ? "selected_tree" : "base_tree", &entry, 1);
+  return commit(txn, selected ? "selected" : "base", snapshot, parent, selected ? 1 : 0);
+}
+
+static void seed_retention(dml_repo *repo) {
+  dml_txn *txn = NULL;
+  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning retention fixture");
+  dml_object_id base = retention_snapshot(txn, NULL);
+  dml_object_id selected = retention_snapshot(txn, &base);
+  require_ok(dml_txn_commit(&txn, NULL), "committing retention fixture inputs");
+
+  lineage_input input;
+  require_ok(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL), "reading retention fixture input");
+  require_ok(lineage_read_input(txn, &selected, name("all"), name("z-bound"), &input, NULL),
+             "selecting retention fixture input");
+  dml_txn_abort(&txn);
+
+  lineage_candidate result = {0};
+  require_ok(lineage_record(repo, &input, name("example.add-one@1"), add_one, &result, NULL),
+             "recording retention fixture result");
+  require_ok(result.completion, "committing retention fixture result");
+  announce("output_datum", "datums", result.output_datum);
+  announce("output_node", "nodes", result.output_node);
+  announce("implementation_datum", "datums", result.implementation_datum);
+  announce("implementation_node", "nodes", result.implementation_node);
+  announce("result_dag", "dags", result.dag);
+  announce("result_tree", "trees", result.tree);
+  announce("result", "commits", result.commit);
+}
+
 static void seed(dml_repo *repo, const char *profile) {
+  if (!strcmp(profile, "retention")) {
+    seed_retention(repo);
+    return;
+  }
+  if (!strcmp(profile, "empty")) return;
   dml_txn *txn = NULL;
   require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning fixture transaction");
   if (strcmp(profile, "source") == 0) {
@@ -255,6 +298,35 @@ static void release_expected(dml_repo *repo, const char *ref, const char *expect
   const char *completion = commit ? dml_status_name(dml_txn_commit(&txn, NULL)) : "aborted";
   dml_txn_abort(&txn);
   printf("%s\n%s\n", dml_status_name(removed), completion);
+}
+
+static dml_status edit_gc_ref(dml_txn *txn, const char *edit, const char *ref_name,
+                              const dml_object_id *target) {
+  dml_bytes ref = name(ref_name);
+  if (!strcmp(edit, "create")) return dml_txn_ref_create(txn, ref, target, NULL);
+  if (!strcmp(edit, "update")) return dml_txn_ref_update(txn, ref, target, NULL);
+  return dml_txn_ref_delete_expected(txn, ref, target, NULL);
+}
+
+static void run_gc_transaction(dml_repo *repo, const char *order, const char *edit,
+                               const char *ref_name, const char *target_hex, bool commit_txn) {
+  dml_txn *txn = NULL;
+  dml_object_id target;
+  bool edit_first = !strcmp(order, "before") || !strcmp(order, "only");
+  bool edit_after = !strcmp(order, "after");
+  if (edit_first || edit_after) {
+    require_ok(dml_object_id_parse(target_hex, strlen(target_hex), &target, NULL), "parse GC ref target");
+  }
+  require_ok(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL), "beginning GC transaction");
+  const char *edit_status = "none";
+  const char *gc_status = "none";
+  size_t removed = 123456789;
+  if (edit_first) edit_status = dml_status_name(edit_gc_ref(txn, edit, ref_name, &target));
+  if (strcmp(order, "only")) gc_status = dml_status_name(dml_txn_collect_garbage(txn, &removed, NULL));
+  if (edit_after) edit_status = dml_status_name(edit_gc_ref(txn, edit, ref_name, &target));
+  const char *completion = commit_txn ? dml_status_name(dml_txn_commit(&txn, NULL)) : "aborted";
+  dml_txn_abort(&txn);
+  printf("%s %s %s %zu\n", gc_status, edit_status, completion, removed);
 }
 
 static void publish_expected(dml_repo *repo, const char *ref, const char *expected_hex,
@@ -617,9 +689,14 @@ int main(int argc, char **argv) {
   bool releasing = argc == 6 && strcmp(argv[1], "release_expected") == 0 &&
                    (!strcmp(argv[5], "commit") || !strcmp(argv[5], "abort"));
   bool checking = argc == 3 && strcmp(argv[1], "check_integrity") == 0;
-  if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading &&
-      !reading_value && !reading_parent && !recording && !reading_lineage && !publishing && !releasing && !checking) {
-    fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize}\n"
+  bool collecting = argc == 8 && !strcmp(argv[1], "gc_transaction") &&
+                    ((!strcmp(argv[3], "none") && !strcmp(argv[4], "none")) ||
+                     ((!strcmp(argv[3], "before") || !strcmp(argv[3], "after") || !strcmp(argv[3], "only")) &&
+                      (!strcmp(argv[4], "create") || !strcmp(argv[4], "update") || !strcmp(argv[4], "delete")))) &&
+                    (!strcmp(argv[7], "commit") || !strcmp(argv[7], "abort"));
+  if (!create && !exporting && !importing && !creating_ref && !updating_ref && !reading && !reading_value &&
+      !reading_parent && !recording && !reading_lineage && !publishing && !releasing && !checking && !collecting) {
+    fprintf(stderr, "usage: transfer_replay seed REPO {source|destination|large|oversize|retention|empty}\n"
                     "       transfer_replay export REPO ROOT FILE {normal|busy|dirty}\n"
                     "       transfer_replay import REPO FILE {normal|busy|limited}\n"
                     "       transfer_replay {create_ref|update_ref} REPO REF TARGET\n"
@@ -631,6 +708,7 @@ int main(int argc, char **argv) {
                     "       transfer_replay publish_expected REPO REF EXPECTED_ID TARGET_ID\n"
                     "       transfer_replay release_expected REPO REF EXPECTED_ID {commit|abort}\n"
                     "       transfer_replay check_integrity REPO\n"
+                    "       transfer_replay gc_transaction REPO ORDER EDIT REF TARGET {commit|abort}\n"
                     "       transfer_replay delete REPO OBJECT_KEY\n"
                     "       transfer_replay overwrite REPO OBJECT_KEY COPY_KEY\n");
     return EXIT_FAILURE;
@@ -642,7 +720,7 @@ int main(int argc, char **argv) {
   }
   const char *mode = create || exporting || importing ? argv[argc - 1] : "";
   if (create && strcmp(mode, "source") && strcmp(mode, "destination") &&
-      strcmp(mode, "large") && strcmp(mode, "oversize")) {
+      strcmp(mode, "large") && strcmp(mode, "oversize") && strcmp(mode, "retention") && strcmp(mode, "empty")) {
     fprintf(stderr, "unknown fixture profile: %s\n", mode);
     return EXIT_FAILURE;
   }
@@ -674,6 +752,8 @@ int main(int argc, char **argv) {
     release_expected(repo, argv[3], argv[4], strcmp(argv[5], "commit") == 0);
   } else if (checking) {
     check_integrity(repo);
+  } else if (collecting) {
+    run_gc_transaction(repo, argv[3], argv[4], argv[5], argv[6], !strcmp(argv[7], "commit"));
   } else {
     if (exporting) export_bundle(repo, argv[3], argv[4], mode);
     else import_bundle(repo, argv[3]);

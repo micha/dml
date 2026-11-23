@@ -22,6 +22,8 @@
 
 static size_t allocation_limit;
 static size_t allocation_count;
+static size_t delete_limit;
+static size_t delete_count;
 
 void *dml_check_fault_malloc(size_t size) {
   if (++allocation_count == allocation_limit) return NULL;
@@ -31,6 +33,11 @@ void *dml_check_fault_malloc(size_t size) {
 void *dml_check_fault_realloc(void *items, size_t size) {
   if (++allocation_count == allocation_limit) return NULL;
   return realloc(items, size);
+}
+
+int dml_check_fault_del(MDB_txn *txn, MDB_dbi dbi, MDB_val *key, MDB_val *value) {
+  if (++delete_count == delete_limit) return MDB_MAP_FULL;
+  return mdb_del(txn, dbi, key, value);
 }
 
 typedef struct {
@@ -316,6 +323,99 @@ static void expect_unchanged(const char *path, dml_buffer before) {
   dml_buffer_free(&after);
 }
 
+static void check_collection(const char *path, const fixture *ids) {
+  dml_repo *repo = NULL;
+  dml_txn *txn = NULL;
+  dml_error error = {0};
+  size_t removed = SIZE_MAX;
+  OK(dml_repo_open(path, NULL, &repo, NULL));
+  CHECK(dml_txn_collect_garbage(NULL, &removed, &error) == DML_INVALID_STATE);
+  OK(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL));
+  CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_INVALID_STATE);
+  CHECK(removed == SIZE_MAX);
+  OK(dml_txn_check_integrity(txn, &(dml_repo_integrity){0}, NULL, NULL, NULL));
+  dml_txn_abort(&txn);
+
+  dml_buffer before = read_data_file(path);
+  OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  CHECK(dml_txn_collect_garbage(txn, NULL, &error) == DML_INVALID_ARGUMENT);
+  CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_INVALID_STATE);
+  CHECK(removed == SIZE_MAX);
+  CHECK(dml_txn_commit(&txn, NULL) == DML_INVALID_STATE && txn == NULL);
+
+  /* Measure and then fail each allocation in the mark phase, before any deletes. */
+  OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  allocation_count = 0;
+  OK(dml_txn_collect_garbage(txn, &removed, &error));
+  const size_t scan_allocations = allocation_count;
+  CHECK(scan_allocations > ROOTED_COUNT && removed == 6 && error.code == DML_OK);
+  dml_txn_abort(&txn);
+  for (size_t fail = 1; fail <= scan_allocations; fail++) {
+    OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+    allocation_limit = fail;
+    allocation_count = delete_count = 0;
+    removed = SIZE_MAX;
+    CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_OUT_OF_MEMORY);
+    CHECK(error.code == DML_OUT_OF_MEMORY && removed == SIZE_MAX && delete_count == 0);
+    allocation_limit = 0;
+    CHECK(dml_txn_commit(&txn, NULL) == DML_INVALID_STATE && txn == NULL);
+  }
+
+  /* Fail after a successful delete and reject commit of the entire batch. */
+  OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  (void)put_number(txn, 13);
+  delete_limit = 2;
+  delete_count = 0;
+  CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_MAP_FULL);
+  CHECK(error.native_code == MDB_MAP_FULL && removed == SIZE_MAX && delete_count == 2);
+  delete_limit = 0;
+  CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_INVALID_STATE);
+  CHECK(dml_txn_commit(&txn, NULL) == DML_INVALID_STATE && txn == NULL);
+  expect_unchanged(path, before);
+
+  OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  dml_object_id early = put_number(txn, 13);
+  OK(dml_txn_collect_garbage(txn, &removed, &error));
+  CHECK(removed == 7);
+  dml_buffer record = {0};
+  CHECK(dml_txn_get_datum(txn, &early, &record, NULL) == DML_NOT_FOUND);
+  OK(dml_txn_collect_garbage(txn, &removed, &error));
+  CHECK(removed == 0);
+  dml_object_id late = put_number(txn, 15);
+  OK(dml_txn_commit(&txn, NULL));
+  OK(dml_repo_close(&repo, NULL));
+
+  OK(dml_repo_open(path, NULL, &repo, NULL));
+  OK(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL));
+  dml_repo_integrity report;
+  OK(dml_txn_check_integrity(txn, &report, NULL, NULL, NULL));
+  expect_report(report, (dml_repo_integrity){.refs = 2, .reachable_objects = ROOTED_COUNT,
+                                            .intact_unreachable_objects = 1});
+  CHECK(dml_txn_get_datum(txn, &ids->loose.id, &record, NULL) == DML_NOT_FOUND);
+  OK(dml_txn_get_datum(txn, &ids->leaf, &record, NULL));
+  dml_buffer_free(&record);
+  OK(dml_txn_get_datum(txn, &late, &record, NULL));
+  dml_buffer_free(&record);
+  dml_txn_abort(&txn);
+  OK(dml_repo_close(&repo, NULL));
+}
+
+static void expect_collection_blocked(const char *path) {
+  dml_buffer before = read_data_file(path);
+  dml_repo *repo = NULL;
+  dml_txn *txn = NULL;
+  dml_error error = {0};
+  size_t removed = SIZE_MAX;
+  OK(dml_repo_open(path, NULL, &repo, NULL));
+  OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  delete_count = 0;
+  CHECK(dml_txn_collect_garbage(txn, &removed, &error) == DML_INTEGRITY_ERROR);
+  CHECK(error.code == DML_INTEGRITY_ERROR && removed == SIZE_MAX && delete_count == 0);
+  CHECK(dml_txn_commit(&txn, NULL) == DML_INVALID_STATE && txn == NULL);
+  OK(dml_repo_close(&repo, NULL));
+  expect_unchanged(path, before);
+}
+
 static void check_broken_ref_release(const char *path, const fixture *ids) {
   dml_repo *repo = NULL;
   dml_txn *txn = NULL;
@@ -335,9 +435,77 @@ static void check_broken_ref_release(const char *path, const fixture *ids) {
   OK(dml_repo_close(&repo, NULL));
 }
 
+typedef enum {
+  BAD_ENTRY,
+  BAD_OBJECT,
+  BAD_REF,
+  REACHABLE_EDGE,
+  DETACHED_EDGE,
+  BAD_FLAGS,
+} damage_kind;
+
+static void check_single_damage(const char *path, damage_kind kind) {
+  dml_repo *repo = NULL;
+  dml_txn *txn = NULL;
+  OK(dml_repo_open(path, &(dml_repo_options){.create = true}, &repo, NULL));
+  dml_object_id rooted = {0}, detached = {0}, loose = {0};
+  if (kind != BAD_FLAGS) {
+    OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+    rooted = put_number(txn, 1);
+    dml_object_id node = put_node(txn, DML_NODE_LITERAL, rooted);
+    dml_tree_entry entry = {bytes("input"), put_dag(txn, node, NULL, 0)};
+    dml_object_id commit = put_commit(txn, put_tree(txn, &entry, 1), NULL);
+    OK(dml_txn_ref_create(txn, bytes("main"), &commit, NULL));
+    detached = put_number(txn, 2);
+    (void)put_node(txn, DML_NODE_LITERAL, detached);
+    loose = put_number(txn, 3);
+    OK(dml_txn_commit(&txn, NULL));
+  }
+  OK(dml_repo_close(&repo, NULL));
+
+  MDB_env *env = NULL;
+  MDB_txn *raw = NULL;
+  MDB_dbi dbi;
+  CHECK(mdb_env_create(&env) == MDB_SUCCESS);
+  CHECK(mdb_env_open(env, path, 0, 0) == MDB_SUCCESS);
+  CHECK(mdb_txn_begin(env, NULL, 0, &raw) == MDB_SUCCESS);
+  CHECK(mdb_dbi_open(raw, NULL, kind == BAD_FLAGS ? MDB_REVERSEKEY : 0, &dbi) == MDB_SUCCESS);
+  char key[64];
+  switch (kind) {
+    case BAD_ENTRY:
+      raw_put(raw, dbi, "unknown/key", bytes("irrelevant"));
+      break;
+    case BAD_OBJECT:
+      make_key(key, "objects/datums/", &loose);
+      raw_put(raw, dbi, key, bytes("invalid encoding"));
+      break;
+    case BAD_REF: {
+      dml_object_id missing = {0};
+      raw_put(raw, dbi, "refs/heads/dangling", (dml_bytes){missing.bytes, sizeof(missing.bytes)});
+      break;
+    }
+    case REACHABLE_EDGE:
+    case DETACHED_EDGE:
+      make_key(key, "objects/datums/", kind == REACHABLE_EDGE ? &rooted : &detached);
+      CHECK(mdb_del(raw, dbi, &(MDB_val){strlen(key), key}, NULL) == MDB_SUCCESS);
+      break;
+    case BAD_FLAGS:
+      break;
+  }
+  CHECK(mdb_txn_commit(raw) == MDB_SUCCESS);
+  mdb_env_close(env);
+  expect_collection_blocked(path);
+}
+
+static void subpath(char out[4096], const char *root, const char *name) {
+  int len = snprintf(out, 4096, "%s/%s", root, name);
+  CHECK(len > 0 && len < 4096);
+}
+
 int main(int argc, char **argv) {
   CHECK(argc == 2);
-  const char *path = argv[1];
+  char path[4096];
+  subpath(path, argv[1], "inspect");
   fixture ids = seed(path);
   dml_buffer before = read_data_file(path);
   inspect_clean(path, &ids);
@@ -347,5 +515,14 @@ int main(int argc, char **argv) {
   inspect_damaged(path, &ids);
   expect_unchanged(path, before);
   check_broken_ref_release(path, &ids);
+
+  subpath(path, argv[1], "collect");
+  ids = seed(path);
+  check_collection(path, &ids);
+  const char *cases[] = {"bad-entry", "bad-object", "bad-ref", "reachable-edge", "detached-edge", "bad-flags"};
+  for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); i++) {
+    subpath(path, argv[1], cases[i]);
+    check_single_damage(path, (damage_kind)i);
+  }
   return EXIT_SUCCESS;
 }

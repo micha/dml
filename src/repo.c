@@ -313,10 +313,10 @@ static dml_record_type classify_entry_key(dml_bytes *key) {
   return 0;
 }
 
-dml_status dml_txn_scan_entries(dml_txn *txn, dml_entry_visitor visitor, void *context,
-                                 dml_error *error) {
-  if (txn == NULL || txn->mode != DML_TXN_READ) {
-    return dml_set_error(error, DML_INVALID_STATE, 0, "integrity check requires a read transaction");
+dml_status dml_txn_scan_entries(dml_txn *txn, dml_txn_mode mode, dml_entry_visitor visitor,
+                                 void *context, dml_error *error) {
+  if (txn->mode != mode) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "transaction mode does not permit this repository scan");
   }
   MDB_cursor *cursor;
   int code = mdb_cursor_open(txn->native, txn->repo->dbi, &cursor);
@@ -333,6 +333,36 @@ dml_status dml_txn_scan_entries(dml_txn *txn, dml_entry_visitor visitor, void *c
   mdb_cursor_close(cursor);
   if (status != DML_OK || code == MDB_NOTFOUND) return status;
   return storage_error(error, code, "scanning repository integrity entries");
+}
+
+dml_status dml_txn_delete_scanned_object(dml_txn *txn, dml_record_type type,
+                                          const dml_object_id *id, dml_error *error) {
+  char key_bytes[48];
+  MDB_val key = {object_key(type, id, key_bytes), key_bytes};
+  int code = mdb_del(txn->native, txn->repo->dbi, &key, NULL);
+  if (code != MDB_SUCCESS) return storage_error(error, code, "deleting unreachable object");
+  return DML_OK;
+}
+
+dml_status dml_txn_collect_garbage(dml_txn *txn, size_t *removed, dml_error *error) {
+  if (txn == NULL || txn->mode != DML_TXN_WRITE || txn->poisoned) {
+    return dml_set_error(error, DML_INVALID_STATE, 0, "transaction is not writable");
+  }
+  dml_status status;
+  unsigned int flags;
+  int code;
+  if (removed == NULL) {
+    status = dml_set_error(error, DML_INVALID_ARGUMENT, 0, "collection count output is null");
+  } else if ((code = mdb_dbi_flags(txn->native, txn->repo->dbi, &flags)) != MDB_SUCCESS) {
+    status = storage_error(error, code, "reading repository database flags");
+  } else if (flags != 0) {
+    /* The index and the sweep require a single value per canonical key. */
+    status = dml_set_error(error, DML_INTEGRITY_ERROR, 0, "unsupported repository database flags");
+  } else {
+    status = dml_txn_sweep_unreachable(txn, removed, error);
+  }
+  if (status != DML_OK) txn->poisoned = 1;
+  return status;
 }
 
 static dml_status lookup_bounded_object(dml_txn *txn, dml_record_type expected,

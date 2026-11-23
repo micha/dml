@@ -13,8 +13,9 @@ persist immutable objects and atomically create, update, or release refs to comm
 - [record.h](../include/dml/record.h): datum codecs, buffers, and ID text conversion.
 - [object.h](../include/dml/object.h): object codecs, borrowed views, and name validation.
 - [repo.h](../include/dml/repo.h): repository and transaction handles, typed object
-  storage, scoped node lookup, refs, and a read-only snapshot integrity checker.
-  The checker follows typed edges from ref roots and classifies detached objects.
+  storage, scoped node lookup, refs, a read-only integrity checker, and explicit
+  transactional garbage collection. Checking and collection share the same typed
+  graph scan from ref roots.
 - [transfer.h](../include/dml/transfer.h): buffered commit export/import with an
   exact dependency closure and atomic import.
 

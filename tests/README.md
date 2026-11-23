@@ -1,7 +1,7 @@
 # Quint trace interpreter
 
-[`run_histories.py`](run_histories.py) is the shared entry point for the ref and
-transfer suites. Run it through [`scripts/check.sh --quint`](../README.md#quint-behavior-checks).
+[`run_histories.py`](run_histories.py) is the shared entry point for the ref,
+transfer, and garbage collection suites. Run it through [`scripts/check.sh --quint`](../README.md#quint-behavior-checks).
 Meson supplies the adapter, native executables, and Quint history and rule modules.
 
 Quint emits ordered histories of `{ op: str, args: List[str] }` requests. The
@@ -52,6 +52,14 @@ source, the old `main` closure becomes unreachable after publication. Quint
 compares exact typed object IDs and independent LMDB scans require unchanged
 inventories during checks. The focused native integrity test covers broken
 refs, records, and graph edges.
+
+The [garbage collection suite](gc_histories.qnt) uses an imported result and
+its input history. Quint predicts the exact persisted rows from the ref set and
+known fixture dependencies. It checks ref changes before and after collection,
+full and partial sweeps, explicit abort, failure poisoning, and refusal to collect
+when a detached object has a missing dependency. The native integrity test also
+injects allocation failures before any deletion and a storage error partway through
+deletion, then checks that the write transaction cannot commit.
 
 ## Add a request or operation
 

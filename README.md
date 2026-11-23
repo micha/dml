@@ -33,16 +33,19 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
 This builds the test executables in `build/core-check-quint/` and runs
-`quint-refs`, `quint-transfer`, and focused interpreter, integrity, and native fault tests.
+`quint-refs`, `quint-transfer`, `quint-gc`, and focused interpreter, integrity, and native fault tests.
 The [shared trace interpreter](tests/README.md) replays requests from Quint against
 native C executables. Quint checks observations against the
-[ref contract](docs/spec-next/repository.md#refs) and [transfer contract](docs/spec-next/transfer.md).
+[ref contract](docs/spec-next/repository.md#refs), [transfer contract](docs/spec-next/transfer.md),
+and [garbage collection contract](docs/spec-next/repository.md#explicit-garbage-collection).
 Fresh native reads and separate read-only LMDB scans check snapshot publication,
 rollback, datum readback from imported history, and recording, transferring back,
 conditionally publishing a caller's result, and guarded staging-ref release.
 The transfer history also checks exact unreachable IDs before staging an import and
-retention after releasing `incoming`. Native checks exercise damaged repositories
-and allocation failures. These checks are local and opt-in; they do not measure coverage.
+retention after releasing `incoming`. The collection suite checks ref ordering,
+rollback, and exact persisted removals. Native checks exercise damaged repositories,
+allocation failures, and deletion failures. These checks are local and opt-in; they
+do not measure coverage.
 
 ### Install and link the C library
 
@@ -95,6 +98,11 @@ then conditionally moves its `main` to the inspected commit. After reopening,
 its `main` yields `44`. The worker releases `incoming` only if it still points
 at the inspected input, then reopens and reads the same result and input through
 `result-pin`.
+
+To also run [explicit garbage collection](docs/spec-next/repository.md#explicit-garbage-collection)
+after the release, use `--round-trip --collect` with two fresh paths. The example
+expects zero removals and reopens both repositories to verify the pinned and
+published lineage again.
 
 To diagnose a repository without modifying it, use the
 [read-only integrity and reachability API](docs/spec-next/repository.md#snapshot-integrity-and-reachability).

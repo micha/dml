@@ -299,10 +299,10 @@ registering resources in manager state and applying physical changes are distinc
 
 ### Garbage collection (GC)
 
-Optional collection of unrooted repository history/objects and eligible project-owned
-resources. Retention follows full history rooted at refs, not just current snapshots.
-External cleanup custody must survive until cleanup can complete or be retried.
-Exact roots and implementation are open.
+Collection of data no longer retained. [Local repository GC](repository.md#explicit-garbage-collection)
+removes objects unreachable from all refs, which retain full history, not just current
+snapshots. Eligible project-owned resources are a separate design concern: external
+cleanup custody must survive until cleanup can complete or be retried.
 
 ### Excision
 

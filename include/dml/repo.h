@@ -57,6 +57,11 @@ dml_status dml_txn_begin(dml_repo *repo, dml_txn_mode mode, dml_txn **out,
 dml_status dml_txn_check_integrity(dml_txn *txn, dml_repo_integrity *out,
                                    dml_unreachable_visitor visitor, void *context,
                                    dml_error *error);
+/* Explicitly delete objects unreachable from all refs in this write transaction.
+ * Integrity damage blocks collection. The count output is required; on success
+ * *removed is set (possibly to zero). Deletions are durable only on commit.
+ * On failure the output is unchanged and a writable transaction is poisoned. */
+dml_status dml_txn_collect_garbage(dml_txn *txn, size_t *removed, dml_error *error);
 dml_status dml_txn_put_datum(dml_txn *txn, const uint8_t *data, size_t len,
                              dml_object_id *out, dml_error *error);
 dml_status dml_txn_get_datum(dml_txn *txn, const dml_object_id *id,

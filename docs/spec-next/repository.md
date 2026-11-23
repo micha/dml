@@ -1,14 +1,14 @@
 # Local repository and transactions
 
-Status: implemented immutable-object storage, transactional refs, and read-only
-integrity checks; repository schema 1.
+Status: implemented immutable-object storage, transactional refs, read-only
+integrity checks, and explicit garbage collection; repository schema 1.
 
 ## Authority boundary
 
 This document owns local repository initialization, persisted object/ref keys,
-direct reference checks, snapshot integrity and reachability checks, transaction
-behavior and repository/transaction handle ownership in this as-built specification. For encoding, IDs, value buffers and
-errors, see [records.md](records.md). For snapshot/history fields and the shared
+direct reference checks, integrity and reachability, garbage collection, transaction
+behavior and repository/transaction handle ownership. For encoding, IDs, value
+buffers and errors, see [records.md](records.md). For snapshot/history fields and the shared
 name profile, see [objects.md](objects.md). For binary bundles and their transitive
 validation, see [Commit transfer](transfer.md). For documented scope, see [README.md](README.md).
 Terms follow the shared [glossary](glossary.md).
@@ -51,8 +51,9 @@ occur inside that transaction; no public operation stores them outside one.
 
 - Write commit makes the transaction's changes visible together through LMDB.
 - Abort discards its changes.
-- A failed object or ref write poisons its write transaction. A subsequent commit
-  MUST abort the entire batch, including earlier successful puts and ref changes.
+- A failed object write, ref write or garbage collection poisons its write
+  transaction. A subsequent commit MUST abort the entire batch, including earlier
+  successful puts and ref changes.
 - Committing a read transaction is rejected and consumes/aborts the handle.
 - `dml_txn_commit()` consumes and nulls its handle on success or failure.
 - `dml_txn_abort()` consumes/nulls its handle and is safe for a null handle.
@@ -97,7 +98,8 @@ Insertion uses no-overwrite semantics:
 - An existing value MUST never be replaced. A different valid encoding under the
   claimed ID produces an integrity error; malformed encoding or a wrong stored
   type produces the corresponding validation error.
-- The public API exposes no immutable-object overwrite or deletion operation.
+- The public API exposes no overwrite or per-object deletion. Unreachable object
+  removal is only available through [garbage collection](#explicit-garbage-collection).
 
 ## Reads and integrity
 
@@ -112,7 +114,8 @@ key returns `integrity_error`. Invalid encoding returns the relevant codec error
 There is limited recognition of a tombstone record found at an immutable-object key: an
 accepted tombstone shape is rejected as `invalid_payload` with detail
 `record_type=tombstone;detail=excised`. This does not implement an excision request,
-tombstone writer, deletion authority, GC, external cleanup or physical erasure.
+tombstone writer, external cleanup or physical erasure. A stored tombstone at an
+object key is damage for the purposes of [garbage collection](#explicit-garbage-collection).
 
 ## Scoped node lookup
 
@@ -213,6 +216,39 @@ if (status == DML_OK) {
 }
 /* Only if status == DML_OK, inspect the report for damage and detached objects. */
 ```
+
+## Explicit garbage collection
+
+`dml_txn_collect_garbage(txn, &removed, error)` requires a caller-owned write
+transaction and a non-null count output. It MUST scan the repository and remove
+unreachable object rows in **that same write transaction**. The scan sees earlier
+changes in the transaction, including inserted objects, new or moved refs, and ref
+releases. It recomputes reachability from every ref through all typed references,
+including commit parents. It does not accept an earlier integrity report, a list
+of object IDs, or an alternative root set. LMDB serializes writers, so another
+writer cannot change the roots between this scan and the deletions.
+
+- Collection MUST reject any damage found by the full integrity scan, even in an
+  unreachable object, or unsupported main database flags. It returns
+  `integrity_error` and does not start deleting. If scanning or deletion fails
+  for another reason, the operation returns that error.
+- On success, `removed` is the number of object rows deleted in this call, possibly
+  zero. No refs, metadata or reachable objects are removed or rewritten. With no
+  refs, a clean repository has no retained objects.
+- On failure, `removed` is unchanged. Failure poisons a writable transaction; a
+  poisoned transaction cannot commit partial deletions or earlier writes. A null
+  count output on a writable transaction returns `invalid_argument`. A missing,
+  read-only or already poisoned transaction returns `invalid_state`.
+- Collection does not end the transaction. A successful write commit makes the
+  deletions durable; abort discards them. The count is not proof that the
+  transaction committed. Later operations in the same transaction see the
+  deletions, so creating a ref to a collected commit requires restoring its
+  objects first. Objects added after the scan are not part of that call.
+
+Collection is opt-in and scans the full repository while holding the write
+transaction. It changes the logical contents of the database, not its format.
+It does not repair damage, compact `data.mdb`, guarantee physical erasure, or
+clean up external resources.
 
 ## Handle ownership and concurrency
 

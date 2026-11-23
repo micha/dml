@@ -194,6 +194,51 @@ static dml_status classify_objects(integrity_scan *scan, dml_error *error) {
   return DML_OK;
 }
 
+static dml_status scan_integrity(dml_txn *txn, dml_txn_mode mode, integrity_scan *scan,
+                                  dml_error *error) {
+  dml_status status = dml_txn_scan_entries(txn, mode, collect_entry, scan, error);
+  if (status != DML_OK) return status;
+  if (!scan->seen_schema) scan->report.invalid_entries++;
+  return classify_objects(scan, error);
+}
+
+static void free_scan(integrity_scan *scan) {
+  free(scan->objects);
+  free(scan->roots);
+}
+
+static bool unreachable_intact(const checked_object *object) {
+  return !object->reachable && object->state == OBJECT_INTACT;
+}
+
+static bool found_damage(const dml_repo_integrity *report) {
+  return report->broken_refs != 0 || report->invalid_entries != 0 || report->invalid_objects != 0 ||
+         report->broken_reachable_edges != 0 || report->broken_unreachable_edges != 0 ||
+         report->broken_unreachable_objects != 0;
+}
+
+dml_status dml_txn_sweep_unreachable(dml_txn *txn, size_t *removed, dml_error *error) {
+  integrity_scan scan = {0};
+  dml_status status = scan_integrity(txn, DML_TXN_WRITE, &scan, error);
+  if (status == DML_OK && found_damage(&scan.report)) {
+    status = dml_set_error(error, DML_INTEGRITY_ERROR, 0, "repository damage prevents collection");
+  }
+  /* Finish every graph read before the first delete. LMDB can invalidate
+   * record views on update; only owned IDs and classifications are used below. */
+  for (size_t i = 0; status == DML_OK && i < scan.object_count; i++) {
+    const checked_object *object = &scan.objects[i];
+    if (unreachable_intact(object)) {
+      status = dml_txn_delete_scanned_object(txn, object->type, &object->id, error);
+    }
+  }
+  if (status == DML_OK) {
+    *removed = scan.report.intact_unreachable_objects;
+    dml_error_clear(error);
+  }
+  free_scan(&scan);
+  return status;
+}
+
 dml_status dml_txn_check_integrity(dml_txn *txn, dml_repo_integrity *out,
                                    dml_unreachable_visitor visitor, void *context,
                                    dml_error *error) {
@@ -201,24 +246,19 @@ dml_status dml_txn_check_integrity(dml_txn *txn, dml_repo_integrity *out,
     return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "integrity check requires transaction and report");
   }
   integrity_scan scan = {0};
-  dml_status status = dml_txn_scan_entries(txn, collect_entry, &scan, error);
-  if (status == DML_OK) {
-    if (!scan.seen_schema) scan.report.invalid_entries++;
-    status = classify_objects(&scan, error);
-  }
+  dml_status status = scan_integrity(txn, DML_TXN_READ, &scan, error);
   if (status == DML_OK) {
     dml_error_clear(error);
     *out = scan.report;
     if (visitor != NULL) {
       for (size_t i = 0; i < scan.object_count; i++) {
         const checked_object *object = &scan.objects[i];
-        if (!object->reachable && object->state == OBJECT_INTACT) {
+        if (unreachable_intact(object)) {
           visitor(context, object->type, &object->id);
         }
       }
     }
   }
-  free(scan.objects);
-  free(scan.roots);
+  free_scan(&scan);
   return status;
 }

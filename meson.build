@@ -95,13 +95,20 @@ if get_option('quint_tests')
            files('tests/transfer_histories.qnt', 'tests/transfer_rules.qnt')],
     timeout: 90,
   )
+  test(
+    'quint-gc', python,
+    args: ['-B', trace_interpreter, 'replay_gc', quint.full_path(), transfer_replay, lmdb_inventory,
+           files('tests/gc_histories.qnt', 'tests/gc_rules.qnt')],
+    timeout: 90,
+  )
 
   # Instrument the test copies only, never the installed library.
   repo_check_fault_subject = static_library(
-    'repo_check_fault_subject', 'src/repo_check.c', 'src/object_id.c',
+    'repo_check_fault_subject', 'src/repo_check.c', 'src/object_id.c', 'src/repo.c',
     include_directories: dml_inc,
     dependencies: vendor_headers,
-    c_args: ['-Dmalloc=dml_check_fault_malloc', '-Drealloc=dml_check_fault_realloc'],
+    c_args: ['-Dmalloc=dml_check_fault_malloc', '-Drealloc=dml_check_fault_realloc',
+             '-Dmdb_del=dml_check_fault_del'],
   )
   repo_check = executable(
     'repo_check', 'tests/repo_check.c',
