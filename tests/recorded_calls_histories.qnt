@@ -233,9 +233,43 @@ module recorded_calls_histories {
     source("inspect", List("ack"))
   ))
 
+  // The producer, factor, and output are identical; only the saved implementation
+  // differs. The rejected commands carry exact pins, including the wrong result.
+  pure val versionRequests: List[Request] = List(
+    source("record_sum", List("producer", "7", "5")),
+    source("inspect", List("producer")),
+    source("request_scale", List("producer", "producer", "v1", "3")),
+    source("request_scale", List("producer", "producer", "explicit-v1", "3", "--implementation", "example.scale@1")),
+    source("request_scale", List("producer", "producer", "v2", "3", "--implementation", "example.scale@2")),
+    source("request_scale", List("producer", "producer", "v3", "3", "--implementation", "example.scale@3")),
+    source("export_request", List("v1", "v1", "v1-request.bundle")),
+    source("export_request", List("v2", "v2", "v2-request.bundle")),
+    source("inspect", List("v2")),
+    worker("stage_input", List("v1-in", "v1-request.bundle")),
+    worker("work_scale", List("v1-in", "v1", "v1-result")),
+    worker("stage_input", List("v2-in", "v2-request.bundle")),
+    worker("work_scale", List("v2-in", "v2", "v2-result")),
+    worker("inspect", List("v1-result")),
+    worker("inspect", List("v2-result")),
+    worker("export_scale", List("v1-result", "v1-result", "v1-result.bundle")),
+    worker("export_scale", List("v2-result", "v2-result", "v2-result.bundle")),
+    source("stage_input", List("older", "v1-result.bundle")),
+    source("stage_input", List("saved", "v2-result.bundle")),
+    source("publish_requested_scale", List("v2", "v2", "older", "v1-result", "ack")),
+    source("stage_reused_scale", List("v2", "v2", "older", "v1-result", "returned")),
+    source("publish_reused_scale", List("v2", "v2", "older", "v1-result", "proof")),
+    source("stage_reused_scale", List("v2", "v2", "saved", "v2-result", "returned")),
+    source("publish_requested_scale", List("v2", "v2", "returned", "v2-result", "ack")),
+    source("request_scale", List("producer", "producer", "next", "3", "--implementation", "example.scale@2")),
+    source("publish_reused_scale", List("next", "next", "saved", "v2-result", "proof")),
+    source("inspect", List()),
+    source("inspect", List("proof")),
+    source("inspect", List("saved"))
+  )
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
-    .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests)
+    .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
   action step = histories' = histories
 }
