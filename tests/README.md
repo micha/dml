@@ -244,6 +244,15 @@ publication from the surviving choice after collection. Focused tests check
 ordered parents, malformed nested records and UUIDs, and reachability with the
 reuse ref as the sole root.
 
+The [versioned attempt selection history](../README.md#record-a-new-version-of-an-attempt-selection)
+executes new attempts after the initial choice, adopts independently on two
+branches, and explicitly reselects the original attempt on a descendant.
+Replay checks exact version matching even when two versions select the same
+attempt, rejects an occupied ref without writes, and reads reuse records for
+the different choices after the attempt pins are removed and collection runs.
+Focused tests check ordered parents, rollback, malformed predecessor chains,
+and retention when only the adopted version is pinned.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -469,5 +478,22 @@ failures. This is a safety check, not liveness or proof of execution.
 ```sh
 mkdir -p build/recorded-attempt-tlc
 (cd build/recorded-attempt-tlc && quint verify ../../tests/recorded_attempt_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the versioned attempt selection design with TLC
+
+The [adoption model](recorded_adoption_design.qnt) bounds the workflow to three
+eligible attempts with the same result, a single selection history with two
+output refs, and one exact-request plan at a time. It checks adoption and
+publication guards, immutable forks, retention through collection, and no
+implicit adoption on fresh work. It abstracts ref-name syntax, packed data,
+transfer and native faults. This checks safety, not liveness.
+
+With Java and Quint 0.34.0 (the 0.33.1 replay shell lacks observation search):
+
+```sh
+mkdir -p build/recorded-adoption-tlc
+(cd build/recorded-adoption-tlc && quint verify ../../tests/recorded_adoption_design.qnt \
   --backend=tlc --search-observations)
 ```
