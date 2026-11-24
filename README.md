@@ -194,7 +194,7 @@ Continue from the previous example with a new bundle filename:
 python examples/recorded_calls.py export-scale ./worker result "$result" ./scale.dml
 python examples/recorded_calls.py stage-input ./origin returned ./scale.dml
 python examples/recorded_calls.py inspect ./origin returned
-python examples/recorded_calls.py publish-scale ./origin returned "$result" "$producer" -
+python examples/recorded_calls.py publish-scale ./origin returned "$result" "$producer" 3 -
 python examples/recorded_calls.py collect ./origin
 python examples/recorded_calls.py inspect ./origin
 ```
@@ -205,16 +205,20 @@ Use a separate staging ref, not `main`. Staging reports the actual bundle root;
 keep the selected result and producer IDs independently of that receipt.
 
 `publish-scale` checks that the result's sole parent is the expected producer
-commit and that its input links to that parent's exact sum DAG. The last argument
-is `-` to require an absent `main`, as above, or the expected current commit ID
-if `main` already exists. This is a conditional ref update, not a merge. Updating
-`main` and deleting `returned` at its expected result ID commit together. If
-`main` or `returned` no longer matches, neither ref is changed by publication.
-The source's other refs and all worker refs are untouched.
+commit and that its input links to that parent's exact sum DAG. It also checks
+the recorded factor against the signed 64-bit factor from the original request
+(`3` above). Supply that expectation independently; do not copy the factor from
+the returned result. The last argument is `-` to require an absent `main`, or the
+expected current commit ID if `main` already exists.
 
-After collection, `main` retains both calls. Inspection and publication check the
-recorded structure, not the arithmetic, the worker's identity, or whether the
-recorded factor was requested. There is no automatic reuse.
+This is a conditional ref update, not a merge. Updating `main` and deleting
+`returned` at its expected result ID commit together. A factor mismatch or stale
+ref expectation leaves both refs unchanged. The source's other refs and all
+worker refs are untouched.
+
+After collection, `main` retains both calls. Publication checks what the result
+records; it does not rerun the calls, verify the arithmetic, or authenticate the
+worker. There is no automatic reuse.
 
 ### Install and link the C library
 

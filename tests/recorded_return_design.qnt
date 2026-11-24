@@ -2,8 +2,9 @@
 module recorded_return_design {
   // IDs represent immutable records and DAG IDs represent entire DAG closures.
   // The two sums have equal values but distinct commit and DAG IDs. A second
-  // well-formed scale of the planned producer uses a different factor. The
-  // remaining three results model valid core graphs with wrong application
+  // well-formed scale of the planned producer uses a different factor. Both
+  // scales can have the same output (e.g. a zero sum); output is not evidence
+  // of the factor. The other three results model valid graphs with wrong application
   // lineage or shape. No malformed bundles, native corruption, ID collisions,
   // or distinct ref names aliasing besides RETURNED == main are modeled.
   pure val absent = 0
@@ -17,6 +18,9 @@ module recorded_return_design {
   pure val wrongInput = 14
   pure val wrongShape = 15
   pure val results = Set(planned, alternate, wrongParent, wrongInput, wrongShape)
+  pure val plannedFactor = 3
+  pure val alternateFactor = -2
+  pure def factorOf(result: int): int = if (result == alternate) alternateFactor else plannedFactor
   pure def sumDag(commit: int): int = 100 + commit
   pure def parentOf(result: int): int = if (result == wrongParent) decoy else producer
   pure def inputOf(result: int): int =
@@ -39,7 +43,7 @@ module recorded_return_design {
   type Source = { main: int, returned: int, producerPin: int, objects: Set[int] }
   type Event = {
     command: str, wanted: int, receipt: int, oldBundle: int, before: Source,
-    expectedMain: int, aliasesMain: bool, failAt: int,
+    expectedMain: int, expectedFactor: int, aliasesMain: bool, failAt: int,
   }
   pure val emptyWorker: Worker = { pin: absent, objects: Set(), selected: absent, bundle: absent }
   pure val initialSource: Source = {
@@ -48,7 +52,7 @@ module recorded_return_design {
   }
   pure val noEvent: Event = {
     command: "", wanted: absent, receipt: absent, oldBundle: absent, before: initialSource,
-    expectedMain: absent, aliasesMain: false, failAt: 0
+    expectedMain: absent, expectedFactor: plannedFactor, aliasesMain: false, failAt: 0
   }
   pure def roots(repo: Source): Set[int] =
     closure(repo.main).union(closure(repo.returned)).union(closure(repo.producerPin))
@@ -126,9 +130,10 @@ module recorded_return_design {
   // All writes are serialized within each repository. Model main's conditional
   // create/update, then the expected staging deletion, then commit. The failure
   // flags stand for aborts after either tentative write, not writer interleaving.
-  action publish(wanted: int, expectedMain: int, aliasesMain: bool, failAt: int): bool = {
+  action publish(wanted: int, expectedMain: int, expectedFactor: int, aliasesMain: bool, failAt: int): bool = {
+    // The source supplies its own producer and factor expectations.
     val validated = not(aliasesMain) and readableScale(wanted, source.objects) and
-      parentOf(wanted) == producer  // The request's independent producer ID, never producerPin.
+      parentOf(wanted) == producer and factorOf(wanted) == expectedFactor
     val writesMain = validated and source.main == expectedMain
     val tentative = if (writesMain) { ...source, main: wanted } else source
     val deletesReturned = writesMain and tentative.returned == wanted and failAt != 1
@@ -136,7 +141,8 @@ module recorded_return_design {
     val committed = deletesReturned and failAt != 2
     updateSource(if (committed) afterDelete else source,
       { ...noEvent, command: "publish", wanted: wanted, receipt: if (committed) wanted else absent,
-        before: source, expectedMain: expectedMain, aliasesMain: aliasesMain, failAt: failAt })
+        before: source, expectedMain: expectedMain, expectedFactor: expectedFactor,
+        aliasesMain: aliasesMain, failAt: failAt })
   }
 
   action workerStep = any {
@@ -154,9 +160,10 @@ module recorded_return_design {
     stage(root),
     nondet root = results.oneOf()
     nondet expectedMain = Set(absent, previousMain, planned).oneOf()
+    nondet expectedFactor = Set(plannedFactor, alternateFactor).oneOf()
     // Choose ordinary success, two failure points, or a main/staging alias.
     nondet mode = Set(0, 1, 2, 3).oneOf()
-    publish(root, expectedMain, mode == 3, if (mode == 3) 0 else mode),
+    publish(root, expectedMain, expectedFactor, mode == 3, if (mode == 3) 0 else mode),
     nondet target = Set(absent, previousMain, competingMain).oneOf()
     updateSource({ ...source, main: target, objects: source.objects.union(closure(target)) }, noEvent),
     nondet target = Set(absent, decoy).oneOf()
@@ -202,8 +209,9 @@ module recorded_return_design {
 
   val atomicPublish = if (event.command != "publish") true else {
     val before = event.before
+    val requested = Set((planned, plannedFactor), (alternate, alternateFactor))
     val allowed = not(event.aliasesMain) and event.failAt == 0 and before.main == event.expectedMain and
-      before.returned == event.wanted and publishable.contains(event.wanted)
+      before.returned == event.wanted and requested.contains((event.wanted, event.expectedFactor))
     if (allowed) event.receipt == event.wanted and source == { ...before, main: event.wanted, returned: absent }
     else event.receipt == absent and source == before
   }
@@ -228,13 +236,20 @@ module recorded_return_design {
   observation exportAfterSweepRejected = event.command == "export" and event.wanted == planned and
     not(worker.objects.contains(planned)) and event.receipt == absent
 
-  val normal = event.command == "publish" and not(event.aliasesMain) and event.failAt == 0
+  val factorMatches = factorOf(event.wanted) == event.expectedFactor
+  val ordinary = event.command == "publish" and not(event.aliasesMain) and event.failAt == 0
+  val normal = ordinary and factorMatches
   val selectedPlanned = event.wanted == planned and event.before.returned == planned
   val mainMatches = event.before.main == event.expectedMain
   observation wrongCandidateStaged = event.command == "stage" and event.receipt == alternate
   observation createMain = normal and selectedPlanned and event.expectedMain == absent and event.receipt == planned
   observation updateMain = normal and selectedPlanned and event.expectedMain == previousMain and event.receipt == planned
-  observation noFactorExpectation = normal and event.receipt == alternate
+  observation matchingAlternateAccepted = normal and event.receipt == alternate
+  val wrongFactorRejected = ordinary and mainMatches and event.wanted == alternate and
+    event.before.returned == alternate and event.expectedFactor == plannedFactor and event.receipt == absent and
+    source == event.before
+  observation wrongFactorCannotCreateMain = wrongFactorRejected and event.expectedMain == absent
+  observation wrongFactorCannotUpdateMain = wrongFactorRejected and event.expectedMain == planned
   observation publishWithMovedProducerPin = normal and selectedPlanned and event.before.producerPin == decoy and
     event.receipt == planned
   observation wrongCandidateRejected = normal and mainMatches and event.wanted == planned and
@@ -258,13 +273,13 @@ module recorded_return_design {
   observation missingMainRejected = normal and selectedPlanned and event.expectedMain == previousMain and
     event.before.main == absent and event.receipt == absent
   observation aliasedMainRejected = event.command == "publish" and event.aliasesMain and selectedPlanned and
-    event.expectedMain == planned and mainMatches and event.receipt == absent
+    factorMatches and event.expectedMain == planned and mainMatches and event.receipt == absent
   observation rollbackAfterMain = event.command == "publish" and not(event.aliasesMain) and selectedPlanned and
-    mainMatches and event.expectedMain == previousMain and event.failAt == 1 and event.receipt == absent and
-    source == event.before
+    factorMatches and mainMatches and event.expectedMain == previousMain and event.failAt == 1 and
+    event.receipt == absent and source == event.before
   observation rollbackAfterDelete = event.command == "publish" and not(event.aliasesMain) and selectedPlanned and
-    mainMatches and event.expectedMain == absent and event.failAt == 2 and event.receipt == absent and
-    source == event.before
+    factorMatches and mainMatches and event.expectedMain == absent and event.failAt == 2 and
+    event.receipt == absent and source == event.before
   observation readbackAfterSweep = event.command == "collect" and source.main == planned and
     source.returned == absent and source.producerPin == absent and event.before.objects.contains(decoy) and
     not(source.objects.contains(decoy)) and readableScale(planned, source.objects)

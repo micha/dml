@@ -59,10 +59,12 @@ module recorded_calls_histories {
   ))
 
   // Result and main expectations name earlier worker record_scale receipts.
+  // The expected factor comes from the request, not a receipt. The zero sum
+  // makes both scales return the same output even with different factors.
   // '-' is an explicit expectation of no main, not an unspecified tip.
   pure val returnRequests: List[Request] = List(
-    source("record_sum", List("producer", "7", "5")),
-    source("record_sum", List("decoy", "8", "4")),
+    source("record_sum", List("producer", "7", "-7")),
+    source("record_sum", List("decoy", "8", "-8")),
     source("inspect", List("producer")),
     source("export_sum", List("producer", "producer", "sum.bundle")),
     worker("stage_input", List("incoming", "sum.bundle")),
@@ -76,16 +78,17 @@ module recorded_calls_histories {
     worker("export_scale", List("revised", "revised", "revised.bundle")),
     source("stage_input", List("returned", "result.bundle")),
     source("inspect", List("returned")),
-    source("publish_scale", List("returned", "result", "decoy", "-")),
-    source("publish_scale", List("returned", "result", "producer", "result")),
-    source("publish_scale", List("returned", "result", "producer", "-")),
+    source("publish_scale", List("returned", "result", "decoy", "3", "-")),
+    source("publish_scale", List("returned", "result", "producer", "3", "result")),
+    source("publish_scale", List("returned", "result", "producer", "3", "-")),
     source("inspect", List("returned")),
     source("inspect", List()),
     source("stage_input", List("returned", "revised.bundle")),
-    source("publish_scale", List("returned", "result", "producer", "result")),
-    source("publish_scale", List("returned", "revised", "producer", "-")),
-    source("publish_scale", List("returned", "revised", "producer", "revised")),
-    source("publish_scale", List("returned", "revised", "producer", "result")),
+    source("publish_scale", List("returned", "result", "producer", "3", "result")),
+    source("publish_scale", List("returned", "revised", "producer", "-2", "-")),
+    source("publish_scale", List("returned", "revised", "producer", "-2", "revised")),
+    source("publish_scale", List("returned", "revised", "producer", "3", "result")),
+    source("publish_scale", List("returned", "revised", "producer", "-2", "result")),
     source("collect", List()),
     source("inspect", List("returned")),
     source("inspect", List()),

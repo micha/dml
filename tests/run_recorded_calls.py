@@ -122,12 +122,12 @@ class ProcessHistory:
                          operands=(pin, commit, bundle), bundle=bundle)
         return {**row, "expectedCommit": commit}
 
-    def publish_scale(self, role, pin, result_receipt, producer_receipt, main_receipt):
+    def publish_scale(self, role, pin, result_receipt, producer_receipt, expected_factor, main_receipt):
         result = self.scale_receipts["worker", result_receipt]
         producer = self.sum_receipts["source", producer_receipt]
         main = "-" if main_receipt == "-" else self.scale_receipts["worker", main_receipt]
-        row = self.write("publish_scale", (role, pin, result_receipt, producer_receipt, main_receipt),
-                         operands=(pin, result, producer, main))
+        row = self.write("publish_scale", (role, pin, result_receipt, producer_receipt, expected_factor, main_receipt),
+                         operands=(pin, result, producer, expected_factor, main))
         return {**row, "expectedResult": result, "expectedCommit": producer, "expectedMain": main}
 
     def collect(self, role):

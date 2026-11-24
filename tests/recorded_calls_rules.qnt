@@ -199,38 +199,40 @@ module recorded_calls_rules {
       val sumRead = attempts[2]
       val result = attempts[5].commit
       val revised = attempts[6].commit
-      val revisedCall = { ...selected, factor: ("-2", -2) }
+      val originalCall: Scenario = { ...selected, b: ("-7", -7) }
+      val revisedCall = { ...originalCall, factor: ("-2", -2) }
       List(
         writeVerdict(attempts[0], req[0]),
         writeVerdict(attempts[1], req[1]),
-        sumReadVerdict(selected, sumRead, req[2], producer),
+        sumReadVerdict(originalCall, sumRead, req[2], producer),
         exportVerdict(attempts[3], req[3], producer),
         stageVerdict(attempts[4], req[4], producer),
         scaleWriteVerdict(attempts[5], req[5], producer),
         scaleWriteVerdict(attempts[6], req[6], producer),
         releaseVerdict(attempts[7], req[7], producer),
         collectVerdict(attempts[8], req[8]),
-        scaleReadVerdict(selected, attempts[9], req[9], result, sumRead),
+        scaleReadVerdict(originalCall, attempts[9], req[9], result, sumRead),
         rejectedExport(attempts[10], req[10], revised, false),
         exportVerdict(attempts[11], req[11], result),
         exportVerdict(attempts[12], req[12], revised),
         stageVerdict(attempts[13], req[13], result),
-        scaleReadVerdict(selected, attempts[14], req[14], result, sumRead),
+        scaleReadVerdict(originalCall, attempts[14], req[14], result, sumRead),
         publishVerdict(attempts[15], req[15], result, decoyCommit, "-", false), // wrong producer
         publishVerdict(attempts[16], req[16], result, producer, result, false), // missing main
         publishVerdict(attempts[17], req[17], result, producer, "-", true),
         rejectedWriteVerdict(attempts[18], req[18], ""), // staging ref released
-        scaleReadVerdict(selected, attempts[19], req[19], result, sumRead),
+        scaleReadVerdict(originalCall, attempts[19], req[19], result, sumRead),
         stageVerdict(attempts[20], req[20], revised),
         publishVerdict(attempts[21], req[21], result, producer, result, false), // moved staging
         publishVerdict(attempts[22], req[22], revised, producer, "-", false), // main exists
         publishVerdict(attempts[23], req[23], revised, producer, revised, false), // main moved
-        publishVerdict(attempts[24], req[24], revised, producer, result, true),
-        if (matches(attempts[25], req[25]) and attempts[25].removed > 0) "collected" else "wrong_collection",
-        rejectedWriteVerdict(attempts[26], req[26], ""),
-        scaleReadVerdict(revisedCall, attempts[27], req[27], revised, sumRead),
-        sumReadVerdict(selected, attempts[28], req[28], producer),
-        scaleReadVerdict(selected, attempts[29], req[29], result, sumRead)
+        publishVerdict(attempts[24], req[24], revised, producer, result, false), // wrong factor, exact result
+        publishVerdict(attempts[25], req[25], revised, producer, result, true),
+        if (matches(attempts[26], req[26]) and attempts[26].removed > 0) "collected" else "wrong_collection",
+        rejectedWriteVerdict(attempts[27], req[27], ""),
+        scaleReadVerdict(revisedCall, attempts[28], req[28], revised, sumRead),
+        sumReadVerdict(originalCall, attempts[29], req[29], producer),
+        scaleReadVerdict(originalCall, attempts[30], req[30], result, sumRead)
       )
     }
   }
@@ -256,8 +258,8 @@ module recorded_calls_rules {
       "inspected", "rejected", "rejected", "released", "collected", "rejected", "inspected", "rejected", "inspected")
     val roundTrip = List("recorded", "recorded", "inspected", "exported", "staged", "recorded", "recorded", "released",
       "collected", "inspected", "rejected", "exported", "exported", "staged", "inspected", "rejected", "rejected",
-      "published", "rejected", "inspected", "staged", "rejected", "rejected", "rejected", "published", "collected",
-      "rejected", "inspected", "inspected", "inspected")
+      "published", "rejected", "inspected", "staged", "rejected", "rejected", "rejected", "rejected", "published",
+      "collected", "rejected", "inspected", "inspected", "inspected")
     if (rows.length() != 5 or verdicts != List(together, together, separate, handoff, roundTrip)) false
     else {
       val split = rows[2].attempts
@@ -271,7 +273,8 @@ module recorded_calls_rules {
         transfer[14].calls == transfer[2].calls and transfer[11].calls == transfer[3].calls and
         transfer[16].calls == transfer[22].calls and returned[0].commit != returned[1].commit and
         returned[5].commit != returned[6].commit and returned[9].calls == returned[14].calls and
-        returned[9].calls == returned[19].calls and returned[9].calls == returned[29].calls
+        returned[9].calls == returned[19].calls and returned[9].calls == returned[30].calls and
+        sameRootNotSameCall(returned[19].calls[1], returned[28].calls[1])
     }
   }
 
