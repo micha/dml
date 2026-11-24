@@ -72,6 +72,9 @@ formatter or linter, defer to its rules and update this section accordingly.
 
 - Follow the [development validation policy](docs/validation-policy.md) for focused
   change-validation mapping, independent risk-based review and explicit CI exceptions.
+- Follow the [Quint design-to-replay workflow](docs/validation-policy.md#design-with-tlc-validate-implementation-with-replay):
+  use TLC before implementation when exhaustive model checking adds value, then
+  use TypeScript replay to check the real implementation.
 - Add tests for new behavior or bug fixes.
 - Keep tests deterministic; avoid time-dependent flakiness.
 - Prefer unit tests for pure logic; use integration tests for boundary

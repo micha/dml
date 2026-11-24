@@ -25,6 +25,23 @@ The suites and coverage reports described at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete)
 are historical evidence, not a passing gate for current code.
 
+## Design with TLC, validate implementation with replay
+
+- **Before implementation**, use [TLC through Quint](https://quint.sh/docs/model-checkers)
+  for behavioral designs where exhaustive exploration adds value, such as changes
+  to operation ordering, concurrency, or transactional guarantees. Build a small
+  finite model, state its bounds and assumptions, and check invariants and any
+  relevant liveness properties. A completed check establishes only the properties
+  checked for that model and configuration, not for the eventual implementation.
+- **During implementation**, use Quint's TypeScript backend to replay selected
+  histories against the real implementation and check observations against the
+  contract. This backend executes the spec; it does not use Z3. Z3 is used by
+  Apalache, a separate model checker. Replay checks implementation behavior on
+  the histories exercised; it is not exhaustive.
+- **As the design evolves**, recheck the model when its behavior or assumptions
+  change. Turn relevant TLC counterexamples into replay regression cases. Design
+  checks complement replay; TLC is not part of the current CI gate.
+
 ## Choose evidence before running
 
 - Map behavior changes or fixes to focused positive and negative checks against
