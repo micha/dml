@@ -220,6 +220,53 @@ After collection, `main` retains both calls. Publication checks what the result
 records; it does not rerun the calls, verify the arithmetic, or authenticate the
 worker. There is no automatic reuse.
 
+#### Save a scale request before sending it
+
+Use a fresh source and worker for this variant. Instead of passing the factor
+again at publication, save the request and the current `main` expectation on
+the source before dispatch:
+
+```sh
+producer=$(python examples/recorded_calls.py record-sum ./origin producer 7 5)
+plan=$(python examples/recorded_calls.py request-scale ./origin producer "$producer" pending 3)
+request=$(python examples/recorded_calls.py export-request ./origin pending "$plan" ./request.dml)
+python examples/recorded_calls.py stage-input ./worker incoming ./request.dml
+result=$(python examples/recorded_calls.py work-scale ./worker incoming "$request" result)
+python examples/recorded_calls.py export-scale ./worker result "$result" ./scale.dml
+python examples/recorded_calls.py stage-input ./origin returned ./scale.dml
+python examples/recorded_calls.py publish-requested-scale ./origin pending "$plan" returned "$result"
+python examples/recorded_calls.py collect ./origin
+python examples/recorded_calls.py inspect ./origin
+```
+
+`request-scale` checks the exact producer selection, records `example.scale@1`
+and the typed factor in a portable request commit, and creates a new
+source-local plan ref. The request has the producer as its sole parent. The
+plan points to the request and, if `main` exists, to the exact `main` commit at
+request creation; one parent means `main` was absent. `inspect ./origin pending` shows the saved
+expectations. `export-request` follows only the portable request's closure, not
+the plan or its `main` edge. Keep request bundles under staging refs, not
+`main`; planning rejects `main` already pointing to that exact request. The
+same no-overwrite file rules apply as for `export-sum`.
+
+Use the request ID from `export-request`, not the worker's staging receipt.
+`work-scale` checks the pinned request and uses its stored factor and producer
+result. Its new result commit has the request as its parent and a direct
+sub-DAG edge to the producer's sum. The worker keeps its refs in this variant.
+
+After staging on the source, publication needs only the repository, the two
+ref names, the saved plan ID and the selected result ID from the worker. Keep
+these IDs independently of the staging receipt if you resume in a new shell.
+Publication checks the exact request, recorded factor and producer edge without
+rerunning either call, verifying arithmetic, or authenticating the worker. The
+three ref names must be distinct. If the saved `main` expectation and both pin
+targets still match, one transaction sets `main` to the exact worker result and
+deletes `pending` and `returned`. A rejection leaves all three refs unchanged. The comparison uses current IDs; it
+does not detect a ref that moved away and back. After collection, `main` keeps
+the request and both calls. The consumed plan no longer retains the old tip.
+These are content IDs, not attempt IDs, and the example does not search for or
+automatically reuse results.
+
 ### Install and link the C library
 
 For example, install the headers and static library under a local prefix:

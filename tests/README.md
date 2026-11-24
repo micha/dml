@@ -172,6 +172,17 @@ of `main` and a mismatched input DAG, and publish a deliberately incorrect store
 output. They read the physical lineage links after collection with no separate
 source producer pin.
 
+The [durable-request history](../README.md#save-a-scale-request-before-sending-it)
+starts separate processes for planning, dispatch, work, staging, and publication.
+It checks two requests with the same zero-valued sum and different factors, and
+rejects a wrong request, stale plan, stale staging selection, and stale `main`
+without changing committed bytes. The focused tests update an existing `main`,
+verify its previous tip is not exported when unrelated to the request, and
+resume publication without the bundles or producer pin. They also reject a
+forged factor or input edge under the right request parent, and directly check
+that the published worker result, request, producer commit, and sub-DAG edge
+survive collection.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -242,3 +253,23 @@ Observations include export despite pin movement, rejection after intervening
 collection, isolated wrong-factor rejection with absent and existing `main`,
 rollback after either tentative write, and readback through `main` alone after
 collection. Run this design check separately from CI.
+
+#### Check the durable-request design with TLC
+
+The [request model](recorded_request_design.qnt) follows one selected plan from
+creation through dispatch, worker execution, staging, and publication. It
+covers absent or unrelated existing `main`, two same-valued sums, two factors,
+and well-formed but mismatched results. Immutable closures abstract away the
+record and bundle bytes. Each repository write is one transaction; concurrent
+writers can move refs between commands. The model checks safety, not liveness,
+and does not model storage corruption or recreating a consumed plan.
+
+```sh
+mkdir -p build/recorded-request-tlc
+(cd build/recorded-request-tlc && quint verify ../../tests/recorded_request_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+Observations include restart after staging, equal-output substitution, a forged
+factor under the correct request, rollback after each tentative ref write, and
+readback after collection. Run this design check separately from CI.
