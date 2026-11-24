@@ -418,6 +418,61 @@ module recorded_calls_rules {
     }
   }
 
+  pure def reuseStageVerdict(attempt: Attempt, req: Request, plan: str, result: str, accepted: bool): str =
+    if (attempt.expectedCommit != plan or attempt.expectedResult != result) "wrong_selection"
+    else if (not(accepted)) rejectedWriteVerdict(attempt, req, plan)
+    else if (not(matches(attempt, req)) or attempt.commit != result or attempt.unchanged) "wrong_reuse"
+    else "reused"
+
+  pure def reuseHistoryVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = reuseRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val sumRead = attempts[1]
+      val plan = attempts[2].commit
+      val portable = attempts[3].commit
+      val result = attempts[5].commit
+      val parallel = attempts[9].commit
+      val wrongPlan = attempts[10].commit
+      val nextPlan = attempts[25].commit
+      val original: Scenario = { ...selected, b: ("-7", -7) }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(original, sumRead, req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], producer),
+        requestExportVerdict(attempts[3], req[3], plan),
+        stageVerdict(attempts[4], req[4], portable),
+        scaleWriteVerdict(attempts[5], req[5], portable),
+        exportVerdict(attempts[6], req[6], result),
+        stageVerdict(attempts[7], req[7], result),
+        requestedReadVerdict(original, attempts[8], req[8], result, portable, sumRead),
+        scaleWriteVerdict(attempts[9], req[9], producer),
+        scaleWriteVerdict(attempts[10], req[10], producer),
+        reuseStageVerdict(attempts[11], req[11], plan, result, false), // stale plan
+        reuseStageVerdict(attempts[12], req[12], plan, result, false), // stale result
+        reuseStageVerdict(attempts[13], req[13], wrongPlan, result, false), // wrong request
+        reuseStageVerdict(attempts[14], req[14], plan, result, true),
+        reuseStageVerdict(attempts[15], req[15], plan, result, false), // occupied by the exact result
+        publishVerdict(attempts[16], req[16], result, plan, "", true),
+        absentRefVerdict(attempts[17], rejectedWriteVerdict(attempts[17], req[17], "")),
+        absentRefVerdict(attempts[18], rejectedWriteVerdict(attempts[18], req[18], "")),
+        reuseStageVerdict(attempts[19], req[19], parallel, result, true), // staging ignores current main
+        publishVerdict(attempts[20], req[20], result, parallel, "", false), // stale main
+        abandonVerdict(attempts[21], req[21], parallel),
+        absentRefVerdict(attempts[22], reuseStageVerdict(attempts[22], req[22], parallel, result, false)),
+        absentRefVerdict(attempts[23], publishVerdict(attempts[23], req[23], result, parallel, "", false)),
+        requestedReadVerdict(original, attempts[24], req[24], result, portable, sumRead),
+        scaleWriteVerdict(attempts[25], req[25], producer),
+        reuseStageVerdict(attempts[26], req[26], nextPlan, result, true),
+        publishVerdict(attempts[27], req[27], result, nextPlan, "", true),
+        requestedReadVerdict(original, attempts[28], req[28], result, portable, sumRead),
+        requestedReadVerdict(original, attempts[29], req[29], result, portable, sumRead),
+        receiptReadVerdict(attempts[30], req[30], { planRef: "plan", plan: plan, stagingRef: "returned", result: result })
+      )
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -425,11 +480,12 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 3) durableVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 4) retryHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 5) abandonHistoryVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 6) reuseHistoryVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
     Set("recorded", "inspected", "rejected", "exported", "staged", "released", "collected", "published",
-      "acknowledged", "abandoned").contains(verdict)
+      "acknowledged", "abandoned", "reused").contains(verdict)
 
   pure def sameRootNotSameCall(first: Call, second: Call): bool =
     first.resultNode == second.resultNode and first.dag != second.dag
@@ -456,8 +512,12 @@ module recorded_calls_rules {
     val abandon = List("recorded", "inspected", "recorded", "exported", "staged", "recorded", "exported",
       "abandoned", "staged", "rejected", "rejected", "rejected", "rejected", "recorded", "rejected", "exported",
       "inspected", "abandoned", "rejected", "inspected")
-    if (rows.length() != 8 or verdicts != List(together, together, separate, handoff, roundTrip, durable, retry, abandon))
-      false
+    val reuse = List("recorded", "inspected", "recorded", "exported", "staged", "recorded", "exported",
+      "staged", "inspected", "recorded", "recorded", "rejected", "rejected", "rejected", "reused", "rejected",
+      "published", "rejected", "rejected", "reused", "rejected", "abandoned", "rejected", "rejected", "inspected",
+      "recorded", "reused", "published", "inspected", "inspected", "inspected")
+    if (rows.length() != 9 or
+      verdicts != List(together, together, separate, handoff, roundTrip, durable, retry, abandon, reuse)) false
     else {
       val split = rows[2].attempts
       val transfer = rows[3].attempts
@@ -465,6 +525,7 @@ module recorded_calls_rules {
       val planned = rows[5].attempts
       val retried = rows[6].attempts
       val abandoned = rows[7].attempts
+      val reused = rows[8].attempts
       rows.indices().forall(i => rows[i].scenario == i) and
         sameRootNotSameCall(rows[0].attempts[1].calls[0], rows[1].attempts[1].calls[0]) and
         sameRootNotSameCall(split[2].calls[0], split[3].calls[0]) and split[0].commit != split[1].commit and
@@ -479,7 +540,10 @@ module recorded_calls_rules {
         planned[9].commit != planned[11].commit and sameRootNotSameCall(planned[12].calls[1], planned[13].calls[1]) and
         planned[12].calls == planned[21].calls and planned[12].calls == planned[25].calls and
         retried[2].commit != retried[11].commit and retried[5].commit != retried[14].commit and
-        abandoned[2].commit != abandoned[13].commit and abandoned[3].commit != abandoned[15].commit
+        abandoned[2].commit != abandoned[13].commit and abandoned[3].commit != abandoned[15].commit and
+        reused[2].commit == reused[9].commit and reused[2].commit != reused[10].commit and
+        reused[2].commit != reused[25].commit and reused[8].calls == reused[24].calls and
+        reused[8].calls == reused[28].calls and reused[8].calls == reused[29].calls
     }
   }
 
@@ -527,7 +591,15 @@ module recorded_calls_rules {
     commit: "receipt", unchanged: true, publication: publication }
   pure val abandoned: Attempt = { ...recorded, op: "abandon_scale_request", args: abandonRequests[7].args,
     commit: "plan", expectedCommit: "plan" }
+  pure val reused: Attempt = { ...recorded, op: "stage_reused_scale", args: reuseRequests[14].args,
+    expectedCommit: "plan", expectedResult: "result", commit: "result" }
   pure val controlsPass = all {
+    reuseStageVerdict(reused, reuseRequests[14], "plan", "result", true) == "reused",
+    reuseStageVerdict({ ...reused, expectedResult: "other" }, reuseRequests[14], "plan", "result", true)
+      == "wrong_selection",
+    reuseStageVerdict({ ...reused, commit: "other" }, reuseRequests[14], "plan", "result", true) == "wrong_reuse",
+    reuseStageVerdict({ ...reused, unchanged: true }, reuseRequests[14], "plan", "result", true) == "wrong_reuse",
+    reuseStageVerdict(reused, reuseRequests[14], "plan", "result", false) == "wrong_rejection",
     abandonVerdict(abandoned, abandonRequests[7], "plan") == "abandoned",
     abandonVerdict({ ...abandoned, unchanged: true }, abandonRequests[7], "plan") == "wrong_abandonment",
     abandonVerdict({ ...abandoned, commit: "replacement" }, abandonRequests[7], "plan") == "wrong_abandonment",

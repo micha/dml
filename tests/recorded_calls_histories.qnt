@@ -181,9 +181,39 @@ module recorded_calls_histories {
     source("inspect", List("returned"))
   ))
 
+  // Retain a local result once; neither later plan dispatches work or uses a
+  // bundle. A parallel plan becomes stale, while a fresh plan can use the same
+  // portable request against the new main.
+  pure val reuseRequests: List[Request] = retryRequests.slice(0, 7).concat(List(
+    source("stage_input", List("saved-result", "result.bundle")),
+    source("inspect", List("saved-result")),
+    source("request_scale", List("producer", "producer", "parallel", "3")),
+    source("request_scale", List("producer", "producer", "wrong-plan", "-2")),
+    source("stage_reused_scale", List("wrong-plan", "plan", "saved-result", "result", "returned")),
+    source("stage_reused_scale", List("plan", "plan", "producer", "result", "returned")),
+    source("stage_reused_scale", List("wrong-plan", "wrong-plan", "saved-result", "result", "returned")),
+    source("stage_reused_scale", List("plan", "plan", "saved-result", "result", "returned")),
+    source("stage_reused_scale", List("plan", "plan", "saved-result", "result", "returned")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
+    source("inspect", List("returned")),
+    source("inspect", List("plan")),
+    source("stage_reused_scale", List("parallel", "parallel", "saved-result", "result", "stalled")),
+    source("publish_requested_scale", List("parallel", "parallel", "stalled", "result")),
+    source("abandon_scale_request", List("parallel", "parallel")),
+    source("stage_reused_scale", List("parallel", "parallel", "saved-result", "result", "late")),
+    source("publish_requested_scale", List("parallel", "parallel", "stalled", "result")),
+    source("inspect", List("stalled")),
+    source("request_scale", List("producer", "producer", "next-plan", "3")),
+    source("stage_reused_scale", List("next-plan", "next-plan", "saved-result", "result", "returned")),
+    source("publish_requested_scale", List("next-plan", "next-plan", "returned", "result")),
+    source("inspect", List("saved-result")),
+    source("inspect", List()),
+    source("inspect", List("ack"))
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
-    .append(abandonRequests)
+    .append(abandonRequests).append(reuseRequests)
   action step = histories' = histories
 }

@@ -7,6 +7,7 @@ Use `export-sum` and `stage-input` to move a producer to another repository,
 then `export-scale`, `stage-input`, and `publish-scale` to return the result.
 Use `request-scale`, `export-request`, `work-scale`, and `publish-requested-scale`
 when the source should preserve its expectations across invocations.
+Use `stage-reused-scale` to select an existing result for the exact request.
 These layouts are not core record types or execution APIs.
 """
 
@@ -305,6 +306,24 @@ def stage_input(path, pin, bundle_path):
         raise ValueError("commit bundle exceeds 64 MiB")
     with _repository(path, create=True) as repo:
         return core.repo_import_commit_staged(repo, bundle, pin)
+
+
+def stage_reused_scale(path, plan_pin, plan_commit, result_pin, result_commit, dest_pin):
+    """Stage an exact local result for a plan without executing or publishing it."""
+    _check_commit_id(plan_commit, "plan commit")
+    _check_commit_id(result_commit, "result commit")
+    for label, ref in (("plan", plan_pin), ("result", result_pin), ("destination", dest_pin)):
+        if type(ref) is not bytes or not REF_NAME.fullmatch(ref):
+            raise ValueError(f"{label} ref must be a valid ASCII ref name in bytes")
+    if len({plan_pin, result_pin, dest_pin, MAIN}) != 4:
+        raise ValueError("plan, result, destination, and main refs must be distinct")
+    with _write_transaction(path, create=False) as txn:
+        request, _ = _selected_plan(txn, plan_pin, plan_commit)
+        if core.txn_ref_get(txn, result_pin) != result_commit:
+            raise ValueError("result pin does not point to the expected commit")
+        _inspect_snapshot(txn, result_commit, expected_request=request)
+        core.txn_ref_create(txn, dest_pin, result_commit)
+    return result_commit
 
 
 def _update_main(txn, result_commit, expected_main):
@@ -619,6 +638,10 @@ def main():
     worker.add_argument("incoming")
     worker.add_argument("request_commit")
     worker.add_argument("result_ref")
+    reuse = commands.add_parser("stage-reused-scale", help="stage a pinned local result for the exact request")
+    reuse.add_argument("repo", type=Path)
+    for name in ("plan_pin", "plan_commit", "result_pin", "result_commit", "dest_pin"):
+        reuse.add_argument(name)
     requested_publisher = commands.add_parser("publish-requested-scale", help="publish and consume a staged plan")
     requested_publisher.add_argument("repo", type=Path)
     requested_publisher.add_argument("plan_pin")
@@ -675,6 +698,11 @@ def main():
         elif args.command == "work-scale":
             request = _parse_commit_id(args.request_commit, "request commit")
             print(work_scale(args.repo, args.incoming.encode("ascii"), request, args.result_ref.encode("ascii")).hex())
+        elif args.command == "stage-reused-scale":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            result = _parse_commit_id(args.result_commit, "result commit")
+            print(stage_reused_scale(args.repo, args.plan_pin.encode("ascii"), plan, args.result_pin.encode("ascii"),
+                                     result, args.dest_pin.encode("ascii")).hex())
         elif args.command == "publish-requested-scale":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             result = _parse_commit_id(args.result_commit, "result commit")

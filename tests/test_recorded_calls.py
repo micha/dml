@@ -41,6 +41,16 @@ def view(txn, kind, object_id):
     return core.object_decode(core.txn_get_object(txn, kind, object_id))
 
 
+def put_requested_result(txn, request, producer_dag, factor, output):
+    version = literal(txn, core.DATUM_STRING, b"example.scale@1")
+    source = put(txn, core.REC_NODE, core.NODE_SUBDAG, producer_dag)
+    multiplier = literal(txn, core.DATUM_I64, factor)
+    root = literal(txn, core.DATUM_I64, output)
+    dag = put(txn, core.REC_DAG, root, b"implementation", version, b"input", source, b"factor", multiplier)
+    tree = put(txn, core.REC_TREE, b"requested-scale-v1", dag)
+    return put(txn, core.REC_COMMIT, tree, request)
+
+
 class RecordedCallsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -615,6 +625,134 @@ class RecordedCallsTest(unittest.TestCase):
                          result)
         report = json.loads(self.expect_success("inspect"))
         self.assertEqual(report["calls"][1]["result"]["value"], -98)
+
+    def test_stage_reused_scale_rejects_malformed_plan_and_inconsistent_results(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        self.example["record_sum"](self.repo, b"decoy", 9, 3)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
+        self.example["request_scale"](self.repo, b"producer", producer, b"other-plan", 4)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            _, other_dag, (other_request,) = self.snapshot(txn, b"other-plan", b"scale-plan-v1")
+            _, producer_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, decoy_dag, _ = self.snapshot(txn, b"decoy", b"recorded-sum-v1")
+            self.assertNotEqual(producer_dag, decoy_dag)
+            self.assertEqual(view(txn, core.REC_DAG, producer_dag)[1], view(txn, core.REC_DAG, decoy_dag)[1])
+
+            bad_plan_tree = put(txn, core.REC_TREE, b"scale-plan-v1", other_dag)
+            bad_plan = put(txn, core.REC_COMMIT, bad_plan_tree, request)
+            core.txn_ref_create(txn, b"bad-plan", bad_plan)
+            good = put_requested_result(txn, request, producer_dag, 3, 36)
+            _, good_tree, _ = view(txn, core.REC_COMMIT, good)
+            candidates = {
+                b"bad-shape": put(txn, core.REC_COMMIT, good_tree),  # Missing request parent.
+                b"wrong-factor": put_requested_result(txn, request, producer_dag, 4, 36),
+                b"wrong-producer": put_requested_result(txn, request, decoy_dag, 3, 36),
+                # Exact expected DAG and factor, but the parent has a different request ID.
+                b"wrong-request": put(txn, core.REC_COMMIT, good_tree, other_request),
+                b"good": good,
+            }
+            for pin, commit in candidates.items():
+                core.txn_ref_create(txn, pin, commit)
+            core.txn_commit(txn)
+
+        stage = self.example["stage_reused_scale"]
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        cases = (
+            (b"bad-plan", bad_plan, b"good", "plan DAG does not match"),
+            (b"plan", plan, b"bad-shape", "required parents"),
+            (b"plan", plan, b"wrong-factor", "recorded factor does not match"),
+            (b"plan", plan, b"wrong-producer", "scale input DAG does not match"),
+            (b"plan", plan, b"wrong-request", "result does not retain the expected request commit"),
+        )
+        for plan_pin, plan_commit, result_pin, reason in cases:
+            with self.subTest(plan=plan_pin, result=result_pin):
+                with self.assertRaisesRegex(ValueError, reason):
+                    stage(self.repo, plan_pin, plan_commit, result_pin, candidates[result_pin], b"dest")
+                self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, b"dest")
+            self.assert_missing_ref(txn, b"main")
+
+    def test_stage_reused_scale_preserves_stored_evidence_and_publication_state(self):
+        producer = self.example["record_sum"](self.repo, b"producer", (1 << 63) - 1, 0)
+        first_plan = self.example["request_scale"](self.repo, b"producer", producer, b"first-plan", 3)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, _, (request,) = self.snapshot(txn, b"first-plan", b"scale-plan-v1")
+            # Real execution would overflow; reuse should retain the literal output unchanged.
+            result = put_requested_result(txn, request, sum_dag, 3, -98)
+            for pin in (b"history", b"returned"):
+                core.txn_ref_create(txn, pin, result)
+            core.txn_commit(txn)
+        self.example["publish_requested_scale"](
+            self.repo, b"first-plan", first_plan, b"returned", result, receipt_ref=b"ack")
+        previous = self.example["record_sum"](self.repo, b"unrelated", 2, 0)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous)
+            receipt = core.txn_ref_get(txn, b"ack")
+            core.txn_commit(txn)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
+        self.assertNotEqual(plan, first_plan)
+        history = self.example["inspect"](self.repo, b"history")
+        self.assertEqual(history["request_commit"], request.hex())
+        self.assertEqual(history["calls"][1]["result"]["value"], -98)
+        destination = "1" + "a" * 124 + "._-"
+
+        staged = self.expect_success("stage-reused-scale", "plan", plan.hex(), "history", result.hex(), destination)
+        self.assertEqual(staged.strip(), result.hex())
+        with transaction(self.repo) as txn:
+            for pin, expected in ((b"plan", plan), (b"main", previous), (b"ack", receipt),
+                                  (b"history", result), (destination.encode("ascii"), result)):
+                self.assertEqual(core.txn_ref_get(txn, pin), expected)
+        self.assertEqual(json.loads(self.expect_success("inspect", destination)), history)
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_delete_expected(txn, b"history", result)
+            core.txn_commit(txn)
+        self.expect_success("collect")
+        published = self.expect_success("publish-requested-scale", "plan", plan.hex(), destination, result.hex())
+        self.assertEqual(published.strip(), result.hex())
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"main"), result)
+            self.assertEqual(core.txn_ref_get(txn, b"ack"), receipt)
+            for pin in (b"history", b"plan", destination.encode("ascii")):
+                self.assert_missing_ref(txn, pin)
+        self.assertEqual(json.loads(self.expect_success("inspect")), history)
+
+    def test_stage_reused_scale_validates_ids_and_all_ref_slots_before_opening_repository(self):
+        class BytesSubclass(bytes):
+            pass
+
+        class UnopenablePath:
+            def __fspath__(self):
+                raise AssertionError("invalid selections must be rejected before opening the repository")
+
+        stage = self.example["stage_reused_scale"]
+        identifier = bytes(16)
+        selection = (b"plan", identifier, b"history", identifier, b"dest")
+        invalid_refs = ("ref", bytearray(b"ref"), BytesSubclass(b"ref"), b"", b"-ref", b"ref/name",
+                        b"r\xc3\xa9f", b"ref\n", b"x" * 129)
+        for index, label in ((0, "plan"), (2, "result"), (4, "destination")):
+            for invalid in invalid_refs:
+                args = list(selection)
+                args[index] = invalid
+                with self.subTest(ref=label, invalid=invalid):
+                    with self.assertRaisesRegex(ValueError, f"{label} ref.*ASCII.*bytes"):
+                        stage(UnopenablePath(), *args)
+        for plan, result, dest in ((b"main", b"history", b"dest"), (b"plan", b"main", b"dest"),
+                                   (b"plan", b"history", b"main"), (b"plan", b"plan", b"dest"),
+                                   (b"plan", b"history", b"history"), (b"plan", b"history", b"plan")):
+            with self.subTest(plan=plan, result=result, dest=dest), self.assertRaisesRegex(ValueError, "distinct"):
+                stage(UnopenablePath(), plan, identifier, result, identifier, dest)
+        for index, label in ((1, "plan"), (3, "result")):
+            for invalid in (identifier.hex(), bytearray(identifier), BytesSubclass(identifier), b"x" * 15, b"x" * 17):
+                args = list(selection)
+                args[index] = invalid
+                with self.subTest(commit=label, invalid=invalid):
+                    with self.assertRaisesRegex(ValueError, f"{label} commit.*16-byte ID"):
+                        stage(UnopenablePath(), *args)
 
     def test_request_or_worker_failure_does_not_leave_partial_state(self):
         producer = self.expect_success("record-sum", "producer", 2, 0).strip()

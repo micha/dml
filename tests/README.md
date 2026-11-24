@@ -200,6 +200,14 @@ abandoned, and the publication receipt still acknowledges success. Focused
 checks cover a moved `main`, invalid and non-plan selections, exact ref
 preservation, and explicit collection.
 
+The [reuse history](../README.md#reuse-an-explicitly-selected-local-scale-result)
+retains one worker result locally and publishes that same commit through two
+exact plans without dispatching more work. Replay rejects stale selections,
+a wrong request for a zero-valued sum, and an occupied staging ref even at the
+same ID. It also checks that a moved `main` blocks publication but not staging,
+that abandonment blocks both commands, and that the original result and
+receipt survive unchanged.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -332,3 +340,23 @@ mkdir -p build/recorded-request-abandon-tlc
 Observations include both transaction orders, a late stage, a moved tip, a
 matching non-plan ref, `main` pointing to a valid plan, and stale rejection
 against a reused pin. Run this design check separately from CI.
+
+#### Check the explicit reuse design with TLC
+
+The [reuse model](recorded_result_reuse_design.qnt) has two valid plans for one
+portable request capturing different tips, two eligible result IDs, malformed
+selections, and a vacant or occupied destination. It models ref changes only
+between transactions and checks that reuse writes only the new destination,
+while publication still checks the plan and captured tip. A receipt is passive
+state. The model checks safety, not liveness, and abstracts away record bytes,
+ref spellings, native failures, and receipt retry.
+
+```sh
+mkdir -p build/recorded-result-reuse-tlc
+(cd build/recorded-result-reuse-tlc && quint verify ../../tests/recorded_result_reuse_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+Observations include a moved `main`, rejection after abandonment, publication
+after removal of the original result pin, and separately malformed or stale
+selections. Run this design check separately from CI.
