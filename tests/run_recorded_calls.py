@@ -42,44 +42,75 @@ def call_evidence(call):
 
 class ProcessHistory:
     def __init__(self, directory, example):
-        self.repo = directory / "calls"
+        self.directory = directory
+        self.repos = {role: directory / role for role in ("source", "worker")}
         self.example = example
         self.receipts = {}
-        self.operations = {"record": self.record, "record_sum": self.record_sum,
-                           "record_scale": self.record_scale, "inspect": self.inspect}
+        self.operations = {
+            "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
+            "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
+            "release_input": self.release_input, "collect": self.collect,
+        }
 
-    def invoke(self, op, args, *, operands=None):
-        data = self.repo / "data.mdb"
+    def invoke(self, op, args, *, operands=None, bundle=None):
+        role, *cli_args = args
+        repo = self.repos[role]
+        data = repo / "data.mdb"
         before = data.read_bytes() if data.is_file() else None
+        bundle_before = bundle.read_bytes() if bundle is not None and bundle.is_file() else None
+        command = op.replace("_", "-")
         result = subprocess.run(
-            [sys.executable, "-B", self.example, op.replace("_", "-"), self.repo,
-             *(args if operands is None else operands)],
-            cwd=self.repo.parent, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            [sys.executable, "-B", self.example, command, repo,
+             *(cli_args if operands is None else operands)],
+            cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30,
         )
         after = data.read_bytes() if data.is_file() else None
+        bundle_after = bundle.read_bytes() if bundle is not None and bundle.is_file() else None
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="")
         return {"op": op, "args": list(args), "code": result.returncode, "quiet": not result.stderr,
-                "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "",
-                "unchanged": before is not None and before == after}, result.stdout
+                "diagnosed": result.stderr.startswith(f"{command}: ") and "Traceback" not in result.stderr,
+                "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
+                "unchanged": before is not None and before == after,
+                "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
 
-    def write(self, op, args, *, operands=None):
-        row, output = self.invoke(op, args, operands=operands)
+    def write(self, op, args, **options):
+        row, output = self.invoke(op, args, **options)
         return {**row, "commit": id_evidence(output.strip()) if output else ""}
 
     def record(self, *args):
         return self.write("record", args)
 
-    def record_sum(self, pin, a, b):
-        row = self.write("record_sum", (pin, a, b))
-        self.receipts[pin] = row["commit"]
+    def record_sum(self, role, pin, a, b):
+        row = self.write("record_sum", (role, pin, a, b))
+        self.receipts[role, pin] = row["commit"]
         return row
 
-    def record_scale(self, pin, producer_receipt, result, factor):
-        commit = self.receipts[producer_receipt]
-        row = self.write("record_scale", (pin, producer_receipt, result, factor),
-                         operands=(pin, commit, result, factor))
+    def select(self, op, role, pin, producer_receipt, *tail, bundle=None):
+        # Only a record_sum receipt supplies the plan, never an import receipt.
+        commit = self.receipts["source", producer_receipt]
+        operands = [pin, commit, *tail]
+        if bundle is not None:
+            operands[-1] = bundle
+        row = self.write(op, (role, pin, producer_receipt, *tail), operands=operands, bundle=bundle)
         return {**row, "expectedCommit": commit}
+
+    def record_scale(self, *args):
+        return self.select("record_scale", *args)
+
+    def export_sum(self, role, pin, producer_receipt, filename):
+        return self.select("export_sum", role, pin, producer_receipt, filename, bundle=self.directory / filename)
+
+    def stage_input(self, role, pin, filename):
+        bundle = self.directory / filename
+        return self.write("stage_input", (role, pin, filename), operands=(pin, bundle), bundle=bundle)
+
+    def release_input(self, *args):
+        return self.select("release_input", *args)
+
+    def collect(self, role):
+        row, output = self.invoke("collect", (role,))
+        return {**row, "removed": int(output) if output else -1}
 
     def inspect(self, *args):
         row, output = self.invoke("inspect", args)

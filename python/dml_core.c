@@ -5,9 +5,7 @@
 #include <string.h>
 
 #include "dml/repo.h"
-#ifdef DML_PRIVATE_REPLAY
 #include "dml/transfer.h"
-#endif
 
 #ifdef Py_GIL_DISABLED
 #error "DML requires a GIL-enabled CPython build"
@@ -551,51 +549,83 @@ static PyObject *output_result(dml_status status, PyObject *output) {
   return Py_BuildValue("(sN)", dml_status_name(status), output);
 }
 
-static PyObject *repo_export_commit(PyObject *self, PyObject *args) {
+static PyObject *repo_import_commit(PyObject *self, PyObject *args) {
   (void)self;
+  PyObject *capsule, *bundle_obj;
+  if (!PyArg_ParseTuple(args, "OO:repo_import_commit", &capsule, &bundle_obj)) return NULL;
+  repo_handle *repo = get_repo(capsule);
+  dml_bytes bundle;
+  if (repo == NULL || !read_bytes(bundle_obj, &bundle)) return NULL;
+  dml_object_id root;
+  memset(root.bytes, 0xa5, sizeof(root.bytes));
+  dml_status status = dml_repo_import_commit(repo->repo, bundle, &root, NULL);
+  return output_result(status, id_bytes(&root));
+}
+#endif
+
+static PyObject *repo_export_commit(PyObject *self, PyObject *args) {
   PyObject *capsule, *root_obj;
-  if (!PyArg_ParseTuple(args, "OO", &capsule, &root_obj)) return NULL;
+  if (!PyArg_ParseTuple(args, "OO:repo_export_commit", &capsule, &root_obj)) return NULL;
   repo_handle *repo = get_repo(capsule);
   dml_object_id root;
   if (repo == NULL || !read_id(root_obj, &root)) return NULL;
   dml_buffer packed = {0};
-  dml_status status = dml_repo_export_commit(repo->repo, &root, &packed, NULL);
-  return output_result(status, take_buffer(&packed));
-}
-
-static PyObject *import_bundle(PyObject *args, bool staged) {
-  PyObject *capsule, *bundle_obj, *name_obj;
-  if (!PyArg_ParseTuple(args, staged ? "OOO" : "OO", &capsule, &bundle_obj, &name_obj)) return NULL;
-  repo_handle *repo = get_repo(capsule);
-  dml_bytes bundle, name;
-  if (repo == NULL || !read_bytes(bundle_obj, &bundle) || (staged && !read_bytes(name_obj, &name)))
-    return NULL;
-  dml_object_id root;
-  memset(root.bytes, 0xa5, sizeof(root.bytes));
-  dml_status status = staged ? dml_repo_import_commit_staged(repo->repo, bundle, name, &root, NULL)
-                             : dml_repo_import_commit(repo->repo, bundle, &root, NULL);
-  return output_result(status, id_bytes(&root));
-}
-
-static PyObject *repo_import_commit(PyObject *self, PyObject *args) {
+  dml_error error = {0};
+  dml_status status = dml_repo_export_commit(repo->repo, &root, &packed, &error);
+#ifdef DML_PRIVATE_REPLAY
   (void)self;
-  return import_bundle(args, false);
+  return output_result(status, take_buffer(&packed));
+#else
+  if (status != DML_OK) {
+    dml_buffer_free(&packed);
+    return raise_status(self, status, &error);
+  }
+  return take_buffer(&packed);
+#endif
 }
 
 static PyObject *repo_import_commit_staged(PyObject *self, PyObject *args) {
+  PyObject *capsule, *bundle_obj, *name_obj;
+  if (!PyArg_ParseTuple(args, "OOO:repo_import_commit_staged", &capsule, &bundle_obj, &name_obj)) return NULL;
+  repo_handle *repo = get_repo(capsule);
+  dml_bytes bundle, name;
+  if (repo == NULL || !read_bytes(bundle_obj, &bundle) || !read_bytes(name_obj, &name)) return NULL;
+  dml_object_id root;
+  dml_error error = {0};
+#ifdef DML_PRIVATE_REPLAY
+  memset(root.bytes, 0xa5, sizeof(root.bytes));
+#else
+  /* Reserve the receipt before the core can commit the import. */
+  PyObject *result = PyBytes_FromStringAndSize(NULL, sizeof(root.bytes));
+  if (result == NULL) return NULL;
+#endif
+  dml_status status = dml_repo_import_commit_staged(repo->repo, bundle, name, &root, &error);
+#ifdef DML_PRIVATE_REPLAY
   (void)self;
-  return import_bundle(args, true);
+  return output_result(status, id_bytes(&root));
+#else
+  if (status != DML_OK) {
+    Py_DECREF(result);
+    return raise_status(self, status, &error);
+  }
+  memcpy(PyBytes_AS_STRING(result), root.bytes, sizeof(root.bytes));
+  return result;
+#endif
 }
 
 static PyObject *txn_collect_garbage(PyObject *self, PyObject *capsule) {
-  (void)self;
   txn_handle *handle = get_txn(capsule);
   if (handle == NULL) return NULL;
-  size_t removed = 123456789;
-  dml_status status = dml_txn_collect_garbage(handle->txn, &removed, NULL);
+  size_t removed = 123456789; /* Sentinel observed by private replay on failure. */
+  dml_error error = {0};
+  dml_status status = dml_txn_collect_garbage(handle->txn, &removed, &error);
+#ifdef DML_PRIVATE_REPLAY
+  (void)self;
   return output_result(status, PyLong_FromSize_t(removed));
-}
+#else
+  return status == DML_OK ? PyLong_FromSize_t(removed) : raise_status(self, status, &error);
 #endif
+}
 
 static PyObject *txn_get_datum(PyObject *self, PyObject *args) {
   PyObject *capsule, *id_obj;
@@ -706,11 +736,11 @@ static PyMethodDef methods[] = {
   {"txn_get_datum", txn_get_datum, METH_VARARGS, NULL},
   {"datum_decode", datum_decode, METH_O, NULL},
   {"txn_lookup_node", txn_lookup_node, METH_VARARGS, NULL},
-#ifdef DML_PRIVATE_REPLAY
   {"repo_export_commit", repo_export_commit, METH_VARARGS, NULL},
-  {"repo_import_commit", repo_import_commit, METH_VARARGS, NULL},
   {"repo_import_commit_staged", repo_import_commit_staged, METH_VARARGS, NULL},
   {"txn_collect_garbage", txn_collect_garbage, METH_O, NULL},
+#ifdef DML_PRIVATE_REPLAY
+  {"repo_import_commit", repo_import_commit, METH_VARARGS, NULL},
   {"txn_check_integrity", txn_check_integrity, METH_O, NULL},
 #endif
   {NULL, NULL, 0, NULL},

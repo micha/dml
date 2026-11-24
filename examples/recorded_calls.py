@@ -3,6 +3,7 @@
 Use `record REPO 7 5 3` to make both calls at once, or run
 `record-sum REPO producer 7 5` and `record-scale REPO producer COMMIT result 3`
 with the printed commit ID. Read either result with `inspect REPO [REF]`.
+Use `export-sum` and `stage-input` to move a producer to another repository.
 This example's call layouts are not core record types or execution APIs.
 """
 
@@ -21,6 +22,7 @@ SCALE_ENTRY = b"recorded-scale-v1"
 SUM = b"example.sum@1"
 SCALE = b"example.scale@1"
 MAIN = b"main"
+MAX_BUNDLE_BYTES = 64 * 1024 * 1024  # The core's commit bundle limit.
 
 
 @contextmanager
@@ -30,6 +32,15 @@ def _repository(path, *, create):
         yield repo
     finally:
         core.repo_close(repo)
+
+
+@contextmanager
+def _read_transaction(repo):
+    txn = core.txn_begin(repo, core.TXN_READ)
+    try:
+        yield txn
+    finally:
+        core.txn_abort(txn)
 
 
 @contextmanager
@@ -140,19 +151,67 @@ def record_sum(path, pin, a, b):
         return _publish(txn, pin, SUM_ENTRY, _record_sum(txn, a, b))
 
 
+def _check_commit_id(commit):
+    if not isinstance(commit, bytes) or len(commit) != 16:
+        raise ValueError("producer commit must be a 16-byte ID")
+
+
+def _selected_sum(txn, pin, expected):
+    if core.txn_ref_get(txn, pin) != expected:
+        raise ValueError("producer pin does not point to the expected commit")
+    dag = _sum_dag(_snapshot(txn, expected))
+    _inspect_call(txn, dag, SUM, (b"a", b"b"))  # Check shape, not arithmetic.
+    return dag
+
+
 def record_scale(path, producer_pin, producer_commit, result_ref, factor):
     """Scale the stored result of the exact pinned sum commit."""
     _check_i64(factor, "factor")
-    if not isinstance(producer_commit, bytes) or len(producer_commit) != 16:
-        raise ValueError("producer commit must be a 16-byte ID")
+    _check_commit_id(producer_commit)
     with _write_transaction(path, create=False) as txn:
-        selected = core.txn_ref_get(txn, producer_pin)
-        if selected != producer_commit:
-            raise ValueError("producer pin does not point to the expected commit")
-        sum_call = _sum_dag(_snapshot(txn, selected))
-        _inspect_call(txn, sum_call, SUM, (b"a", b"b"))  # Check shape, not arithmetic.
+        sum_call = _selected_sum(txn, producer_pin, producer_commit)
         scale_call = _record_scale(txn, sum_call, factor)
-        return _publish(txn, result_ref, SCALE_ENTRY, scale_call, selected)
+        return _publish(txn, result_ref, SCALE_ENTRY, scale_call, producer_commit)
+
+
+def export_sum(path, pin, producer_commit, bundle_path):
+    """Export the exact selected sum to a new bundle file."""
+    _check_commit_id(producer_commit)
+    with _repository(path, create=False) as repo:
+        with _read_transaction(repo) as txn:
+            _selected_sum(txn, pin, producer_commit)
+        # Export by immutable ID in a new snapshot, never by re-resolving the pin.
+        bundle = core.repo_export_commit(repo, producer_commit)
+    with Path(bundle_path).open("xb") as output:
+        output.write(bundle)
+    return producer_commit
+
+
+def stage_input(path, pin, bundle_path):
+    """Import a bundle under a new local pin and return its actual root ID."""
+    with Path(bundle_path).open("rb") as source:
+        bundle = source.read(MAX_BUNDLE_BYTES + 1)
+    if len(bundle) > MAX_BUNDLE_BYTES:
+        raise ValueError("commit bundle exceeds 64 MiB")
+    with _repository(path, create=True) as repo:
+        return core.repo_import_commit_staged(repo, bundle, pin)
+
+
+def release_input(path, pin, producer_commit, result_ref):
+    """Release the exact producer pin only if the selected result retains it."""
+    _check_commit_id(producer_commit)
+    with _write_transaction(path, create=False) as txn:
+        result = core.txn_ref_get(txn, result_ref)
+        if _inspect_snapshot(txn, result).get("producer_commit") != producer_commit.hex():
+            raise ValueError("result does not retain the expected producer commit")
+        core.txn_ref_delete_expected(txn, pin, producer_commit)
+    return producer_commit
+
+
+def collect(path):
+    """Commit garbage collection and return the number of removed objects."""
+    with _write_transaction(path, create=False) as txn:
+        return core.txn_collect_garbage(txn)
 
 
 def _inspect_call(txn, dag, implementation, names, *, call_input=None):
@@ -218,12 +277,8 @@ def _inspect_snapshot(txn, commit):
 
 def inspect(path, ref=MAIN):
     """Read the committed example graph without executing or verifying arithmetic."""
-    with _repository(path, create=False) as repo:
-        txn = core.txn_begin(repo, core.TXN_READ)
-        try:
-            return _inspect_snapshot(txn, core.txn_ref_get(txn, ref))
-        finally:
-            core.txn_abort(txn)
+    with _repository(path, create=False) as repo, _read_transaction(repo) as txn:
+        return _inspect_snapshot(txn, core.txn_ref_get(txn, ref))
 
 
 def _parse_commit_id(text):
@@ -254,6 +309,22 @@ def main():
     consumer.add_argument("producer_commit")
     consumer.add_argument("result_ref")
     consumer.add_argument("factor", type=int)
+    exporter = commands.add_parser("export-sum", help="export the exact pinned sum to a new bundle")
+    exporter.add_argument("repo", type=Path)
+    exporter.add_argument("pin")
+    exporter.add_argument("producer_commit")
+    exporter.add_argument("bundle", type=Path)
+    stage = commands.add_parser("stage-input", help="stage a bundle under a new local pin")
+    stage.add_argument("repo", type=Path)
+    stage.add_argument("pin")
+    stage.add_argument("bundle", type=Path)
+    release = commands.add_parser("release-input", help="release a staged pin retained by a recorded result")
+    release.add_argument("repo", type=Path)
+    release.add_argument("pin")
+    release.add_argument("producer_commit")
+    release.add_argument("result_ref")
+    collector = commands.add_parser("collect", help="collect unreachable objects")
+    collector.add_argument("repo", type=Path)
     reader = commands.add_parser("inspect", help="read recorded calls from a ref (default: main)")
     reader.add_argument("repo", type=Path)
     reader.add_argument("ref", nargs="?", default="main")
@@ -267,6 +338,16 @@ def main():
             commit = record_scale(args.repo, args.producer_pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                                   args.result_ref.encode("ascii"), args.factor)
             print(commit.hex())
+        elif args.command == "export-sum":
+            print(export_sum(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
+                             args.bundle).hex())
+        elif args.command == "stage-input":
+            print(stage_input(args.repo, args.pin.encode("ascii"), args.bundle).hex())
+        elif args.command == "release-input":
+            print(release_input(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
+                                args.result_ref.encode("ascii")).hex())
+        elif args.command == "collect":
+            print(collect(args.repo))
         else:
             print(json.dumps(inspect(args.repo, args.ref.encode("ascii"))))
     except (core.Error, OSError, ValueError) as error:

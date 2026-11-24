@@ -20,6 +20,8 @@ implicit ref selections, transactions, retries, or publication workflows.
 - A repository handle permits one active transaction. The binding rejects a
   second begin with `RuntimeError` before calling C; a close with a live
   transaction is rejected by the core without consuming the repository.
+  Bundle export and staged import also require a handle without a live
+  transaction; they do not consume the handle.
 - A live transaction keeps its repository alive. `txn_commit` consumes the
   transaction on C success or failure, including when a read or poisoned
   transaction cannot commit. `txn_abort` consumes the transaction and is safe
@@ -53,8 +55,11 @@ Arguments are positional. Functions without a listed result return `None`.
 | --- | --- |
 | `repo_open(path, create[, map_size])` | Path is `str`, `bytes`, or `os.PathLike`, converted using Python's filesystem encoding before calling C; `create` is `bool`. Returns a repository handle. Omitted or zero `map_size` uses the C default. |
 | `repo_close(repo)` | Consumes the repository handle on success. |
+| `repo_export_commit(repo, root)` | [Bundle bytes](transfer.md#repository-behavior) for the specified commit ID. |
+| `repo_import_commit_staged(repo, bundle, name)` | Imported root commit ID. Accepts bundle `bytes` and [atomically creates](transfer.md#atomic-staging) the named ref; does not replace an existing ref. |
 | `txn_begin(repo, mode)` | `TXN_READ` or `TXN_WRITE`; returns a transaction handle. |
 | `txn_commit(txn)`, `txn_abort(txn)` | End a storage transaction. |
+| `txn_collect_garbage(txn)` | Number of objects removed by [collection](repository.md#explicit-garbage-collection) in the caller's write transaction. The caller still needs to commit. |
 | `txn_ref_create(txn, name, target)`, `txn_ref_update(txn, name, target)`, `txn_ref_delete_expected(txn, name, expected)` | Mutate a ref under the [C ref contract](repository.md#refs). |
 | `txn_ref_get(txn, name)` | Commit ID. |
 | `txn_put_datum(txn, packed)`, `txn_put_object(txn, type, packed)` | The stored object's ID. |

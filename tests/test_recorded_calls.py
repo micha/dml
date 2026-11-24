@@ -47,22 +47,22 @@ class RecordedCallsTest(unittest.TestCase):
         self.workspace = Path(directory.name)
         self.repo = self.workspace / "repo"
 
-    def run_example(self, command, *operands):
+    def run_example(self, command, *operands, repo=None):
         return subprocess.run(
-            [sys.executable, "-B", EXAMPLE, command, self.repo, *map(str, operands)],
+            [sys.executable, "-B", EXAMPLE, command, self.repo if repo is None else repo, *map(str, operands)],
             cwd=self.workspace,
             capture_output=True,
             text=True,
             timeout=30,
         )
 
-    def expect_success(self, command, *operands):
-        result = self.run_example(command, *operands)
+    def expect_success(self, command, *operands, repo=None):
+        result = self.run_example(command, *operands, repo=repo)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
-    def expect_failure(self, command, *operands):
-        result = self.run_example(command, *operands)
+    def expect_failure(self, command, *operands, repo=None):
+        result = self.run_example(command, *operands, repo=repo)
         self.assertEqual(result.returncode, 1, (result.stdout, result.stderr))
         self.assertEqual(result.stdout, "")
         self.assertTrue(result.stderr.strip())
@@ -277,6 +277,137 @@ class RecordedCallsTest(unittest.TestCase):
         self.assertEqual(scaled["arguments"]["input"]["call"], producer.hex())
         self.assertEqual(scaled["arguments"]["input"]["value"], -17)
         self.assertEqual(scaled["result"]["value"], -102)
+
+    def test_handoff_scales_stored_value_and_keeps_exact_lineage_after_collection(self):
+        expected, producer, stored_root = self.publish_sum_fixture()
+        decoy = self.expect_success("record-sum", "decoy", 6, -23).strip()  # Same stored result: -17.
+        origin = self.repo / "data.mdb"
+        origin_before = origin.read_bytes()
+        worker = self.workspace / "worker"
+        selected_bundle = self.workspace / "selected.dmlb"
+        decoy_bundle = self.workspace / "decoy.dmlb"
+        for pin, commit, bundle, dest_pin in (
+            ("producer", expected.hex(), selected_bundle, "incoming"),
+            ("decoy", decoy, decoy_bundle, "discard"),
+        ):
+            self.assertEqual(self.expect_success("export-sum", pin, commit, bundle).strip(), commit)
+            self.assertEqual(self.expect_success("stage-input", dest_pin, bundle, repo=worker).strip(), commit)
+            bundle.unlink()  # No bundle is available to any later worker invocation.
+
+        result = self.expect_success("record-scale", "incoming", expected.hex(), "main", 6, repo=worker).strip()
+        self.assertEqual(self.expect_success("release-input", "incoming", expected.hex(), "main", repo=worker).strip(),
+                         expected.hex())
+        with transaction(worker, core.TXN_WRITE) as txn:
+            self.assert_missing_ref(txn, b"incoming")
+            core.txn_ref_delete_expected(txn, b"discard", bytes.fromhex(decoy))
+            core.txn_commit(txn)
+        with transaction(worker) as txn:
+            view(txn, core.REC_COMMIT, bytes.fromhex(decoy))  # Ref release alone did not collect it.
+        self.assertGreater(int(self.expect_success("collect", repo=worker)), 0)
+
+        with transaction(worker) as txn:
+            with self.assertRaises(core.Error) as collected:
+                core.txn_get_object(txn, core.REC_COMMIT, bytes.fromhex(decoy))
+            self.assertEqual(collected.exception.args[0], "not_found")
+            self.assert_missing_ref(txn, b"producer")  # Bundles did not copy origin refs.
+            self.assert_missing_ref(txn, b"incoming")
+            commit, scale, parents = self.snapshot(txn, b"main", b"recorded-scale-v1")
+            self.assertEqual((commit.hex(), parents), (result, (expected,)))
+            _, sum_tree, _ = view(txn, core.REC_COMMIT, expected)
+            sum_view, _, _ = view(txn, core.REC_TREE, sum_tree)
+            self.assertEqual(core.object_view_entry(sum_view, 0), (producer, b"recorded-sum-v1"))
+            self.assertEqual(view(txn, core.REC_DAG, producer)[1], stored_root)
+            input_node = core.txn_lookup_node(txn, scale, b"input")
+            self.assertEqual(self.node_target(txn, input_node, core.NODE_SUBDAG), producer)
+            result_node = view(txn, core.REC_DAG, scale)[1]
+            self.assertEqual(self.literal_value(txn, result_node, core.DATUM_I64), -102)  # Not (2 + 3) * 6.
+
+        data = worker / "data.mdb"
+        before = data.read_bytes()
+        report = json.loads(self.expect_success("inspect", repo=worker))
+        self.assertEqual(report["commit"], result)
+        self.assertEqual(report["producer_commit"], expected.hex())
+        summed, scaled = report["calls"]
+        self.assertEqual(summed["result"], {"node": stored_root.hex(), "value": -17})
+        self.assertEqual(scaled["arguments"]["input"], {"node": input_node.hex(), "value": -17, "call": producer.hex()})
+        self.assertEqual(scaled["result"], {"node": result_node.hex(), "value": -102})
+        self.assertEqual(data.read_bytes(), before)
+        self.assertEqual(origin.read_bytes(), origin_before)
+
+    def test_handoff_rejects_decoy_identity_and_unverified_release_without_changes(self):
+        expected = self.expect_success("record-sum", "producer", 7, 5).strip()
+        decoy = self.expect_success("record-sum", "decoy", 9, 3).strip()
+        expected_id, decoy_id = bytes.fromhex(expected), bytes.fromhex(decoy)
+        self.assertNotEqual(expected_id, decoy_id)
+        worker = self.workspace / "worker"
+        data = worker / "data.mdb"
+        selected_bundle = self.workspace / "selected.dmlb"
+        decoy_bundle = self.workspace / "decoy.dmlb"
+
+        self.assertIn("expected commit", self.expect_failure("export-sum", "decoy", expected, selected_bundle))
+        self.assertFalse(selected_bundle.exists())
+        self.expect_success("export-sum", "producer", expected, selected_bundle)
+        self.expect_success("export-sum", "decoy", decoy, decoy_bundle)
+        selected_bytes = selected_bundle.read_bytes()
+        self.expect_failure("export-sum", "decoy", decoy, selected_bundle)
+        self.assertEqual(selected_bundle.read_bytes(), selected_bytes)
+        self.assertEqual(self.expect_success("stage-input", "incoming", decoy_bundle, repo=worker).strip(), decoy)
+
+        def worker_rejects(reason, command, *operands):
+            before = data.read_bytes()
+            self.assertIn(reason, self.expect_failure(command, *operands, repo=worker))
+            self.assertEqual(data.read_bytes(), before)
+
+        worker_rejects("invalid_state", "stage-input", "incoming", decoy_bundle)
+        worker_rejects("invalid_state", "stage-input", "incoming", selected_bundle)
+        worker_rejects("expected commit", "record-scale", "incoming", expected, "main", 3)
+        self.expect_success("record-scale", "incoming", decoy, "other", 3, repo=worker)
+        with transaction(worker, core.TXN_WRITE) as txn:
+            self.assert_missing_ref(txn, b"main")
+            core.txn_ref_delete_expected(txn, b"incoming", decoy_id)
+            core.txn_commit(txn)
+        self.expect_success("stage-input", "incoming", selected_bundle, repo=worker)
+        worker_rejects("not_found", "release-input", "incoming", expected, "main")
+        worker_rejects("does not retain the expected producer commit", "release-input", "incoming", expected, "other")
+        self.expect_success("record-scale", "incoming", expected, "main", 3, repo=worker)
+
+        with transaction(worker, core.TXN_WRITE) as txn:
+            other = core.txn_ref_get(txn, b"other")
+            _, wrong_tree, _ = view(txn, core.REC_COMMIT, other)
+            # The expected sole parent is present, but the input DAG in this tree belongs to the decoy.
+            forged = put(txn, core.REC_COMMIT, wrong_tree, expected_id)
+            core.txn_ref_create(txn, b"forged", forged)
+            core.txn_commit(txn)
+        worker_rejects("does not match the producer parent", "release-input", "incoming", expected, "forged")
+
+        with transaction(worker, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"incoming", decoy_id)
+            core.txn_commit(txn)
+        worker_rejects("invalid_state", "release-input", "incoming", expected, "main")
+        with transaction(worker) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"incoming"), decoy_id)
+
+    def test_truncated_bundle_never_publishes_a_pin_or_partial_closure(self):
+        expected, producer, _ = self.publish_sum_fixture()
+        worker = self.workspace / "worker"
+        bundle = self.workspace / "selected.dmlb"
+        truncated = self.workspace / "truncated.dmlb"
+        self.expect_success("export-sum", "producer", expected.hex(), bundle)
+        truncated.write_bytes(bundle.read_bytes()[:-1])
+
+        self.assertIn("invalid_bounds", self.expect_failure("stage-input", "incoming", truncated, repo=worker))
+        # The first attempt may initialize the repository, but not commit the import.
+        with transaction(worker, create=True) as txn:
+            self.assert_missing_ref(txn, b"incoming")
+            with self.assertRaises(core.Error) as absent:
+                core.txn_get_object(txn, core.REC_DAG, producer)
+            self.assertEqual(absent.exception.args[0], "not_found")
+
+        data = worker / "data.mdb"
+        before = data.read_bytes()
+        self.assertIn("invalid_bounds", self.expect_failure("stage-input", "incoming", truncated, repo=worker))
+        self.assertEqual(data.read_bytes(), before)
+        self.assertEqual(self.expect_success("stage-input", "incoming", bundle, repo=worker).strip(), expected.hex())
 
     def test_scale_rejects_unknown_sum_version_even_with_matching_pin_and_tree_entry(self):
         commit, _, _ = self.publish_sum_fixture(b"example.sum@2")

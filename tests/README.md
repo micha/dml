@@ -11,9 +11,10 @@ Each request names **one DML core function**, without the `dml_` prefix. The
 [shared adapter](replay_core.py) resolves handles, object IDs and buffers, then
 calls the matching [Python binding](../python/dml_core.c) once. Ref replay
 imports the same [public module](../docs/spec-next/python.md) that ships in the
-wheel. The transfer, staged-import, and collection suites still use a private
-build with extra output-slot instrumentation. Neither layer implicitly begins,
-commits or aborts transactions during replay, or judges the core outcome.
+wheel. The transfer, staged-import, and collection suites use a private build
+with extra output-slot instrumentation, even where a public wrapper exists.
+Neither layer implicitly begins, commits or aborts transactions during replay,
+or judges the core outcome.
 
 For example, `txn_ref_create` with `List("writer", "main", "A")` uses the
 transaction aliased as `writer` and the commit ID aliased as `A`. A separate
@@ -149,6 +150,15 @@ released, and does not recompute results. An intentionally incorrect stored sum
 checks that composition consumes the stored value. Both the workflow and
 focused tests run in the opt-in Meson gate.
 
+The [one-way bundle handoff](../README.md#compose-from-a-producer-in-another-repository)
+exercises the same caller on a second repository through the public binding.
+The replay checks read-only export, bundle file preservation, create-only staging,
+rejection of a valid same-valued decoy, release guarded by the expected producer,
+and readback after release and collection. The focused tests also verify that
+both physical links survive while collection removes an unpinned decoy, that
+release rejects a result with the correct parent and the wrong input DAG, and
+that a deliberately incorrect stored sum is transferred and consumed unchanged.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -174,3 +184,24 @@ Both producer selections, stale and missing pin rejection, overflow, duplicate
 publication, and readback after pin release must be reachable. TLC checks this
 finite design; [runtime replay](../docs/validation-policy.md#design-with-tlc-validate-implementation-with-replay)
 checks the implementation on selected histories.
+
+#### Check the one-way handoff design with TLC
+
+The [handoff model](recorded_handoff_design.qnt) has one planned sum and one
+same-valued decoy with distinct IDs, a fixed factor, distinct worker refs, and
+abstract immutable closures. Source pin movement or collection can interleave
+between pin selection and export; worker writes each use one transaction.
+The model checks safety, not liveness. It abstracts away wire parsing,
+filesystem errors and native corruption.
+
+```sh
+mkdir -p build/recorded-handoff-tlc
+(cd build/recorded-handoff-tlc && quint verify ../../tests/recorded_handoff_design.qnt \
+  --backend=tlc --invariants exactExport atomicStage exactScale guardedRelease retainedAndInspectable \
+  --search-observations)
+```
+
+The observations include a decoy staging successfully but failing selection,
+release rejecting a moved pin or mismatched result, and readback after the
+producer pin is released and collection removes the decoy. The design check
+runs separately from CI.

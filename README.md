@@ -146,8 +146,45 @@ unchanged. A failed first `record-sum` can still leave an initialized repository
 `producer_commit` and checks that the stored input edge matches the parent
 commit's DAG. The result remains readable after the producer pin moves or is
 released: inspection follows committed links, not the original pin name. The
-example stays local to one repository and uses only the explicitly selected
-stored input; it does not search for reusable results.
+example uses only the explicitly selected stored input; it does not search for
+reusable results.
+
+#### Compose from a producer in another repository
+
+Use fresh source and worker paths and a new bundle filename:
+
+```sh
+producer=$(python examples/recorded_calls.py record-sum ./origin producer 7 5)
+python examples/recorded_calls.py export-sum ./origin producer "$producer" ./sum.dml
+python examples/recorded_calls.py stage-input ./worker incoming ./sum.dml
+python examples/recorded_calls.py record-scale ./worker incoming "$producer" result 3
+python examples/recorded_calls.py release-input ./worker incoming "$producer" result
+python examples/recorded_calls.py collect ./worker
+python examples/recorded_calls.py inspect ./worker result
+```
+
+Only the bundle and the originally selected commit ID need to cross between
+repositories. `export-sum` checks the source pin and exports by immutable ID;
+if collection removes the commit between the check and export, export fails
+rather than substituting another commit. Use regular binary bundle files. Export
+never overwrites a file, but a failed write can leave a partial file. Discard it
+and retry to a fresh output path.
+
+`stage-input` atomically imports a bundle and creates a new local ref. It prints
+the bundle's actual root ID, not proof that it is the selected sum. Pass the
+original ID, not the staging receipt, to `record-scale`. A valid wrong bundle
+can be staged for inspection, but scale rejects it without writing a result,
+even if the stored numbers agree. Staging a different bundle under an existing
+ref is rejected; use a new staging name. Failed staging can leave a newly
+initialized worker without refs.
+
+`release-input` checks in one write transaction that `result` has the expected
+producer commit as its sole parent and links to that parent's sum DAG. It deletes
+`incoming` only if it still points to that producer. The result ref then retains
+both calls through explicit `collect`, which prints the number of objects
+removed. The final read reports `36` and the original producer ID, without
+opening the source or executing either call. This is a one-way handoff; no result
+is returned or published to the source.
 
 ### Install and link the C library
 

@@ -76,6 +76,48 @@ class BindingTest(unittest.TestCase):
         self.assertEqual(output, data)
         self.assertEqual(core.datum_decode(output), (b"kept", core.DATUM_STRING))
 
+    def test_bundle_binding_owns_results_and_maps_native_errors(self):
+        repo = core.repo_open(self.path, True)
+        self.addCleanup(core.repo_close, repo)
+        txn = core.txn_begin(repo, core.TXN_WRITE)
+        tree = core.txn_put_object(txn, core.REC_TREE, core.object_encode(core.REC_TREE))
+        root = core.txn_put_object(txn, core.REC_COMMIT, core.object_encode(core.REC_COMMIT, tree))
+        core.txn_commit(txn)
+
+        with self.assertRaisesRegex(ValueError, "16 bytes"):
+            core.repo_export_commit(repo, root.hex().encode("ascii"))
+        with self.assertRaises(TypeError):
+            core.repo_import_commit_staged(repo, bytearray(), b"incoming")
+        bundle = core.repo_export_commit(repo, root)
+        self.assertIs(type(bundle), bytes)
+        reader = core.txn_begin(repo, core.TXN_READ)
+        for operation, args in (
+            (core.repo_export_commit, (repo, root)),
+            (core.repo_import_commit_staged, (repo, bundle, b"incoming")),
+            (core.txn_collect_garbage, (reader,)),
+        ):
+            with self.subTest(operation=operation):
+                with self.assertRaises(core.Error) as rejected:
+                    operation(*args)
+                self.assertEqual(rejected.exception.args[0], "invalid_state")
+                self.assertTrue(rejected.exception.args[2])
+        core.txn_abort(reader)
+        with self.assertRaises(core.Error) as malformed:
+            core.repo_import_commit_staged(repo, b"", b"incoming")
+        self.assertEqual(malformed.exception.args[0], "invalid_bounds")
+        imported = core.repo_import_commit_staged(repo, bundle, b"incoming")
+        self.assertIs(type(imported), bytes)
+        self.assertEqual(imported, root)
+        with self.assertRaises(core.Error) as occupied:
+            core.repo_import_commit_staged(repo, bundle, b"incoming")
+        self.assertEqual(occupied.exception.args[0], "invalid_state")
+
+        txn = core.txn_begin(repo, core.TXN_WRITE)
+        core.txn_ref_delete_expected(txn, b"incoming", imported)
+        self.assertEqual(core.txn_collect_garbage(txn), 2)
+        core.txn_abort(txn)
+        self.assertEqual(core.repo_export_commit(repo, imported), bundle)
+
     def test_view_keeps_packed_input_alive_and_checks_kind_and_bounds(self):
         dag = bytes(range(16))
         view, reference, count = core.object_decode(core.object_encode(core.REC_TREE, b"snapshot", dag))
