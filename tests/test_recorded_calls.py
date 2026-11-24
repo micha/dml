@@ -42,6 +42,11 @@ def view(txn, kind, object_id):
 
 
 class RecordedCallsTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.example = runpy.run_path(EXAMPLE)
+
     def setUp(self):
         directory = TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -647,22 +652,22 @@ class RecordedCallsTest(unittest.TestCase):
             self.assertEqual(core.txn_ref_get(txn, b"incoming").hex(), request)
 
     def prepare_receipted_scale(self):
-        producer = self.expect_success("record-sum", "producer", 7, 5).strip()
-        previous = self.expect_success("record-sum", "main", 12, 0).strip()
-        plan = self.expect_success("request-scale", "producer", producer, "plan", 3).strip()
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        previous = self.example["record_sum"](self.repo, b"main", 12, 0)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
         worker = self.workspace / "worker"
         outbound = self.workspace / "request.dmlb"
         inbound = self.workspace / "result.dmlb"
-        request = self.expect_success("export-request", "plan", plan, outbound).strip()
-        self.expect_success("stage-input", "incoming", outbound, repo=worker)
-        result = self.expect_success("work-scale", "incoming", request, "result", repo=worker).strip()
-        self.expect_success("export-scale", "result", result, inbound, repo=worker)
-        self.expect_success("stage-input", "returned", inbound)
+        request = self.example["export_request"](self.repo, b"plan", plan, outbound)
+        self.example["stage_input"](worker, b"incoming", outbound)
+        result = self.example["work_scale"](worker, b"incoming", request, b"result")
+        self.example["export_scale"](worker, b"result", result, inbound)
+        self.example["stage_input"](self.repo, b"returned", inbound)
         return producer, previous, plan, result
 
     def test_receipt_retries_without_changes_after_ref_reuse_and_collection(self):
-        producer, previous, plan, result = self.prepare_receipted_scale()
-        producer_id, previous_id, plan_id, result_id = map(bytes.fromhex, (producer, previous, plan, result))
+        producer_id, previous_id, plan_id, result_id = self.prepare_receipted_scale()
+        plan, result = plan_id.hex(), result_id.hex()
         publish = ("publish-requested-scale", "plan", plan, "returned", result, "--receipt-ref", "ack")
         self.assertEqual(self.expect_success(*publish).strip(), result)
         fields = {"plan_ref": "plan", "plan_commit": plan, "staging_ref": "returned", "result_commit": result}
@@ -683,9 +688,11 @@ class RecordedCallsTest(unittest.TestCase):
 
         def assert_retry_unchanged():
             before = data.read_bytes()
-            self.assertEqual(self.expect_success(*publish).strip(), result)
+            retry = self.example["publish_requested_scale"]
+            self.assertEqual(retry(self.repo, b"plan", plan_id, b"returned", result_id, receipt_ref=b"ack"),
+                             result_id)
             self.assertEqual(data.read_bytes(), before)
-            self.assertEqual(json.loads(self.expect_success("inspect", "ack")), report)
+            self.assertEqual(self.example["inspect"](self.repo, b"ack"), report)
             self.assertEqual(data.read_bytes(), before)
 
         assert_retry_unchanged()
@@ -701,28 +708,34 @@ class RecordedCallsTest(unittest.TestCase):
             for ref in (b"main", b"plan", b"returned"):
                 core.txn_ref_update(txn, ref, producer_id)
             core.txn_commit(txn)
-        self.assertGreater(int(self.expect_success("collect")), 0)
+        self.assertGreater(self.example["collect"](self.repo), 0)
         with transaction(self.repo) as txn:
             for commit in (previous_id, plan_id, result_id):
                 with self.assertRaises(core.Error) as swept:
                     core.txn_get_object(txn, core.REC_COMMIT, commit)
                 self.assertEqual(swept.exception.args[0], "not_found")
-        assert_retry_unchanged()
+
+        # Keep a fresh-process retry and JSON inspection after the referenced commits are gone.
+        before = data.read_bytes()
+        self.assertEqual(self.expect_success(*publish).strip(), result)
+        self.assertEqual(data.read_bytes(), before)
+        self.assertEqual(json.loads(self.expect_success("inspect", "ack")), report)
+        self.assertEqual(data.read_bytes(), before)
 
     def test_receipt_key_rejects_each_changed_field_even_when_new_publication_is_ready(self):
-        producer, previous, plan, result = self.prepare_receipted_scale()
-        producer_id, previous_id, plan_id, result_id = map(bytes.fromhex, (producer, previous, plan, result))
+        producer_id, previous_id, plan_id, result_id = self.prepare_receipted_scale()
 
-        def publish(plan_ref, proposed_plan, staging_ref, proposed_result, receipt="ack"):
-            return ("publish-requested-scale", plan_ref, proposed_plan, staging_ref, proposed_result,
-                    "--receipt-ref", receipt)
+        def publish(plan_ref, proposed_plan, staging_ref, proposed_result, receipt=b"ack"):
+            return self.example["publish_requested_scale"](
+                self.repo, plan_ref, proposed_plan, staging_ref, proposed_result, receipt_ref=receipt)
 
-        self.assertEqual(self.expect_success(*publish("plan", plan, "returned", result)).strip(), result)
+        self.assertEqual(publish(b"plan", plan_id, b"returned", result_id), result_id)
         data = self.repo / "data.mdb"
 
         def reject(*selection):
             before = data.read_bytes()
-            self.expect_failure(*publish(*selection))
+            with self.assertRaisesRegex(ValueError, "receipt does not match"):
+                publish(*selection)
             self.assertEqual(data.read_bytes(), before)
 
         with transaction(self.repo, core.TXN_WRITE) as txn:
@@ -731,8 +744,8 @@ class RecordedCallsTest(unittest.TestCase):
                                 (b"returned", result_id), (b"other-returned", result_id)):
                 core.txn_ref_create(txn, ref, commit)
             core.txn_commit(txn)
-        reject("other-plan", plan, "returned", result)
-        reject("plan", plan, "other-returned", result)
+        reject(b"other-plan", plan_id, b"returned", result_id)
+        reject(b"plan", plan_id, b"other-returned", result_id)
 
         with transaction(self.repo, core.TXN_WRITE) as txn:
             # Both results satisfy the original request; only their stored output differs.
@@ -747,7 +760,7 @@ class RecordedCallsTest(unittest.TestCase):
             other_result = put(txn, core.REC_COMMIT, new_tree, request)
             core.txn_ref_update(txn, b"returned", other_result)
             core.txn_commit(txn)
-        reject("plan", plan, "returned", other_result.hex())
+        reject(b"plan", plan_id, b"returned", other_result)
 
         with transaction(self.repo, core.TXN_WRITE) as txn:
             # Recapture a different main, but keep the producer and factor (hence request) exact.
@@ -755,15 +768,15 @@ class RecordedCallsTest(unittest.TestCase):
             core.txn_ref_delete_expected(txn, b"plan", plan_id)
             core.txn_ref_update(txn, b"returned", result_id)
             core.txn_commit(txn)
-        other_plan = self.expect_success("request-scale", "producer", producer, "plan", 3).strip()
-        self.assertNotEqual(other_plan, plan)
-        reject("plan", other_plan, "returned", result)
+        other_plan = self.example["request_scale"](self.repo, b"producer", producer_id, b"plan", 3)
+        self.assertNotEqual(other_plan, plan_id)
+        reject(b"plan", other_plan, b"returned", result_id)
         # This plan and result are ready under a fresh key, including a maximum-length name.
-        fresh = "1" + "a" * 124 + "._-"
-        selection = publish("plan", other_plan, "returned", result, fresh)
-        self.assertEqual(self.expect_success(*selection).strip(), result)
+        fresh = b"1" + b"a" * 124 + b"._-"
+        selection = (b"plan", other_plan, b"returned", result_id, fresh)
+        self.assertEqual(publish(*selection), result_id)
         after = data.read_bytes()
-        self.assertEqual(self.expect_success(*selection).strip(), result)
+        self.assertEqual(publish(*selection), result_id)
         self.assertEqual(data.read_bytes(), after)
         with transaction(self.repo) as txn:
             self.assertEqual(core.txn_ref_get(txn, b"other-plan"), plan_id)
@@ -772,17 +785,22 @@ class RecordedCallsTest(unittest.TestCase):
     def test_receipt_aliases_and_occupied_key_reject_without_writes(self):
         producer, _, plan, result = self.prepare_receipted_scale()
         data = self.repo / "data.mdb"
-        publish = ("publish-requested-scale", "plan", plan, "returned", result, "--receipt-ref")
+
+        def publish(receipt):
+            return self.example["publish_requested_scale"](
+                self.repo, b"plan", plan, b"returned", result, receipt_ref=receipt)
+
         before = data.read_bytes()
-        for alias in ("main", "plan", "returned"):
+        for alias in (b"main", b"plan", b"returned"):
             with self.subTest(alias=alias):
-                self.assertIn("distinct", self.expect_failure(*publish, alias))
+                with self.assertRaisesRegex(ValueError, "distinct"):
+                    publish(alias)
                 self.assertEqual(data.read_bytes(), before)
         with transaction(self.repo, core.TXN_WRITE) as txn:
-            core.txn_ref_create(txn, b"not-receipt", bytes.fromhex(producer))
+            core.txn_ref_create(txn, b"not-receipt", producer)
             nodes = {name: literal(txn, core.DATUM_STRING, value) for name, value in (
-                (b"plan_ref", b"plan"), (b"plan_commit", plan.encode("ascii")),
-                (b"staging_ref", b"returned"), (b"result_commit", result.encode("ascii")),
+                (b"plan_ref", b"plan"), (b"plan_commit", plan.hex().encode("ascii")),
+                (b"staging_ref", b"returned"), (b"result_commit", result.hex().encode("ascii")),
             )}
             # Exact matching fields, but the wrong binding is the root.
             operands = [field for binding in nodes.items() for field in binding]
@@ -791,39 +809,45 @@ class RecordedCallsTest(unittest.TestCase):
             core.txn_ref_create(txn, b"bad-receipt", put(txn, core.REC_COMMIT, tree))
             core.txn_commit(txn)
         before = data.read_bytes()
-        for occupied in ("not-receipt", "bad-receipt"):
+        for occupied, reason in ((b"not-receipt", "expected a parentless"),
+                                 (b"bad-receipt", "wrong DAG layout")):
             with self.subTest(occupied=occupied):
-                self.expect_failure(*publish, occupied)
+                with self.assertRaisesRegex(ValueError, reason):
+                    publish(occupied)
                 self.assertEqual(data.read_bytes(), before)
-        self.expect_failure("inspect", "bad-receipt")
+        with self.assertRaisesRegex(ValueError, "wrong DAG layout"):
+            self.example["inspect"](self.repo, b"bad-receipt")
         self.assertEqual(data.read_bytes(), before)
 
     def test_failed_receipted_publication_does_not_reserve_key_or_infer_success_from_main(self):
         producer, previous, plan, result = self.prepare_receipted_scale()
-        producer_id, previous_id, result_id = map(bytes.fromhex, (producer, previous, result))
-        publish = ("publish-requested-scale", "plan", plan, "returned", result, "--receipt-ref", "ack")
         data = self.repo / "data.mdb"
 
-        def reject(reason):
+        def publish():
+            return self.example["publish_requested_scale"](
+                self.repo, b"plan", plan, b"returned", result, receipt_ref=b"ack")
+
+        def reject(error, reason):
             before = data.read_bytes()
-            self.assertIn(reason, self.expect_failure(*publish))
+            with self.assertRaisesRegex(error, reason):
+                publish()
             self.assertEqual(data.read_bytes(), before)
             with transaction(self.repo) as txn:
                 self.assert_missing_ref(txn, b"ack")
 
         with transaction(self.repo, core.TXN_WRITE) as txn:
-            core.txn_ref_update(txn, b"returned", producer_id)
+            core.txn_ref_update(txn, b"returned", producer)
             core.txn_commit(txn)
-        reject("ref target differs")
+        reject(core.Error, "ref target differs")
         with transaction(self.repo, core.TXN_WRITE) as txn:
-            core.txn_ref_update(txn, b"returned", result_id)
-            core.txn_ref_update(txn, b"main", result_id)
+            core.txn_ref_update(txn, b"returned", result)
+            core.txn_ref_update(txn, b"main", result)
             core.txn_commit(txn)
-        reject("main does not point to the expected commit")
+        reject(ValueError, "main does not point to the expected commit")
         with transaction(self.repo, core.TXN_WRITE) as txn:
-            core.txn_ref_update(txn, b"main", previous_id)
+            core.txn_ref_update(txn, b"main", previous)
             core.txn_commit(txn)
-        self.assertEqual(self.expect_success(*publish).strip(), result)
+        self.assertEqual(publish(), result)
 
     def test_receipted_publication_validates_ref_names_before_opening_repository(self):
         class BytesSubclass(bytes):
@@ -833,7 +857,7 @@ class RecordedCallsTest(unittest.TestCase):
             def __fspath__(self):
                 raise AssertionError("invalid ref names must be rejected before opening the repository")
 
-        publish = runpy.run_path(EXAMPLE)["publish_requested_scale"]
+        publish = self.example["publish_requested_scale"]
         identifier = bytes(16)
         invalid_types = ("ref", bytearray(b"ref"), BytesSubclass(b"ref"))
         invalid_names = (b"", b"-ref", b".ref", b"_ref", b"ref/name", b"r\xc3\xa9f", b"ref\n", b"x" * 129)
