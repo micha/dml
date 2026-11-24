@@ -1,8 +1,9 @@
-"""Record and inspect two local calls using ordinary DML objects.
+"""Record and inspect local calls using ordinary DML objects.
 
-Run `python examples/recorded_calls.py record REPO 7 5 3` with an installed
-`daggerml.core`, then `python examples/recorded_calls.py inspect REPO`.
-This example's call layout is not a core record type or execution API.
+Use `record REPO 7 5 3` to make both calls at once, or run
+`record-sum REPO producer 7 5` and `record-scale REPO producer COMMIT result 3`
+with the printed commit ID. Read either result with `inspect REPO [REF]`.
+This example's call layouts are not core record types or execution APIs.
 """
 
 import argparse
@@ -15,6 +16,8 @@ from daggerml import core
 
 
 ENTRY = b"recorded-calls-v1"
+SUM_ENTRY = b"recorded-sum-v1"
+SCALE_ENTRY = b"recorded-scale-v1"
 SUM = b"example.sum@1"
 SCALE = b"example.scale@1"
 MAIN = b"main"
@@ -27,6 +30,17 @@ def _repository(path, *, create):
         yield repo
     finally:
         core.repo_close(repo)
+
+
+@contextmanager
+def _write_transaction(path, *, create):
+    with _repository(path, create=create) as repo:
+        txn = core.txn_begin(repo, core.TXN_WRITE)
+        try:
+            yield txn
+            core.txn_commit(txn)
+        finally:
+            core.txn_abort(txn)  # Safe after commit consumes the handle.
 
 
 def _check_i64(value, label):
@@ -88,27 +102,57 @@ def _record_call(txn, implementation, operation, sources, *, call_input=None):
     return _put_object(txn, core.REC_DAG, result, b"implementation", version, *bindings)
 
 
+def _record_sum(txn, a, b):
+    left = _put_literal(txn, core.DATUM_I64, a)
+    right = _put_literal(txn, core.DATUM_I64, b)
+    return _record_call(txn, SUM, add, ((b"a", left), (b"b", right)))
+
+
+def _record_scale(txn, sum_call, factor):
+    source = _put_object(txn, core.REC_NODE, core.NODE_SUBDAG, sum_call)
+    multiplier = _put_literal(txn, core.DATUM_I64, factor)
+    return _record_call(txn, SCALE, mul, ((b"input", source), (b"factor", multiplier)), call_input=b"input")
+
+
+def _publish(txn, ref, entry, dag, *parents):
+    tree = _put_object(txn, core.REC_TREE, entry, dag)
+    commit = _put_object(txn, core.REC_COMMIT, tree, *parents)
+    core.txn_ref_create(txn, ref, commit)
+    return commit
+
+
 def record(path, a, b, factor):
     """Create a fresh repository and return the recorded commit ID."""
     for name, value in (("a", a), ("b", b), ("factor", factor)):
         _check_i64(value, name)
     Path(path).mkdir()  # Do not reuse or modify an existing path.
-    with _repository(path, create=True) as repo:
-        txn = core.txn_begin(repo, core.TXN_WRITE)
-        try:
-            left, right, multiplier = (_put_literal(txn, core.DATUM_I64, value) for value in (a, b, factor))
-            sum_call = _record_call(txn, SUM, add, ((b"a", left), (b"b", right)))
-            source = _put_object(txn, core.REC_NODE, core.NODE_SUBDAG, sum_call)
-            scale_call = _record_call(txn, SCALE, mul, ((b"input", source), (b"factor", multiplier)),
-                                      call_input=b"input")
-            tree = _put_object(txn, core.REC_TREE, ENTRY, scale_call)
-            commit = _put_object(txn, core.REC_COMMIT, tree)
-            core.txn_ref_create(txn, MAIN, commit)
-            core.txn_commit(txn)
-            return commit
-        finally:
-            # Abort on Python or native write failure; safe after commit consumes the handle.
-            core.txn_abort(txn)
+    with _write_transaction(path, create=True) as txn:
+        sum_call = _record_sum(txn, a, b)
+        scale_call = _record_scale(txn, sum_call, factor)
+        return _publish(txn, MAIN, ENTRY, scale_call)
+
+
+def record_sum(path, pin, a, b):
+    """Publish a sum under a new pin and return its commit ID."""
+    _check_i64(a, "a")
+    _check_i64(b, "b")
+    with _write_transaction(path, create=True) as txn:
+        return _publish(txn, pin, SUM_ENTRY, _record_sum(txn, a, b))
+
+
+def record_scale(path, producer_pin, producer_commit, result_ref, factor):
+    """Scale the stored result of the exact pinned sum commit."""
+    _check_i64(factor, "factor")
+    if not isinstance(producer_commit, bytes) or len(producer_commit) != 16:
+        raise ValueError("producer commit must be a 16-byte ID")
+    with _write_transaction(path, create=False) as txn:
+        selected = core.txn_ref_get(txn, producer_pin)
+        if selected != producer_commit:
+            raise ValueError("producer pin does not point to the expected commit")
+        sum_call = _sum_dag(_snapshot(txn, selected))
+        _inspect_call(txn, sum_call, SUM, (b"a", b"b"))  # Check shape, not arithmetic.
+        scale_call = _record_scale(txn, sum_call, factor)
+        return _publish(txn, result_ref, SCALE_ENTRY, scale_call, selected)
 
 
 def _inspect_call(txn, dag, implementation, names, *, call_input=None):
@@ -136,24 +180,60 @@ def _inspect_call(txn, dag, implementation, names, *, call_input=None):
     }, producer
 
 
-def inspect(path):
+def _snapshot(txn, commit):
+    commit_view, tree, parents = _object(txn, core.REC_COMMIT, commit)
+    tree_view, _, entries = _object(txn, core.REC_TREE, tree)
+    if entries != 1:
+        raise ValueError("expected a single recorded-call tree entry")
+    dag, entry = core.object_view_entry(tree_view, 0)
+    return commit_view, parents, entry, dag
+
+
+def _sum_dag(snapshot):
+    _, parents, entry, dag = snapshot
+    if parents != 0 or entry != SUM_ENTRY:
+        raise ValueError("expected a parentless recorded-sum-v1 commit")
+    return dag
+
+
+def _inspect_snapshot(txn, commit):
+    snapshot = _snapshot(txn, commit)
+    view, parents, entry, terminal = snapshot
+    report = {"commit": commit.hex()}
+    if entry == SUM_ENTRY:
+        dag = _sum_dag(snapshot)
+        summed, _ = _inspect_call(txn, dag, SUM, (b"a", b"b"))
+        return {**report, "calls": [summed]}
+    if not ((entry == ENTRY and parents == 0) or (entry == SCALE_ENTRY and parents == 1)):
+        raise ValueError("expected a recorded-calls-v1 or recorded-scale-v1 commit with its required parents")
+    scale, producer = _inspect_call(txn, terminal, SCALE, (b"input", b"factor"), call_input=b"input")
+    if entry == SCALE_ENTRY:
+        parent = core.object_view_parent(view, 0)
+        if _sum_dag(_snapshot(txn, parent)) != producer:
+            raise ValueError("scale input DAG does not match the producer parent")
+        report["producer_commit"] = parent.hex()
+    summed, _ = _inspect_call(txn, producer, SUM, (b"a", b"b"))
+    return {**report, "calls": [summed, scale]}
+
+
+def inspect(path, ref=MAIN):
     """Read the committed example graph without executing or verifying arithmetic."""
     with _repository(path, create=False) as repo:
         txn = core.txn_begin(repo, core.TXN_READ)
         try:
-            commit = core.txn_ref_get(txn, MAIN)
-            _, tree, parents = _object(txn, core.REC_COMMIT, commit)
-            view, _, entries = _object(txn, core.REC_TREE, tree)
-            if parents or entries != 1:
-                raise ValueError("expected one entry in a parentless recorded-calls commit")
-            terminal, name = core.object_view_entry(view, 0)
-            if name != ENTRY:
-                raise ValueError("expected recorded-calls-v1 tree entry")
-            scale, producer = _inspect_call(txn, terminal, SCALE, (b"input", b"factor"), call_input=b"input")
-            summed, _ = _inspect_call(txn, producer, SUM, (b"a", b"b"))
-            return {"commit": commit.hex(), "calls": [summed, scale]}
+            return _inspect_snapshot(txn, core.txn_ref_get(txn, ref))
         finally:
             core.txn_abort(txn)
+
+
+def _parse_commit_id(text):
+    try:
+        identifier = bytes.fromhex(text)
+    except ValueError:
+        identifier = b""
+    if len(text) != 32 or len(identifier) != 16:
+        raise ValueError("producer commit must be a 32-digit hexadecimal ID")
+    return identifier
 
 
 def main():
@@ -163,14 +243,32 @@ def main():
     writer.add_argument("repo", type=Path)
     for name in ("a", "b", "factor"):
         writer.add_argument(name, type=int)
-    reader = commands.add_parser("inspect", help="read the recorded calls from main")
+    producer = commands.add_parser("record-sum", help="record a sum and create its pin")
+    producer.add_argument("repo", type=Path)
+    producer.add_argument("pin")
+    producer.add_argument("a", type=int)
+    producer.add_argument("b", type=int)
+    consumer = commands.add_parser("record-scale", help="scale the stored result of a pinned sum")
+    consumer.add_argument("repo", type=Path)
+    consumer.add_argument("producer_pin")
+    consumer.add_argument("producer_commit")
+    consumer.add_argument("result_ref")
+    consumer.add_argument("factor", type=int)
+    reader = commands.add_parser("inspect", help="read recorded calls from a ref (default: main)")
     reader.add_argument("repo", type=Path)
+    reader.add_argument("ref", nargs="?", default="main")
     args = parser.parse_args()
     try:
         if args.command == "record":
             print(record(args.repo, args.a, args.b, args.factor).hex())
+        elif args.command == "record-sum":
+            print(record_sum(args.repo, args.pin.encode("ascii"), args.a, args.b).hex())
+        elif args.command == "record-scale":
+            commit = record_scale(args.repo, args.producer_pin.encode("ascii"), _parse_commit_id(args.producer_commit),
+                                  args.result_ref.encode("ascii"), args.factor)
+            print(commit.hex())
         else:
-            print(json.dumps(inspect(args.repo)))
+            print(json.dumps(inspect(args.repo, args.ref.encode("ascii"))))
     except (core.Error, OSError, ValueError) as error:
         parser.exit(1, f"{args.command}: {error}\n")
 

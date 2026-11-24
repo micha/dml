@@ -44,30 +44,52 @@ class ProcessHistory:
     def __init__(self, directory, example):
         self.repo = directory / "calls"
         self.example = example
-        self.operations = {"record": self.record, "inspect": self.inspect}
+        self.receipts = {}
+        self.operations = {"record": self.record, "record_sum": self.record_sum,
+                           "record_scale": self.record_scale, "inspect": self.inspect}
 
-    def invoke(self, op, args):
-        result = subprocess.run([sys.executable, "-B", self.example, op, self.repo, *args],
-                                cwd=self.repo.parent, capture_output=True, text=True, encoding="utf-8", timeout=30)
+    def invoke(self, op, args, *, operands=None):
+        data = self.repo / "data.mdb"
+        before = data.read_bytes() if data.is_file() else None
+        result = subprocess.run(
+            [sys.executable, "-B", self.example, op.replace("_", "-"), self.repo,
+             *(args if operands is None else operands)],
+            cwd=self.repo.parent, capture_output=True, text=True, encoding="utf-8", timeout=30,
+        )
+        after = data.read_bytes() if data.is_file() else None
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="")
         return {"op": op, "args": list(args), "code": result.returncode, "quiet": not result.stderr,
-                "commit": "", "calls": [], "unchanged": False}, result.stdout
+                "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "",
+                "unchanged": before is not None and before == after}, result.stdout
 
-    def record(self, *args):
-        row, output = self.invoke("record", args)
+    def write(self, op, args, *, operands=None):
+        row, output = self.invoke(op, args, operands=operands)
         return {**row, "commit": id_evidence(output.strip()) if output else ""}
 
-    def inspect(self):
-        data = self.repo / "data.mdb"
-        before = data.read_bytes() if data.is_file() else None
-        row, output = self.invoke("inspect", ())
-        after = data.read_bytes() if data.is_file() else None
+    def record(self, *args):
+        return self.write("record", args)
+
+    def record_sum(self, pin, a, b):
+        row = self.write("record_sum", (pin, a, b))
+        self.receipts[pin] = row["commit"]
+        return row
+
+    def record_scale(self, pin, producer_receipt, result, factor):
+        commit = self.receipts[producer_receipt]
+        row = self.write("record_scale", (pin, producer_receipt, result, factor),
+                         operands=(pin, commit, result, factor))
+        return {**row, "expectedCommit": commit}
+
+    def inspect(self, *args):
+        row, output = self.invoke("inspect", args)
         if output:
             report = json.loads(output)
             row["commit"] = id_evidence(report["commit"])
             row["calls"] = [call_evidence(call) for call in report["calls"]]
-        return {**row, "unchanged": before is not None and before == after}
+            if "producer_commit" in report:
+                row["producerCommit"] = id_evidence(report["producer_commit"])
+        return row
 
 
 class Processes:

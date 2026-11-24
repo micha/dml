@@ -120,6 +120,35 @@ fingerprint or attestation. IDs identify immutable records, not distinct executi
 attempts; recording identical calls can produce the same IDs. Inspection leaves
 committed data unchanged; the repository still uses LMDB's normal locking.
 
+#### Compose from an already committed call
+
+Use separate invocations to record a sum and later scale its stored result:
+
+```sh
+producer=$(python examples/recorded_calls.py record-sum ./split-repo producer 7 5)
+python examples/recorded_calls.py record-sum ./split-repo decoy 8 4
+python examples/recorded_calls.py record-scale ./split-repo producer "$producer" result 3
+python examples/recorded_calls.py inspect ./split-repo result
+```
+
+`record-sum REPO PIN A B` initializes the repository if needed and publishes a
+parentless `recorded-sum-v1` commit under a new ref. `record-scale REPO PIN COMMIT
+RESULT_REF FACTOR` requires an existing repository. In one write transaction it
+checks that `PIN` still names the supplied commit ID and that the commit has the
+expected sum layout. It multiplies the stored result without rerunning the sum.
+The `recorded-scale-v1` commit has that exact producer commit as its sole parent,
+and its `input` node points directly to the producer DAG. Both write commands
+print the committed ID and refuse to replace an existing ref. A missing or stale
+pin, invalid producer, overflow, or occupied result ref leaves committed data
+unchanged. A failed first `record-sum` can still leave an initialized repository.
+
+`inspect REPO [REF]` defaults to `main`. For a split scale commit it reports
+`producer_commit` and checks that the stored input edge matches the parent
+commit's DAG. The result remains readable after the producer pin moves or is
+released: inspection follows committed links, not the original pin name. The
+example stays local to one repository and uses only the explicitly selected
+stored input; it does not search for reusable results.
+
 ### Install and link the C library
 
 For example, install the headers and static library under a local prefix:

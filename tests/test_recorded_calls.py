@@ -136,6 +136,179 @@ class RecordedCallsTest(unittest.TestCase):
 
         self.assertEqual(json.loads(self.expect_success("inspect")), expected)
 
+    def snapshot(self, txn, ref, entry):
+        commit = core.txn_ref_get(txn, ref)
+        commit_view, tree, parents = view(txn, core.REC_COMMIT, commit)
+        tree_view, _, entries = view(txn, core.REC_TREE, tree)
+        self.assertEqual(entries, 1)
+        dag, name = core.object_view_entry(tree_view, 0)
+        self.assertEqual(name, entry)
+        return commit, dag, tuple(core.object_view_parent(commit_view, index) for index in range(parents))
+
+    def assert_missing_ref(self, txn, name):
+        with self.assertRaises(core.Error) as error:
+            core.txn_ref_get(txn, name)
+        self.assertEqual(error.exception.args[0], "not_found")
+
+    def test_compose_each_pinned_sum_even_when_both_share_a_result_node(self):
+        expected = self.expect_success("record-sum", "producer", 7, 5).strip()
+        decoy = self.expect_success("record-sum", "decoy", 9, 3).strip()
+        consumer = self.expect_success("record-scale", "producer", expected, "main", 3).strip()
+        alternate = self.expect_success("record-scale", "decoy", decoy, "alternate", 3).strip()
+        with transaction(self.repo) as txn:
+            first, first_dag, parents = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            self.assertEqual(parents, ())
+            second, second_dag, parents = self.snapshot(txn, b"decoy", b"recorded-sum-v1")
+            self.assertEqual(parents, ())
+            self.assertEqual((first.hex(), second.hex()), (expected, decoy))
+            self.assertNotEqual(first, second)
+            self.assertNotEqual(first_dag, second_dag)
+            _, first_root, _ = view(txn, core.REC_DAG, first_dag)
+            _, second_root, _ = view(txn, core.REC_DAG, second_dag)
+            self.assertEqual(first_root, second_root)
+            self.assertEqual(self.literal_value(txn, first_root, core.DATUM_I64), 12)
+            for ref, printed, parent, producer in (
+                (b"main", consumer, first, first_dag), (b"alternate", alternate, second, second_dag),
+            ):
+                commit, scale, parents = self.snapshot(txn, ref, b"recorded-scale-v1")
+                self.assertEqual(commit.hex(), printed)
+                self.assertEqual(parents, (parent,))
+                source = core.txn_lookup_node(txn, scale, b"input")
+                self.assertEqual(self.node_target(txn, source, core.NODE_SUBDAG), producer)
+        self.assertNotEqual(consumer, alternate)
+
+        sum_report = json.loads(self.expect_success("inspect", "producer"))
+        self.assertEqual(sum_report["commit"], expected)
+        self.assertEqual([call["dag"] for call in sum_report["calls"]], [first_dag.hex()])
+
+        # Neither changing the input ref to an equal-valued decoy nor releasing both
+        # pins changes the already committed parent and sub-DAG edge.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"producer", second)
+            core.txn_commit(txn)
+        moved = json.loads(self.expect_success("inspect"))
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_delete_expected(txn, b"producer", second)
+            core.txn_ref_delete_expected(txn, b"decoy", second)
+            core.txn_commit(txn)
+        data_path = self.repo / "data.mdb"
+        before = data_path.read_bytes()
+        main = json.loads(self.expect_success("inspect"))
+        other = json.loads(self.expect_success("inspect", "alternate"))
+        self.assertEqual(data_path.read_bytes(), before)
+        self.assertEqual(main, moved)
+        for report, commit, parent, dag, a, b in (
+            (main, consumer, expected, first_dag, 7, 5), (other, alternate, decoy, second_dag, 9, 3),
+        ):
+            self.assertEqual(report["commit"], commit)
+            self.assertEqual(report["producer_commit"], parent)
+            summed, scaled = report["calls"]
+            self.assertEqual(summed["dag"], dag.hex())
+            self.assertEqual(summed["arguments"]["a"]["value"], a)
+            self.assertEqual(summed["arguments"]["b"]["value"], b)
+            self.assertEqual(scaled["arguments"]["input"]["call"], dag.hex())
+            self.assertEqual(scaled["arguments"]["input"]["value"], 12)
+            self.assertEqual(scaled["result"]["value"], 36)
+
+    def test_scale_rejects_stale_or_missing_pin_even_if_requested_commit_exists(self):
+        expected = self.expect_success("record-sum", "producer", 7, 5).strip()
+        decoy = self.expect_success("record-sum", "decoy", 9, 3).strip()
+        data_path = self.repo / "data.mdb"
+        before = data_path.read_bytes()
+        for pin, reason in (("decoy", "expected commit"), ("missing", "not_found")):
+            with self.subTest(pin=pin):
+                self.assertIn(reason, self.expect_failure("record-scale", pin, expected, "main", 3))
+                self.assertEqual(data_path.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"producer").hex(), expected)
+            self.assertEqual(core.txn_ref_get(txn, b"decoy").hex(), decoy)
+            self.assert_missing_ref(txn, b"main")
+
+    def test_rejected_writes_keep_existing_refs_and_discard_new_values(self):
+        expected = self.expect_success("record-sum", "producer", 7, 5).strip()
+        consumer = self.expect_success("record-scale", "producer", expected, "main", 3).strip()
+        data_path = self.repo / "data.mdb"
+        cases = (
+            ("record-sum", ("producer", 43, 77), 43, "invalid_state"),
+            ("record-scale", ("producer", expected, "producer", 41), 41, "invalid_state"),
+            ("record-scale", ("producer", expected, "main", 17), 17, "invalid_state"),
+            ("record-scale", ("producer", expected, "overflow", 1 << 62), 1 << 62, "example.scale@1 result"),
+        )
+        for command, arguments, candidate_value, reason in cases:
+            with self.subTest(command=command, arguments=arguments):
+                # Derive the ID without permanently storing the candidate datum.
+                with transaction(self.repo, core.TXN_WRITE) as txn:
+                    datum = core.txn_put_datum(txn, core.datum_encode(core.DATUM_I64, candidate_value))
+                before = data_path.read_bytes()
+                self.assertIn(reason, self.expect_failure(command, *arguments))
+                self.assertEqual(data_path.read_bytes(), before)
+                with transaction(self.repo) as txn:
+                    self.assertEqual(core.txn_ref_get(txn, b"producer").hex(), expected)
+                    self.assertEqual(core.txn_ref_get(txn, b"main").hex(), consumer)
+                    self.assert_missing_ref(txn, b"overflow")
+                    with self.assertRaises(core.Error) as error:
+                        core.txn_get_datum(txn, datum)
+                    self.assertEqual(error.exception.args[0], "not_found")
+
+    def publish_sum_fixture(self, implementation=b"example.sum@1"):
+        with transaction(self.repo, core.TXN_WRITE, create=True) as txn:
+            implementation_node = literal(txn, core.DATUM_STRING, implementation)
+            a = literal(txn, core.DATUM_I64, 2)
+            b = literal(txn, core.DATUM_I64, 3)
+            root = literal(txn, core.DATUM_I64, -17)
+            producer = put(txn, core.REC_DAG, root, b"implementation", implementation_node, b"a", a, b"b", b)
+            tree = put(txn, core.REC_TREE, b"recorded-sum-v1", producer)
+            commit = put(txn, core.REC_COMMIT, tree)
+            core.txn_ref_create(txn, b"producer", commit)
+            core.txn_commit(txn)
+            return commit, producer, root
+
+    def test_scale_uses_the_stored_sum_result_without_reexecuting_sum(self):
+        commit, producer, root = self.publish_sum_fixture()
+        self.expect_success("record-scale", "producer", commit.hex(), "main", 6)
+        with transaction(self.repo) as txn:
+            _, scale, _ = self.snapshot(txn, b"main", b"recorded-scale-v1")
+            _, scale_root, _ = view(txn, core.REC_DAG, scale)
+            self.assertEqual(self.literal_value(txn, scale_root, core.DATUM_I64), -102)  # Not (2 + 3) * 6.
+        report = json.loads(self.expect_success("inspect"))
+        self.assertEqual(report["producer_commit"], commit.hex())
+        summed, scaled = report["calls"]
+        self.assertEqual(summed["result"], {"node": root.hex(), "value": -17})
+        self.assertEqual(scaled["arguments"]["input"]["call"], producer.hex())
+        self.assertEqual(scaled["arguments"]["input"]["value"], -17)
+        self.assertEqual(scaled["result"]["value"], -102)
+
+    def test_scale_rejects_unknown_sum_version_even_with_matching_pin_and_tree_entry(self):
+        commit, _, _ = self.publish_sum_fixture(b"example.sum@2")
+        data_path = self.repo / "data.mdb"
+        before = data_path.read_bytes()
+        diagnostic = self.expect_failure("record-scale", "producer", commit.hex(), "main", 3)
+        self.assertIn("expected recorded implementation example.sum@1", diagnostic)
+        self.assertEqual(data_path.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"producer"), commit)
+            self.assert_missing_ref(txn, b"main")
+
+    def test_inspect_rejects_mismatched_parent_even_when_the_sum_roots_match(self):
+        expected = self.expect_success("record-sum", "producer", 7, 5).strip()
+        decoy = self.expect_success("record-sum", "decoy", 9, 3).strip()
+        self.expect_success("record-scale", "producer", expected, "main", 3)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            consumer = core.txn_ref_get(txn, b"main")
+            _, tree, _ = view(txn, core.REC_COMMIT, consumer)
+            _, first_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, second_dag, _ = self.snapshot(txn, b"decoy", b"recorded-sum-v1")
+            self.assertNotEqual(first_dag, second_dag)
+            self.assertEqual(view(txn, core.REC_DAG, first_dag)[1], view(txn, core.REC_DAG, second_dag)[1])
+            forged = put(txn, core.REC_COMMIT, tree, bytes.fromhex(decoy))
+            core.txn_ref_create(txn, b"mismatch", forged)
+            core.txn_commit(txn)
+
+        data_path = self.repo / "data.mdb"
+        before = data_path.read_bytes()
+        self.assertIn("does not match the producer parent", self.expect_failure("inspect", "mismatch"))
+        self.assertEqual(data_path.read_bytes(), before)
+
     def publish_fixture(self, *, linked_input):
         with transaction(self.repo, core.TXN_WRITE, create=True) as txn:
             sum_impl = literal(txn, core.DATUM_STRING, b"example.sum@1")

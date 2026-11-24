@@ -134,11 +134,43 @@ The [Python example](../README.md#record-two-composed-calls-in-python) uses the
 public binding. The [workflow runner](run_recorded_calls.py) launches separate
 record and inspect processes and observes the JSON report and committed LMDB
 bytes. Quint supplies the [input histories](recorded_calls_histories.qnt) and
-[judges the report](recorded_calls_rules.qnt). Two different sets of inputs
-produce the same sum literal; the scale input must identify the producer DAG,
-not just the literal shared by both sums.
+[judges the report](recorded_calls_rules.qnt). For split recording, the runner
+passes the exact commit ID printed by an earlier sum process, not the current
+pin target. Two sums in the same repository share a result node. Quint checks
+that each scale report refers to its selected producer commit and reports the
+same producer DAG seen in an independent inspection of that sum. Stale and
+missing pins, overflow, and a duplicate result ref must leave `data.mdb`
+unchanged.
 
-The [focused tests](test_recorded_calls.py) independently read the stored graph
-with the public binding. They exercise overflow rollback and inspect a synthetic
-commit with incorrect arithmetic to show that inspection reports recorded values
-without recomputing. Both checks run in the opt-in Meson gate.
+The [focused tests](test_recorded_calls.py) independently read both physical
+links with the public binding. They also check that inspection rejects an
+inconsistent parent and input DAG, works after the producer pins are moved or
+released, and does not recompute results. An intentionally incorrect stored sum
+checks that composition consumes the stored value. Both the workflow and
+focused tests run in the opt-in Meson gate.
+
+#### Check the split-call design with TLC
+
+The [design model](committed_calls_design.qnt) has two same-valued producer
+commits with distinct DAGs, two movable producer pins, one disjoint create-only
+result ref, and two classes of factor (valid or overflowing). It models each
+workflow write as one transaction and allows other writers to change pins only
+between transactions. It checks safety, not liveness, and abstracts away
+native writes, malformed records, garbage collection, and ref-name aliases.
+The replay and focused tests check those parts of actual behavior relevant to
+this example, including the case where a result ref aliases a producer pin.
+
+Run this design check separately from CI, with Java and a Quint CLI supporting
+TLC observation search (for example, Quint 0.34.0):
+
+```sh
+mkdir -p build/committed-calls-tlc
+(cd build/committed-calls-tlc && quint verify ../../tests/committed_calls_design.qnt \
+  --backend=tlc --invariants pinsRetainProducers retainedAndConsistent scaleRefAndObjects \
+  --search-observations)
+```
+
+Both producer selections, stale and missing pin rejection, overflow, duplicate
+publication, and readback after pin release must be reachable. TLC checks this
+finite design; [runtime replay](../docs/validation-policy.md#design-with-tlc-validate-implementation-with-replay)
+checks the implementation on selected histories.
