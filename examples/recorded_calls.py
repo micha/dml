@@ -15,6 +15,7 @@ from contextlib import contextmanager
 import json
 from operator import add, mul
 from pathlib import Path
+import re
 from typing import NamedTuple
 
 from daggerml import core
@@ -26,6 +27,11 @@ SCALE_ENTRY = b"recorded-scale-v1"
 REQUEST_ENTRY = b"scale-request-v1"
 PLAN_ENTRY = b"scale-plan-v1"
 REQUESTED_SCALE_ENTRY = b"requested-scale-v1"
+PUBLICATION_ENTRY = b"scale-publication-v1"
+PUBLICATION_FIELDS = (b"plan_ref", b"plan_commit", b"staging_ref", b"result_commit")
+# The core's ASCII name profile, also used to validate receipt literals.
+REF_NAME = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+COMMIT_HEX = re.compile(rb"[0-9a-f]{32}")
 SUM = b"example.sum@1"
 SCALE = b"example.scale@1"
 MAIN = b"main"
@@ -334,17 +340,41 @@ def publish_scale(path, returned, result_commit, producer_commit, expected_facto
     return result_commit
 
 
-def publish_requested_scale(path, plan_pin, plan_commit, returned, result_commit):
-    """Publish the exact staged result and consume both source-local pins."""
+def _record_publication(txn, receipt_ref, fields):
+    nodes = {name: _put_literal(txn, core.DATUM_STRING, value) for name, value in fields.items()}
+    bindings = [field for binding in nodes.items() for field in binding]
+    dag = _put_object(txn, core.REC_DAG, nodes[b"result_commit"], *bindings)
+    # Literal IDs, not parents: retaining a receipt does not pin the old history.
+    _publish(txn, receipt_ref, PUBLICATION_ENTRY, dag)
+
+
+def publish_requested_scale(path, plan_pin, plan_commit, returned, result_commit, *, receipt_ref=None):
+    """Publish and consume both pins, or acknowledge a matching retained receipt."""
     _check_commit_id(plan_commit, "plan commit")
     _check_commit_id(result_commit, "result commit")
     if type(plan_pin) is not bytes or type(returned) is not bytes:
         raise ValueError("plan and staging refs must be bytes")
     if len({plan_pin, returned, MAIN}) != 3:
         raise ValueError("plan, staging, and main refs must be distinct")
+    if receipt_ref is not None:
+        for label, ref in (("plan", plan_pin), ("staging", returned), ("receipt", receipt_ref)):
+            if type(ref) is not bytes or not REF_NAME.fullmatch(ref):
+                raise ValueError(f"{label} ref must be a valid ASCII ref name in bytes")
+        if receipt_ref in (plan_pin, returned, MAIN):
+            raise ValueError("receipt, plan, staging, and main refs must be distinct")
+        intent = {b"plan_ref": plan_pin, b"plan_commit": plan_commit.hex().encode("ascii"),
+                  b"staging_ref": returned, b"result_commit": result_commit.hex().encode("ascii")}
     with _write_transaction(path, create=False) as txn:
+        if receipt_ref is not None:
+            receipt = _optional_ref(txn, receipt_ref)
+            if receipt is not None:
+                if _read_publication(txn, receipt) != intent:
+                    raise ValueError("receipt does not match the requested publication")
+                return result_commit
         request, expected_main = _selected_plan(txn, plan_pin, plan_commit)
         _inspect_snapshot(txn, result_commit, expected_request=request)
+        if receipt_ref is not None:
+            _record_publication(txn, receipt_ref, intent)
         _update_main(txn, result_commit, expected_main)
         core.txn_ref_delete_expected(txn, returned, result_commit)
         core.txn_ref_delete_expected(txn, plan_pin, plan_commit)
@@ -451,6 +481,22 @@ def _inspect_request(txn, commit, entry):
             "request_implementation": SCALE.decode("ascii"), "request_factor": request.factor, "calls": [summed]}
 
 
+def _read_publication(txn, commit):
+    _, parents, entry, dag = _snapshot(txn, commit)
+    if entry != PUBLICATION_ENTRY or parents != 0:
+        raise ValueError("expected a parentless scale-publication-v1 receipt")
+    _, root, count = _object(txn, core.REC_DAG, dag)
+    if count != len(PUBLICATION_FIELDS) or root != core.txn_lookup_node(txn, dag, b"result_commit"):
+        raise ValueError("publication receipt has the wrong DAG layout")
+    fields = {name: _read_literal(txn, core.txn_lookup_node(txn, dag, name), core.DATUM_STRING)
+              for name in PUBLICATION_FIELDS}
+    plan, stage = fields[b"plan_ref"], fields[b"staging_ref"]
+    if not (REF_NAME.fullmatch(plan) and REF_NAME.fullmatch(stage) and len({plan, stage, MAIN}) == 3
+            and COMMIT_HEX.fullmatch(fields[b"plan_commit"]) and COMMIT_HEX.fullmatch(fields[b"result_commit"])):
+        raise ValueError("publication receipt has invalid ref names or commit IDs")
+    return fields
+
+
 def _inspect_snapshot(txn, commit, *, expected_request=None):
     snapshot = _snapshot(txn, commit)
     view, parents, entry, terminal = snapshot
@@ -459,6 +505,9 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
     if entry in (REQUEST_ENTRY, PLAN_ENTRY):
         return _inspect_request(txn, commit, entry)
     report = {"commit": commit.hex()}
+    if entry == PUBLICATION_ENTRY:
+        fields = _read_publication(txn, commit)
+        return {**report, **{name.decode("ascii"): value.decode("ascii") for name, value in fields.items()}}
     if entry == SUM_ENTRY:
         dag = _sum_dag(snapshot)
         summed, _ = _inspect_call(txn, dag, SUM, (b"a", b"b"))
@@ -563,6 +612,7 @@ def main():
     requested_publisher.add_argument("plan_commit")
     requested_publisher.add_argument("returned")
     requested_publisher.add_argument("result_commit")
+    requested_publisher.add_argument("--receipt-ref", help="keep a source-local receipt for safe retries")
     release = commands.add_parser("release-input", help="release a staged sum retained by a recorded result")
     release.add_argument("repo", type=Path)
     release.add_argument("pin")
@@ -611,8 +661,9 @@ def main():
         elif args.command == "publish-requested-scale":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             result = _parse_commit_id(args.result_commit, "result commit")
+            receipt = args.receipt_ref.encode("ascii") if args.receipt_ref is not None else None
             print(publish_requested_scale(args.repo, args.plan_pin.encode("ascii"), plan,
-                                          args.returned.encode("ascii"), result).hex())
+                                          args.returned.encode("ascii"), result, receipt_ref=receipt).hex())
         elif args.command == "release-input":
             print(release_input(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                                 args.result_ref.encode("ascii")).hex())

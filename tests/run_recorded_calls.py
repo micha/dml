@@ -79,6 +79,7 @@ class ProcessHistory:
                 "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
                 "expectedResult": "", "expectedMain": "", "requestCommit": "",
                 "requestImplementation": "", "requestFactor": 0,
+                "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
                 "unchanged": before is not None and before == after,
                 "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
 
@@ -158,11 +159,15 @@ class ProcessHistory:
             self.scale_receipts[role, result_ref] = row["commit"]
         return {**row, "expectedCommit": request}
 
-    def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt):
+    def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt, receipt_ref=None):
         plan = self.plan_receipts[plan_receipt]
         result = self.scale_receipts["worker", result_receipt]
-        row = self.write("publish_requested_scale", (role, pin, plan_receipt, returned, result_receipt),
-                         operands=(pin, plan, returned, result))
+        args = (role, pin, plan_receipt, returned, result_receipt)
+        operands = (pin, plan, returned, result)
+        if receipt_ref is not None:
+            args += (receipt_ref,)
+            operands += ("--receipt-ref", receipt_ref)
+        row = self.write("publish_requested_scale", args, operands=operands)
         return {**row, "expectedCommit": plan, "expectedResult": result}
 
     def collect(self, role):
@@ -174,7 +179,11 @@ class ProcessHistory:
         if output:
             report = json.loads(output)
             row["commit"] = id_evidence(report["commit"])
-            row["calls"] = [call_evidence(call) for call in report["calls"]]
+            if "calls" in report:
+                row["calls"] = [call_evidence(call) for call in report["calls"]]
+            if "plan_commit" in report:
+                row["publication"] = {"planRef": report["plan_ref"], "plan": id_evidence(report["plan_commit"]),
+                                      "stagingRef": report["staging_ref"], "result": id_evidence(report["result_commit"])}
             if "producer_commit" in report:
                 row["producerCommit"] = id_evidence(report["producer_commit"])
             if "request_commit" in report:

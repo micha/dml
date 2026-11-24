@@ -646,6 +646,206 @@ class RecordedCallsTest(unittest.TestCase):
             self.assert_missing_ref(txn, b"result")
             self.assertEqual(core.txn_ref_get(txn, b"incoming").hex(), request)
 
+    def prepare_receipted_scale(self):
+        producer = self.expect_success("record-sum", "producer", 7, 5).strip()
+        previous = self.expect_success("record-sum", "main", 12, 0).strip()
+        plan = self.expect_success("request-scale", "producer", producer, "plan", 3).strip()
+        worker = self.workspace / "worker"
+        outbound = self.workspace / "request.dmlb"
+        inbound = self.workspace / "result.dmlb"
+        request = self.expect_success("export-request", "plan", plan, outbound).strip()
+        self.expect_success("stage-input", "incoming", outbound, repo=worker)
+        result = self.expect_success("work-scale", "incoming", request, "result", repo=worker).strip()
+        self.expect_success("export-scale", "result", result, inbound, repo=worker)
+        self.expect_success("stage-input", "returned", inbound)
+        return producer, previous, plan, result
+
+    def test_receipt_retries_without_changes_after_ref_reuse_and_collection(self):
+        producer, previous, plan, result = self.prepare_receipted_scale()
+        producer_id, previous_id, plan_id, result_id = map(bytes.fromhex, (producer, previous, plan, result))
+        publish = ("publish-requested-scale", "plan", plan, "returned", result, "--receipt-ref", "ack")
+        self.assertEqual(self.expect_success(*publish).strip(), result)
+        fields = {"plan_ref": "plan", "plan_commit": plan, "staging_ref": "returned", "result_commit": result}
+        with transaction(self.repo) as txn:
+            receipt, dag, parents = self.snapshot(txn, b"ack", b"scale-publication-v1")
+            self.assertEqual(parents, ())
+            _, root, bindings = view(txn, core.REC_DAG, dag)
+            self.assertEqual(bindings, len(fields))
+            self.assertEqual(root, core.txn_lookup_node(txn, dag, b"result_commit"))
+            for name, value in fields.items():
+                node = core.txn_lookup_node(txn, dag, name.encode("ascii"))
+                self.assertEqual(self.literal_value(txn, node, core.DATUM_STRING), value)
+            self.assertEqual(core.txn_ref_get(txn, b"main"), result_id)
+            self.assert_missing_ref(txn, b"plan")
+            self.assert_missing_ref(txn, b"returned")
+        report = {"commit": receipt.hex(), **fields}
+        data = self.repo / "data.mdb"
+
+        def assert_retry_unchanged():
+            before = data.read_bytes()
+            self.assertEqual(self.expect_success(*publish).strip(), result)
+            self.assertEqual(data.read_bytes(), before)
+            self.assertEqual(json.loads(self.expect_success("inspect", "ack")), report)
+            self.assertEqual(data.read_bytes(), before)
+
+        assert_retry_unchanged()
+        # All first-publication guards now pass again, but the old attempt may not republish.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous_id)
+            core.txn_ref_create(txn, b"plan", plan_id)
+            core.txn_ref_create(txn, b"returned", result_id)
+            core.txn_commit(txn)
+        assert_retry_unchanged()
+        # Unrelated new targets use the old names. The receipt retains no old history.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            for ref in (b"main", b"plan", b"returned"):
+                core.txn_ref_update(txn, ref, producer_id)
+            core.txn_commit(txn)
+        self.assertGreater(int(self.expect_success("collect")), 0)
+        with transaction(self.repo) as txn:
+            for commit in (previous_id, plan_id, result_id):
+                with self.assertRaises(core.Error) as swept:
+                    core.txn_get_object(txn, core.REC_COMMIT, commit)
+                self.assertEqual(swept.exception.args[0], "not_found")
+        assert_retry_unchanged()
+
+    def test_receipt_key_rejects_each_changed_field_even_when_new_publication_is_ready(self):
+        producer, previous, plan, result = self.prepare_receipted_scale()
+        producer_id, previous_id, plan_id, result_id = map(bytes.fromhex, (producer, previous, plan, result))
+
+        def publish(plan_ref, proposed_plan, staging_ref, proposed_result, receipt="ack"):
+            return ("publish-requested-scale", plan_ref, proposed_plan, staging_ref, proposed_result,
+                    "--receipt-ref", receipt)
+
+        self.assertEqual(self.expect_success(*publish("plan", plan, "returned", result)).strip(), result)
+        data = self.repo / "data.mdb"
+
+        def reject(*selection):
+            before = data.read_bytes()
+            self.expect_failure(*publish(*selection))
+            self.assertEqual(data.read_bytes(), before)
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous_id)
+            for ref, commit in ((b"plan", plan_id), (b"other-plan", plan_id),
+                                (b"returned", result_id), (b"other-returned", result_id)):
+                core.txn_ref_create(txn, ref, commit)
+            core.txn_commit(txn)
+        reject("other-plan", plan, "returned", result)
+        reject("plan", plan, "other-returned", result)
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            # Both results satisfy the original request; only their stored output differs.
+            commit_view, tree, _ = view(txn, core.REC_COMMIT, result_id)
+            request = core.object_view_parent(commit_view, 0)
+            tree_view, _, _ = view(txn, core.REC_TREE, tree)
+            dag, entry = core.object_view_entry(tree_view, 0)
+            arguments = (b"implementation", b"input", b"factor")
+            bindings = [field for name in arguments for field in (name, core.txn_lookup_node(txn, dag, name))]
+            new_dag = put(txn, core.REC_DAG, literal(txn, core.DATUM_I64, 99), *bindings)
+            new_tree = put(txn, core.REC_TREE, entry, new_dag)
+            other_result = put(txn, core.REC_COMMIT, new_tree, request)
+            core.txn_ref_update(txn, b"returned", other_result)
+            core.txn_commit(txn)
+        reject("plan", plan, "returned", other_result.hex())
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            # Recapture a different main, but keep the producer and factor (hence request) exact.
+            core.txn_ref_update(txn, b"main", producer_id)
+            core.txn_ref_delete_expected(txn, b"plan", plan_id)
+            core.txn_ref_update(txn, b"returned", result_id)
+            core.txn_commit(txn)
+        other_plan = self.expect_success("request-scale", "producer", producer, "plan", 3).strip()
+        self.assertNotEqual(other_plan, plan)
+        reject("plan", other_plan, "returned", result)
+        # This plan and result are ready under a fresh key, including a maximum-length name.
+        fresh = "1" + "a" * 124 + "._-"
+        selection = publish("plan", other_plan, "returned", result, fresh)
+        self.assertEqual(self.expect_success(*selection).strip(), result)
+        after = data.read_bytes()
+        self.assertEqual(self.expect_success(*selection).strip(), result)
+        self.assertEqual(data.read_bytes(), after)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"other-plan"), plan_id)
+            self.assertEqual(core.txn_ref_get(txn, b"other-returned"), result_id)
+
+    def test_receipt_aliases_and_occupied_key_reject_without_writes(self):
+        producer, _, plan, result = self.prepare_receipted_scale()
+        data = self.repo / "data.mdb"
+        publish = ("publish-requested-scale", "plan", plan, "returned", result, "--receipt-ref")
+        before = data.read_bytes()
+        for alias in ("main", "plan", "returned"):
+            with self.subTest(alias=alias):
+                self.assertIn("distinct", self.expect_failure(*publish, alias))
+                self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_create(txn, b"not-receipt", bytes.fromhex(producer))
+            nodes = {name: literal(txn, core.DATUM_STRING, value) for name, value in (
+                (b"plan_ref", b"plan"), (b"plan_commit", plan.encode("ascii")),
+                (b"staging_ref", b"returned"), (b"result_commit", result.encode("ascii")),
+            )}
+            # Exact matching fields, but the wrong binding is the root.
+            operands = [field for binding in nodes.items() for field in binding]
+            dag = put(txn, core.REC_DAG, nodes[b"plan_commit"], *operands)
+            tree = put(txn, core.REC_TREE, b"scale-publication-v1", dag)
+            core.txn_ref_create(txn, b"bad-receipt", put(txn, core.REC_COMMIT, tree))
+            core.txn_commit(txn)
+        before = data.read_bytes()
+        for occupied in ("not-receipt", "bad-receipt"):
+            with self.subTest(occupied=occupied):
+                self.expect_failure(*publish, occupied)
+                self.assertEqual(data.read_bytes(), before)
+        self.expect_failure("inspect", "bad-receipt")
+        self.assertEqual(data.read_bytes(), before)
+
+    def test_failed_receipted_publication_does_not_reserve_key_or_infer_success_from_main(self):
+        producer, previous, plan, result = self.prepare_receipted_scale()
+        producer_id, previous_id, result_id = map(bytes.fromhex, (producer, previous, result))
+        publish = ("publish-requested-scale", "plan", plan, "returned", result, "--receipt-ref", "ack")
+        data = self.repo / "data.mdb"
+
+        def reject(reason):
+            before = data.read_bytes()
+            self.assertIn(reason, self.expect_failure(*publish))
+            self.assertEqual(data.read_bytes(), before)
+            with transaction(self.repo) as txn:
+                self.assert_missing_ref(txn, b"ack")
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"returned", producer_id)
+            core.txn_commit(txn)
+        reject("ref target differs")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"returned", result_id)
+            core.txn_ref_update(txn, b"main", result_id)
+            core.txn_commit(txn)
+        reject("main does not point to the expected commit")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous_id)
+            core.txn_commit(txn)
+        self.assertEqual(self.expect_success(*publish).strip(), result)
+
+    def test_receipted_publication_validates_ref_names_before_opening_repository(self):
+        class BytesSubclass(bytes):
+            pass
+
+        class UnopenablePath:
+            def __fspath__(self):
+                raise AssertionError("invalid ref names must be rejected before opening the repository")
+
+        publish = runpy.run_path(EXAMPLE)["publish_requested_scale"]
+        identifier = bytes(16)
+        invalid_types = ("ref", bytearray(b"ref"), BytesSubclass(b"ref"))
+        invalid_names = (b"", b"-ref", b".ref", b"_ref", b"ref/name", b"r\xc3\xa9f", b"ref\n", b"x" * 129)
+        for index, label in enumerate(("plan", "staging", "receipt")):
+            for invalid in (*invalid_types, *invalid_names):
+                names = [b"plan", b"returned", b"ack"]
+                names[index] = invalid
+                diagnostic = f"{label} ref.*valid ASCII ref name" if type(invalid) is bytes else "ref.*bytes"
+                with self.subTest(ref=label, invalid=repr(invalid)), self.assertRaisesRegex(ValueError, diagnostic):
+                    plan, stage, receipt = names
+                    publish(UnopenablePath(), plan, identifier, stage, identifier, receipt_ref=receipt)
+
     def test_publish_validates_arguments_before_opening_the_repository(self):
         class BytesSubclass(bytes):
             pass
