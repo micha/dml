@@ -15,7 +15,7 @@ changes to the replay suite or to covered behavior: ref creation, atomic snapsho
 publication and rollback, caller-side conditional publication, binary commit
 transfer and the staged result round trip, read-only integrity and reachability
 checks, and explicit transactional garbage collection. This also runs focused
-interpreter tests, native integrity and collection fault checks, and native
+interpreter and Python binding tests, native integrity and collection fault checks, and native
 transfer boundary and fault tests, plus Quint's separate provenance handoff
 workflow checks against the C example.
 See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
@@ -33,6 +33,8 @@ are historical evidence, not a passing gate for current code.
 - Use an installed consumer or equivalent boundary check when changing native
   build or installation behavior. For handoff changes, also run the
   [process integration against the installed C library](../tests/README.md#process-integration).
+  For Python binding or packaging changes, run the focused binding tests and
+  [ref replay against the installed wheel](../tests/README.md#replay-refs-against-the-installed-wheel).
   Use Valgrind when touching memory-critical paths.
 - Prefer Quint for behavior that can be checked against live observations. Keep
   core API replay separate from application-level workflow suites. Keep model

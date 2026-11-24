@@ -14,6 +14,7 @@ and the [historical draft](../spec/overview.md) do not define implemented behavi
 | Nodes, DAGs, trees, commits, names, and borrowed views | [Snapshot and history objects](objects.md) |
 | Repository initialization, storage keys, transactions, refs, retention, integrity, and garbage collection | [Local repository and transactions](repository.md) |
 | Binary commit bundle, export, and atomic import | [Commit transfer](transfer.md) |
+| Public CPython binding arguments, results, errors, and handle lifetime | [Python core binding](python.md) |
 | Working vocabulary | [Glossary](glossary.md) |
 | Documentation conventions | [Writing guidelines](../documentation-guidelines.md) and [agent guide](AGENTS.md) |
 
@@ -29,6 +30,8 @@ It can also export and atomically import self-contained binary commit bundles,
 either unpinned or with a new [local staging ref](transfer.md#atomic-staging).
 The [public headers](../../include/dml/) define the API, and the
 [entity diagram](../lmdb-entity-diagram.html) shows the implemented storage layout.
+The [Python core binding](python.md) exposes a subset of the local C operations
+through an optional CPython package.
 
 The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
 contains the earlier application layers and validation evidence. It does not extend

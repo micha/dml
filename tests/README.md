@@ -9,9 +9,11 @@ transfer, staged-import, and garbage-collection suites. Run it through
 Each history is an ordered list of `{ op: str, args: List[str] }` requests.
 Each request names **one DML core function**, without the `dml_` prefix. The
 [shared adapter](replay_core.py) resolves handles, object IDs and buffers, then
-calls the matching [Python binding](../python/dml_core.c) once. The binding is
-private and built only for opt-in tests. Neither layer implicitly begins,
-commits or aborts transactions, or decides whether a core outcome passes.
+calls the matching [Python binding](../python/dml_core.c) once. Ref replay
+imports the same [public module](../docs/spec-next/python.md) that ships in the
+wheel. The transfer, staged-import, and collection suites still use a private
+build with extra output-slot instrumentation. Neither layer implicitly begins,
+commits or aborts transactions during replay, or judges the core outcome.
 
 For example, `txn_ref_create` with `List("writer", "main", "A")` uses the
 transaction aliased as `writer` and the commit ID aliased as `A`. A separate
@@ -29,6 +31,25 @@ changes. Exported bundles are also read with an independent wire parser. Quint
 judges these observations against expected records, dependencies, ref values,
 and transaction outcomes. Dispatch errors, missing observations or verdicts,
 and insufficient history coverage fail the suite.
+
+## Replay refs against the installed wheel
+
+After [installing the binding](../README.md#install-the-python-binding) in a
+clean virtual environment and building the opt-in suite, run from outside the
+checkout with no `PYTHONPATH`. Set `source` to the absolute checkout path and
+`consumer_python` to the virtual environment's Python. Use the scanner
+executable for the platform (`lmdb_inventory.exe` on Windows).
+
+```sh
+"$consumer_python" -IB "$source/tests/test_python_binding.py"
+"$consumer_python" -EB "$source/tests/run_histories.py" "$(command -v quint)" \
+  daggerml.core "$source/build/core-check-quint/lmdb_inventory" \
+  "$source/tests/ref_histories.qnt" "$source/tests/ref_rules.qnt" \
+  --init init --init changedInit
+```
+
+The focused binding tests check Python argument rejection, error mapping,
+byte-buffer ownership, explicit handle consumption, and thread-affine cleanup.
 
 ## Exercised behavior
 

@@ -12,6 +12,10 @@ from run_histories import check_verdicts, replay_history
 from trace_support import Replay
 
 
+class ApiError(RuntimeError):
+    pass
+
+
 class Fixture:
     def __init__(self):
         self.closed = False
@@ -56,12 +60,12 @@ class TraceInterpreterTest(unittest.TestCase):
 
     @patch("replay_core.scan_inventory", return_value={})
     def test_core_dispatch_does_not_end_transaction_on_write_failure(self, scan):
-        core = Mock()
+        core = Mock(Error=ApiError)
         repo, txn = object(), object()
         core.repo_open.return_value = repo
         core.txn_begin.return_value = txn
-        core.txn_ref_create.side_effect = RuntimeError("invalid_state", 0, "ref already exists")
-        core.txn_commit.side_effect = RuntimeError("invalid_state", 0, "transaction poisoned")
+        core.txn_ref_create.side_effect = ApiError("invalid_state", 0, "ref already exists")
+        core.txn_commit.side_effect = ApiError("invalid_state", 0, "transaction poisoned")
         target = bytes(range(16))
         history = CoreHistory(core, "scanner", Path("repo"))
         history.values["id"]["A"] = target
@@ -83,8 +87,8 @@ class TraceInterpreterTest(unittest.TestCase):
         self.assertEqual(scan.call_count, len(core.mock_calls))
 
     def test_binding_errors_are_not_api_statuses(self):
-        core = Mock()
-        core.repo_open.side_effect = RuntimeError("unexpected binding failure")
+        core = Mock(Error=ApiError)
+        core.repo_open.side_effect = RuntimeError("invalid_state", 0, "unexpected binding failure")
         history = CoreHistory(core, "scanner", Path("repo"))
         with self.assertRaisesRegex(RuntimeError, "unexpected binding failure"):
             history.run("repo_open", "repo", "create")

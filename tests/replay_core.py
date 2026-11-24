@@ -1,9 +1,11 @@
-"""Replay individual DML core operations through the private Python binding."""
+"""Replay individual DML core operations through a Python binding."""
 
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
+from importlib import import_module
 from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 import re
 import struct
 
@@ -196,7 +198,7 @@ class CoreHistory:
         status, value, count, items = "ok", "", 0, []
         try:
             result = getattr(self.core, op)(*native_args)
-        except RuntimeError as error:
+        except self.core.Error as error:
             if (len(error.args) != 3 or not isinstance(error.args[0], str)
                     or not isinstance(error.args[1], int) or not isinstance(error.args[2], str)):
                 raise
@@ -230,11 +232,14 @@ class CoreHistory:
 
 class Suite:
     def __init__(self, binding, scanner):
-        spec = spec_from_file_location("_dml_core", binding)
-        if spec is None or spec.loader is None:
-            raise ValueError(f"Cannot load the DML Python binding at {binding}")
-        self.core = module_from_spec(spec)
-        spec.loader.exec_module(self.core)
+        if binding == "daggerml.core":
+            self.core = import_module(binding)
+        else:
+            spec = spec_from_file_location("_dml_core", Path(binding).absolute())
+            if spec is None or spec.loader is None:
+                raise ValueError(f"Cannot load the private DML binding at {binding}")
+            self.core = module_from_spec(spec)
+            spec.loader.exec_module(self.core)
         self.scanner = scanner
 
     @contextmanager

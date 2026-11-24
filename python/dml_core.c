@@ -4,17 +4,42 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "dml/repo.h"
+#ifdef DML_PRIVATE_REPLAY
 #include "dml/transfer.h"
+#endif
 
-/* Private, single-threaded replay binding. Each entry point calls one core
- * operation; destructors and result conversion only manage ownership. */
-#define REPO_CAPSULE "_dml_core.repo"
-#define TXN_CAPSULE "_dml_core.txn"
-#define VIEW_CAPSULE "_dml_core.object_view"
+#ifdef Py_GIL_DISABLED
+#error "DML requires a GIL-enabled CPython build"
+#endif
+
+/* The private test build adds observations of C output slots on failure. */
+#ifdef DML_PRIVATE_REPLAY
+#define MODULE_NAME "_dml_core"
+#define MODULE_INIT PyInit__dml_core
+#else
+#define MODULE_NAME "daggerml.core"
+#define MODULE_INIT PyInit_core
+#endif
+#define REPO_CAPSULE MODULE_NAME ".repo"
+#define TXN_CAPSULE MODULE_NAME ".txn"
+#define VIEW_CAPSULE MODULE_NAME ".object_view"
+
+typedef struct {
+  PyObject *error;
+} module_state;
+
+typedef struct {
+  dml_repo *repo;
+  dml_txn *abandoned;
+  uint64_t owner_thread;
+  bool active;
+} repo_handle;
 
 typedef struct {
   dml_txn *txn;
   PyObject *repo;
+  uint64_t owner_thread;
 } txn_handle;
 
 typedef struct {
@@ -22,25 +47,93 @@ typedef struct {
   PyObject *packed;
 } object_handle;
 
-static PyObject *raise_status(dml_status status, const dml_error *error) {
+static PyObject *raise_status(PyObject *module, dml_status status, const dml_error *error) {
+  module_state *state = PyModule_GetState(module);
   PyObject *args = Py_BuildValue("(sis)", dml_status_name(status), error->native_code, error->detail);
   if (args != NULL) {
-    PyErr_SetObject(PyExc_RuntimeError, args);
+    PyErr_SetObject(state->error, args);
     Py_DECREF(args);
   }
   return NULL;
 }
 
+static uint64_t thread_id(void) {
+  return PyThreadState_GetID(PyThreadState_Get());
+}
+
+static bool on_owner_thread(uint64_t owner_thread) {
+  if (thread_id() == owner_thread) return true;
+  PyErr_SetString(PyExc_RuntimeError, "DML handle must be used on its creating thread");
+  return false;
+}
+
+static void *get_handle(PyObject *owner, const char *name) {
+  if (!PyCapsule_IsValid(owner, name)) {
+    PyErr_Format(PyExc_TypeError, "expected a %s handle", name);
+    return NULL;
+  }
+  return PyCapsule_GetPointer(owner, name);
+}
+
+static repo_handle *get_repo(PyObject *owner) {
+  repo_handle *handle = get_handle(owner, REPO_CAPSULE);
+  return handle != NULL && on_owner_thread(handle->owner_thread) ? handle : NULL;
+}
+
+static txn_handle *get_txn(PyObject *owner) {
+  txn_handle *handle = get_handle(owner, TXN_CAPSULE);
+  return handle != NULL && on_owner_thread(handle->owner_thread) ? handle : NULL;
+}
+
+static void reap_abandoned(repo_handle *handle) {
+  if (handle->abandoned == NULL) return;
+  dml_txn_abort(&handle->abandoned);
+  handle->active = false;
+}
+
 static void destroy_repo(PyObject *capsule) {
-  dml_repo **repo = PyCapsule_GetPointer(capsule, REPO_CAPSULE);
-  if (*repo != NULL) dml_repo_close(repo, NULL);
-  PyMem_Free(repo);
+  repo_handle *handle = PyCapsule_GetPointer(capsule, REPO_CAPSULE);
+  if (handle->abandoned == NULL || handle->owner_thread == thread_id()) {
+    reap_abandoned(handle);
+    if (handle->repo != NULL) dml_repo_close(&handle->repo, NULL);
+  } else {
+    /* No owner remains to abort this transaction safely. Leave native state
+     * alone rather than ending the LMDB transaction from the wrong thread. */
+#if PY_VERSION_HEX >= 0x030c0000
+    PyObject *saved = PyErr_GetRaisedException();
+#else
+    PyObject *type, *value, *traceback;
+    PyErr_Fetch(&type, &value, &traceback);
+#endif
+    PyErr_SetString(PyExc_RuntimeError, "DML repository and live transaction abandoned on foreign thread");
+    PyErr_WriteUnraisable(NULL);
+#if PY_VERSION_HEX >= 0x030c0000
+    PyErr_SetRaisedException(saved);
+#else
+    PyErr_Restore(type, value, traceback);
+#endif
+  }
+  PyMem_Free(handle);
+}
+
+static void detach_txn(txn_handle *handle) {
+  repo_handle *repo = PyCapsule_GetPointer(handle->repo, REPO_CAPSULE);
+  repo->active = false;
+  Py_CLEAR(handle->repo);
 }
 
 static void destroy_txn(PyObject *capsule) {
   txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
-  if (handle->txn != NULL) dml_txn_abort(&handle->txn);
-  Py_DECREF(handle->repo);
+  if (handle->txn != NULL) {
+    if (handle->owner_thread == thread_id()) {
+      dml_txn_abort(&handle->txn);
+      detach_txn(handle);
+    } else {
+      repo_handle *repo = PyCapsule_GetPointer(handle->repo, REPO_CAPSULE);
+      repo->abandoned = handle->txn;
+    }
+  }
+  Py_XDECREF(handle->repo);
   PyMem_Free(handle);
 }
 
@@ -90,93 +183,101 @@ static PyObject *take_buffer(dml_buffer *buffer) {
 }
 
 static PyObject *repo_open(PyObject *self, PyObject *args) {
-  (void)self;
-  const char *path;
-  int create;
-  if (!PyArg_ParseTuple(args, "sp", &path, &create)) return NULL;
-  dml_repo **repo = PyMem_Calloc(1, sizeof(*repo));
-  if (repo == NULL) return PyErr_NoMemory();
-  PyObject *capsule = PyCapsule_New(repo, REPO_CAPSULE, destroy_repo);
-  if (capsule == NULL) {
-    PyMem_Free(repo);
+  PyObject *path, *create, *size = NULL;
+  if (!PyArg_ParseTuple(args, "OO|O:repo_open", &path, &create, &size)) return NULL;
+  if (!PyBool_Check(create)) {
+    PyErr_SetString(PyExc_TypeError, "create must be a bool");
     return NULL;
   }
-  const dml_repo_options options = {.create = create != 0};
+  dml_repo_options options = {.create = create == Py_True};
+  if (size != NULL) {
+    options.map_size = PyLong_AsSize_t(size);
+    if (PyErr_Occurred()) return NULL;
+  }
+  PyObject *encoded;
+  if (!PyUnicode_FSConverter(path, &encoded)) return NULL;
+  repo_handle *handle = PyMem_Calloc(1, sizeof(*handle));
+  if (handle == NULL) {
+    Py_DECREF(encoded);
+    return PyErr_NoMemory();
+  }
+  handle->owner_thread = thread_id();
+  PyObject *capsule = PyCapsule_New(handle, REPO_CAPSULE, destroy_repo);
+  if (capsule == NULL) {
+    Py_DECREF(encoded);
+    PyMem_Free(handle);
+    return NULL;
+  }
   dml_error error = {0};
-  dml_status status = dml_repo_open(path, &options, repo, &error);
+  dml_status status = dml_repo_open(PyBytes_AS_STRING(encoded), &options, &handle->repo, &error);
+  Py_DECREF(encoded);
   if (status != DML_OK) {
     Py_DECREF(capsule);
-    return raise_status(status, &error);
+    return raise_status(self, status, &error);
   }
   return capsule;
 }
 
 static PyObject *repo_close(PyObject *self, PyObject *capsule) {
-  (void)self;
-  dml_repo **repo = PyCapsule_GetPointer(capsule, REPO_CAPSULE);
-  if (repo == NULL) return NULL;
+  repo_handle *handle = get_repo(capsule);
+  if (handle == NULL) return NULL;
+  reap_abandoned(handle);
   dml_error error = {0};
-  dml_status status = dml_repo_close(repo, &error);
-  if (status != DML_OK) return raise_status(status, &error);
-  if (*repo != NULL) {
-    PyErr_SetString(PyExc_RuntimeError, "repo_close did not consume the repository");
-    return NULL;
-  }
+  dml_status status = dml_repo_close(&handle->repo, &error);
+  if (status != DML_OK) return raise_status(self, status, &error);
   Py_RETURN_NONE;
 }
 
 static PyObject *txn_begin(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *owner;
   int mode;
   if (!PyArg_ParseTuple(args, "Oi", &owner, &mode)) return NULL;
-  dml_repo **repo = PyCapsule_GetPointer(owner, REPO_CAPSULE);
+  repo_handle *repo = get_repo(owner);
   if (repo == NULL) return NULL;
+  reap_abandoned(repo);
+  if (repo->active) {
+    PyErr_SetString(PyExc_RuntimeError, "end the active transaction before beginning another");
+    return NULL;
+  }
   txn_handle *handle = PyMem_Calloc(1, sizeof(*handle));
   if (handle == NULL) return PyErr_NoMemory();
+  handle->owner_thread = repo->owner_thread;
   PyObject *capsule = PyCapsule_New(handle, TXN_CAPSULE, destroy_txn);
   if (capsule == NULL) {
     PyMem_Free(handle);
     return NULL;
   }
-  handle->repo = Py_NewRef(owner);
   dml_error error = {0};
-  dml_status status = dml_txn_begin(*repo, (dml_txn_mode)mode, &handle->txn, &error);
+  dml_status status = dml_txn_begin(repo->repo, (dml_txn_mode)mode, &handle->txn, &error);
   if (status != DML_OK) {
     Py_DECREF(capsule);
-    return raise_status(status, &error);
+    return raise_status(self, status, &error);
   }
+  repo->active = true;
+  handle->repo = Py_NewRef(owner);
   return capsule;
 }
 
 static PyObject *txn_commit(PyObject *self, PyObject *capsule) {
-  (void)self;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   if (handle == NULL) return NULL;
   dml_error error = {0};
   dml_status status = dml_txn_commit(&handle->txn, &error);
-  if (handle->txn != NULL) {
-    PyErr_SetString(PyExc_RuntimeError, "txn_commit did not consume the transaction");
-    return NULL;
-  }
-  if (status != DML_OK) return raise_status(status, &error);
+  if (handle->repo != NULL) detach_txn(handle);
+  if (status != DML_OK) return raise_status(self, status, &error);
   Py_RETURN_NONE;
 }
 
 static PyObject *txn_abort(PyObject *self, PyObject *capsule) {
   (void)self;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   if (handle == NULL) return NULL;
   dml_txn_abort(&handle->txn);
-  if (handle->txn != NULL) {
-    PyErr_SetString(PyExc_RuntimeError, "txn_abort did not consume the transaction");
-    return NULL;
-  }
+  if (handle->repo != NULL) detach_txn(handle);
   Py_RETURN_NONE;
 }
 
 static PyObject *datum_encode(PyObject *self, PyObject *args) {
-  (void)self;
   int kind;
   PyObject *value;
   if (!PyArg_ParseTuple(args, "iO", &kind, &value)) return NULL;
@@ -194,7 +295,7 @@ static PyObject *datum_encode(PyObject *self, PyObject *args) {
   dml_buffer packed = {0};
   dml_error error = {0};
   dml_status status = dml_datum_encode(&input, &packed, &error);
-  return status == DML_OK ? take_buffer(&packed) : raise_status(status, &error);
+  return status == DML_OK ? take_buffer(&packed) : raise_status(self, status, &error);
 }
 
 static int read_named_id(PyObject *args, Py_ssize_t index, dml_bytes *name, dml_object_id *target) {
@@ -281,7 +382,6 @@ static int read_object_input(PyObject *args, long type, dml_object_input *input,
 
 /* Borrow Python tuple bytes for names; arrays only live through encoding. */
 static PyObject *object_encode(PyObject *self, PyObject *args) {
-  (void)self;
   if (PyTuple_GET_SIZE(args) == 0) {
     PyErr_SetString(PyExc_TypeError, "object encoder requires a record type");
     return NULL;
@@ -298,112 +398,127 @@ static PyObject *object_encode(PyObject *self, PyObject *args) {
   dml_error error = {0};
   dml_status status = dml_object_encode(&input, &packed, &error);
   PyMem_Free(allocated);
-  return status == DML_OK ? take_buffer(&packed) : raise_status(status, &error);
+  return status == DML_OK ? take_buffer(&packed) : raise_status(self, status, &error);
+}
+
+static PyObject *placed_id(PyObject *self, PyObject *result, const dml_object_id *id,
+                            dml_status status, const dml_error *error) {
+  if (status == DML_OK) {
+    memcpy(PyBytes_AS_STRING(result), id->bytes, sizeof(id->bytes));
+    return result;
+  }
+  Py_DECREF(result);
+  return raise_status(self, status, error);
 }
 
 static PyObject *txn_put_datum(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule, *record;
   if (!PyArg_ParseTuple(args, "OO", &capsule, &record)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_bytes packed;
   if (handle == NULL || !read_bytes(record, &packed)) return NULL;
   dml_object_id id;
+  PyObject *result = PyBytes_FromStringAndSize(NULL, sizeof(id.bytes));
+  if (result == NULL) return NULL;
   dml_error error = {0};
   dml_status status = dml_txn_put_datum(handle->txn, packed.data, packed.len, &id, &error);
-  return status == DML_OK ? id_bytes(&id) : raise_status(status, &error);
+  return placed_id(self, result, &id, status, &error);
 }
 
 static PyObject *txn_put_object(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule, *record;
   int type;
   if (!PyArg_ParseTuple(args, "OiO", &capsule, &type, &record)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_bytes packed;
   if (handle == NULL || !read_bytes(record, &packed)) return NULL;
   dml_object_id id;
+  PyObject *result = PyBytes_FromStringAndSize(NULL, sizeof(id.bytes));
+  if (result == NULL) return NULL;
   dml_error error = {0};
   dml_status status = dml_txn_put_object(handle->txn, (dml_record_type)type, packed.data, packed.len,
                                          &id, &error);
-  return status == DML_OK ? id_bytes(&id) : raise_status(status, &error);
+  return placed_id(self, result, &id, status, &error);
 }
 
 static PyObject *txn_get_object(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule, *id_obj;
   int type;
   if (!PyArg_ParseTuple(args, "OiO", &capsule, &type, &id_obj)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_object_id id;
   if (handle == NULL || !read_id(id_obj, &id)) return NULL;
   dml_buffer packed = {0};
   dml_error error = {0};
   dml_status status = dml_txn_get_object(handle->txn, (dml_record_type)type, &id, &packed, &error);
-  return status == DML_OK ? take_buffer(&packed) : raise_status(status, &error);
+  return status == DML_OK ? take_buffer(&packed) : raise_status(self, status, &error);
 }
 
 typedef dml_status (*ref_write_fn)(dml_txn *, dml_bytes, const dml_object_id *, dml_error *);
 
-static PyObject *ref_write(PyObject *args, ref_write_fn write) {
+static PyObject *ref_write(PyObject *self, PyObject *args, ref_write_fn write) {
   PyObject *capsule, *name_obj, *id_obj;
   if (!PyArg_ParseTuple(args, "OOO", &capsule, &name_obj, &id_obj)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_bytes name;
   dml_object_id id;
   if (handle == NULL || !read_bytes(name_obj, &name) || !read_id(id_obj, &id)) return NULL;
   dml_error error = {0};
   dml_status status = write(handle->txn, name, &id, &error);
-  if (status != DML_OK) return raise_status(status, &error);
+  if (status != DML_OK) return raise_status(self, status, &error);
   Py_RETURN_NONE;
 }
 
 static PyObject *txn_ref_create(PyObject *self, PyObject *args) {
-  (void)self;
-  return ref_write(args, dml_txn_ref_create);
+  return ref_write(self, args, dml_txn_ref_create);
 }
 
 static PyObject *txn_ref_update(PyObject *self, PyObject *args) {
-  (void)self;
-  return ref_write(args, dml_txn_ref_update);
+  return ref_write(self, args, dml_txn_ref_update);
 }
 
 static PyObject *txn_ref_delete_expected(PyObject *self, PyObject *args) {
-  (void)self;
-  return ref_write(args, dml_txn_ref_delete_expected);
+  return ref_write(self, args, dml_txn_ref_delete_expected);
 }
 
 static PyObject *txn_ref_get(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule, *name_obj;
   if (!PyArg_ParseTuple(args, "OO", &capsule, &name_obj)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_bytes name;
   if (handle == NULL || !read_bytes(name_obj, &name)) return NULL;
   dml_object_id id;
   dml_error error = {0};
   dml_status status = dml_txn_ref_get(handle->txn, name, &id, &error);
-  return status == DML_OK ? id_bytes(&id) : raise_status(status, &error);
+  return status == DML_OK ? id_bytes(&id) : raise_status(self, status, &error);
 }
 
 static PyObject *object_decode(PyObject *self, PyObject *record) {
-  (void)self;
   dml_bytes packed;
   if (!read_bytes(record, &packed)) return NULL;
   object_handle *handle = PyMem_Malloc(sizeof(*handle));
   if (handle == NULL) return PyErr_NoMemory();
-  dml_error error = {0};
-  dml_status status = dml_object_decode(packed.data, packed.len, &handle->view, &error);
-  if (status != DML_OK) {
-    PyMem_Free(handle);
-    return raise_status(status, &error);
-  }
-  PyObject *capsule = PyCapsule_New(handle, VIEW_CAPSULE, destroy_view);
-  if (capsule == NULL) {
+  /* A bytes subclass could refer back to the capsule, hiding a cycle from GC. */
+  handle->packed = PyBytes_CheckExact(record) ? Py_NewRef(record) :
+    PyBytes_FromStringAndSize((const char *)packed.data, (Py_ssize_t)packed.len);
+  if (handle->packed == NULL) {
     PyMem_Free(handle);
     return NULL;
   }
-  handle->packed = Py_NewRef(record);
+  dml_error error = {0};
+  const uint8_t *data = (const uint8_t *)PyBytes_AS_STRING(handle->packed);
+  dml_status status = dml_object_decode(data, packed.len, &handle->view, &error);
+  if (status != DML_OK) {
+    Py_DECREF(handle->packed);
+    PyMem_Free(handle);
+    return raise_status(self, status, &error);
+  }
+  PyObject *capsule = PyCapsule_New(handle, VIEW_CAPSULE, destroy_view);
+  if (capsule == NULL) {
+    Py_DECREF(handle->packed);
+    PyMem_Free(handle);
+    return NULL;
+  }
   PyObject *reference = id_bytes(&handle->view.reference);
   PyObject *count = PyLong_FromSize_t(handle->view.count);
   PyObject *result = NULL;
@@ -415,11 +530,10 @@ static PyObject *object_decode(PyObject *self, PyObject *record) {
 }
 
 static PyObject *object_view_parent(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule;
   Py_ssize_t index;
   if (!PyArg_ParseTuple(args, "On", &capsule, &index)) return NULL;
-  object_handle *handle = PyCapsule_GetPointer(capsule, VIEW_CAPSULE);
+  object_handle *handle = get_handle(capsule, VIEW_CAPSULE);
   if (handle == NULL) return NULL;
   if (index < 0) {
     PyErr_SetString(PyExc_ValueError, "parent index must be nonnegative");
@@ -428,9 +542,10 @@ static PyObject *object_view_parent(PyObject *self, PyObject *args) {
   dml_object_id id;
   dml_error error = {0};
   dml_status status = dml_object_view_parent(&handle->view, (size_t)index, &id, &error);
-  return status == DML_OK ? id_bytes(&id) : raise_status(status, &error);
+  return status == DML_OK ? id_bytes(&id) : raise_status(self, status, &error);
 }
 
+#ifdef DML_PRIVATE_REPLAY
 static PyObject *output_result(dml_status status, PyObject *output) {
   if (output == NULL) return NULL;
   return Py_BuildValue("(sN)", dml_status_name(status), output);
@@ -440,25 +555,25 @@ static PyObject *repo_export_commit(PyObject *self, PyObject *args) {
   (void)self;
   PyObject *capsule, *root_obj;
   if (!PyArg_ParseTuple(args, "OO", &capsule, &root_obj)) return NULL;
-  dml_repo **repo = PyCapsule_GetPointer(capsule, REPO_CAPSULE);
+  repo_handle *repo = get_repo(capsule);
   dml_object_id root;
   if (repo == NULL || !read_id(root_obj, &root)) return NULL;
   dml_buffer packed = {0};
-  dml_status status = dml_repo_export_commit(*repo, &root, &packed, NULL);
+  dml_status status = dml_repo_export_commit(repo->repo, &root, &packed, NULL);
   return output_result(status, take_buffer(&packed));
 }
 
 static PyObject *import_bundle(PyObject *args, bool staged) {
   PyObject *capsule, *bundle_obj, *name_obj;
   if (!PyArg_ParseTuple(args, staged ? "OOO" : "OO", &capsule, &bundle_obj, &name_obj)) return NULL;
-  dml_repo **repo = PyCapsule_GetPointer(capsule, REPO_CAPSULE);
+  repo_handle *repo = get_repo(capsule);
   dml_bytes bundle, name;
   if (repo == NULL || !read_bytes(bundle_obj, &bundle) || (staged && !read_bytes(name_obj, &name)))
     return NULL;
   dml_object_id root;
   memset(root.bytes, 0xa5, sizeof(root.bytes));
-  dml_status status = staged ? dml_repo_import_commit_staged(*repo, bundle, name, &root, NULL)
-                             : dml_repo_import_commit(*repo, bundle, &root, NULL);
+  dml_status status = staged ? dml_repo_import_commit_staged(repo->repo, bundle, name, &root, NULL)
+                             : dml_repo_import_commit(repo->repo, bundle, &root, NULL);
   return output_result(status, id_bytes(&root));
 }
 
@@ -474,56 +589,53 @@ static PyObject *repo_import_commit_staged(PyObject *self, PyObject *args) {
 
 static PyObject *txn_collect_garbage(PyObject *self, PyObject *capsule) {
   (void)self;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   if (handle == NULL) return NULL;
   size_t removed = 123456789;
   dml_status status = dml_txn_collect_garbage(handle->txn, &removed, NULL);
   return output_result(status, PyLong_FromSize_t(removed));
 }
+#endif
 
 static PyObject *txn_get_datum(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule, *id_obj;
   if (!PyArg_ParseTuple(args, "OO", &capsule, &id_obj)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_object_id id;
   if (handle == NULL || !read_id(id_obj, &id)) return NULL;
   dml_buffer packed = {0};
   dml_error error = {0};
   dml_status status = dml_txn_get_datum(handle->txn, &id, &packed, &error);
-  return status == DML_OK ? take_buffer(&packed) : raise_status(status, &error);
+  return status == DML_OK ? take_buffer(&packed) : raise_status(self, status, &error);
 }
 
 static PyObject *datum_decode(PyObject *self, PyObject *record) {
-  (void)self;
   dml_bytes packed;
   if (!read_bytes(record, &packed)) return NULL;
   dml_datum_view view;
   dml_error error = {0};
   dml_status status = dml_datum_decode(packed.data, packed.len, &view, &error);
-  if (status != DML_OK) return raise_status(status, &error);
+  if (status != DML_OK) return raise_status(self, status, &error);
   return Py_BuildValue("(y#i)", (const char *)view.payload, (Py_ssize_t)view.payload_len, (int)view.kind);
 }
 
 static PyObject *txn_lookup_node(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule, *id_obj, *name_obj;
   if (!PyArg_ParseTuple(args, "OOO", &capsule, &id_obj, &name_obj)) return NULL;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   dml_object_id dag, node;
   dml_bytes name;
   if (handle == NULL || !read_id(id_obj, &dag) || !read_bytes(name_obj, &name)) return NULL;
   dml_error error = {0};
   dml_status status = dml_txn_lookup_node(handle->txn, &dag, name, &node, &error);
-  return status == DML_OK ? id_bytes(&node) : raise_status(status, &error);
+  return status == DML_OK ? id_bytes(&node) : raise_status(self, status, &error);
 }
 
 static PyObject *object_view_entry(PyObject *self, PyObject *args) {
-  (void)self;
   PyObject *capsule;
   Py_ssize_t index;
   if (!PyArg_ParseTuple(args, "On", &capsule, &index)) return NULL;
-  object_handle *handle = PyCapsule_GetPointer(capsule, VIEW_CAPSULE);
+  object_handle *handle = get_handle(capsule, VIEW_CAPSULE);
   if (handle == NULL) return NULL;
   if (index < 0) {
     PyErr_SetString(PyExc_ValueError, "tree index must be nonnegative");
@@ -532,11 +644,12 @@ static PyObject *object_view_entry(PyObject *self, PyObject *args) {
   dml_tree_entry entry;
   dml_error error = {0};
   dml_status status = dml_object_view_entry(&handle->view, (size_t)index, &entry, &error);
-  if (status != DML_OK) return raise_status(status, &error);
+  if (status != DML_OK) return raise_status(self, status, &error);
   return Py_BuildValue("(y#y#)", (const char *)entry.dag.bytes, (Py_ssize_t)sizeof(entry.dag.bytes),
                        (const char *)entry.name.data, (Py_ssize_t)entry.name.len);
 }
 
+#ifdef DML_PRIVATE_REPLAY
 typedef struct {
   PyObject *visited;
   bool failed;
@@ -551,8 +664,7 @@ static void observe_unreachable(void *context, dml_record_type type, const dml_o
 }
 
 static PyObject *txn_check_integrity(PyObject *self, PyObject *capsule) {
-  (void)self;
-  txn_handle *handle = PyCapsule_GetPointer(capsule, TXN_CAPSULE);
+  txn_handle *handle = get_txn(capsule);
   if (handle == NULL) return NULL;
   integrity_visitor visitor = {.visited = PyList_New(0)};
   if (visitor.visited == NULL) return NULL;
@@ -561,7 +673,7 @@ static PyObject *txn_check_integrity(PyObject *self, PyObject *capsule) {
   dml_status status = dml_txn_check_integrity(handle->txn, &report, observe_unreachable, &visitor, &error);
   if (status != DML_OK || visitor.failed) {
     Py_DECREF(visitor.visited);
-    return visitor.failed ? NULL : raise_status(status, &error);
+    return visitor.failed ? NULL : raise_status(self, status, &error);
   }
   return Py_BuildValue("((KKKKKKKKK)N)", (unsigned long long)report.refs,
                        (unsigned long long)report.broken_refs, (unsigned long long)report.invalid_entries,
@@ -571,6 +683,7 @@ static PyObject *txn_check_integrity(PyObject *self, PyObject *capsule) {
                        (unsigned long long)report.intact_unreachable_objects,
                        (unsigned long long)report.broken_unreachable_objects, visitor.visited);
 }
+#endif
 
 static PyMethodDef methods[] = {
   {"repo_open", repo_open, METH_VARARGS, NULL},
@@ -589,26 +702,69 @@ static PyMethodDef methods[] = {
   {"object_decode", object_decode, METH_O, NULL},
   {"object_view_parent", object_view_parent, METH_VARARGS, NULL},
   {"object_view_entry", object_view_entry, METH_VARARGS, NULL},
-  {"repo_export_commit", repo_export_commit, METH_VARARGS, NULL},
-  {"repo_import_commit", repo_import_commit, METH_VARARGS, NULL},
-  {"repo_import_commit_staged", repo_import_commit_staged, METH_VARARGS, NULL},
-  {"txn_collect_garbage", txn_collect_garbage, METH_O, NULL},
   {"txn_ref_delete_expected", txn_ref_delete_expected, METH_VARARGS, NULL},
   {"txn_get_datum", txn_get_datum, METH_VARARGS, NULL},
   {"datum_decode", datum_decode, METH_O, NULL},
   {"txn_lookup_node", txn_lookup_node, METH_VARARGS, NULL},
+#ifdef DML_PRIVATE_REPLAY
+  {"repo_export_commit", repo_export_commit, METH_VARARGS, NULL},
+  {"repo_import_commit", repo_import_commit, METH_VARARGS, NULL},
+  {"repo_import_commit_staged", repo_import_commit_staged, METH_VARARGS, NULL},
+  {"txn_collect_garbage", txn_collect_garbage, METH_O, NULL},
   {"txn_check_integrity", txn_check_integrity, METH_O, NULL},
+#endif
   {NULL, NULL, 0, NULL},
 };
 
+static int module_traverse(PyObject *self, visitproc visit, void *arg) {
+  module_state *state = PyModule_GetState(self);
+  Py_VISIT(state->error);
+  return 0;
+}
+
+static int module_clear(PyObject *self) {
+  module_state *state = PyModule_GetState(self);
+  if (state != NULL) Py_CLEAR(state->error);
+  return 0;
+}
+
+static void module_free(void *self) {
+  module_clear(self);
+}
+
 static struct PyModuleDef module = {
   .m_base = PyModuleDef_HEAD_INIT,
-  .m_name = "_dml_core",
-  .m_doc = "Private DML core bindings for sequential Quint replay.",
-  .m_size = -1,
+  .m_name = MODULE_NAME,
+  .m_doc = "Direct operations on the DML C core.",
+  .m_size = sizeof(module_state),
   .m_methods = methods,
+  .m_traverse = module_traverse,
+  .m_clear = module_clear,
+  .m_free = module_free,
 };
 
-PyMODINIT_FUNC PyInit__dml_core(void) {
-  return PyModule_Create(&module);
+PyMODINIT_FUNC MODULE_INIT(void) {
+  if (PyInterpreterState_Get() != PyInterpreterState_Main()) {
+    PyErr_SetString(PyExc_ImportError, "DML requires the main CPython interpreter");
+    return NULL;
+  }
+  PyObject *self = PyModule_Create(&module);
+  if (self == NULL) return NULL;
+  module_state *state = PyModule_GetState(self);
+  state->error = PyErr_NewException(MODULE_NAME ".Error", PyExc_RuntimeError, NULL);
+  if (state->error == NULL || PyModule_AddObjectRef(self, "Error", state->error) < 0 ||
+      PyModule_AddIntConstant(self, "TXN_READ", DML_TXN_READ) < 0 ||
+      PyModule_AddIntConstant(self, "TXN_WRITE", DML_TXN_WRITE) < 0 ||
+      PyModule_AddIntConstant(self, "DATUM_I64", DML_DATUM_I64) < 0 ||
+      PyModule_AddIntConstant(self, "DATUM_STRING", DML_DATUM_STRING) < 0 ||
+      PyModule_AddIntConstant(self, "REC_NODE", DML_REC_NODE) < 0 ||
+      PyModule_AddIntConstant(self, "REC_DAG", DML_REC_DAG) < 0 ||
+      PyModule_AddIntConstant(self, "REC_TREE", DML_REC_TREE) < 0 ||
+      PyModule_AddIntConstant(self, "REC_COMMIT", DML_REC_COMMIT) < 0 ||
+      PyModule_AddIntConstant(self, "NODE_LITERAL", DML_NODE_LITERAL) < 0 ||
+      PyModule_AddIntConstant(self, "NODE_SUBDAG", DML_NODE_SUBDAG) < 0) {
+    Py_DECREF(self);
+    return NULL;
+  }
+  return self;
 }

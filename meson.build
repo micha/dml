@@ -69,34 +69,55 @@ dml_dep = declare_dependency(
 )
 meson.override_dependency('dml', dml_dep)
 
-if get_option('quint_tests')
-  python = import('python').find_installation('python3')
+if get_option('python_bindings') or get_option('quint_tests')
+  python = import('python').find_installation(pure: false)
   if not python.language_version().version_compare('>=3.10')
-    error('Quint checks require CPython 3.10 or newer')
+    error('DML Python bindings require CPython 3.10 or newer')
   endif
+  python_dep = python.dependency()
+  subdir('python/daggerml')
+endif
+
+if get_option('quint_tests')
   quint = find_program('quint')
   trace_interpreter = files('tests/run_histories.py')
   test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
-  python_core = python.extension_module(
+  private_python_core = python.extension_module(
     '_dml_core', 'python/dml_core.c',
-    dependencies: [python.dependency(), dml_dep],
+    c_args: ['-DDML_PRIVATE_REPLAY'],
+    dependencies: [python_dep, dml_dep],
     install: false,
+  )
+  binding_env = environment()
+  binding_env.prepend('PYTHONPATH', meson.current_build_dir() / 'python')
+  test(
+    'python-binding', python,
+    args: ['-B', files('tests/test_python_binding.py')],
+    env: binding_env,
+    depends: public_python_core,
   )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
   )
+  test(
+    'quint-refs', python,
+    args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
+           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'],
+    env: binding_env,
+    depends: public_python_core,
+    timeout: 150,
+  )
   retention_modules = ['--quint-module', files('tests/retention_fixture.qnt'),
                        '--quint-module', files('tests/retention_rules.qnt')]
   foreach suite : [
-    ['refs', 'ref', ['--init', 'init', '--init', 'changedInit']],
     ['transfer', 'transfer', ['--quint-module', files('tests/transfer_fixture.qnt')]],
     ['staged-import', 'staged_import', retention_modules],
     ['gc', 'gc', retention_modules],
   ]
     test(
       'quint-' + suite[0], python,
-      args: ['-B', trace_interpreter, quint.full_path(), python_core, lmdb_inventory,
+      args: ['-B', trace_interpreter, quint.full_path(), private_python_core, lmdb_inventory,
              files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2],
       timeout: 150,
     )

@@ -166,9 +166,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--init", action="append", help="history initializer (default: init)")
     parser.add_argument("--quint-module", type=Path, action="append", default=[], help="local Quint rules import")
-    for argument in ("quint", "binding", "scanner", "histories", "rules"):
-        # Preserve the intended path if Meson passes a relative build artifact.
-        parser.add_argument(argument, type=lambda path: Path(path).absolute())
+    # Preserve the intended path if Meson passes a relative build artifact.
+    def absolute_path(path):
+        return Path(path).absolute()
+
+    parser.add_argument("quint", type=absolute_path)
+    parser.add_argument("binding", help="daggerml.core import or path to the private replay extension")
+    for argument in ("scanner", "histories", "rules"):
+        parser.add_argument(argument, type=absolute_path)
     args = parser.parse_args()
     with TemporaryDirectory(prefix="dml-histories-") as tmp:
         directory = Path(tmp)

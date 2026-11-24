@@ -1,15 +1,15 @@
 # DML
 
 DML currently provides a C library for content-addressed data and history in a local
-transactional repository, with [binary commit transfer](docs/spec-next/transfer.md).
+transactional repository, with [binary commit transfer](docs/spec-next/transfer.md)
+and an optional [Python core binding](docs/spec-next/python.md).
 See the [as-built specification](docs/spec-next/README.md)
 for the implemented contracts and [architecture](docs/architecture.md) for the module
 boundaries.
 
 The earlier Python package, CLI, test suites, and spike evidence are preserved at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
-They are not maintained or run on this branch. The opt-in Quint suites use a
-private Python binding to the current C core.
+That package and its application layers are not maintained or run on this branch.
 
 ## Build and validation
 
@@ -43,9 +43,10 @@ PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
 [provenance handoff integration](tests/README.md#process-integration), and focused
-interpreter, integrity, native boundary, and fault tests.
+interpreter, Python binding, integrity, native boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
-Quint request through the Python binding. Quint checks observations against the
+Quint request. Ref replay uses public `daggerml.core`; the other core replay
+suites still use a private test binding. Quint checks observations against the
 [ref contract](docs/spec-next/repository.md#refs), [transfer contract](docs/spec-next/transfer.md),
 and [garbage collection contract](docs/spec-next/repository.md#explicit-garbage-collection).
 Reopened read transactions and independent LMDB scans check snapshot publication,
@@ -58,6 +59,23 @@ import leaves no new objects or refs. The collection suite checks ref ordering,
 rollback, and exact persisted removals. Native checks exercise damaged repositories,
 allocation failures, and deletion failures. These checks are local and opt-in; they
 do not measure coverage.
+
+### Install the Python binding
+
+With GIL-enabled CPython 3.10 or newer, Python development headers, and the native
+build tools above, build and install a local wheel from the checkout. For example,
+with an active virtual environment:
+
+```sh
+python -m pip install .
+python -c 'from daggerml import core; print(core.TXN_READ)'
+```
+
+The wheel targets the CPython ABI and platform used to build it. It contains no
+CLI, C development files, or historical `daggerml` application modules. The
+standalone C build does not require Python headers; pass `-Dpython_bindings=true`
+to also build and install the binding with Meson. See the
+[Python contract](docs/spec-next/python.md) for supported operations and an example.
 
 ### Install and link the C library
 
