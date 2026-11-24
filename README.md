@@ -157,7 +157,7 @@ Use fresh source and worker paths and a new bundle filename:
 producer=$(python examples/recorded_calls.py record-sum ./origin producer 7 5)
 python examples/recorded_calls.py export-sum ./origin producer "$producer" ./sum.dml
 python examples/recorded_calls.py stage-input ./worker incoming ./sum.dml
-python examples/recorded_calls.py record-scale ./worker incoming "$producer" result 3
+result=$(python examples/recorded_calls.py record-scale ./worker incoming "$producer" result 3)
 python examples/recorded_calls.py release-input ./worker incoming "$producer" result
 python examples/recorded_calls.py collect ./worker
 python examples/recorded_calls.py inspect ./worker result
@@ -183,8 +183,38 @@ producer commit as its sole parent and links to that parent's sum DAG. It delete
 `incoming` only if it still points to that producer. The result ref then retains
 both calls through explicit `collect`, which prints the number of objects
 removed. The final read reports `36` and the original producer ID, without
-opening the source or executing either call. This is a one-way handoff; no result
-is returned or published to the source.
+opening the source or executing either call. Export and the worker steps leave
+the source unchanged.
+
+#### Return and publish a recorded scale
+
+Continue from the previous example with a new bundle filename:
+
+```sh
+python examples/recorded_calls.py export-scale ./worker result "$result" ./scale.dml
+python examples/recorded_calls.py stage-input ./origin returned ./scale.dml
+python examples/recorded_calls.py inspect ./origin returned
+python examples/recorded_calls.py publish-scale ./origin returned "$result" "$producer" -
+python examples/recorded_calls.py collect ./origin
+python examples/recorded_calls.py inspect ./origin
+```
+
+`export-scale` checks the selected worker result and exports its immutable
+commit and full producer closure. The file rules are the same as for `export-sum`.
+Use a separate staging ref, not `main`. Staging reports the actual bundle root;
+keep the selected result and producer IDs independently of that receipt.
+
+`publish-scale` checks that the result's sole parent is the expected producer
+commit and that its input links to that parent's exact sum DAG. The last argument
+is `-` to require an absent `main`, as above, or the expected current commit ID
+if `main` already exists. This is a conditional ref update, not a merge. Updating
+`main` and deleting `returned` at its expected result ID commit together. If
+`main` or `returned` no longer matches, neither ref is changed by publication.
+The source's other refs and all worker refs are untouched.
+
+After collection, `main` retains both calls. Inspection and publication check the
+recorded structure, not the arithmetic, the worker's identity, or whether the
+recorded factor was requested. There is no automatic reuse.
 
 ### Install and link the C library
 

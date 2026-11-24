@@ -159,6 +159,17 @@ both physical links survive while collection removes an unpinned decoy, that
 release rejects a result with the correct parent and the wrong input DAG, and
 that a deliberately incorrect stored sum is transferred and consumed unchanged.
 
+The [return and publication history](../README.md#return-and-publish-a-recorded-scale)
+checks exact result export and staging, rejection of a same-valued wrong producer,
+and conditional publication to either an absent or an existing `main`. Failed
+publication must leave committed bytes unchanged, including when the staging ref
+points elsewhere. Successful publication releases the staging ref and leaves both
+calls readable after a sweep that removes the superseded result. The focused tests
+exercise rollback after a tentative main create or update, reject a staging alias
+of `main` and a mismatched input DAG, and publish a deliberately incorrect stored
+output. They read the physical lineage links after collection with no separate
+source producer pin.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -205,3 +216,26 @@ The observations include a decoy staging successfully but failing selection,
 release rejecting a moved pin or mismatched result, and readback after the
 producer pin is released and collection removes the decoy. The design check
 runs separately from CI.
+
+#### Check the return and publication design with TLC
+
+The [return model](recorded_return_design.qnt) starts with immutable worker
+fixtures: two scales of the selected producer, and three results with incorrect
+parent, input DAG, or application shape. Worker pin changes and collection can
+interleave between selection and export. Source writes are serialized. The model
+checks main's conditional create or update and the expected staging deletion as a
+single transaction, including modeled aborts after each tentative write. It
+checks safety, not liveness, and abstracts away malformed bundle bytes,
+filesystem errors, and native corruption.
+
+```sh
+mkdir -p build/recorded-return-tlc
+(cd build/recorded-return-tlc && quint verify ../../tests/recorded_return_design.qnt \
+  --backend=tlc --invariants exactExport stageOnly atomicPublish retainedAndReadable \
+  --search-observations)
+```
+
+Observations include export despite pin movement, rejection after intervening
+collection, stale publication with no writes, rollback after either tentative
+write, and readback through `main` alone after collection. Run this design check
+separately from CI.

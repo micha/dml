@@ -3,7 +3,8 @@
 Use `record REPO 7 5 3` to make both calls at once, or run
 `record-sum REPO producer 7 5` and `record-scale REPO producer COMMIT result 3`
 with the printed commit ID. Read either result with `inspect REPO [REF]`.
-Use `export-sum` and `stage-input` to move a producer to another repository.
+Use `export-sum` and `stage-input` to move a producer to another repository,
+then `export-scale`, `stage-input`, and `publish-scale` to return the result.
 This example's call layouts are not core record types or execution APIs.
 """
 
@@ -151,9 +152,9 @@ def record_sum(path, pin, a, b):
         return _publish(txn, pin, SUM_ENTRY, _record_sum(txn, a, b))
 
 
-def _check_commit_id(commit):
-    if not isinstance(commit, bytes) or len(commit) != 16:
-        raise ValueError("producer commit must be a 16-byte ID")
+def _check_commit_id(commit, label="producer commit"):
+    if type(commit) is not bytes or len(commit) != 16:
+        raise ValueError(f"{label} must be a 16-byte ID")
 
 
 def _selected_sum(txn, pin, expected):
@@ -174,17 +175,40 @@ def record_scale(path, producer_pin, producer_commit, result_ref, factor):
         return _publish(txn, result_ref, SCALE_ENTRY, scale_call, producer_commit)
 
 
+def _export_selected(path, pin, commit, bundle_path, select):
+    with _repository(path, create=False) as repo:
+        with _read_transaction(repo) as txn:
+            select(txn, pin, commit)
+        # Export by immutable ID in a new snapshot, never by re-resolving the pin.
+        bundle = core.repo_export_commit(repo, commit)
+    with Path(bundle_path).open("xb") as output:
+        output.write(bundle)
+    return commit
+
+
 def export_sum(path, pin, producer_commit, bundle_path):
     """Export the exact selected sum to a new bundle file."""
     _check_commit_id(producer_commit)
-    with _repository(path, create=False) as repo:
-        with _read_transaction(repo) as txn:
-            _selected_sum(txn, pin, producer_commit)
-        # Export by immutable ID in a new snapshot, never by re-resolving the pin.
-        bundle = core.repo_export_commit(repo, producer_commit)
-    with Path(bundle_path).open("xb") as output:
-        output.write(bundle)
-    return producer_commit
+    return _export_selected(path, pin, producer_commit, bundle_path, _selected_sum)
+
+
+def _checked_scale_parent(txn, result):
+    producer = _inspect_snapshot(txn, result).get("producer_commit")
+    if producer is None:
+        raise ValueError("expected a split recorded-scale-v1 commit")
+    return bytes.fromhex(producer)
+
+
+def _selected_scale(txn, pin, expected):
+    if core.txn_ref_get(txn, pin) != expected:
+        raise ValueError("result pin does not point to the expected commit")
+    _checked_scale_parent(txn, expected)
+
+
+def export_scale(path, pin, result_commit, bundle_path):
+    """Export the exact selected scale with its producer to a new bundle file."""
+    _check_commit_id(result_commit, "result commit")
+    return _export_selected(path, pin, result_commit, bundle_path, _selected_scale)
 
 
 def stage_input(path, pin, bundle_path):
@@ -195,6 +219,31 @@ def stage_input(path, pin, bundle_path):
         raise ValueError("commit bundle exceeds 64 MiB")
     with _repository(path, create=True) as repo:
         return core.repo_import_commit_staged(repo, bundle, pin)
+
+
+def publish_scale(path, returned, result_commit, producer_commit, expected_main):
+    """Publish a staged scale to main and release its staging ref atomically."""
+    if type(returned) is not bytes:
+        raise ValueError("staging ref must be bytes")
+    if returned == MAIN:
+        raise ValueError("staging ref must differ from main")
+    _check_commit_id(result_commit, "result commit")
+    _check_commit_id(producer_commit)
+    if expected_main is not None:
+        _check_commit_id(expected_main, "expected main commit")
+    with _write_transaction(path, create=False) as txn:
+        # Inspect the caller's immutable selection, never substitute the current pin target.
+        if _checked_scale_parent(txn, result_commit) != producer_commit:
+            raise ValueError("result does not retain the expected producer commit")
+        if expected_main is None:
+            core.txn_ref_create(txn, MAIN, result_commit)
+        else:
+            if core.txn_ref_get(txn, MAIN) != expected_main:
+                raise ValueError("main does not point to the expected commit")
+            core.txn_ref_update(txn, MAIN, result_commit)
+        # If the ref moved or disappeared, this failure also rolls back main.
+        core.txn_ref_delete_expected(txn, returned, result_commit)
+    return result_commit
 
 
 def release_input(path, pin, producer_commit, result_ref):
@@ -281,13 +330,13 @@ def inspect(path, ref=MAIN):
         return _inspect_snapshot(txn, core.txn_ref_get(txn, ref))
 
 
-def _parse_commit_id(text):
+def _parse_commit_id(text, label="producer commit"):
     try:
         identifier = bytes.fromhex(text)
     except ValueError:
         identifier = b""
     if len(text) != 32 or len(identifier) != 16:
-        raise ValueError("producer commit must be a 32-digit hexadecimal ID")
+        raise ValueError(f"{label} must be a 32-digit hexadecimal ID")
     return identifier
 
 
@@ -318,6 +367,17 @@ def main():
     stage.add_argument("repo", type=Path)
     stage.add_argument("pin")
     stage.add_argument("bundle", type=Path)
+    scale_exporter = commands.add_parser("export-scale", help="export the exact pinned scale to a new bundle")
+    scale_exporter.add_argument("repo", type=Path)
+    scale_exporter.add_argument("result_ref")
+    scale_exporter.add_argument("result_commit")
+    scale_exporter.add_argument("bundle", type=Path)
+    publisher = commands.add_parser("publish-scale", help="publish the selected scale and release its staging ref")
+    publisher.add_argument("repo", type=Path)
+    publisher.add_argument("returned")
+    publisher.add_argument("result_commit")
+    publisher.add_argument("producer_commit")
+    publisher.add_argument("expected_main", help="required current main commit ID, or '-' if main must be absent")
     release = commands.add_parser("release-input", help="release a staged pin retained by a recorded result")
     release.add_argument("repo", type=Path)
     release.add_argument("pin")
@@ -343,6 +403,16 @@ def main():
                              args.bundle).hex())
         elif args.command == "stage-input":
             print(stage_input(args.repo, args.pin.encode("ascii"), args.bundle).hex())
+        elif args.command == "export-scale":
+            result = _parse_commit_id(args.result_commit, "result commit")
+            print(export_scale(args.repo, args.result_ref.encode("ascii"), result, args.bundle).hex())
+        elif args.command == "publish-scale":
+            result = _parse_commit_id(args.result_commit, "result commit")
+            producer = _parse_commit_id(args.producer_commit)
+            expected_main = None if args.expected_main == "-" else _parse_commit_id(
+                args.expected_main, "expected main commit",
+            )
+            print(publish_scale(args.repo, args.returned.encode("ascii"), result, producer, expected_main).hex())
         elif args.command == "release-input":
             print(release_input(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                                 args.result_ref.encode("ascii")).hex())

@@ -45,11 +45,13 @@ class ProcessHistory:
         self.directory = directory
         self.repos = {role: directory / role for role in ("source", "worker")}
         self.example = example
-        self.receipts = {}
+        self.sum_receipts = {}
+        self.scale_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
             "release_input": self.release_input, "collect": self.collect,
+            "export_scale": self.export_scale, "publish_scale": self.publish_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -71,6 +73,7 @@ class ProcessHistory:
         return {"op": op, "args": list(args), "code": result.returncode, "quiet": not result.stderr,
                 "diagnosed": result.stderr.startswith(f"{command}: ") and "Traceback" not in result.stderr,
                 "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
+                "expectedResult": "", "expectedMain": "",
                 "unchanged": before is not None and before == after,
                 "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
 
@@ -83,20 +86,24 @@ class ProcessHistory:
 
     def record_sum(self, role, pin, a, b):
         row = self.write("record_sum", (role, pin, a, b))
-        self.receipts[role, pin] = row["commit"]
+        if row["commit"]:
+            self.sum_receipts[role, pin] = row["commit"]
         return row
 
     def select(self, op, role, pin, producer_receipt, *tail, bundle=None):
         # Only a record_sum receipt supplies the plan, never an import receipt.
-        commit = self.receipts["source", producer_receipt]
+        commit = self.sum_receipts["source", producer_receipt]
         operands = [pin, commit, *tail]
         if bundle is not None:
             operands[-1] = bundle
         row = self.write(op, (role, pin, producer_receipt, *tail), operands=operands, bundle=bundle)
         return {**row, "expectedCommit": commit}
 
-    def record_scale(self, *args):
-        return self.select("record_scale", *args)
+    def record_scale(self, role, pin, producer_receipt, result_ref, factor):
+        row = self.select("record_scale", role, pin, producer_receipt, result_ref, factor)
+        if row["commit"]:
+            self.scale_receipts[role, result_ref] = row["commit"]
+        return row
 
     def export_sum(self, role, pin, producer_receipt, filename):
         return self.select("export_sum", role, pin, producer_receipt, filename, bundle=self.directory / filename)
@@ -107,6 +114,21 @@ class ProcessHistory:
 
     def release_input(self, *args):
         return self.select("release_input", *args)
+
+    def export_scale(self, role, pin, result_receipt, filename):
+        commit = self.scale_receipts[role, result_receipt]
+        bundle = self.directory / filename
+        row = self.write("export_scale", (role, pin, result_receipt, filename),
+                         operands=(pin, commit, bundle), bundle=bundle)
+        return {**row, "expectedCommit": commit}
+
+    def publish_scale(self, role, pin, result_receipt, producer_receipt, main_receipt):
+        result = self.scale_receipts["worker", result_receipt]
+        producer = self.sum_receipts["source", producer_receipt]
+        main = "-" if main_receipt == "-" else self.scale_receipts["worker", main_receipt]
+        row = self.write("publish_scale", (role, pin, result_receipt, producer_receipt, main_receipt),
+                         operands=(pin, result, producer, main))
+        return {**row, "expectedResult": result, "expectedCommit": producer, "expectedMain": main}
 
     def collect(self, role):
         row, output = self.invoke("collect", (role,))

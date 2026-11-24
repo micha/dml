@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -409,6 +410,109 @@ class RecordedCallsTest(unittest.TestCase):
         self.assertEqual(data.read_bytes(), before)
         self.assertEqual(self.expect_success("stage-input", "incoming", bundle, repo=worker).strip(), expected.hex())
 
+    def test_return_publishes_stored_output_and_retains_both_links_without_source_pin(self):
+        producer, sum_dag, _ = self.publish_sum_fixture()
+        decoy = bytes.fromhex(self.expect_success("record-sum", "decoy", 6, -23).strip())
+        worker = self.workspace / "worker"
+        outbound = self.workspace / "sum.dmlb"
+        inbound = self.workspace / "scale.dmlb"
+        self.expect_success("export-sum", "producer", producer.hex(), outbound)
+        self.expect_success("stage-input", "incoming", outbound, repo=worker)
+        with transaction(worker, core.TXN_WRITE) as txn:
+            source = put(txn, core.REC_NODE, core.NODE_SUBDAG, sum_dag)
+            factor = literal(txn, core.DATUM_I64, 6)
+            version = literal(txn, core.DATUM_STRING, b"example.scale@1")
+            root = literal(txn, core.DATUM_I64, -98)  # Neither (2 + 3) * 6 nor -17 * 6.
+            dag = put(txn, core.REC_DAG, root, b"implementation", version, b"input", source, b"factor", factor)
+            tree = put(txn, core.REC_TREE, b"recorded-scale-v1", dag)
+            result = put(txn, core.REC_COMMIT, tree, producer)
+            core.txn_ref_create(txn, b"result", result)
+            core.txn_commit(txn)
+        worker_report = self.expect_success("inspect", "result", repo=worker)
+        worker_data = worker / "data.mdb"
+        worker_before = worker_data.read_bytes()
+        self.assertEqual(self.expect_success("export-scale", "result", result.hex(), inbound, repo=worker).strip(),
+                         result.hex())
+        self.assertEqual(self.expect_success("stage-input", "returned", inbound).strip(), result.hex())
+        self.assertEqual(self.expect_success("inspect", "returned"), worker_report)
+        outbound.unlink()
+        inbound.unlink()  # Publication uses only objects that have already been staged.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_delete_expected(txn, b"producer", producer)
+            core.txn_ref_delete_expected(txn, b"decoy", decoy)
+            core.txn_commit(txn)
+
+        report = self.expect_success("publish-scale", "returned", result.hex(), producer.hex(), "-")
+        self.assertEqual(report.strip(), result.hex())
+        self.assertGreater(int(self.expect_success("collect")), 0)
+        with transaction(self.repo) as txn:
+            for ref in (b"producer", b"decoy", b"returned", b"incoming", b"result"):
+                self.assert_missing_ref(txn, ref)
+            with self.assertRaises(core.Error) as collected:
+                core.txn_get_object(txn, core.REC_COMMIT, decoy)
+            self.assertEqual(collected.exception.args[0], "not_found")
+            self.assertEqual(self.snapshot(txn, b"main", b"recorded-scale-v1"), (result, dag, (producer,)))
+            _, producer_tree, _ = view(txn, core.REC_COMMIT, producer)
+            tree_view, _, _ = view(txn, core.REC_TREE, producer_tree)
+            self.assertEqual(core.object_view_entry(tree_view, 0), (sum_dag, b"recorded-sum-v1"))
+            input_node = core.txn_lookup_node(txn, dag, b"input")
+            self.assertEqual(self.node_target(txn, input_node, core.NODE_SUBDAG), sum_dag)
+            self.assertEqual(self.literal_value(txn, view(txn, core.REC_DAG, dag)[1], core.DATUM_I64), -98)
+        self.assertEqual(self.expect_success("inspect"), worker_report)
+        self.assertEqual(worker_data.read_bytes(), worker_before)
+
+    def test_failed_staging_guard_rolls_back_both_create_and_update_of_main(self):
+        producer = self.expect_success("record-sum", "producer", 7, 5).strip()
+        result = self.expect_success("record-scale", "producer", producer, "result", 3).strip()
+        other = self.expect_success("record-scale", "producer", producer, "other", 4).strip()
+        producer_id, result_id, other_id = (bytes.fromhex(commit) for commit in (producer, result, other))
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_create(txn, b"returned", result_id)
+            core.txn_commit(txn)
+        self.assertEqual(json.loads(self.expect_success("inspect", "returned"))["commit"], result)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"returned", other_id)
+            core.txn_commit(txn)
+        data = self.repo / "data.mdb"
+
+        def reject(reason, pin, expected_main):
+            before = data.read_bytes()
+            self.assertIn(reason, self.expect_failure("publish-scale", pin, result, producer, expected_main))
+            self.assertEqual(data.read_bytes(), before)
+
+        reject("ref target differs", "returned", "-")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            self.assert_missing_ref(txn, b"main")
+            core.txn_ref_create(txn, b"main", producer_id)
+            core.txn_commit(txn)
+        reject("ref target differs", "returned", producer)
+        reject("must differ from main", "main", producer)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"main"), producer_id)
+            self.assertEqual(core.txn_ref_get(txn, b"returned"), other_id)
+            core.txn_ref_delete_expected(txn, b"returned", other_id)
+            core.txn_commit(txn)
+        reject("not_found", "returned", producer)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"main"), producer_id)
+            self.assert_missing_ref(txn, b"returned")
+
+    def test_publish_checks_plain_byte_arguments_before_opening_the_repository(self):
+        class BytesSubclass(bytes):
+            pass
+
+        publish = runpy.run_path(EXAMPLE)["publish_scale"]
+        identifier = bytes(16)
+        for arguments, diagnostic in (
+            ((BytesSubclass(b"main"), identifier, identifier, None), "staging ref must be bytes"),
+            ((b"returned", BytesSubclass(identifier), identifier, None), "result commit must be a 16-byte ID"),
+            ((b"returned", identifier, BytesSubclass(identifier), None), "producer commit must be a 16-byte ID"),
+            ((b"returned", identifier, identifier, BytesSubclass(identifier)), "expected main commit must be a 16-byte ID"),
+        ):
+            with self.subTest(diagnostic=diagnostic), self.assertRaisesRegex(ValueError, diagnostic):
+                publish(self.repo, *arguments)
+        self.assertFalse(self.repo.exists())
+
     def test_scale_rejects_unknown_sum_version_even_with_matching_pin_and_tree_entry(self):
         commit, _, _ = self.publish_sum_fixture(b"example.sum@2")
         data_path = self.repo / "data.mdb"
@@ -437,8 +541,16 @@ class RecordedCallsTest(unittest.TestCase):
 
         data_path = self.repo / "data.mdb"
         before = data_path.read_bytes()
-        self.assertIn("does not match the producer parent", self.expect_failure("inspect", "mismatch"))
-        self.assertEqual(data_path.read_bytes(), before)
+        bundle = self.workspace / "mismatch.dmlb"
+        for command, args in (
+            ("inspect", ("mismatch",)),
+            ("export-scale", ("mismatch", forged.hex(), bundle)),
+            ("publish-scale", ("mismatch", forged.hex(), decoy, consumer.hex())),
+        ):
+            with self.subTest(command=command):
+                self.assertIn("does not match the producer parent", self.expect_failure(command, *args))
+                self.assertEqual(data_path.read_bytes(), before)
+                self.assertFalse(bundle.exists())
 
     def publish_fixture(self, *, linked_input):
         with transaction(self.repo, core.TXN_WRITE, create=True) as txn:

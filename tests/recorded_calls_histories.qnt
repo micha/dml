@@ -58,8 +58,43 @@ module recorded_calls_histories {
     source("inspect", List("producer"))
   ))
 
+  // Result and main expectations name earlier worker record_scale receipts.
+  // '-' is an explicit expectation of no main, not an unspecified tip.
+  pure val returnRequests: List[Request] = List(
+    source("record_sum", List("producer", "7", "5")),
+    source("record_sum", List("decoy", "8", "4")),
+    source("inspect", List("producer")),
+    source("export_sum", List("producer", "producer", "sum.bundle")),
+    worker("stage_input", List("incoming", "sum.bundle")),
+    worker("record_scale", List("incoming", "producer", "result", "3")),
+    worker("record_scale", List("incoming", "producer", "revised", "-2")),
+    worker("release_input", List("incoming", "producer", "result")),
+    worker("collect", List()),
+    worker("inspect", List("result")),
+    worker("export_scale", List("result", "revised", "wrong.bundle")),
+    worker("export_scale", List("result", "result", "result.bundle")),
+    worker("export_scale", List("revised", "revised", "revised.bundle")),
+    source("stage_input", List("returned", "result.bundle")),
+    source("inspect", List("returned")),
+    source("publish_scale", List("returned", "result", "decoy", "-")),
+    source("publish_scale", List("returned", "result", "producer", "result")),
+    source("publish_scale", List("returned", "result", "producer", "-")),
+    source("inspect", List("returned")),
+    source("inspect", List()),
+    source("stage_input", List("returned", "revised.bundle")),
+    source("publish_scale", List("returned", "result", "producer", "result")),
+    source("publish_scale", List("returned", "revised", "producer", "-")),
+    source("publish_scale", List("returned", "revised", "producer", "revised")),
+    source("publish_scale", List("returned", "revised", "producer", "result")),
+    source("collect", List()),
+    source("inspect", List("returned")),
+    source("inspect", List()),
+    source("inspect", List("producer")),
+    worker("inspect", List("result"))
+  )
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
-    .append(splitRequests).append(handoffRequests)
+    .append(splitRequests).append(handoffRequests).append(returnRequests)
   action step = histories' = histories
 }
