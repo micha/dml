@@ -16,9 +16,11 @@ Read the shared [glossary](glossary.md) for terminology.
   evidence of implementation.
 - Keep the existing `docs/spec/` suite untouched unless separately authorized.
   Its future layers are not automatically requirements for this specification.
-- Design discussions, iteration plans and open questions belong in the separate
-  design repository. A concise orientation link is appropriate; speculative
-  normative APIs and placeholder subsystem specifications are not.
+- Record agreed direction outside this specification in
+  [design decisions](../design-decisions.md). The
+  [design archive](https://github.com/micha/dml/tree/archive/dml-design) preserves
+  earlier discussions and plans. Do not add speculative normative APIs or
+  placeholder subsystem specifications here.
 
 ## Ownership and change procedure
 
@@ -40,8 +42,8 @@ Read the shared [glossary](glossary.md) for terminology.
   do not imply concurrency, recovery or safety guarantees that have not been built.
 - Record which checks actually ran. Existing tests or source inspection are not a
   fresh passing suite, and finite checks do not establish untested guarantees.
-- Validate local Markdown links, section references and whitespace. Cross-repository
-  links are orientation links and depend on the documented sibling-checkout layout.
+- Validate Markdown links, section references and whitespace. Links to the
+  design archive use branch URLs; they do not require a sibling checkout.
 - Relevant storage-contract changes also require review/update of the informative
   [LMDB entity diagram](../lmdb-entity-diagram.html), following
   [visualization maintenance](../documentation-guidelines.md#as-built-visualization-maintenance).

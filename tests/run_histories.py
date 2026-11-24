@@ -1,7 +1,6 @@
 """Interpret Quint request histories against native DML and report Quint's verdicts."""
 
 import argparse
-from importlib import import_module
 import json
 from pathlib import Path
 import re
@@ -10,16 +9,35 @@ from shutil import copyfile
 import subprocess
 from tempfile import TemporaryDirectory
 
+from replay_core import Suite
 
-TIMEOUT = 15
+
+# Evaluating all live observations is heavier than loading the request histories.
+# Meson separately bounds the complete replay and verdict run.
+HISTORY_TIMEOUT = 60
+VERDICT_TIMEOUT = 120
 
 
-def quint_state(quint, source, output, fields, init="init"):
+def absolute_path(path):
+    # Preserve the intended path if Meson passes a relative build artifact.
+    return Path(path).absolute()
+
+
+def add_quint_arguments(parser):
+    parser.add_argument("quint", type=absolute_path, help="Quint executable (or Node with --quint-script)")
+    parser.add_argument("--quint-script", type=absolute_path, help="run this Quint JavaScript entry point with Node")
+
+
+def quint_command(args):
+    return [args.quint] if args.quint_script is None else [args.quint, args.quint_script]
+
+
+def quint_state(quint, source, output, fields, *, timeout, init="init"):
     output.unlink(missing_ok=True)
     result = subprocess.run(
-        [quint, "run", source, "--backend=typescript", f"--init={init}",
+        [*quint, "run", source, "--backend=typescript", f"--init={init}",
          "--max-samples=1", "--max-steps=0", "--seed=1", "--verbosity=0", f"--out-itf={output}"],
-        capture_output=True, text=True, timeout=TIMEOUT,
+        capture_output=True, text=True, timeout=timeout,
     )
     if result.returncode or not output.is_file():
         raise ValueError(f"Quint failed for {source.name}/{init}:\n{result.stdout}{result.stderr}")
@@ -35,7 +53,7 @@ def read_histories(quint, source, output, initializers):
     histories = []
     groups = []
     for init in initializers:
-        group = quint_state(quint, source, output, {"histories"}, init)["histories"]
+        group = quint_state(quint, source, output, {"histories"}, timeout=HISTORY_TIMEOUT, init=init)["histories"]
         if not isinstance(group, list) or not group:
             raise ValueError(f"{init}: expected a nonempty list of histories")
         if group in groups:
@@ -74,10 +92,7 @@ def replay_history(suite, directory, requests):
             if not isinstance(attempt, dict):
                 raise ValueError(f"{context}: operation must return an observation record")
             attempts.append(attempt)
-        evidence = {"attempts": attempts}
-        if replay.fixture is not None:
-            evidence["fixture"] = replay.fixture
-        return evidence
+        return {"attempts": attempts}
 
 
 def quint_literal(value):
@@ -96,11 +111,15 @@ def quint_literal(value):
     raise ValueError(f"Cannot encode Quint evidence value: {short_repr(value)}")
 
 
-def evaluate(quint, rules, directory, observations):
+def evaluate(quint, rules, directory, observations, imports=()):
     # The rule module exports a common interface; Observation is suite-specific.
     if not re.fullmatch(r"[a-z][a-z0-9_]*", rules.stem):
         raise ValueError(f"Invalid Quint rules module name: {rules.stem!r}")
-    copyfile(rules, directory / rules.name)
+    for source in (rules, *imports):
+        destination = directory / source.name
+        if destination.exists() or source.name == "trace_observations.qnt":
+            raise ValueError(f"Duplicate or reserved Quint module path: {source.name}")
+        copyfile(source, destination)
     module = directory / "trace_observations.qnt"
     rows = ",\n    ".join(map(quint_literal, observations))
     module.write_text(
@@ -126,7 +145,7 @@ def evaluate(quint, rules, directory, observations):
         '}\n', encoding="utf-8",
     )
     return quint_state(quint, module, directory / "verdicts.itf.json",
-                       {"verdicts", "accepting", "coverage", "controls"})
+                       {"verdicts", "accepting", "coverage", "controls"}, timeout=VERDICT_TIMEOUT)
 
 
 def check_verdicts(histories, observations, state):
@@ -148,7 +167,8 @@ def check_verdicts(histories, observations, state):
             context = f"history {index}, step {step}: {short_repr(request)}"
             if accepted is not True:
                 raise ValueError(f"{context}: Quint verdict {verdict}; observed {short_repr(attempt)}")
-            label = f'{request["op"]}({", ".join(request["args"])})'
+            args = ", ".join(arg if len(arg) <= 80 else short_repr(arg) for arg in request["args"])
+            label = f'{request["op"]}({args})'
             status = attempt.get("status", verdict)
             labels.append(f"{label}={status}")
         print(f"history {index}: {', '.join(labels)}")
@@ -159,20 +179,22 @@ def check_verdicts(histories, observations, state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("adapter", help="test adapter module exporting Suite")
-    for argument in ("quint", "runner", "scanner", "histories", "rules"):
-        # Meson may pass ./ref_replay; Path alone would drop the ./ and use PATH.
-        parser.add_argument(argument, type=lambda path: Path(path).absolute())
+    parser.add_argument("--init", action="append", help="history initializer (default: init)")
+    parser.add_argument("--quint-module", type=Path, action="append", default=[], help="local Quint rules import")
+    add_quint_arguments(parser)
+    parser.add_argument("binding", help="daggerml.core import or path to the private replay extension")
+    for argument in ("scanner", "histories", "rules"):
+        parser.add_argument(argument, type=absolute_path)
     args = parser.parse_args()
-    adapter = import_module(args.adapter)
+    quint = quint_command(args)
     with TemporaryDirectory(prefix="dml-histories-") as tmp:
         directory = Path(tmp)
-        histories = read_histories(args.quint, args.histories, directory / "histories.itf.json",
-                                   adapter.Suite.initializers)
-        suite = adapter.Suite(args.runner, args.scanner, directory)
+        histories = read_histories(quint, args.histories, directory / "histories.itf.json", args.init or ["init"])
+        suite = Suite(args.binding, args.scanner)
         observations = [replay_history(suite, directory / f"history-{index}", history)
                         for index, history in enumerate(histories, 1)]
-        check_verdicts(histories, observations, evaluate(args.quint, args.rules, directory, observations))
+        state = evaluate(quint, args.rules, directory, observations, args.quint_module)
+        check_verdicts(histories, observations, state)
 
 
 if __name__ == "__main__":

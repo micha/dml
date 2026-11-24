@@ -40,6 +40,7 @@ libdml = static_library(
     'src/object_id.c',
     'src/record.c',
     'src/repo.c',
+    'src/repo_check.c',
     'src/text.c',
     'src/transfer.c',
     'src/uri.c',
@@ -68,39 +69,158 @@ dml_dep = declare_dependency(
 )
 meson.override_dependency('dml', dml_dep)
 
+if get_option('python_bindings') or get_option('quint_tests')
+  python = import('python').find_installation(pure: false)
+  if not python.language_version().version_compare('>=3.10')
+    error('DML Python bindings require CPython 3.10 or newer')
+  endif
+  python_dep = python.dependency()
+  subdir('python/daggerml')
+endif
+
 if get_option('quint_tests')
-  python = find_program('python3', version: '>=3.10')
-  quint = find_program('quint')
+  quint_script = get_option('quint_script')
+  quint_args = []
+  if quint_script == ''
+    quint = find_program('quint')
+  else
+    quint = find_program(build_machine.system() == 'windows' ? 'node.exe' : 'node')
+    quint_script = meson.project_source_root() / quint_script
+    if not import('fs').is_file(quint_script)
+      error('Quint JavaScript entry point not found: ' + quint_script)
+    endif
+    quint_args = ['--quint-script', quint_script]
+  endif
   trace_interpreter = files('tests/run_histories.py')
   test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
-  ref_replay = executable('ref_replay', 'tests/ref_replay.c', dependencies: dml_dep)
+  private_python_core = python.extension_module(
+    '_dml_core', 'python/dml_core.c',
+    c_args: ['-DDML_PRIVATE_REPLAY'],
+    dependencies: [python_dep, dml_dep],
+    install: false,
+  )
+  binding_env = environment()
+  binding_env.prepend('PYTHONPATH', meson.current_build_dir() / 'python')
+  test(
+    'python-binding', python,
+    args: ['-B', files('tests/test_python_binding.py')],
+    env: binding_env,
+    depends: public_python_core,
+  )
+  test(
+    'recorded-calls-boundaries', python,
+    args: ['-B', files('tests/test_recorded_calls.py')],
+    env: binding_env,
+    depends: public_python_core,
+  )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
   )
+  # Includes native replay in addition to the bounded Quint verdict process.
+  replay_timeout = 210
   test(
     'quint-refs', python,
-    args: ['-B', trace_interpreter, 'replay_refs', quint.full_path(), ref_replay, lmdb_inventory,
-           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt')],
-    timeout: 90,
+    args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
+           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
   )
-  transfer_replay = executable(
-    'transfer_replay', 'tests/transfer_replay.c',
+  retention_modules = ['--quint-module', files('tests/retention_fixture.qnt'),
+                       '--quint-module', files('tests/retention_rules.qnt')]
+  foreach suite : [
+    ['transfer', 'transfer', ['--quint-module', files('tests/transfer_fixture.qnt')]],
+    ['staged-import', 'staged_import', retention_modules],
+    ['gc', 'gc', retention_modules],
+  ]
+    test(
+      'quint-' + suite[0], python,
+      args: ['-B', trace_interpreter, quint.full_path(), private_python_core, lmdb_inventory,
+             files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2] + quint_args,
+      timeout: replay_timeout,
+    )
+  endforeach
+
+  # Instrument the test copies only, never the installed library.
+  fault_header = meson.current_source_dir() / 'tests/fault_allocators.h'
+  force_fault_header = ['-include', fault_header]
+  if meson.get_compiler('c').get_argument_syntax() == 'msvc'
+    force_fault_header = ['/FI' + fault_header]
+  endif
+  repo_check_fault_subject = static_library(
+    'repo_check_fault_subject', 'src/repo_check.c', 'src/object_id.c', 'src/repo.c',
+    include_directories: dml_inc,
+    dependencies: vendor_headers,
+    c_args: ['-Dmalloc=dml_check_fault_malloc', '-Drealloc=dml_check_fault_realloc',
+             '-Dmdb_del=dml_check_fault_del'] + force_fault_header,
+  )
+  repo_check = executable(
+    'repo_check', 'tests/repo_check.c',
+    objects: repo_check_fault_subject.extract_all_objects(recursive: false),
     dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
   )
   test(
-    'quint-transfer', python,
-    args: ['-B', trace_interpreter, 'replay_transfer', quint.full_path(), transfer_replay, lmdb_inventory,
-           files('tests/transfer_histories.qnt', 'tests/transfer_rules.qnt')],
-    timeout: 90,
+    'native-repo-integrity', python,
+    args: ['-c', '''
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    subprocess.run([sys.argv[1], Path(tmp)], check=True)
+''', repo_check],
   )
 
-  # Instrument the test copies only, never the installed library.
+  transfer_boundaries = executable(
+    'transfer_boundaries', 'tests/transfer_boundaries.c',
+    dependencies: [dml_dep, lmdb_proj.get_variable('lmdb_dep')],
+  )
+  test(
+    'native-transfer-boundaries', python,
+    args: ['-c', '''
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory() as tmp:
+    subprocess.run([sys.argv[1], *(Path(tmp) / name for name in ('source', 'oversize', 'dest'))], check=True)
+''', transfer_boundaries],
+  )
+
+  provenance_handoff = executable(
+    'provenance_handoff', 'examples/provenance_handoff.c',
+    dependencies: dml_dep,
+  )
+  handoff_fixture = executable(
+    'handoff_fixture', 'tests/handoff_fixture.c',
+    dependencies: dml_dep,
+  )
+  test(
+    'provenance-handoff', python,
+    args: ['-B', files('tests/run_provenance_handoff.py'), quint.full_path(), provenance_handoff, handoff_fixture,
+           files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')] + quint_args,
+    timeout: replay_timeout,
+  )
+
+  test(
+    'recorded-calls', python,
+    args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
+           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_rules.qnt')]
+          + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
   transfer_fault_subject = static_library(
     'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
     include_directories: dml_inc,
     dependencies: vendor_headers,
-    c_args: ['-Dmalloc=dml_fault_malloc', '-Dcalloc=dml_fault_calloc', '-Drealloc=dml_fault_realloc'],
+    c_args: ['-Dmalloc=dml_fault_malloc', '-Dcalloc=dml_fault_calloc', '-Drealloc=dml_fault_realloc'] +
+            force_fault_header,
   )
   transfer_faults = executable(
     'transfer_faults', 'tests/transfer_faults.c',

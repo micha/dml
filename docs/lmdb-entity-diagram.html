@@ -105,7 +105,7 @@ const entities = [
     key: 'refs/heads/<name>', size: '16 raw bytes · no envelope',
     fields: ['name : ASCII key suffix', 'target : Commit ID'],
     summary: 'A mutable, case-sensitive name pointing to an immutable history commit.',
-    rules: ['Create requires an absent ref; update requires an existing ref.', 'Target commit and its direct references are validated. Moving a ref does not rewrite any historical object.', 'No fast-forward, ancestry, or compare-and-swap policy is imposed.'],
+    rules: ['Create requires an absent ref; update requires an existing ref. Both validate the new target and its direct references.', 'Guarded deletion compares the stored ID and removes only the ref row.', 'Every ref is a retention root, including staging refs and provenance pins.'],
     links: ['Exactly one target commit per ref; any commit can have zero or many refs.'], source: 'repository.md#refs' },
   { id: 'commit', hashedFields: true, title: 'Commit', x: 420, y: 130, key: 'objects/commits/<id>', size: '40 + 16 × parent count bytes',
     fields: ['tree : Tree ID', 'parents[] : Commit IDs', 'parent_count : u32'],
@@ -337,8 +337,9 @@ function select(id = '') {
       heading('Hash domain'), list(identityEnvelope.map(item => `${item.hashed ? '◆ Included' : '○ Zeroed before hashing'}: ${item.label} (${item.width} bytes, byte ${item.offset})`)),
       paragraph('XXH3-128 hashes the entire validated packed byte sequence after zeroing magic, total-record-length and checksum bytes; those positions are zeroed, not omitted. The sequence length still matters. Record format version, record type, reserved flags and the complete body remain included. Names, embedded counts/lengths, ordering and raw 16-byte referenced IDs contribute. The LMDB key/path and the entity ID itself are not hash inputs.'),
       heading('Packed fields'), paragraph('Object records have a 20-byte envelope. Entries, bindings, and parent lists are embedded arrays; they have no separate keys or secondary indexes.'),
-      heading('Validation & publication'), paragraph('Ordinary object operations check direct references, types, and IDs. Insert referenced objects first. One write transaction can publish objects and a ref atomically. Commit transfer validates the transitive object dependencies and does not publish refs.'),
-      heading('Scope'), paragraph('Execution requests, attempts, and results use ordinary DAGs built from these object types, not additional native LMDB entities. Commit bundles are external transfer data, not stored entity types. Tombstone recognition exists on reads, but no public tombstone writer or excision operation is implemented.', 'note'));
+      heading('Validation & publication'), paragraph('Ordinary object operations check direct references, types, and IDs. Insert referenced objects first. One write transaction can publish objects and a ref atomically. Commit bundles contain no refs. Import validates the full dependency closure and can create a local staging ref in the same write transaction.'),
+      heading('Retention & integrity'), paragraph('Every ref roots the full history and object dependencies it reaches. A read-only integrity scan changes nothing. Explicit garbage collection rechecks the graph in a write transaction and removes detached object rows only if the scan finds no damage.'),
+      heading('Scope'), paragraph('The handoff example records computation requests and results with ordinary commits and DAGs, not additional native LMDB entities. Commit bundles are external transfer data, not stored entity types. Tombstone recognition exists on reads, but no public tombstone writer or excision operation is implemented.', 'note'));
     return;
   }
   renderEntityLayout(entity);

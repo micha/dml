@@ -1,303 +1,337 @@
 module transfer_rules {
-  type Row = { key: str, packed: str }
-  type Edge = { parent: str, child: str }
+  import transfer_fixture.* from "./transfer_fixture"
+
   type Change = { kind: str, key: str, before: str, after: str }
-  type DatumRead = { stage: str, parent: str, id: str, kind: int, i64: int }
-  type Attempt = {
-    command: str,
-    status: str,
-    completion: str,
-    shape: str,
-    result: str,
-    binary: str,
-    rows: List[Row],
-    changes: List[Change],
-    value: DatumRead
+  type Attempt = { op: str, args: List[str], status: str, value: str, count: int,
+    items: List[str], changes: List[Change], otherChanges: List[Change] }
+  type Observation = { attempts: List[Attempt] }
+  type Inventory = str -> str
+  type State = {
+    inventories: str -> Inventory, open: Set[str], repo: str, txn: str, mode: str, staged: Inventory,
+    poisoned: bool, ids: str -> str, buffers: str -> Object, views: str -> Object,
+    bundles: str -> str
   }
-  type Commit = { id: str, packed: str }
-  type Parent = { id: str, datum: str }
-  type Fixture = {
-    root: Commit, initialHead: Commit, datum: str, parent: Parent, rows: List[Row], edges: List[Edge]
-  }
-  type Observation = { fixture: Fixture, attempts: List[Attempt] }
-  type Expected = {
-    present: bool, importedExport: bool, staged: bool, published: bool, canonical: str
-  }
+  type Prediction = { state: State, repo: str, status: str, value: str, count: int, items: List[str] }
 
+  pure val byId = objects.foldl(Map(), (out, row) => out.put(row.id, row))
+  pure val byPacked = objects.foldl(Map(), (out, row) => out.put(row.packed, row))
+  pure val variantByPacked = variants.foldl(Map(), (out, row) => out.put(row.packed, row))
+  pure val refKeys = Map(
+    "main" -> "726566732f68656164732f6d61696e",
+    "pinned" -> "726566732f68656164732f70696e6e6564",
+    "incoming" -> "726566732f68656164732f696e636f6d696e67",
+    "result-pin" -> "726566732f68656164732f726573756c742d70696e"
+  )
   pure val sentinel = "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
-  pure val mainKey = "726566732f68656164732f6d61696e" // refs/heads/main
-  pure val stagedKey = "726566732f68656164732f696e636f6d696e67" // refs/heads/incoming
-  pure val initial: Expected = {
-    present: false, importedExport: false, staged: false, published: false, canonical: ""
+  pure val initial: State = { inventories: Map(), open: Set(), repo: "", txn: "", mode: "",
+    staged: Map(), poisoned: false, ids: Map(), buffers: Map(), views: Map(), bundles: Map() }
+
+  pure def lookup(rows: Inventory, key: str): str = if (rows.keys().contains(key)) rows.get(key) else ""
+  pure def snapshot(s: State, repo: str): Inventory =
+    if (s.inventories.keys().contains(repo)) s.inventories.get(repo) else Map()
+  pure def save(s: State, repo: str, rows: Inventory): State =
+    { ...s, inventories: s.inventories.put(repo, rows) }
+  pure def outcome(s: State, repo: str, status: str): Prediction =
+    { state: s, repo: repo, status: status, value: "", count: 0, items: List() }
+  pure def ok(s: State, repo: str): Prediction = outcome(s, repo, "ok")
+  pure def unsupported(s: State): Prediction = outcome(s, "", "unsupported_request")
+  pure def idOf(s: State, operand: str): str = if (s.ids.keys().contains(operand)) s.ids.get(operand) else operand
+  pure def withId(p: Prediction, alias: str, id: str): Prediction =
+    { ...p, value: id, state: { ...p.state, ids: p.state.ids.put(alias, id) } }
+  pure def existsIn(rows: Inventory, object: Object): bool = rows.keys().contains(object.key)
+
+  // Fixtures are topologically ordered. Traverse from consumers back to their dependencies.
+  pure def reachable(roots: Set[str]): Set[str] =
+    range(0, objects.length()).foldl(roots, (seen, i) => {
+      val obj = objects[objects.length() - i - 1]
+      if (seen.contains(obj.name)) obj.deps.foldl(seen, (out, dep) => out.union(Set(dep))) else seen
+    })
+
+  pure def diff(before: Inventory, after: Inventory): Set[Change] =
+    before.keys().union(after.keys()).map(key => {
+      val old = lookup(before, key)
+      val current = lookup(after, key)
+      { key: key, before: old, after: current,
+        kind: if (old == "") "added" else if (current == "") "removed" else "modified" }
+    }).filter(row => row.before != row.after)
+
+  pure def transfer(s: State, op: str, args: List[str]): Prediction = {
+    val repo = args[0]
+    val stored = snapshot(s, repo)
+    if (not(s.open.contains(repo))) unsupported(s)
+    else if (op == "repo_export_commit") {
+      val root = idOf(s, args[1])
+      if (s.repo == repo) outcome(s, repo, "invalid_state")
+      else if (not(byId.keys().contains(root))) outcome(s, repo, "not_found")
+      else if (not(existsIn(stored, byId.get(root)))) outcome(s, repo, "not_found")
+      else ok({ ...s, bundles: s.bundles.put(args[2], byId.get(root).name) }, repo)
+    } else {
+      val value = args[1]
+      val input = if (s.bundles.keys().contains(value)) {status: "ok", target: s.bundles.get(value)}
+                  else if (variantByPacked.keys().contains(value)) {
+                    val fixture = variantByPacked.get(value)
+                    {status: fixture.status, target: fixture.target}
+                  } else {status: "unsupported_request", target: ""}
+      val status = if (s.repo == repo) "invalid_state" else input.status
+      if (status != "ok") { ...outcome(s, repo, status), value: sentinel }
+      else {
+        val root = byName.get(input.target)
+        val imported = reachable(Set(root.name)).fold(stored, (out, name) => {
+          val row = byName.get(name)
+          out.put(row.key, row.packed)
+        })
+        withId(ok(save(s, repo, imported), repo), args[2], root.id)
+      }
+    }
   }
-  pure val publicationSequence = List("export", "import_exported", "read_main", "read_value",
-    "read_staged", "stage_imported", "read_staged", "read_staged_value", "read_staged_parent_value",
-    "read_main", "publish_imported", "read_main", "read_value", "read_parent_value")
-  pure val refWrites = Set("stage_imported", "publish_imported")
-  pure val stagedValues = Set("read_staged_value", "read_staged_parent_value")
-  pure val parentValues = Set("read_parent_value", "read_staged_parent_value")
-  pure val goodExports = Set("export", "repeat", "reexport")
-  pure val goodImports = Set("import", "alternative", "import_exported")
-  pure val emptyExports = Set("missing_root", "missing_edge", "busy_export", "oversize_export")
-  pure val busy = Set("busy_export", "busy_import")
-  pure val badHeaders = Set("bad_magic", "bad_version", "reserved", "bad_packed")
-  pure val badBounds = Set("short_header", "short_frame", "short_record", "trailing",
-                           "oversize_record", "oversize_export", "oversize_count", "oversize_bundle")
-  pure val badGraphs = Set("wrong_root_type", "duplicate", "extra", "thin", "forward")
-  pure val badIDs = Set("wrong_id", "wrong_root", "corrupt_store")
-  pure val badKinds = Set("wrong_kind", "embedded_kind")
 
-  pure val requiredCases = goodExports.union(goodImports).union(emptyExports).union(busy)
-    .union(badHeaders).union(badBounds).union(badGraphs).union(badIDs).union(badKinds)
-    .union(Set("dirty_export", "map_full"))
+  pure def editRef(s: State, op: str, args: List[str]): Prediction = {
+    val key = refKeys.get(args[1])
+    val target = idOf(s, args[2])
+    val before = lookup(s.staged, key)
+    val remove = op == "txn_ref_delete_expected"
+    val status = if (not(remove) and not(existsIn(s.staged, byId.get(target)))) "not_found"
+                 else if (op == "txn_ref_create") (if (before == "") "ok" else "invalid_state")
+                 else if (before == "") "not_found"
+                 else if (remove and before != target) "invalid_state"
+                 else "ok"
+    if (status != "ok") outcome({ ...s, poisoned: true }, s.repo, status)
+    else ok({ ...s, staged: if (remove) s.staged.keys().exclude(Set(key)).mapBy(k => s.staged.get(k))
+                            else s.staged.put(key, target) }, s.repo)
+  }
 
+  pure val decimal = List("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
+    "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+    "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48")
+
+  pure def checkIntegrity(s: State): Prediction = {
+    val rootKeys = refKeys.keys().map(name => refKeys.get(name)).intersect(s.staged.keys())
+    val roots = rootKeys.map(key => byId.get(s.staged.get(key)).name)
+    val live = reachable(roots)
+    val dead = objects.select(row => existsIn(s.staged, row) and not(live.contains(row.name)))
+    val report = List(decimal[rootKeys.size()], "0", "0", "0", decimal[live.size()], "0", "0", decimal[dead.length()], "0")
+    { ...ok(s, s.repo), items: dead.foldl(report, (out, row) => out.concat(List(row.tag, row.id))) }
+  }
+
+  pure def txnStep(s: State, op: str, args: List[str]): Prediction = {
+    val repo = s.repo
+    if (s.txn == "" or args[0] != s.txn) unsupported(s)
+    else if (op == "txn_abort" or op == "txn_commit") {
+      val ended = { ...s, repo: "", txn: "", mode: "", staged: Map(), poisoned: false }
+      if (op == "txn_abort") ok(ended, repo)
+      else if (s.poisoned or s.mode != "write") outcome(ended, repo, "invalid_state")
+      else ok(save(ended, repo, s.staged), repo)
+    } else if (op == "txn_put_datum" or op == "txn_put_object") {
+      val datum = op == "txn_put_datum"
+      val row = byPacked.get(if (datum) args[1] else args[2])
+      val kind = if (datum) "datum" else args[1]
+      if (s.mode != "write" or s.poisoned or row.kind != kind
+          or not(row.deps.foldl(true, (present, dep) => present and existsIn(s.staged, byName.get(dep))))) unsupported(s)
+      else withId(ok({ ...s, staged: s.staged.put(row.key, row.packed) }, repo),
+        if (datum) args[2] else args[3], row.id)
+    } else if (Set("txn_ref_create", "txn_ref_update", "txn_ref_delete_expected").contains(op))
+      editRef(s, op, args)
+    else if (op == "txn_ref_get") {
+      val id = lookup(s.staged, refKeys.get(args[1]))
+      if (id == "") outcome(s, repo, "not_found") else withId(ok(s, repo), args[2], id)
+    } else if (op == "txn_lookup_node") {
+      val dag = byId.get(idOf(s, args[1]))
+      val binding = dag.entries.select(entry => entry.name == args[2])
+      if (binding.length() == 0) outcome(s, repo, "not_found")
+      else withId(ok(s, repo), args[3], byName.get(binding.head().target).id)
+    } else if (op == "txn_get_object" or op == "txn_get_datum") {
+      val datum = op == "txn_get_datum"
+      val row = byId.get(idOf(s, if (datum) args[1] else args[2]))
+      val kind = if (datum) "datum" else args[1]
+      val alias = if (datum) args[2] else args[3]
+      if (row.kind != kind or not(existsIn(s.staged, row))) unsupported(s)
+      else { ...ok({ ...s, buffers: s.buffers.put(alias, row) }, repo), value: row.packed }
+    } else if (op == "txn_check_integrity" and s.mode == "read") checkIntegrity(s)
+    else unsupported(s)
+  }
+
+  pure def viewStep(s: State, op: str, args: List[str]): Prediction =
+    if (op == "object_decode") {
+      val row = s.buffers.get(args[0])
+      val decoded = { ...s, views: s.views.put(args[1], row), ids: s.ids.put(args[1], row.reference) }
+      { ...ok(decoded, ""), value: row.reference, count: row.count }
+    } else if (op == "datum_decode") {
+      val row = s.buffers.get(args[0])
+      { ...ok(s, ""), value: row.payload, count: row.datumKind }
+    } else {
+      val row = s.views.get(args[0])
+      val index = if (args[1] == "0") 0 else 1
+      if (op == "object_view_parent") withId(ok(s, ""), args[2], byName.get(row.deps[index + 1]).id)
+      else {
+        val entry = row.entries[index]
+        { ...withId(ok(s, ""), args[2], byName.get(entry.target).id), items: List(entry.hexName) }
+      }
+    }
+
+  pure def predict(s: State, a: Attempt): Prediction = {
+    val args = a.args
+    val op = a.op
+    if (op == "repo_open") {
+      val repo = args[0]
+      if (s.open.contains(repo)) unsupported(s)
+      else if (args[1] == "create" and not(s.inventories.keys().contains(repo)))
+        ok(save({ ...s, open: s.open.union(Set(repo)) }, repo, Map(schemaKey -> schema)), repo)
+      else if (args[1] == "existing" and snapshot(s, repo).keys().contains(schemaKey))
+        ok({ ...s, open: s.open.union(Set(repo)) }, repo)
+      else unsupported(s)
+    } else if (op == "repo_close") ok({ ...s, open: s.open.exclude(Set(args[0])) }, args[0])
+    else if (op == "txn_begin" and s.txn == "" and s.open.contains(args[0]))
+      ok({ ...s, repo: args[0], mode: args[1], txn: args[2], staged: snapshot(s, args[0]) }, args[0])
+    else if (Set("repo_export_commit", "repo_import_commit").contains(op)) transfer(s, op, args)
+    else if (Set("object_decode", "datum_decode", "object_view_parent", "object_view_entry").contains(op))
+      viewStep(s, op, args)
+    else txnStep(s, op, args)
+  }
+
+  pure def sameDiff(a: Attempt, expected: Set[Change]): bool = a.otherChanges == List()
+    and a.changes.length() == expected.size() and a.changes.foldl(Set(), (rows, row) => rows.union(Set(row))) == expected
+  pure def pairs(items: List[str], offset: int): Set[List[str]] = items.indices().filter(i => i >= offset and (i - offset) % 2 == 0)
+    .map(i => List(items[i], items[i + 1]))
+  pure def exportMatches(a: Attempt, root: Object): bool = {
+    val needed = reachable(Set(root.name))
+    if (a.value == "" or a.items.length() != 1 + 3 * needed.size()) false
+    else {
+      val rows = range(0, needed.size()).foldl(List(), (out, i) =>
+        out.append(List(a.items[3*i + 1], a.items[3*i + 2], a.items[3*i + 3])))
+      val actual = rows.foldl({ seen: Set(), valid: true }, (out, frame) => {
+        val id = frame[1]
+        if (not(byId.keys().contains(id))) { ...out, valid: false }
+        else {
+          val row = byId.get(id)
+          { seen: out.seen.union(Set(row.name)), valid: out.valid and not(out.seen.contains(row.name))
+            and frame == List(row.tag, row.id, row.packed)
+            and row.deps.foldl(true, (passed, dep) => passed and out.seen.contains(dep)) }
+        }
+      })
+      a.items.head() == root.id and rows[rows.length() - 1][1] == root.id and actual.valid and actual.seen == needed
+    }
+  }
+
+  pure def verdict(s: State, p: Prediction, a: Attempt, seen: Inventory): str = {
+    val expected = diff(snapshot(s, p.repo), snapshot(p.state, p.repo))
+    if (p.status == "unsupported_request") "request"
+    else if (p.status != a.status) "status"
+    else if (not(sameDiff(a, expected))) "inventory"
+    else if (a.op == "repo_export_commit" and p.status == "ok") {
+      val root = byId.get(idOf(s, a.args[1]))
+      if (not(exportMatches(a, root))) "bundle"
+      else if (seen.keys().contains(root.id) and seen.get(root.id) != a.value) "determinism"
+      else "pass"
+    } else if (p.value != a.value or p.count != a.count) "value"
+    else if (a.op == "txn_check_integrity") {
+      if (a.items.length() == p.items.length() and a.items.slice(0, 9) == p.items.slice(0, 9)
+          and pairs(a.items, 9) == pairs(p.items, 9)) "pass" else "integrity"
+    } else if (a.items != p.items) "items"
+    else "pass"
+  }
+
+  pure def historyVerdicts(observed: Observation): List[str] =
+    observed.attempts.foldl({ state: initial, seen: Map(), verdicts: List() }, (out, a) => {
+      val p = predict(out.state, a)
+      val v = verdict(out.state, p, a, out.seen)
+      val seen = if (v == "pass" and a.op == "repo_export_commit" and a.status == "ok")
+        out.seen.put(a.items[0], a.value) else out.seen
+      { state: p.state, seen: seen, verdicts: out.verdicts.append(v) }
+    }).verdicts
   pure def verdictAccepted(verdict: str): bool = verdict == "pass"
 
-  pure def coversPublication(attempts: List[Attempt]): bool = {
-    val sequenceSize = publicationSequence.length()
-    attempts.foldl(0, (matched, attempt) =>
-      if (matched == sequenceSize) matched
-      else if (publicationSequence[matched] == attempt.command) matched + 1
-      else matched) == sequenceSize
+  pure def hasMatch(attempts: List[Attempt], predicate: Attempt => bool): bool =
+    attempts.select(predicate).length() > 0
+  pure def has(attempts: List[Attempt], op: str, args: List[str], status: str, value: str): bool =
+    hasMatch(attempts, a => a.op == op and a.args == args and a.status == status and a.value == value)
+  pure def exactExport(a: Attempt, repo: str, root: str, alias: str): bool =
+    a.op == "repo_export_commit" and a.args == List(repo, root, alias) and a.status == "ok"
+
+  pure def roundTrips(evidence: List[Observation]): bool = {
+    val thin = variants.select(v => v.name == "thin").head().packed
+    val alternative = variants.select(v => v.name == "alternative").head().packed
+    val root = byName.get("root").id
+    val direct = evidence.select(row => {
+      val a = row.attempts
+      val replay = a.select(step => step.op == "repo_export_commit" or step.op == "repo_import_commit")
+      if (replay.length() != 6) false
+      else all {
+        exactExport(replay[0], "source", "root", "exported"),
+        has(List(replay[1]), "repo_import_commit", List("dest", "exported", "imported"), "ok", root),
+        exactExport(replay[2], "dest", "imported", "reexported"),
+        exactExport(replay[3], "source", "root", "repeated"),
+        replay[0].value == replay[2].value and replay[0].value == replay[3].value,
+        has(List(replay[5]), "repo_import_commit", List("dest", thin, "thinOverExisting"), "invalid_payload", sentinel)
+      }
+    })
+    val reordered = evidence.select(row => {
+      val a = row.attempts.select(step => step.op == "repo_export_commit" or step.op == "repo_import_commit")
+      if (a.length() != 3) false
+      else all {
+        has(List(a[0]), "repo_import_commit", List("dest", alternative, "alternative"), "ok", root),
+        exactExport(a[1], "dest", "alternative", "altExport"),
+        exactExport(a[2], "source", "root", "firstExport"),
+        a[1].value == a[2].value
+      }
+    })
+    direct.length() > 0 and reordered.length() > 0
   }
 
   pure def coveragePass(evidence: List[Observation], _verdicts: List[List[str]]): bool = {
-    val seen = evidence.foldl(Set(), (allSeen, row) =>
-      row.attempts.foldl(allSeen, (seen, attempt) => seen.union(Set(attempt.command))))
-    requiredCases.subseteq(seen) and evidence.foldl(false, (covered, row) =>
-      covered or coversPublication(row.attempts))
+    val ids = byName
+    val allAttempts = evidence.foldl(List(), (out, row) => out.concat(row.attempts))
+    val imports = allAttempts.select(a => a.op == "repo_import_commit")
+    val missing = "ffffffffffffffffffffffffffffffff"
+    val rounds = evidence.select(row => {
+      val a = row.attempts
+      all {
+        has(a, "txn_ref_create", List("result", "result-pin", "resultA"), "ok", ""),
+        has(a, "txn_ref_create", List("result", "result-pin", "resultB"), "invalid_state", ""),
+        has(a, "txn_commit", List("result"), "invalid_state", ""),
+        has(a, "repo_import_commit", List("source", "returnedBundle", "returnedAgain"), "ok", ids.get("resultA").id),
+        has(a, "txn_ref_get", List("capture", "main", "originalMain"), "ok", ids.get("other").id),
+        has(a, "txn_ref_get", List("stale", "main", "staleActual"), "ok", ids.get("other").id),
+        ids.get("other").id != ids.get("root").id,
+        has(a, "txn_abort", List("stale"), "ok", ""),
+        has(a, "txn_ref_get", List("publish", "main", "publishActual"), "ok", ids.get("other").id),
+        has(a, "txn_ref_get", List("lineage", "main", "publishedResult"), "ok", ids.get("resultA").id),
+        has(a, "txn_ref_get", List("lineage", "result-pin", "releasedResult"), "ok", ids.get("resultA").id),
+        has(a, "txn_ref_get", List("noPin", "result-pin", "noPin"), "not_found", ""),
+        has(a, "txn_ref_delete_expected", List("release", "incoming", "keep"), "invalid_state", ""),
+        has(a, "txn_ref_delete_expected", List("release", "incoming", "imported"), "not_found", ""),
+        has(a, "txn_ref_get", List("noStage", "incoming", "noStage"), "not_found", ""),
+        a.select(step => step.op == "txn_check_integrity" and step.status == "ok").length() == 4
+      }
+    }).length() > 0
+    all {
+      variants.foldl(true, (covered, fixture) => covered
+        and hasMatch(imports, a => a.args[1] == fixture.packed and a.status == fixture.status)),
+      has(allAttempts, "repo_export_commit", List("dest", missing, "missingBundle"), "not_found", ""),
+      has(allAttempts, "repo_export_commit", List("dest", "keep", "busyBundle"), "invalid_state", ""),
+      hasMatch(imports, a => a.args[2] == "busyId" and a.status == "invalid_state"),
+      hasMatch(allAttempts, a => a.op == "txn_lookup_node" and a.status == "not_found"),
+      has(allAttempts, "object_view_parent", List("inputView", "0", "firstParent"), "ok", ids.get("otherParent").id),
+      has(allAttempts, "object_view_parent", List("inputView", "1", "secondParent"), "ok", ids.get("oldHead").id),
+      hasMatch(allAttempts, a => a.op == "datum_decode" and a.value == ids.get("first").payload),
+      hasMatch(allAttempts, a => a.op == "datum_decode" and a.value == ids.get("fifth").payload),
+      roundTrips(evidence),
+      rounds
+    }
   }
 
-  pure def expectedStatus(command: str, state: Expected): str =
-    if (command == "read_value") (if (state.published) "ok" else "not_found")
-    else if (command == "read_staged") (if (state.staged) "ok" else "not_found")
-    else if (goodExports.contains(command) or goodImports.contains(command)
-        or command == "read_main" or command == "read_parent_value"
-        or stagedValues.contains(command) or refWrites.contains(command)) "ok"
-    else if (busy.contains(command)) "invalid_state"
-    else if (badHeaders.contains(command)) "invalid_header"
-    else if (badBounds.contains(command)) "invalid_bounds"
-    else if (badIDs.contains(command)) "integrity_error"
-    else if (badKinds.contains(command)) "invalid_kind"
-    else if (badGraphs.contains(command)) "invalid_payload"
-    else if (command == "missing_root" or command == "missing_edge") "not_found"
-    else if (command == "dirty_export") "invalid_argument"
-    else if (command == "map_full") "map_full"
-    else "unknown_command"
-
-  pure def exactRows(rows: List[Row], expected: List[Row]): bool =
-    rows.length() == expected.length()
-      and rows.foldl(Set(), (seen, row) => seen.union(Set(row)))
-          == expected.foldl(Set(), (seen, row) => seen.union(Set(row)))
-
-  pure def dependencyOrder(rows: List[Row], edges: List[Edge]): bool =
-    rows.foldl({ ok: true, keys: Set() }, (state, row) => {
-      ok: state.ok and edges.foldl(true, (ok, edge) =>
-        ok and (edge.parent != row.key or state.keys.contains(edge.child))),
-      keys: state.keys.union(Set(row.key))
-    }).ok
-
-  pure def additions(rows: List[Row]): Set[Change] =
-    rows.foldl(Set(), (changes, row) => changes.union(Set({
-      kind: "added", key: row.key, before: "", after: row.packed
-    })))
-
-  pure def exportVerdict(attempt: Attempt, fixture: Fixture, canonical: str): str =
-    if (attempt.shape != "buffer" or attempt.result != fixture.root.id) "export_output"
-    else if (not(exactRows(attempt.rows, fixture.rows))) "export_rows"
-    else if (not(dependencyOrder(attempt.rows, fixture.edges))) "export_order"
-    else if (canonical != "" and canonical != attempt.binary) "export_unstable"
-    else "pass"
-
-  pure def mainMoved(fixture: Fixture): Change = {
-    kind: "modified", key: mainKey, before: fixture.initialHead.id, after: fixture.root.id
-  }
-
-  pure def stagedAdded(fixture: Fixture): Change = {
-    kind: "added", key: stagedKey, before: "", after: fixture.root.id
-  }
-
-  pure def expectedChanges(command: str, fixture: Fixture, state: Expected): Set[Change] =
-    if (goodImports.contains(command) and not(state.present)) additions(fixture.rows)
-    else if (command == "stage_imported") Set(stagedAdded(fixture))
-    else if (command == "publish_imported") Set(mainMoved(fixture))
-    else Set()
-
-  pure def readVerdict(attempt: Attempt, target: Commit): str =
-    if (attempt.result != target.id) "read_target"
-    else if (attempt.binary != target.packed) "read_commit"
-    else "pass"
-
-  pure def valueVerdict(attempt: Attempt, fixture: Fixture, atImportedRoot: bool): str = {
-    val expectedTip = if (atImportedRoot) fixture.root.id else fixture.initialHead.id
-    // The initial tree lacks `all`. The imported tip yields I64(45) through the same path
-    // and its first parent yields I64(41), by construction rather than decoding observed bytes.
-    val expected: DatumRead =
-      if (parentValues.contains(attempt.command))
-        { stage: "datum_decode", parent: fixture.parent.id, id: fixture.parent.datum, kind: 3, i64: 41 }
-      else if (atImportedRoot) { stage: "datum_decode", parent: "", id: fixture.datum, kind: 3, i64: 45 }
-      else { stage: "tree_entry", parent: "", id: sentinel, kind: 0, i64: 0 }
-    if (attempt.result != expectedTip) "read_target"
-    else if (attempt.value.stage != expected.stage) "read_value_stage"
-    else if (attempt.value.parent != expected.parent) "read_parent"
-    else if (attempt.value.id != expected.id) "read_datum"
-    else if (attempt.value.kind != expected.kind or attempt.value.i64 != expected.i64) "read_value"
-    else "pass"
-  }
-
-  pure def verdict(attempt: Attempt, fixture: Fixture, state: Expected): str = {
-    val command = attempt.command
-    val status = expectedStatus(command, state)
-    val completion = if (busy.contains(command) or refWrites.contains(command)
-                         or command == "read_main" or (command == "read_staged" and state.staged))
-                       "ok" else "none"
-    val changes = attempt.changes.foldl(Set(), (seen, change) => seen.union(Set(change)))
-    if (status == "unknown_command") "unknown_command"
-    else if (attempt.status != status) "status"
-    else if (attempt.completion != completion) "completion"
-    else if ((command == "stage_imported" and (not(state.importedExport) or state.staged or state.published))
-             or (stagedValues.contains(command) and (not(state.staged) or state.published))) "staging_order"
-    else if ((command == "publish_imported" and (not(state.importedExport) or state.published))
-             or (command == "read_parent_value" and not(state.published))) "publication_order"
-    else if (changes != expectedChanges(command, fixture, state)) "inventory"
-    else if (goodExports.contains(command)) exportVerdict(attempt, fixture, state.canonical)
-    else if (goodImports.contains(command) and attempt.result != fixture.root.id) "import_root"
-    else if (command == "stage_imported" and attempt.result != fixture.root.id) "stage_target"
-    else if (command == "publish_imported" and attempt.result != fixture.root.id) "publish_target"
-    else if (command == "read_main")
-      readVerdict(attempt, if (state.published) fixture.root else fixture.initialHead)
-    else if (command == "read_staged")
-      readVerdict(attempt, if (state.staged) fixture.root else { id: sentinel, packed: "" })
-    else if (stagedValues.contains(command)) valueVerdict(attempt, fixture, true)
-    else if (command == "read_value" or command == "read_parent_value")
-      valueVerdict(attempt, fixture, state.published)
-    else if (emptyExports.contains(command) and attempt.shape != "empty") "export_not_empty"
-    else if (command == "dirty_export" and attempt.shape != "unchanged") "export_changed_buffer"
-    else if (attempt.shape == "" and status != "ok" and attempt.result != sentinel)
-      "import_changed_root"
-    else "pass"
-  }
-
-  // Expected state follows requested imports, staging and publication, not observed C outcomes.
-  pure def historyVerdicts(observed: Observation): List[str] =
-    observed.attempts.foldl({ expected: initial, verdicts: List() }, (state, attempt) => {
-      expected: {
-        present: state.expected.present or goodImports.contains(attempt.command),
-        importedExport: state.expected.importedExport or attempt.command == "import_exported",
-        staged: state.expected.staged or attempt.command == "stage_imported",
-        published: state.expected.published or attempt.command == "publish_imported",
-        canonical: if (state.expected.canonical == "" and goodExports.contains(attempt.command))
-                     attempt.binary else state.expected.canonical
-      },
-      verdicts: state.verdicts.append(verdict(attempt, observed.fixture, state.expected))
-    }).verdicts
-
-  // The oracle must reject a successful partial export, failure with a leaked row,
-  // and failure that changes the caller's output ID even if the LMDB state is unchanged.
-  pure val leaf = { key: "aa", packed: "bb" }
-  pure val root = { key: "cc", packed: "dd" }
-  pure val fixture = {
-    root: { id: "cc", packed: "dd" }, initialHead: { id: "ee", packed: "11" }, datum: "aa",
-    parent: { id: "55", datum: "77" },
-    rows: List(leaf, root), edges: List({ parent: "cc", child: "aa" })
-  }
-  pure val noValue: DatumRead = { stage: "", parent: "", id: "", kind: 0, i64: 0 }
-  pure val exported = {
-    command: "export", status: "ok", completion: "none", shape: "buffer", result: "cc",
-    binary: "ff", rows: List(leaf, root), changes: List(), value: noValue
-  }
-  pure val rejected = {
-    command: "extra", status: "invalid_payload", completion: "none", shape: "", result: sentinel,
-    binary: "", rows: List(), changes: List(), value: noValue
-  }
-  pure val earlyPublication = {
-    command: "import_exported", status: "ok", completion: "none", shape: "", result: "cc",
-    binary: "", rows: List(), value: noValue, changes: List(
-      { kind: "added", key: "aa", before: "", after: "bb" },
-      { kind: "added", key: "cc", before: "", after: "dd" }, mainMoved(fixture))
-  }
-  pure val published = {
-    command: "publish_imported", status: "ok", completion: "ok", shape: "", result: "cc",
-    binary: "", rows: List(), changes: List(mainMoved(fixture)), value: noValue
-  }
-  pure val readback = {
-    command: "read_main", status: "ok", completion: "ok", shape: "", result: "cc",
-    binary: "dd", rows: List(), changes: List(), value: noValue
-  }
-  pure val valueRead = {
-    command: "read_value", status: "ok", completion: "none", shape: "", result: "cc",
-    binary: "", rows: List(), changes: List(),
-    value: { stage: "datum_decode", parent: "", id: "aa", kind: 3, i64: 45 }
-  }
-  pure val valueMiss = {
-    ...valueRead, status: "not_found", result: "ee",
-    value: { stage: "tree_entry", parent: "", id: sentinel, kind: 0, i64: 0 }
-  }
-  pure val parentRead = {
-    ...valueRead, command: "read_parent_value",
-    value: { stage: "datum_decode", parent: "55", id: "77", kind: 3, i64: 41 }
-  }
-  pure val imported = { ...earlyPublication, changes: List(
-    { kind: "added", key: "aa", before: "", after: "bb" },
-    { kind: "added", key: "cc", before: "", after: "dd" }) }
-  pure val importedState = { ...initial, present: true, importedExport: true }
-  pure val stagedState = { ...importedState, staged: true }
-  pure val publishedState = { ...stagedState, published: true }
-  pure val staged = { ...published, command: "stage_imported", changes: List(stagedAdded(fixture)) }
-  pure val stagedReadback = { ...readback, command: "read_staged" }
-  pure val unstagedReadback = {
-    ...stagedReadback, status: "not_found", completion: "none", result: sentinel, binary: ""
-  }
-  pure val stagedValue = { ...valueRead, command: "read_staged_value" }
-  pure val stagedParent = { ...parentRead, command: "read_staged_parent_value" }
-  pure val beforeStaging = List(exported, imported, readback, valueMiss, unstagedReadback, staged)
-  pure val afterStaging = List(readback, published, readback, valueRead, parentRead)
-  pure val controlsPass = all {
-    verdict({ ...exported, rows: List(root) }, fixture, initial) == "export_rows",
-    verdict({ ...exported, rows: List(root, leaf) }, fixture, initial) == "export_order",
-    verdict({ ...exported, changes: List({kind: "added", key: "aa", before: "", after: "bb"}) },
-      fixture, initial) == "inventory",
-    verdict({ ...rejected, changes: List({kind: "added", key: "aa", before: "", after: "bb"}) },
-      fixture, initial) == "inventory",
-    verdict({ ...rejected, result: "cc" }, fixture, initial) == "import_changed_root",
-    verdict(earlyPublication, fixture, initial) == "inventory",
-    verdict(published, fixture, { ...initial, present: true }) == "publication_order",
-    verdict({ ...published, changes: List() }, fixture, importedState) == "inventory",
-    verdict({ ...published, completion: "invalid_state" }, fixture, importedState) == "completion",
-    verdict({ ...published, result: "ee" }, fixture, importedState) == "publish_target",
-    verdict(readback, fixture, importedState) == "read_target",
-    verdict({ ...readback, result: "ee", binary: "11" }, fixture, publishedState) == "read_target",
-    verdict({ ...readback, binary: "11" }, fixture, publishedState) == "read_commit",
-    verdict(valueMiss, fixture, importedState) == "pass",
-    verdict({ ...valueMiss, value: { ...valueMiss.value, stage: "tree" } },
-      fixture, importedState) == "read_value_stage",
-    verdict(valueRead, fixture, publishedState) == "pass",
-    verdict({ ...valueRead, value: { ...valueRead.value, id: "bb" } },
-      fixture, publishedState) == "read_datum",
-    verdict({ ...valueRead, value: { ...valueRead.value, kind: 4 } },
-      fixture, publishedState) == "read_value",
-    verdict({ ...valueRead, value: { ...valueRead.value, i64: 44 } },
-      fixture, publishedState) == "read_value",
-    verdict(parentRead, fixture, publishedState) == "pass",
-    verdict(parentRead, fixture, importedState) == "publication_order",
-    verdict({ ...parentRead, value: { ...parentRead.value, parent: "cc" } },
-      fixture, publishedState) == "read_parent",
-    verdict({ ...parentRead, value: { ...valueRead.value, parent: "55" } },
-      fixture, publishedState) == "read_datum",
-    verdict({ ...parentRead, value: { ...parentRead.value, i64: 45 } },
-      fixture, publishedState) == "read_value",
-    verdict(staged, fixture, importedState) == "pass",
-    verdict(staged, fixture, initial) == "staging_order",
-    verdict({ ...staged, changes: List(stagedAdded(fixture), mainMoved(fixture)) },
-      fixture, importedState) == "inventory",
-    verdict(stagedReadback, fixture, importedState) == "status",
-    verdict(stagedReadback, fixture, stagedState) == "pass",
-    verdict(stagedParent, fixture, importedState) == "staging_order",
-    verdict(stagedParent, fixture, stagedState) == "pass",
-    verdict(readback, fixture, stagedState) == "read_target",
-    coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent)).concat(afterStaging)),
-    not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue)).concat(afterStaging))),
-    not(coversPublication(beforeStaging.concat(List(stagedReadback, stagedValue, stagedParent))
-      .concat(List(published, readback, valueRead, parentRead))))
+  pure val badImport = variants.select(v => v.name == "thin").head()
+  pure val dest = { ...initial, open: Set("dest"), inventories: Map("dest" -> Map(schemaKey -> schema)) }
+  pure val rejet: Attempt = { op: "repo_import_commit", args: List("dest", badImport.packed, "bad"),
+    status: "invalid_payload", value: sentinel, count: 0, items: List(), changes: List(), otherChanges: List() }
+  pure val leak = { kind: "added", key: byName.get("ancestor").key, before: "", after: byName.get("ancestor").packed }
+  pure val controlsPass = {
+    val p = predict(dest, rejet)
+    all {
+      verdict(dest, p, rejet, Map()) == "pass",
+      verdict(dest, p, { ...rejet, changes: List(leak) }, Map()) == "inventory",
+      verdict(dest, p, { ...rejet, otherChanges: List(leak) }, Map()) == "inventory",
+      verdict(dest, p, { ...rejet, value: byName.get("ancestor").id }, Map()) == "value",
+      not(exportMatches({ ...rejet, value: "abcd", items: List(byName.get("oldHead").id) }, byName.get("oldHead")))
+    }
   }
 }

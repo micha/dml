@@ -72,12 +72,18 @@ formatter or linter, defer to its rules and update this section accordingly.
 
 - Follow the [development validation policy](docs/validation-policy.md) for focused
   change-validation mapping, independent risk-based review and explicit CI exceptions.
+- Follow the [Quint design-to-replay workflow](docs/validation-policy.md#design-with-tlc-validate-implementation-with-replay):
+  use TLC before implementation when exhaustive model checking adds value, then
+  use TypeScript replay to check the real implementation.
 - Add tests for new behavior or bug fixes.
 - Keep tests deterministic; avoid time-dependent flakiness.
 - Prefer unit tests for pure logic; use integration tests for boundary
   interactions.
-- For the new suite, use Quint to generate attempted histories and evaluate
-  observations from real C API calls. The runner must not predict outcomes.
+- Prefer Quint for behavior that can be specified and checked against live
+  observations. Keep core replay at one C API call per step. Use a separate
+  workflow-level spec for application behavior, as in the
+  [handoff integration](tests/README.md#process-integration). Runners collect
+  evidence; Quint decides whether it matches the behavioral contract.
 - Use focused C tests for low-level scenarios such as allocation failures.
 - Prioritize contract scenarios over coverage percentages. Use coverage as a
   diagnostic, not a target; see the validation policy for evidence selection.
@@ -142,8 +148,26 @@ Tooling and project layout guidance is being rewritten from scratch.
 Do not treat prior command examples or directory assumptions as canonical.
 
 [The optional Nix development shell](README.md#optional-nix-development-shell)
-supplies build tools. Historical Python, CLI, test, and spike workflows are at
+supplies build tools. The opt-in `.#quint` shell supplies the pinned CLI for
+[Quint behavior checks](README.md#quint-behavior-checks).
+Historical Python, CLI, test, and spike workflows are at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
+
+### Build outputs and experiment evidence
+
+- Treat `build/` as disposable. Use it for rebuildable outputs, caches, and
+  scratch runs. Create temporary Git worktrees outside `build/` and remove them
+  with `git worktree remove` when done.
+- Decide what evidence to keep before running an experiment. Before handing it
+  off, move the report, source revision or patch, rerun instructions, and any
+  results or diagnostic logs needed to support its conclusions out of `build/`.
+  Use the `archive/experiments` branch for completed historical studies (see
+  `git show archive/experiments:experiments/README.md`). Put large irreplaceable
+  artifacts in backed-up storage and record their location and checksum.
+- Keep routine logs, binaries, and regenerable fixtures out of the archive.
+  Review retained logs for secrets before sharing. Report historical runs as
+  evidence, not as current validation, per the
+  [validation policy](docs/validation-policy.md#report-actual-results).
 
 ## Updating This File
 

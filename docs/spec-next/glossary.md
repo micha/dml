@@ -7,8 +7,9 @@ Status: working vocabulary, evolving with the design spiral.
 This document owns the meanings of terms used in the current design discussion
 and maintained documentation. It does not define object layouts, APIs or execution
 protocols. Implemented behavior is specified in the
-[technical documents](README.md); design agreements and open questions are recorded
-in [the design discussion](../../../dml-design/discussion.md).
+[technical documents](README.md). See [agreed design direction](../design-decisions.md)
+and the [historical design discussion](https://github.com/micha/dml/blob/archive/dml-design/discussion.md)
+for design context.
 
 An entry here does **not** mean the concept is implemented. **Provisional** marks
 an unsettled term or distinction, not merely an unimplemented feature. Examples are
@@ -299,10 +300,10 @@ registering resources in manager state and applying physical changes are distinc
 
 ### Garbage collection (GC)
 
-Optional collection of unrooted repository history/objects and eligible project-owned
-resources. Retention follows full history rooted at refs, not just current snapshots.
-External cleanup custody must survive until cleanup can complete or be retried.
-Exact roots and implementation are open.
+Collection of data no longer retained. [Local repository GC](repository.md#explicit-garbage-collection)
+removes objects unreachable from all refs, which retain full history, not just current
+snapshots. Eligible project-owned resources are a separate design concern: external
+cleanup custody must survive until cleanup can complete or be retried.
 
 ### Excision
 

@@ -1,0 +1,14 @@
+[build-system]
+requires = ["meson-python>=0.17", "meson>=1.4", "ninja>=1.11"]
+build-backend = "mesonpy"
+
+[project]
+name = "daggerml"
+dynamic = ["version"]
+description = "Low-level Python binding for the DML repository core"
+requires-python = ">=3.10"
+
+[tool.meson-python.args]
+setup = ["-Dpython_bindings=true", "--wrap-mode=forcefallback"]
+install = ["--skip-subprojects", "--tags=python-runtime"]
+dist = ["--include-subprojects"]

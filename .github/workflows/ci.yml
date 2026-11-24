@@ -13,6 +13,9 @@ jobs:
     name: C core (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      QUINT_PACKAGE: '@informalsystems/quint@0.33.1'
+      DML_QUINT_SCRIPT: build/quint-tool/node_modules/@informalsystems/quint/dist/src/cli.js
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +34,13 @@ jobs:
         if: runner.os != 'Windows'
         run: python -m pip install 'meson>=1.4' ninja
 
+      - name: Set up Node.js
+        if: runner.os != 'Windows'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
       - name: Set up MSYS2 UCRT64
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -41,21 +51,32 @@ jobs:
             mingw-w64-ucrt-x86_64-toolchain
             mingw-w64-ucrt-x86_64-meson
             mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-nodejs
+            mingw-w64-ucrt-x86_64-python
 
-      - name: Build C core (Unix)
+      - name: Run Quint checks (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: scripts/check.sh
+        run: |
+          npm install --prefix build/quint-tool --no-save --ignore-scripts --no-audit --no-fund "$QUINT_PACKAGE"
+          # Reduce contention between Quint verdict processes on Intel macOS.
+          if [[ "$RUNNER_OS" == macOS && "$RUNNER_ARCH" == X64 ]]; then
+            export MESON_TESTTHREADS=1
+          fi
+          ./scripts/check.sh --quint
 
-      - name: Build C core (Windows)
+      - name: Run Quint checks (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: scripts/check.sh
+        run: |
+          set -e
+          npm install --prefix build/quint-tool --no-save --ignore-scripts --no-audit --no-fund "$QUINT_PACKAGE"
+          ./scripts/check.sh --quint
 
       - name: Upload Meson logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.os }}-meson-logs
-          path: build/core-check/meson-logs
+          path: build/core-check-quint/meson-logs
           if-no-files-found: warn
