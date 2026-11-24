@@ -1342,6 +1342,131 @@ class RecordedCallsTest(unittest.TestCase):
                     adopt(self.repo, basis, old, incoming, attempt, output)
                 self.assertFalse(self.repo.exists())
 
+    def test_policy_legacy_reuse_rolls_back_late_and_keeps_distinct_decisions_for_equal_intent(self):
+        producer, old_plan, request, _, _, _ = self.prepare_adoption()
+        define = self.example["define_scale_policy"]
+        policy = define(self.repo, b"policy", b"reuse-by-default")
+        result = self.example["work_scale"](self.repo, b"incoming", request, b"result")
+        chosen = self.example["select_scale_result"](self.repo, b"plan", old_plan, b"result", result, b"legacy")
+        prior_main = self.example["record_scale"](self.repo, b"producer", producer, b"main", 4)
+        self.assertNotEqual(prior_main, result)
+
+        def decide(ref, *, factor=3):
+            return self.example["request_policy_scale"](
+                self.repo, b"producer", producer, b"policy", policy, b"would-plan", ref, factor,
+                selection_ref=b"legacy", selection_commit=chosen,
+            )
+
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "selection does not retain the expected request"):
+            decide(b"wrong-request", factor=4)
+        self.assertEqual(data.read_bytes(), before)
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            decide(b"result")
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"main"), prior_main)
+            self.assertEqual(core.txn_ref_get(txn, b"plan"), old_plan)
+            self.assert_missing_ref(txn, b"would-plan")
+            self.assert_missing_ref(txn, b"wrong-request")
+
+        decision = decide(b"first-decision")
+        report = self.example["inspect"](self.repo, b"first-decision")
+        self.assertEqual(report["expected_main"], prior_main.hex())
+        self.assertEqual((report["selection_commit"], report["result_commit"]), (chosen.hex(), result.hex()))
+        self.assertNotIn("attempt_id", report)
+        with transaction(self.repo) as txn:
+            stored, dag, parents = self.snapshot(txn, b"first-decision", b"scale-request-decision-v1")
+            plan = bytes.fromhex(report["plan_commit"])
+            self.assertEqual((stored, parents), (decision, (plan, policy, chosen)))
+            self.assertEqual(core.txn_ref_get(txn, b"main"), result)
+            self.assertEqual(core.txn_ref_get(txn, b"plan"), old_plan)
+            self.assert_missing_ref(txn, b"would-plan")
+            plan_view, _, parent_count = view(txn, core.REC_COMMIT, plan)
+            self.assertEqual(parent_count, 2)
+            self.assertEqual(core.object_view_parent(plan_view, 0), request)
+            self.assertEqual(core.object_view_parent(plan_view, 1), prior_main)
+            _, root, count = view(txn, core.REC_DAG, dag)
+            self.assertEqual((count, root), (4, core.txn_lookup_node(txn, dag, b"decision_id")))
+            self.assertEqual(self.literal_value(txn, root, core.DATUM_STRING), report["decision_id"])
+
+        # Both later decisions have the same immutable parents and intent data.
+        self.assertNotEqual(decide(b"again"), decide(b"repeat"))
+        again = self.example["inspect"](self.repo, b"again")
+        repeat = self.example["inspect"](self.repo, b"repeat")
+        self.assertNotEqual(again.pop("commit"), repeat.pop("commit"))
+        self.assertNotEqual(again.pop("decision_id"), repeat.pop("decision_id"))
+        self.assertEqual(again, repeat)
+        self.assertEqual((again["selection_commit"], again["result_commit"]), (chosen.hex(), result.hex()))
+
+    def test_policy_and_decision_readers_revalidate_typed_parents_and_fields(self):
+        producer, plan, _, _, _, selection = self.prepare_adoption()
+        define = self.example["define_scale_policy"]
+        policy = define(self.repo, b"policy", b"reuse-by-default")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            def record(ref, entry, fields, root, *parents):
+                nodes = {key: literal(txn, core.DATUM_STRING, value) for key, value in fields.items()}
+                bindings = [value for pair in nodes.items() for value in pair]
+                dag = put(txn, core.REC_DAG, nodes[root], *bindings)
+                tree = put(txn, core.REC_TREE, entry, dag)
+                commit = put(txn, core.REC_COMMIT, tree, *parents)
+                core.txn_ref_create(txn, ref, commit)
+                return commit
+
+            policy_entry = b"scale-intent-policy-v1"
+            malformed = record(b"bad-policy", policy_entry, {b"default": b"reuse-by-default"}, b"default", producer)
+            invalid = ((b"bad-policy", "optional policy parent"), (b"unknown-policy", "policy default must be"))
+            record(b"unknown-policy", policy_entry, {b"default": b"typo"}, b"default")
+            fields = {b"decision_id": ATTEMPT_A, b"override": b"default", b"reason": b"default-selection",
+                      b"selection_ref": b"chosen"}
+            cases = (
+                (b"swapped", fields, b"decision_id", (policy, plan, selection), "expected a scale-plan-v1"),
+                (b"bad-ancestor", fields, b"decision_id", (plan, malformed, selection), "optional policy parent"),
+                (b"not-selection", fields, b"decision_id", (plan, policy, producer), "expected a scale result or attempt"),
+                (b"wrong-root", fields, b"reason", (plan, policy, selection), "decision ID as root"),
+                (b"wrong-id", {**fields, b"decision_id": b"not-a-uuid"}, b"decision_id",
+                 (plan, policy, selection), "canonical lowercase UUIDv4"),
+                (b"wrong-override", {**fields, b"override": b"fresh"}, b"decision_id",
+                 (plan, policy, selection), "fresh execution cannot retain a selection"),
+                (b"wrong-reason", {**fields, b"reason": b"default-no-selection"}, b"decision_id",
+                 (plan, policy, selection), "fields do not match"),
+                (b"extra-field", {**fields, b"plan_ref": b"not-created"}, b"decision_id",
+                 (plan, policy, selection), "fields do not match"),
+                (b"aliased-refs", {**fields, b"plan_ref": b"fresh", b"reason": b"default-no-selection",
+                                   b"selection_ref": b"fresh"}, b"decision_id",
+                 (plan, policy), "invalid or aliased ref names"),
+            )
+            commits = {ref: record(ref, b"scale-request-decision-v1", fields, root, *parents)
+                       for ref, fields, root, parents, _ in cases}
+            core.txn_commit(txn)
+
+        before = (self.repo / "data.mdb").read_bytes()
+        inspect = self.example["inspect"]
+        for ref, reason in (*invalid, *((ref, reason) for ref, _, _, _, reason in cases)):
+            with self.subTest(ref=ref), self.assertRaisesRegex(ValueError, reason):
+                inspect(self.repo, ref)
+        with self.assertRaisesRegex(ValueError, "optional policy parent"):
+            define(self.repo, b"next", b"execute-by-default", basis_ref=b"bad-policy", basis_commit=malformed)
+        with self.assertRaisesRegex(ValueError, "optional policy parent"):
+            self.example["request_policy_scale"](self.repo, b"producer", producer, b"bad-policy", malformed,
+                                                 b"would-plan", b"decision", 3, override=b"fresh")
+
+        def decide(override):
+            return self.example["request_policy_scale"](
+                self.repo, b"producer", producer, b"policy", policy, b"would-plan", b"decision", 3,
+                override=override, selection_ref=b"swapped", selection_commit=commits[b"swapped"],
+            )
+
+        with self.assertRaisesRegex(ValueError, "expected a scale result or attempt selection"):
+            decide(b"default")
+        self.assertEqual((self.repo / "data.mdb").read_bytes(), before)
+        decision = decide(b"fresh")
+        report = inspect(self.repo, b"decision")
+        self.assertEqual((report["commit"], report["reason"]), (decision.hex(), "override-fresh"))
+        self.assertNotIn("selection_ref", report)
+        self.assertNotIn("selection_commit", report)
+
     def test_attempt_work_rejects_invalid_identity_stale_ref_and_overflow_atomically(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
         self.example["request_scale"](self.repo, b"producer", producer, b"plan", 1 << 62)

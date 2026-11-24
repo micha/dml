@@ -59,6 +59,9 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "selectedPublication": {"mode": "", "planRef": "", "plan": "", "selectionRef": "",
                                     "selection": "", "result": ""},
             "occurrence": {"id": "", "commit": "", "result": "", "historicalRef": ""},
+            "policy": {"defaultMode": "", "previous": ""}, "expectedPolicy": "",
+            "decision": {"id": "", "canonicalId": False, "policy": "", "defaultMode": "", "override": "", "route": "",
+                         "reason": "", "plan": "", "planRef": "", "selectionRef": "", "selection": "", "result": ""},
             "unchanged": unchanged, "bundlePresent": bundle_present, "bundleUnchanged": bundle_unchanged}
 
 
@@ -73,6 +76,7 @@ class ProcessHistory:
         self.request_receipts = {}
         self.selection_receipts = {}
         self.attempt_receipts = {}
+        self.policy_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
@@ -85,6 +89,7 @@ class ProcessHistory:
             "publish_selected_scale": self.publish_selected_scale, "work_scale_attempt": self.work_scale_attempt,
             "export_scale_attempt": self.export_scale_attempt, "select_scale_attempt": self.select_scale_attempt,
             "adopt_scale_attempt": self.adopt_scale_attempt, "drop_ref": self.drop_ref,
+            "define_scale_policy": self.define_scale_policy, "request_policy_scale": self.request_policy_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -229,9 +234,41 @@ class ProcessHistory:
             self.selection_receipts[selection_ref] = row["commit"]
         return {**row, "expectedCommit": basis, "expectedAttempt": attempt}
 
+    def define_scale_policy(self, role, policy_ref, default, *basis):
+        expected = ""
+        operands = [policy_ref, default]
+        if basis:
+            basis_ref, receipt = basis
+            expected = self.policy_receipts[receipt]
+            operands.extend(("--basis-ref", basis_ref, "--basis-commit", expected))
+        row = self.write("define_scale_policy", (role, policy_ref, default, *basis), operands=operands)
+        if row["commit"]:
+            self.policy_receipts[policy_ref] = row["commit"]
+        return {**row, "expectedCommit": expected}
+
+    def request_policy_scale(self, role, producer_ref, producer_receipt, policy_ref, policy_receipt,
+                             plan_ref, decision_ref, factor, override, *selection):
+        producer = self.sum_receipts["source", producer_receipt]
+        policy = self.policy_receipts[policy_receipt]
+        args = (role, producer_ref, producer_receipt, policy_ref, policy_receipt, plan_ref, decision_ref,
+                factor, override, *selection)
+        operands = [producer_ref, producer, policy_ref, policy, plan_ref, decision_ref, factor,
+                    "--implementation", "example.scale@2"]
+        if override != "default":
+            operands.extend(("--override", override))
+        expected_selection = ""
+        if selection:
+            operands.extend(("--selection", selection[0]))
+            if len(selection) == 2:
+                expected_selection = self.selection_receipts[selection[1]]
+                operands.extend(("--selection-commit", expected_selection))
+        row = self.write("request_policy_scale", args, operands=operands)
+        return {**row, "expectedCommit": producer, "expectedPolicy": policy, "expectedSelection": expected_selection}
+
     def drop_ref(self, role, pin, kind, receipt):
         # Fixture only: simulate a separate ref owner without adding a CLI command.
-        receipts = {"attempt": self.attempt_receipts, "selection": self.selection_receipts}
+        receipts = {"attempt": self.attempt_receipts, "selection": self.selection_receipts,
+                    "policy": self.policy_receipts}
         expected = receipts[kind][receipt]
         path = self.repos[role]
         data = path / "data.mdb"
@@ -301,7 +338,24 @@ class ProcessHistory:
             row["commit"] = id_evidence(report["commit"])
             if "calls" in report:
                 row["calls"] = [call_evidence(call) for call in report["calls"]]
-            if "selection_commit" in report:
+            if "decision_id" in report:
+                decision_id = report["decision_id"]
+                canonical_id = re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+                                            decision_id) is not None
+                row["decision"] = {
+                    "id": decision_id, "canonicalId": canonical_id, "policy": id_evidence(report["policy_commit"]),
+                    "defaultMode": report["policy_default"], "override": report["override"],
+                    "route": report["action"], "reason": report["reason"], "plan": id_evidence(report["plan_commit"]),
+                    "planRef": report.get("plan_ref", ""), "selectionRef": report.get("selection_ref", ""),
+                    "selection": id_evidence(report["selection_commit"]) if "selection_commit" in report else "",
+                    "result": id_evidence(report["result_commit"]) if "result_commit" in report else "",
+                }
+                if "plan_ref" in report:
+                    self.plan_receipts[report["plan_ref"]] = row["decision"]["plan"]
+            elif "policy_default" in report:
+                row["policy"] = {"defaultMode": report["policy_default"], "previous":
+                                 id_evidence(report["previous_policy_commit"]) if "previous_policy_commit" in report else ""}
+            elif "selection_commit" in report:
                 row["selectedPublication"] = {
                     "mode": report["publication_mode"], "planRef": report["plan_ref"],
                     "plan": id_evidence(report["plan_commit"]), "selectionRef": report["selection_ref"],

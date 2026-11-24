@@ -494,6 +494,59 @@ publishing plan. An adopted version retains its predecessor versions and their
 attempts through collection even without the original pins. A reuse record in
 turn retains the exact version used, not whatever its old ref points to later.
 
+#### Set a reuse default for the scale intent
+
+Continue from [versioned attempt selection](#record-a-new-version-of-an-attempt-selection).
+Create two policy versions under different refs. The second version retains the
+first as its parent but does not replace it. The policy belongs to the example's
+scale intent, not to an implementation version or a particular input.
+
+```sh
+reuse_policy=$(python examples/recorded_calls.py define-scale-policy ./origin reuse-default reuse-by-default)
+execute_policy=$(python examples/recorded_calls.py define-scale-policy ./origin execute-default execute-by-default \
+  --basis-ref reuse-default --basis-commit "$reuse_policy")
+
+python examples/recorded_calls.py request-policy-scale ./origin producer "$producer" \
+  reuse-default "$reuse_policy" unused-plan policy-hit 3 --selection adopted --selection-commit "$adopted"
+python examples/recorded_calls.py inspect ./origin policy-hit
+
+python examples/recorded_calls.py request-policy-scale ./origin producer "$producer" \
+  execute-default "$execute_policy" pending-fresh policy-fresh 3
+python examples/recorded_calls.py inspect ./origin policy-fresh
+```
+
+| Request override | Pinned default | Decision |
+| --- | --- | --- |
+| `default` (omitted) | `reuse-by-default` | Reuse the exact selected result, or prepare fresh work if the named slot is absent. |
+| `default` (omitted) | `execute-by-default` | Prepare fresh work without reading a selection. |
+| `fresh` | Either | Prepare fresh work without reading a selection. |
+| `reuse-selected` | Either | Require and reuse the exact selected result. |
+
+On a reuse path, give `--selection REF` and the exact `--selection-commit ID`.
+For a default reuse request that expects the slot to be absent, give only
+`--selection REF`. A moved, unexpectedly present or missing, malformed, or
+wrong-request selection rejects; none is treated as an absent slot. The match
+still requires the exact portable request (producer, implementation, and
+factor). Fresh-only paths don't read any supplied selection slot.
+
+The command prints a **decision commit ID** on both paths. Reuse publishes the
+original result to `main` and retains the decision in one transaction. It does
+not create a live plan or an attempt. Fresh work leaves `main` unchanged and
+creates a normal plan at `pending-fresh`: use its `plan_commit` from `inspect`
+with the [existing export and worker commands](#save-a-scale-request-before-sending-it).
+The decision does not dispatch work or record what a later worker does. No
+path automatically installs or changes a selection. All supplied refs must be
+mutually distinct and different from `main`; both output names must be unused,
+even on the reuse path where the plan name remains unused.
+
+Each decision has its own UUID and retains the local plan (including its
+saved `main`, if any), the exact policy version, and, on reuse, the exact
+selection version. Inspection explains the route after the original refs are
+gone, without executing or consulting current defaults. An absence decision
+records the slot observed at request time, not a claim about its current
+contents. Policy versions and decisions do not change the portable request or
+result IDs. The legacy commands do not consult policies.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).

@@ -399,10 +399,66 @@ module recorded_calls_histories {
     source("inspect", List("base"))
   ))
 
+  // Revert to the same attempt via a new immutable choice, then exercise
+  // intent on both the stale and exact versions of that choice.
+  pure def intent(policy: str, receipt: str, plan: str, decision: str, override: str, slot: List[str]): Request =
+    source("request_policy_scale", List("producer", "producer", policy, receipt, plan, decision, "3", override)
+      .concat(slot))
+
+  pure val policyRequests: List[Request] = attemptRequests.slice(0, 8).concat(List(
+    worker("export_scale_attempt", List("attempt-a", "attempt-a", "a.bundle")),
+    worker("export_scale_attempt", List("attempt-b", "attempt-b", "b.bundle")),
+    source("stage_input", List("returned-a", "a.bundle")),
+    source("stage_input", List("returned-b", "b.bundle")),
+    source("select_scale_attempt", List("plan", "plan", "returned-a", "attempt-a", "base")),
+    source("adopt_scale_attempt", List("base", "base", "returned-b", "attempt-b", "alternate")),
+    source("adopt_scale_attempt", List("alternate", "alternate", "returned-a", "attempt-a", "active")),
+    source("define_scale_policy", List("old-policy", "reuse-by-default")),
+    source("define_scale_policy", List("reuse-policy", "reuse-by-default", "old-policy", "old-policy")),
+    source("define_scale_policy", List("execute-policy", "execute-by-default", "reuse-policy", "reuse-policy")),
+    source("inspect", List("execute-policy")),
+    intent("reuse-policy", "old-policy", "no-plan", "reuse-decision", "default", List("active", "active")),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "default", List("active")),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "default", List("empty", "active")),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "default", List("active", "base")),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "default", List()),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "reuse-selected", List("empty")),
+    intent("reuse-policy", "reuse-policy", "plan", "reuse-decision", "default", List("active", "active")),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "default", List("active", "active")),
+    source("inspect", List("reuse-decision")),
+    source("inspect", List("no-plan")),
+    source("inspect", List()),
+    intent("reuse-policy", "reuse-policy", "no-plan", "reuse-decision", "default", List("active", "active")),
+    intent("reuse-policy", "reuse-policy", "rolled-back", "reuse-decision", "fresh", List("active", "base")),
+    source("inspect", List("rolled-back")),
+    intent("reuse-policy", "reuse-policy", "forced-plan", "forced-decision", "fresh", List("active", "base")),
+    source("inspect", List("forced-decision")),
+    source("inspect", List("forced-plan")),
+    intent("execute-policy", "execute-policy", "default-plan", "execution-decision", "default", List("active", "base")),
+    source("inspect", List("execution-decision")),
+    intent("execute-policy", "execute-policy", "no-plan", "override-decision", "reuse-selected", List("active", "active")),
+    source("inspect", List("override-decision")),
+    intent("reuse-policy", "reuse-policy", "fallback-plan", "fallback-decision", "default", List("empty")),
+    source("inspect", List("fallback-decision")),
+    source("export_request", List("fallback-plan", "fallback-plan", "fallback.bundle")),
+    worker("work_scale", List("incoming", "fallback-plan", "fallback-result")),
+    source("drop_ref", List("reuse-policy", "policy", "reuse-policy")),
+    source("drop_ref", List("old-policy", "policy", "old-policy")),
+    source("drop_ref", List("execute-policy", "policy", "execute-policy")),
+    source("drop_ref", List("base", "selection", "base")),
+    source("drop_ref", List("alternate", "selection", "alternate")),
+    source("drop_ref", List("active", "selection", "active")),
+    source("drop_ref", List("returned-a", "attempt", "attempt-a")),
+    source("drop_ref", List("returned-b", "attempt", "attempt-b")),
+    source("collect", List()),
+    source("inspect", List("reuse-decision")),
+    source("inspect", List("fallback-decision"))
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
-    .append(selectionRequests).append(attemptRequests).append(adoptionRequests)
+    .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
   action step = histories' = histories
 }
