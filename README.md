@@ -239,9 +239,9 @@ python examples/recorded_calls.py collect ./origin
 python examples/recorded_calls.py inspect ./origin
 ```
 
-`request-scale` checks the exact producer selection, records `example.scale@1`
-and the typed factor in a portable request commit, and creates a new
-source-local plan ref. The request has the producer as its sole parent. The
+`request-scale` checks the exact producer selection, records the implementation
+(`example.scale@1` by default) and the typed factor in a portable request commit,
+and creates a new source-local plan ref. The request has the producer as its sole parent. The
 plan points to the request and, if `main` exists, to the exact `main` commit at
 request creation; one parent means `main` was absent. `inspect ./origin pending` shows the saved
 expectations. `export-request` follows only the portable request's closure, not
@@ -257,8 +257,9 @@ sub-DAG edge to the producer's sum. The worker keeps its refs in this variant.
 After staging on the source, publication needs only the repository, the two
 ref names, the saved plan ID and the selected result ID from the worker. Keep
 these IDs independently of the staging receipt if you resume in a new shell.
-Publication checks the exact request, recorded factor and producer edge without
-rerunning either call, verifying arithmetic, or authenticating the worker. The
+Publication checks the exact request, recorded implementation, factor, and
+producer edge without rerunning either call, verifying arithmetic, or
+authenticating the worker. The
 three ref names must be distinct. If the saved `main` expectation and both pin
 targets still match, one transaction sets `main` to the exact worker result and
 deletes `pending` and `returned`. A rejection leaves all three refs unchanged. The comparison uses current IDs; it
@@ -266,6 +267,30 @@ does not detect a ref that moved away and back. After collection, `main` keeps
 the request and both calls. The consumed plan no longer retains the old tip.
 These are content IDs, not attempt IDs, and the example does not search for or
 automatically reuse results.
+
+#### Select a scale implementation version
+
+To plan the same scale under a different version, choose it explicitly when
+creating the plan:
+
+```sh
+plan=$(python examples/recorded_calls.py request-scale ./origin producer "$producer" next-plan 3 \
+  --implementation example.scale@2)
+python examples/recorded_calls.py inspect ./origin next-plan
+```
+
+The example supports `example.scale@1` and `example.scale@2`. Both use the same
+signed 64-bit multiplication, but their requests and results have different
+commit IDs even when the producer, factor, and output are identical. `inspect`
+reports the plan's saved version, and `work-scale` uses that exact version from
+the portable request. Planning and work reject unsupported versions rather than
+falling back. The defaults and layouts of existing `@1` records are unchanged.
+
+Publication and reuse require an explicitly pinned result with the exact
+request parent and a recorded implementation that matches that request. A
+result from the other version cannot substitute, even if both results share the
+same output node. The version is an application label, not a code fingerprint
+or proof of execution.
 
 #### Retry publication if its acknowledgment was lost
 

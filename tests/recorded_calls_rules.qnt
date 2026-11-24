@@ -23,7 +23,10 @@ module recorded_calls_rules {
       summed.resultValue == s.a._2 + s.b._2
     }
 
-  pure def checkCalls(s: Scenario, calls: List[Call]): bool = {
+  pure val scaleV1 = "example.scale@1"
+  pure val scaleV2 = "example.scale@2"
+
+  pure def checkCalls(s: Scenario, calls: List[Call], implementation: str): bool = {
     if (calls.length() != 2) false
     else {
       val summed = calls[0]
@@ -34,7 +37,7 @@ module recorded_calls_rules {
         val input = scaled.arguments[1] // Runner sorts the argument names.
         all {
           scaled.dag != "", scaled.dag != summed.dag, scaled.resultNode != "",
-          scaled.implementation == "example.scale@1", literal(scaled.arguments[0], "factor", s.factor._2),
+          scaled.implementation == implementation, literal(scaled.arguments[0], "factor", s.factor._2),
           input.name == "input", input.producer == summed.dag, input.node != "", input.node != summed.resultNode,
           input.value == combined, scaled.resultValue == combined * s.factor._2
         }
@@ -63,7 +66,7 @@ module recorded_calls_rules {
         if (not(matches(readback, expected[1]))) "wrong_inspect"
         else if (not(readback.unchanged)) "storage_changed"
         else if (readback.commit != write.commit) "wrong_commit"
-        else if (not(checkCalls(scenario, readback.calls))) "wrong_graph"
+        else if (not(checkCalls(scenario, readback.calls, scaleV1))) "wrong_graph"
         else "inspected"
       )
     }
@@ -79,15 +82,19 @@ module recorded_calls_rules {
     else if (readback.calls.length() != 1) "wrong_graph"
     else if (checkSum(s, readback.calls[0])) "inspected" else "wrong_graph"
 
-  pure def scaleReadVerdict(s: Scenario, readback: Attempt, request: Request, recordedCommit: str,
-                           sumRead: Attempt): str =
+  pure def versionedScaleRead(s: Scenario, readback: Attempt, request: Request, recordedCommit: str,
+                              sumRead: Attempt, implementation: str): str =
     if (not(matches(readback, request))) "wrong_inspect"
     else if (not(readback.unchanged)) "storage_changed"
     else if (readback.commit != recordedCommit or readback.producerCommit != sumRead.commit) "wrong_commit"
-    else if (not(checkCalls(s, readback.calls))) "wrong_graph"
+    else if (not(checkCalls(s, readback.calls, implementation))) "wrong_graph"
     else if (sumRead.calls.length() != 1) "missing_producer"
     else if (readback.calls[0] != sumRead.calls[0]) "wrong_producer"
     else "inspected"
+
+  pure def scaleReadVerdict(s: Scenario, readback: Attempt, request: Request, recordedCommit: str,
+                            sumRead: Attempt): str =
+    versionedScaleRead(s, readback, request, recordedCommit, sumRead, scaleV1)
 
   pure def scaleWriteVerdict(write: Attempt, request: Request, expectedCommit: str): str =
     if (write.expectedCommit != expectedCommit) "wrong_selection" else writeVerdict(write, request)
@@ -245,20 +252,24 @@ module recorded_calls_rules {
   }
 
   pure def planReadVerdict(readback: Attempt, req: Request, plan: str, portable: str, factor: int,
-                          sumRead: Attempt): str =
+                          sumRead: Attempt, implementation: str): str =
     if (not(matches(readback, req))) "wrong_inspect"
     else if (not(readback.unchanged)) "storage_changed"
     else if (readback.commit != plan or readback.requestCommit != portable or readback.expectedMain != "-")
       "wrong_plan"
     else if (readback.producerCommit != sumRead.commit or readback.calls != sumRead.calls or
-             readback.requestImplementation != "example.scale@1" or readback.requestFactor != factor)
+             readback.requestImplementation != implementation or readback.requestFactor != factor)
       "wrong_request"
     else "inspected"
 
+  pure def versionedRequestedRead(s: Scenario, readback: Attempt, req: Request, result: str, portable: str,
+                                  sumRead: Attempt, implementation: str): str =
+    if (readback.requestCommit != portable) "wrong_request"
+    else versionedScaleRead(s, readback, req, result, sumRead, implementation)
+
   pure def requestedReadVerdict(s: Scenario, readback: Attempt, req: Request, result: str, portable: str,
                                sumRead: Attempt): str =
-    if (readback.requestCommit != portable) "wrong_request"
-    else scaleReadVerdict(s, readback, req, result, sumRead)
+    versionedRequestedRead(s, readback, req, result, portable, sumRead, scaleV1)
 
   pure def requestExportVerdict(attempt: Attempt, req: Request, plan: str): str =
     if (not(matches(attempt, req)) or attempt.expectedCommit != plan or attempt.commit == "" or attempt.commit == plan)
@@ -284,7 +295,7 @@ module recorded_calls_rules {
         sumReadVerdict(original, sumRead, req[1], producer),
         scaleWriteVerdict(attempts[2], req[2], producer),
         scaleWriteVerdict(attempts[3], req[3], producer),
-        planReadVerdict(attempts[4], req[4], plan, portable, 3, sumRead),
+        planReadVerdict(attempts[4], req[4], plan, portable, 3, sumRead, scaleV1),
         requestExportVerdict(attempts[5], req[5], plan),
         requestExportVerdict(attempts[6], req[6], otherPlan),
         stageVerdict(attempts[7], req[7], otherPortable),
@@ -308,7 +319,7 @@ module recorded_calls_rules {
         requestedReadVerdict(original, attempts[25], req[25], result, portable, sumRead),
         rejectedWriteVerdict(attempts[26], req[26], ""), // consumed plan
         rejectedWriteVerdict(attempts[27], req[27], ""), // consumed staging pin
-        planReadVerdict(attempts[28], req[28], otherPlan, otherPortable, -2, sumRead),
+        planReadVerdict(attempts[28], req[28], otherPlan, otherPortable, -2, sumRead, scaleV1),
         requestedReadVerdict(revised, attempts[29], req[29], otherResult, otherPortable, sumRead)
       )
     }
@@ -411,7 +422,7 @@ module recorded_calls_rules {
         scaleWriteVerdict(attempts[13], req[13], producer),
         rejectedWriteVerdict(attempts[14], req[14], plan), // Same name, original plan ID.
         requestExportVerdict(attempts[15], req[15], replacement),
-        planReadVerdict(attempts[16], req[16], replacement, replacementRequest, -2, sumRead),
+        planReadVerdict(attempts[16], req[16], replacement, replacementRequest, -2, sumRead, scaleV1),
         abandonVerdict(attempts[17], req[17], replacement),
         absentRefVerdict(attempts[18], rejectedWriteVerdict(attempts[18], req[18], "")),
         requestedReadVerdict(original, attempts[19], req[19], result, portable, sumRead)
@@ -527,6 +538,55 @@ module recorded_calls_rules {
     }
   }
 
+  pure def versionHistoryVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = versionRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val sumRead = attempts[1]
+      val firstPlan = attempts[2].commit
+      val secondPlan = attempts[4].commit
+      val firstRequest = attempts[6].commit
+      val secondRequest = attempts[7].commit
+      val firstResult = attempts[10].commit
+      val secondResult = attempts[12].commit
+      val nextPlan = attempts[24].commit
+      val proof: ReusePublication = { mode: "reuse", planRef: "next", plan: nextPlan,
+                                      resultRef: "saved", result: secondResult }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(selected, sumRead, req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], producer),
+        scaleWriteVerdict(attempts[3], req[3], producer),
+        scaleWriteVerdict(attempts[4], req[4], producer),
+        rejectedWriteVerdict(attempts[5], req[5], producer),
+        requestExportVerdict(attempts[6], req[6], firstPlan),
+        requestExportVerdict(attempts[7], req[7], secondPlan),
+        planReadVerdict(attempts[8], req[8], secondPlan, secondRequest, 3, sumRead, scaleV2),
+        stageVerdict(attempts[9], req[9], firstRequest),
+        scaleWriteVerdict(attempts[10], req[10], firstRequest),
+        stageVerdict(attempts[11], req[11], secondRequest),
+        scaleWriteVerdict(attempts[12], req[12], secondRequest),
+        requestedReadVerdict(selected, attempts[13], req[13], firstResult, firstRequest, sumRead),
+        versionedRequestedRead(selected, attempts[14], req[14], secondResult, secondRequest, sumRead, scaleV2),
+        exportVerdict(attempts[15], req[15], firstResult),
+        exportVerdict(attempts[16], req[16], secondResult),
+        stageVerdict(attempts[17], req[17], firstResult),
+        stageVerdict(attempts[18], req[18], secondResult),
+        publishVerdict(attempts[19], req[19], firstResult, secondPlan, "", false),
+        reuseStageVerdict(attempts[20], req[20], secondPlan, firstResult, false),
+        publishVerdict(attempts[21], req[21], firstResult, secondPlan, "", false),
+        reuseStageVerdict(attempts[22], req[22], secondPlan, secondResult, true),
+        publishVerdict(attempts[23], req[23], secondResult, secondPlan, "", true),
+        scaleWriteVerdict(attempts[24], req[24], producer),
+        publishVerdict(attempts[25], req[25], secondResult, nextPlan, "", true),
+        versionedRequestedRead(selected, attempts[26], req[26], secondResult, secondRequest, sumRead, scaleV2),
+        reuseRecordVerdict(attempts[27], req[27], proof, secondRequest, secondResult),
+        versionedRequestedRead(selected, attempts[28], req[28], secondResult, secondRequest, sumRead, scaleV2)
+      )
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -536,6 +596,7 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 5) abandonHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 6) reuseHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 7) reusePublicationVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 8) versionHistoryVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -574,9 +635,13 @@ module recorded_calls_rules {
     val reusePublication = List("recorded", "inspected", "recorded", "exported", "staged", "recorded", "exported",
       "staged", "staged", "recorded", "published", "inspected", "rejected", "rejected", "rejected", "abandoned",
       "rejected", "recorded", "published", "inspected", "inspected", "inspected", "rejected", "inspected")
+    val versioned = List("recorded", "inspected", "recorded", "recorded", "recorded", "rejected", "exported",
+      "exported", "inspected", "staged", "recorded", "staged", "recorded", "inspected", "inspected",
+      "exported", "exported", "staged", "staged", "rejected", "rejected", "rejected", "reused", "published",
+      "recorded", "published", "inspected", "inspected", "inspected")
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
-      reuse, reusePublication)
-    if (rows.length() != 10 or verdicts != expected) false
+      reuse, reusePublication, versioned)
+    if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
       val transfer = rows[3].attempts
@@ -586,6 +651,7 @@ module recorded_calls_rules {
       val abandoned = rows[7].attempts
       val reused = rows[8].attempts
       val reusePublished = rows[9].attempts
+      val versions = rows[10].attempts
       rows.indices().forall(i => rows[i].scenario == i) and
         sameRootNotSameCall(rows[0].attempts[1].calls[0], rows[1].attempts[1].calls[0]) and
         sameRootNotSameCall(split[2].calls[0], split[3].calls[0]) and split[0].commit != split[1].commit and
@@ -606,7 +672,14 @@ module recorded_calls_rules {
         reused[8].calls == reused[28].calls and reused[8].calls == reused[29].calls and
         reusePublished[2].commit == reusePublished[9].commit and
         reusePublished[2].commit != reusePublished[17].commit and
-        reusePublished[11].calls == reusePublished[20].calls and reusePublished[20].calls == reusePublished[21].calls
+        reusePublished[11].calls == reusePublished[20].calls and
+        reusePublished[20].calls == reusePublished[21].calls and
+        versions[2].commit == versions[3].commit and versions[2].commit != versions[4].commit and
+        versions[4].commit != versions[24].commit and versions[6].commit != versions[7].commit and
+        versions[10].commit != versions[12].commit and
+        sameRootNotSameCall(versions[13].calls[1], versions[14].calls[1]) and
+        versions[13].calls[1].arguments == versions[14].calls[1].arguments and
+        versions[14].calls == versions[26].calls and versions[26].calls == versions[28].calls
     }
   }
 
@@ -719,10 +792,12 @@ module recorded_calls_rules {
     inspectVerdict(inspected) == "inspected",
     inspectVerdict({ ...inspected, unchanged: false }) == "storage_changed",
     inspectVerdict({ ...inspected, commit: "different-commit" }) == "wrong_commit",
-    checkCalls(scenarios[0], List(summed, scaled)),
-    not(checkCalls(scenarios[0], List(summed, { ...scaled, resultValue: 37 }))),
-    not(checkCalls(scenarios[0], List(summed, { ...scaled, implementation: "example.scale@2" }))),
+    checkCalls(scenarios[0], List(summed, scaled), scaleV1),
+    not(checkCalls(scenarios[0], List(summed, scaled), scaleV2)),
+    checkCalls(scenarios[0], List(summed, { ...scaled, implementation: scaleV2 }), scaleV2),
+    not(checkCalls(scenarios[0], List(summed, { ...scaled, resultValue: 37 }), scaleV1)),
+    not(checkCalls(scenarios[0], List(summed, { ...scaled, implementation: scaleV2 }), scaleV1)),
     not(checkCalls(scenarios[0], List(summed, { ...scaled, arguments: List(factor, { ...input,
-      producer: "different-call-with-same-value" }) })))
+      producer: "different-call-with-same-value" }) }), scaleV1))
   }
 }

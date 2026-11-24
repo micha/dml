@@ -36,7 +36,8 @@ REUSE_ENTRY = b"recorded-scale-reuse-v1"
 REF_NAME = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 COMMIT_HEX = re.compile(rb"[0-9a-f]{32}")
 SUM = b"example.sum@1"
-SCALE = b"example.scale@1"
+SCALE_V1 = b"example.scale@1"
+SCALE_V2 = b"example.scale@2"
 MAIN = b"main"
 MAX_BUNDLE_BYTES = 64 * 1024 * 1024  # The core's commit bundle limit.
 
@@ -46,6 +47,7 @@ class _ScaleRequest(NamedTuple):
     dag: bytes
     producer: bytes
     sum_dag: bytes
+    implementation: bytes
     factor: int
 
 
@@ -143,10 +145,16 @@ def _record_sum(txn, a, b):
     return _record_call(txn, SUM, add, ((b"a", left), (b"b", right)))
 
 
-def _record_scale(txn, sum_call, factor):
+def _check_scale_implementation(implementation):
+    if type(implementation) is not bytes or implementation not in (SCALE_V1, SCALE_V2):
+        raise ValueError(f"unsupported scale implementation {implementation!r}; use example.scale@1 or example.scale@2")
+
+
+def _record_scale(txn, sum_call, factor, *, implementation=SCALE_V1):
     source = _put_object(txn, core.REC_NODE, core.NODE_SUBDAG, sum_call)
     multiplier = _put_literal(txn, core.DATUM_I64, factor)
-    return _record_call(txn, SCALE, mul, ((b"input", source), (b"factor", multiplier)), call_input=b"input")
+    # The two supported versions deliberately share the same arithmetic.
+    return _record_call(txn, implementation, mul, ((b"input", source), (b"factor", multiplier)), call_input=b"input")
 
 
 def _publish(txn, ref, entry, dag, *parents):
@@ -209,10 +217,11 @@ def _optional_ref(txn, ref):
         return None
 
 
-def request_scale(path, producer_pin, producer_commit, plan_pin, factor):
-    """Pin the portable request and the source's current main in a local plan."""
+def request_scale(path, producer_pin, producer_commit, plan_pin, factor, *, implementation=SCALE_V1):
+    """Pin the versioned portable request and current main in a local plan."""
     _check_commit_id(producer_commit)
     _check_i64(factor, "factor")
+    _check_scale_implementation(implementation)
     if type(plan_pin) is not bytes:
         raise ValueError("plan ref must be bytes")
     if plan_pin == MAIN:
@@ -220,7 +229,7 @@ def request_scale(path, producer_pin, producer_commit, plan_pin, factor):
     with _write_transaction(path, create=False) as txn:
         _selected_sum(txn, producer_pin, producer_commit)
         expected_main = _optional_ref(txn, MAIN)
-        operation = _put_literal(txn, core.DATUM_STRING, SCALE)
+        operation = _put_literal(txn, core.DATUM_STRING, implementation)
         multiplier = _put_literal(txn, core.DATUM_I64, factor)
         dag = _put_object(txn, core.REC_DAG, operation, b"implementation", operation, b"factor", multiplier)
         tree = _put_object(txn, core.REC_TREE, REQUEST_ENTRY, dag)
@@ -239,7 +248,7 @@ def work_scale(path, incoming, request_commit, result_ref):
             raise ValueError("incoming ref does not point to the expected request commit")
         request = _read_request(txn, request_commit)
         _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
-        scale = _record_scale(txn, request.sum_dag, request.factor)
+        scale = _record_scale(txn, request.sum_dag, request.factor, implementation=request.implementation)
         return _publish(txn, result_ref, REQUESTED_SCALE_ENTRY, scale, request_commit)
 
 
@@ -502,12 +511,14 @@ def _read_request(txn, commit):
     if entry != REQUEST_ENTRY or parents != 1:
         raise ValueError("expected a scale-request-v1 commit with one producer parent")
     _, root, count = _object(txn, core.REC_DAG, dag)
-    implementation = core.txn_lookup_node(txn, dag, b"implementation")
-    if count != 2 or root != implementation or _read_literal(txn, implementation, core.DATUM_STRING) != SCALE:
-        raise ValueError("expected scale request for example.scale@1 with a factor")
+    version = core.txn_lookup_node(txn, dag, b"implementation")
+    if count != 2 or root != version:
+        raise ValueError("expected scale request with an implementation root and a factor")
+    implementation = _read_literal(txn, version, core.DATUM_STRING)
+    _check_scale_implementation(implementation)
     factor = _read_i64(txn, core.txn_lookup_node(txn, dag, b"factor"))
     producer = core.object_view_parent(view, 0)
-    return _ScaleRequest(commit, dag, producer, _sum_dag(_snapshot(txn, producer)), factor)
+    return _ScaleRequest(commit, dag, producer, _sum_dag(_snapshot(txn, producer)), implementation, factor)
 
 
 def _read_plan(txn, commit):
@@ -535,7 +546,8 @@ def _inspect_request(txn, commit, entry):
         request = _read_request(txn, commit)
     summed, _ = _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
     return {**report, "request_commit": request.commit.hex(), "producer_commit": request.producer.hex(),
-            "request_implementation": SCALE.decode("ascii"), "request_factor": request.factor, "calls": [summed]}
+            "request_implementation": request.implementation.decode("ascii"),
+            "request_factor": request.factor, "calls": [summed]}
 
 
 def _read_publication(txn, commit):
@@ -596,22 +608,25 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
         return {**report, "calls": [summed]}
     if not ((entry == ENTRY and parents == 0) or (entry in (SCALE_ENTRY, REQUESTED_SCALE_ENTRY) and parents == 1)):
         raise ValueError("expected a recorded or requested scale commit with its required parents")
-    scale, producer = _inspect_call(txn, terminal, SCALE, (b"input", b"factor"), call_input=b"input")
-    if entry == SCALE_ENTRY:
-        parent = core.object_view_parent(view, 0)
-        if _sum_dag(_snapshot(txn, parent)) != producer:
-            raise ValueError("scale input DAG does not match the producer parent")
-        report["producer_commit"] = parent.hex()
+    request = None
     if entry == REQUESTED_SCALE_ENTRY:
         parent = core.object_view_parent(view, 0)
         if expected_request is not None and expected_request.commit != parent:
             raise ValueError("result does not retain the expected request commit")
         request = expected_request if expected_request is not None else _read_request(txn, parent)
+    implementation = SCALE_V1 if request is None else request.implementation
+    scale, producer = _inspect_call(txn, terminal, implementation, (b"input", b"factor"), call_input=b"input")
+    if entry == SCALE_ENTRY:
+        parent = core.object_view_parent(view, 0)
+        if _sum_dag(_snapshot(txn, parent)) != producer:
+            raise ValueError("scale input DAG does not match the producer parent")
+        report["producer_commit"] = parent.hex()
+    if request is not None:
         if producer != request.sum_dag:
             raise ValueError("scale input DAG does not match the request's producer")
         if scale["arguments"]["factor"]["value"] != request.factor:
             raise ValueError("recorded factor does not match the request factor")
-        report["request_commit"] = parent.hex()
+        report["request_commit"] = request.commit.hex()
         report["producer_commit"] = request.producer.hex()
     summed, _ = _inspect_call(txn, producer, SUM, (b"a", b"b"))
     return {**report, "calls": [summed, scale]}
@@ -678,6 +693,8 @@ def main():
     planner.add_argument("producer_commit")
     planner.add_argument("plan_pin")
     planner.add_argument("factor", type=int)
+    planner.add_argument("--implementation", default=SCALE_V1.decode("ascii"),
+                         help="exact scale implementation version (default: %(default)s)")
     request_exporter = commands.add_parser("export-request", help="export only the portable request from a plan")
     request_exporter.add_argument("repo", type=Path)
     request_exporter.add_argument("plan_pin")
@@ -745,7 +762,8 @@ def main():
                                 args.expected_factor, expected_main).hex())
         elif args.command == "request-scale":
             print(request_scale(args.repo, args.producer_pin.encode("ascii"), _parse_commit_id(args.producer_commit),
-                                args.plan_pin.encode("ascii"), args.factor).hex())
+                                args.plan_pin.encode("ascii"), args.factor,
+                                implementation=args.implementation.encode("utf-8")).hex())
         elif args.command == "export-request":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             print(export_request(args.repo, args.plan_pin.encode("ascii"), plan, args.bundle).hex())

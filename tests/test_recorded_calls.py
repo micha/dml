@@ -626,6 +626,38 @@ class RecordedCallsTest(unittest.TestCase):
         report = json.loads(self.expect_success("inspect"))
         self.assertEqual(report["calls"][1]["result"]["value"], -98)
 
+    def test_result_with_exact_request_parent_but_wrong_implementation_is_rejected(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        previous = self.example["record_sum"](self.repo, b"main", 12, 0)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3,
+                                             implementation=b"example.scale@2")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, _, (request, _) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            bad_result = put_requested_result(txn, request, sum_dag, 3, 36)
+            core.txn_ref_create(txn, b"candidate", bad_result)
+            core.txn_commit(txn)
+
+        bundle = self.workspace / "candidate.dmlb"
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for args in (
+            ("inspect", "candidate"),
+            ("export-scale", "candidate", bad_result.hex(), bundle),
+            ("publish-requested-scale", "plan", plan.hex(), "candidate", bad_result.hex(), "--receipt-ref", "ack"),
+            ("stage-reused-scale", "plan", plan.hex(), "candidate", bad_result.hex(), "returned"),
+            ("publish-reused-scale", "plan", plan.hex(), "candidate", bad_result.hex(), "proof"),
+        ):
+            with self.subTest(command=args[0]):
+                self.assertIn("expected recorded implementation example.scale@2", self.expect_failure(*args))
+                self.assertEqual(data.read_bytes(), before)
+        self.assertFalse(bundle.exists())
+        with transaction(self.repo) as txn:
+            for ref, commit in ((b"main", previous), (b"plan", plan), (b"candidate", bad_result)):
+                self.assertEqual(core.txn_ref_get(txn, ref), commit)
+            for ref in (b"ack", b"returned", b"proof"):
+                self.assert_missing_ref(txn, ref)
+
     def test_reuse_commands_reject_malformed_plan_and_inconsistent_results(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
         self.example["record_sum"](self.repo, b"decoy", 9, 3)
@@ -672,6 +704,10 @@ class RecordedCallsTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, reason):
                         reuse(self.repo, plan_pin, plan_commit, result_pin, candidates[result_pin], b"dest")
                     self.assertEqual(data.read_bytes(), before)
+        with self.assertRaisesRegex(ValueError, "result does not retain the expected request commit"):
+            self.example["publish_requested_scale"](self.repo, b"plan", plan, b"wrong-request",
+                                                    candidates[b"wrong-request"])
+        self.assertEqual(data.read_bytes(), before)
         with transaction(self.repo) as txn:
             self.assert_missing_ref(txn, b"dest")
             self.assert_missing_ref(txn, b"main")
@@ -944,6 +980,35 @@ class RecordedCallsTest(unittest.TestCase):
         with transaction(worker) as txn:
             self.assert_missing_ref(txn, b"result")
             self.assertEqual(core.txn_ref_get(txn, b"incoming").hex(), request)
+
+    def test_worker_rejects_an_imported_request_for_an_unsupported_implementation(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        # Build a structurally valid portable record that local planning would reject.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            version = literal(txn, core.DATUM_STRING, b"example.scale@3")
+            factor = literal(txn, core.DATUM_I64, 3)
+            dag = put(txn, core.REC_DAG, version, b"implementation", version, b"factor", factor)
+            tree = put(txn, core.REC_TREE, b"scale-request-v1", dag)
+            request = put(txn, core.REC_COMMIT, tree, producer)
+            core.txn_ref_create(txn, b"portable", request)
+            core.txn_commit(txn)
+        bundle = self.workspace / "future-request.dmlb"
+        repo = core.repo_open(self.repo, False)
+        try:
+            bundle.write_bytes(core.repo_export_commit(repo, request))
+        finally:
+            core.repo_close(repo)
+
+        worker = self.workspace / "worker"
+        self.assertEqual(self.expect_success("stage-input", "incoming", bundle, repo=worker).strip(), request.hex())
+        data = worker / "data.mdb"
+        before = data.read_bytes()
+        self.assertIn("unsupported scale implementation",
+                      self.expect_failure("work-scale", "incoming", request.hex(), "result", repo=worker))
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(worker) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"incoming"), request)
+            self.assert_missing_ref(txn, b"result")
 
     def prepare_receipted_scale(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)

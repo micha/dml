@@ -143,13 +143,15 @@ class ProcessHistory:
                          operands=(pin, result, producer, expected_factor, main))
         return {**row, "expectedResult": result, "expectedCommit": producer, "expectedMain": main}
 
-    def request_scale(self, role, pin, producer_receipt, plan, factor, receipt_alias=None):
-        row = self.select("request_scale", role, pin, producer_receipt, plan, factor)
-        if receipt_alias is not None:
-            # The alias is only for replay; the CLI still writes the named pin.
-            row["args"].append(receipt_alias)
+    def request_scale(self, role, pin, producer_receipt, plan, factor, *tail):
+        # A lone extra operand aliases the receipt only in replay. Pass the
+        # two-token implementation option through to the actual CLI instead.
+        alias, options = (tail[0], ()) if len(tail) == 1 else (plan, tail)
+        row = self.select("request_scale", role, pin, producer_receipt, plan, factor, *options)
+        if len(tail) == 1:
+            row["args"].append(alias)
         if row["commit"]:
-            self.plan_receipts[plan if receipt_alias is None else receipt_alias] = row["commit"]
+            self.plan_receipts[alias] = row["commit"]
         return row
 
     def abandon_scale_request(self, role, pin, plan_receipt):

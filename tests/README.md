@@ -216,6 +216,15 @@ survives, and that `main` still reports the original graph. Focused tests inspec
 the record's parent edges and check retention after collection and rollback on
 an occupied reuse ref.
 
+The [version selection history](../README.md#select-a-scale-implementation-version)
+checks that the default and explicit `@1` plans have the same ID, then runs `@1`
+and `@2` through separate worker commands. The recorded calls share arguments
+and an output node, not request, call, or result IDs. Replay checks rejection
+without writes for an unsupported version and for cross-version publication
+and reuse, then publishes and reuses the matching `@2` result. The focused
+checks reject an imported request for an unsupported version and a result
+with the exact request parent but the wrong recorded implementation.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -390,3 +399,21 @@ mkdir -p build/recorded-reuse-publication-tlc
 Observations include reuse without a change to the `main` target, rollback after
 each tentative write, rejection under an occupied ref at the exact record ID,
 and readback with the reuse ref as the sole root. Run this separately from CI.
+
+#### Check the version selection design with TLC
+
+The [version selection model](recorded_version_selection_design.qnt) bounds
+planning and work to two supported versions and one unsupported version, with
+one ref per role. It checks that dispatch uses the saved version and that each
+publication or reuse path requires both the exact request ID and its recorded
+implementation. The model also covers stale selections, abandonment, and retry
+of a retained receipt. It abstracts bundles, GC, native faults, and ref aliases,
+and checks safety, not liveness.
+
+Run separately from CI with Java and Quint 0.34.0 or a compatible release:
+
+```sh
+mkdir -p build/recorded-version-selection-tlc
+(cd build/recorded-version-selection-tlc && quint verify ../../tests/recorded_version_selection_design.qnt \
+  --backend=tlc --search-observations)
+```
