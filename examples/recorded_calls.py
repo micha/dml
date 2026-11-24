@@ -192,17 +192,19 @@ def export_sum(path, pin, producer_commit, bundle_path):
     return _export_selected(path, pin, producer_commit, bundle_path, _selected_sum)
 
 
-def _checked_scale_parent(txn, result):
-    producer = _inspect_snapshot(txn, result).get("producer_commit")
+def _checked_scale(txn, result):
+    report = _inspect_snapshot(txn, result)
+    producer = report.get("producer_commit")
     if producer is None:
         raise ValueError("expected a split recorded-scale-v1 commit")
-    return bytes.fromhex(producer)
+    _, scale = report["calls"]
+    return bytes.fromhex(producer), scale["arguments"]["factor"]["value"]
 
 
 def _selected_scale(txn, pin, expected):
     if core.txn_ref_get(txn, pin) != expected:
         raise ValueError("result pin does not point to the expected commit")
-    _checked_scale_parent(txn, expected)
+    _checked_scale(txn, expected)
 
 
 def export_scale(path, pin, result_commit, bundle_path):
@@ -221,20 +223,24 @@ def stage_input(path, pin, bundle_path):
         return core.repo_import_commit_staged(repo, bundle, pin)
 
 
-def publish_scale(path, returned, result_commit, producer_commit, expected_main):
-    """Publish a staged scale to main and release its staging ref atomically."""
+def publish_scale(path, returned, result_commit, producer_commit, expected_factor, expected_main):
+    """Publish a staged scale matching the requested producer and factor."""
     if type(returned) is not bytes:
         raise ValueError("staging ref must be bytes")
     if returned == MAIN:
         raise ValueError("staging ref must differ from main")
     _check_commit_id(result_commit, "result commit")
     _check_commit_id(producer_commit)
+    _check_i64(expected_factor, "expected factor")
     if expected_main is not None:
         _check_commit_id(expected_main, "expected main commit")
     with _write_transaction(path, create=False) as txn:
         # Inspect the caller's immutable selection, never substitute the current pin target.
-        if _checked_scale_parent(txn, result_commit) != producer_commit:
+        producer, factor = _checked_scale(txn, result_commit)
+        if producer != producer_commit:
             raise ValueError("result does not retain the expected producer commit")
+        if factor != expected_factor:
+            raise ValueError("recorded factor does not match the expected factor")
         if expected_main is None:
             core.txn_ref_create(txn, MAIN, result_commit)
         else:
@@ -377,6 +383,7 @@ def main():
     publisher.add_argument("returned")
     publisher.add_argument("result_commit")
     publisher.add_argument("producer_commit")
+    publisher.add_argument("expected_factor", type=int, help="signed 64-bit factor from the source request")
     publisher.add_argument("expected_main", help="required current main commit ID, or '-' if main must be absent")
     release = commands.add_parser("release-input", help="release a staged pin retained by a recorded result")
     release.add_argument("repo", type=Path)
@@ -412,7 +419,8 @@ def main():
             expected_main = None if args.expected_main == "-" else _parse_commit_id(
                 args.expected_main, "expected main commit",
             )
-            print(publish_scale(args.repo, args.returned.encode("ascii"), result, producer, expected_main).hex())
+            print(publish_scale(args.repo, args.returned.encode("ascii"), result, producer,
+                                args.expected_factor, expected_main).hex())
         elif args.command == "release-input":
             print(release_input(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                                 args.result_ref.encode("ascii")).hex())

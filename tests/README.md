@@ -161,9 +161,11 @@ that a deliberately incorrect stored sum is transferred and consumed unchanged.
 
 The [return and publication history](../README.md#return-and-publish-a-recorded-scale)
 checks exact result export and staging, rejection of a same-valued wrong producer,
-and conditional publication to either an absent or an existing `main`. Failed
-publication must leave committed bytes unchanged, including when the staging ref
-points elsewhere. Successful publication releases the staging ref and leaves both
+and conditional publication to either an absent or an existing `main`. Two scales
+of a zero sum share an output node but record different factors. Even when the
+exact result is staged and `main` matches, publication rejects the wrong factor
+and accepts the same result with the matching expectation. Any rejection must
+leave committed bytes unchanged. Success releases the staging ref and leaves both
 calls readable after a sweep that removes the superseded result. The focused tests
 exercise rollback after a tentative main create or update, reject a staging alias
 of `main` and a mismatched input DAG, and publish a deliberately incorrect stored
@@ -220,13 +222,14 @@ runs separately from CI.
 #### Check the return and publication design with TLC
 
 The [return model](recorded_return_design.qnt) starts with immutable worker
-fixtures: two scales of the selected producer, and three results with incorrect
-parent, input DAG, or application shape. Worker pin changes and collection can
-interleave between selection and export. Source writes are serialized. The model
-checks main's conditional create or update and the expected staging deletion as a
-single transaction, including modeled aborts after each tentative write. It
-checks safety, not liveness, and abstracts away malformed bundle bytes,
-filesystem errors, and native corruption.
+fixtures: two scales of the selected producer with different factors, and three
+results with incorrect parent, input DAG, or application shape. Each publication
+chooses a request factor independently of the selected result. Worker pin changes
+and collection can interleave between selection and export. Source writes are
+serialized. The model checks main's conditional create or update and the expected
+staging deletion as a single transaction, including modeled aborts after each
+tentative write. It checks safety, not liveness, and abstracts away malformed
+bundle bytes, filesystem errors, and native corruption.
 
 ```sh
 mkdir -p build/recorded-return-tlc
@@ -236,6 +239,6 @@ mkdir -p build/recorded-return-tlc
 ```
 
 Observations include export despite pin movement, rejection after intervening
-collection, stale publication with no writes, rollback after either tentative
-write, and readback through `main` alone after collection. Run this design check
-separately from CI.
+collection, isolated wrong-factor rejection with absent and existing `main`,
+rollback after either tentative write, and readback through `main` alone after
+collection. Run this design check separately from CI.

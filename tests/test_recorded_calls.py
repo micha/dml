@@ -442,7 +442,16 @@ class RecordedCallsTest(unittest.TestCase):
             core.txn_ref_delete_expected(txn, b"decoy", decoy)
             core.txn_commit(txn)
 
-        report = self.expect_success("publish-scale", "returned", result.hex(), producer.hex(), "-")
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        self.assertIn("recorded factor does not match the expected factor",
+                      self.expect_failure("publish-scale", "returned", result.hex(), producer.hex(), 5, "-"))
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, b"main")
+            self.assertEqual(core.txn_ref_get(txn, b"returned"), result)
+
+        report = self.expect_success("publish-scale", "returned", result.hex(), producer.hex(), 6, "-")
         self.assertEqual(report.strip(), result.hex())
         self.assertGreater(int(self.expect_success("collect")), 0)
         with transaction(self.repo) as txn:
@@ -477,7 +486,7 @@ class RecordedCallsTest(unittest.TestCase):
 
         def reject(reason, pin, expected_main):
             before = data.read_bytes()
-            self.assertIn(reason, self.expect_failure("publish-scale", pin, result, producer, expected_main))
+            self.assertIn(reason, self.expect_failure("publish-scale", pin, result, producer, 3, expected_main))
             self.assertEqual(data.read_bytes(), before)
 
         reject("ref target differs", "returned", "-")
@@ -497,20 +506,27 @@ class RecordedCallsTest(unittest.TestCase):
             self.assertEqual(core.txn_ref_get(txn, b"main"), producer_id)
             self.assert_missing_ref(txn, b"returned")
 
-    def test_publish_checks_plain_byte_arguments_before_opening_the_repository(self):
+    def test_publish_validates_arguments_before_opening_the_repository(self):
         class BytesSubclass(bytes):
+            pass
+
+        class IntSubclass(int):
             pass
 
         publish = runpy.run_path(EXAMPLE)["publish_scale"]
         identifier = bytes(16)
         for arguments, diagnostic in (
-            ((BytesSubclass(b"main"), identifier, identifier, None), "staging ref must be bytes"),
-            ((b"returned", BytesSubclass(identifier), identifier, None), "result commit must be a 16-byte ID"),
-            ((b"returned", identifier, BytesSubclass(identifier), None), "producer commit must be a 16-byte ID"),
-            ((b"returned", identifier, identifier, BytesSubclass(identifier)), "expected main commit must be a 16-byte ID"),
+            ((BytesSubclass(b"main"), identifier, identifier, 3, None), "staging ref must be bytes"),
+            ((b"returned", BytesSubclass(identifier), identifier, 3, None), "result commit must be a 16-byte ID"),
+            ((b"returned", identifier, BytesSubclass(identifier), 3, None), "producer commit must be a 16-byte ID"),
+            ((b"returned", identifier, identifier, 3, BytesSubclass(identifier)),
+             "expected main commit must be a 16-byte ID"),
         ):
             with self.subTest(diagnostic=diagnostic), self.assertRaisesRegex(ValueError, diagnostic):
                 publish(self.repo, *arguments)
+        for factor in (True, IntSubclass(3), "3", -(1 << 63) - 1, 1 << 63):
+            with self.subTest(factor=factor), self.assertRaisesRegex(ValueError, "expected factor.*signed 64-bit"):
+                publish(self.repo, b"returned", identifier, identifier, factor, None)
         self.assertFalse(self.repo.exists())
 
     def test_scale_rejects_unknown_sum_version_even_with_matching_pin_and_tree_entry(self):
@@ -545,7 +561,7 @@ class RecordedCallsTest(unittest.TestCase):
         for command, args in (
             ("inspect", ("mismatch",)),
             ("export-scale", ("mismatch", forged.hex(), bundle)),
-            ("publish-scale", ("mismatch", forged.hex(), decoy, consumer.hex())),
+            ("publish-scale", ("mismatch", forged.hex(), decoy, 3, consumer.hex())),
         ):
             with self.subTest(command=command):
                 self.assertIn("does not match the producer parent", self.expect_failure(command, *args))
