@@ -191,6 +191,15 @@ tests also check atomic rollback of a tentative receipt, reused pin names, a ret
 with all first-publication guards satisfied again, and physical reclamation of the
 old commits despite the retained receipt.
 
+The [abandonment history](../README.md#abandon-a-scale-request-without-publishing)
+checks that a late staged result cannot publish after abandonment, no receipt or
+`main` appears, and a stale ID cannot delete a replacement plan under the same
+name. Removing the replacement leaves the exact staged result intact. The
+publication retry history covers the opposite order: a consumed plan cannot be
+abandoned, and the publication receipt still acknowledges success. Focused
+checks cover a moved `main`, invalid and non-plan selections, exact ref
+preservation, and explicit collection.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -303,3 +312,23 @@ Observations include a retry despite a moved `main` and collected objects, a
 no-op retry with every original guard satisfied again, conflicts under the
 same key, rejection when only `main` matches, and rollback without a receipt.
 Run this design check separately from CI.
+
+#### Check the request abandonment design with TLC
+
+The [abandonment model](recorded_request_abandon_design.qnt) has one original
+plan capturing an existing tip, an exact result that may arrive late, one
+optional publication receipt, and a reused pin with a different target ID.
+Other writers can move `main` between transactions. It checks safety, not
+liveness, and abstracts away immutable closures, storage errors, byte-level
+validation, and recreating the same name at the same ID.
+
+```sh
+mkdir -p build/recorded-request-abandon-tlc
+(cd build/recorded-request-abandon-tlc && quint verify ../../tests/recorded_request_abandon_design.qnt \
+  --backend=tlc --invariants exactAbandonment onlyPlanRemoved noWritesOnRejectionOrRetry \
+  exclusiveConsumption publicationUnaffected --search-observations)
+```
+
+Observations include both transaction orders, a late stage, a moved tip, a
+matching non-plan ref, `main` pointing to a valid plan, and stale rejection
+against a reused pin. Run this design check separately from CI.

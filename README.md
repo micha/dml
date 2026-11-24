@@ -297,6 +297,28 @@ proof against someone who can write arbitrary refs or objects in the source.
 Omitting `--receipt-ref` keeps one-shot behavior; you cannot add a receipt to
 recover a publication that already committed without one.
 
+#### Abandon a scale request without publishing
+
+Instead of publishing a request, you can abandon it using its saved
+source-local plan name and commit ID:
+
+```sh
+python examples/recorded_calls.py abandon-scale-request ./origin pending "$plan"
+```
+
+The command prints the plan ID after removing only that ref in one transaction.
+It requires a valid plan at the exact selected ID and rejects a missing or
+changed ref, and `main` itself. It works even if `main` has moved. It leaves
+`main`, staging refs, publication receipts, and bundles alone, and does not
+stop workers or collect objects. A later `collect` can reclaim objects no
+longer retained by any ref.
+
+If abandonment wins, a late result cannot publish through the removed pin.
+If publication wins, abandonment rejects; a retained publication receipt can
+still acknowledge that success. Abandonment itself creates no receipt. Use
+fresh plan names for new requests: recreating the same name at the same content
+ID makes an old selection valid again.
+
 ### Install and link the C library
 
 For example, install the headers and static library under a local prefix:
