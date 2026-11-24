@@ -4,7 +4,8 @@ module recorded_calls_rules {
   type Argument = { name: str, node: str, value: int, producer: str }
   type Call = { dag: str, implementation: str, resultNode: str, resultValue: int, arguments: List[Argument] }
   type Publication = { planRef: str, plan: str, stagingRef: str, result: str }
-  type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, commit: str, calls: List[Call],
+  type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
+    commit: str, calls: List[Call],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
     expectedResult: str, expectedMain: str, requestCommit: str, requestImplementation: str, requestFactor: int,
     bundlePresent: bool, bundleUnchanged: bool, publication: Publication }
@@ -325,6 +326,16 @@ module recorded_calls_rules {
       readback.publication != expected or readback.calls.length() != 0) "wrong_receipt"
     else "inspected"
 
+  pure def abandonVerdict(write: Attempt, req: Request, plan: str): str =
+    if (write.expectedCommit != plan) "wrong_selection"
+    else if (not(matches(write, req)) or write.commit != plan or write.unchanged) "wrong_abandonment"
+    else "abandoned"
+
+  pure def absentRefVerdict(attempt: Attempt, verdict: str): str =
+    if (verdict != "rejected") verdict
+    else if (not(attempt.missingRef)) "wrong_absence"
+    else verdict
+
   pure def retryHistoryVerdicts(attempts: List[Attempt]): List[str] = {
     val req = retryRequests
     if (attempts.length() != req.length()) List("missing_steps")
@@ -361,10 +372,48 @@ module recorded_calls_rules {
         publishVerdict(attempts[18], req[18], nextResult, nextPlan, "", true),
         if (matches(attempts[19], req[19]) and attempts[19].removed > 0) "collected" else "wrong_collection",
         receiptReadVerdict(attempts[20], req[20], { planRef: "plan", plan: plan, stagingRef: "returned", result: result }),
-        retryVerdict(attempts[21], req[21], plan, result),
-        requestedReadVerdict(revised, attempts[22], req[22], nextResult, nextRequest, sumRead),
-        rejectedWriteVerdict(attempts[23], req[23], ""),
-        rejectedWriteVerdict(attempts[24], req[24], "")
+        absentRefVerdict(attempts[21], rejectedWriteVerdict(attempts[21], req[21], plan)), // Publication won.
+        retryVerdict(attempts[22], req[22], plan, result),
+        requestedReadVerdict(revised, attempts[23], req[23], nextResult, nextRequest, sumRead),
+        rejectedWriteVerdict(attempts[24], req[24], ""),
+        rejectedWriteVerdict(attempts[25], req[25], "")
+      )
+    }
+  }
+
+  pure def abandonHistoryVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = abandonRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val sumRead = attempts[1]
+      val plan = attempts[2].commit
+      val portable = attempts[3].commit
+      val result = attempts[5].commit
+      val replacement = attempts[13].commit
+      val replacementRequest = attempts[15].commit
+      val original: Scenario = { ...selected, b: ("-7", -7) }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(original, sumRead, req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], producer),
+        requestExportVerdict(attempts[3], req[3], plan),
+        stageVerdict(attempts[4], req[4], portable),
+        scaleWriteVerdict(attempts[5], req[5], portable),
+        exportVerdict(attempts[6], req[6], result),
+        abandonVerdict(attempts[7], req[7], plan),
+        stageVerdict(attempts[8], req[8], result),
+        absentRefVerdict(attempts[9], publishVerdict(attempts[9], req[9], result, plan, "", false)), // Late result.
+        absentRefVerdict(attempts[10], rejectedWriteVerdict(attempts[10], req[10], "")), // No main.
+        absentRefVerdict(attempts[11], rejectedWriteVerdict(attempts[11], req[11], "")), // No receipt.
+        absentRefVerdict(attempts[12], rejectedWriteVerdict(attempts[12], req[12], "")), // No plan.
+        scaleWriteVerdict(attempts[13], req[13], producer),
+        rejectedWriteVerdict(attempts[14], req[14], plan), // Same name, original plan ID.
+        requestExportVerdict(attempts[15], req[15], replacement),
+        planReadVerdict(attempts[16], req[16], replacement, replacementRequest, -2, sumRead),
+        abandonVerdict(attempts[17], req[17], replacement),
+        absentRefVerdict(attempts[18], rejectedWriteVerdict(attempts[18], req[18], "")),
+        requestedReadVerdict(original, attempts[19], req[19], result, portable, sumRead)
       )
     }
   }
@@ -375,11 +424,12 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 2) returnVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 3) durableVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 4) retryHistoryVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 5) abandonHistoryVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
     Set("recorded", "inspected", "rejected", "exported", "staged", "released", "collected", "published",
-      "acknowledged").contains(verdict)
+      "acknowledged", "abandoned").contains(verdict)
 
   pure def sameRootNotSameCall(first: Call, second: Call): bool =
     first.resultNode == second.resultNode and first.dag != second.dag
@@ -401,14 +451,20 @@ module recorded_calls_rules {
       "inspected", "rejected", "rejected", "inspected", "inspected")
     val retry = List("recorded", "inspected", "recorded", "exported", "staged", "recorded", "exported",
       "staged", "published", "acknowledged", "rejected", "recorded", "exported", "staged", "recorded", "exported",
-      "staged", "rejected", "published", "collected", "inspected", "acknowledged", "inspected", "rejected", "rejected")
-    if (rows.length() != 7 or verdicts != List(together, together, separate, handoff, roundTrip, durable, retry)) false
+      "staged", "rejected", "published", "collected", "inspected", "rejected", "acknowledged", "inspected",
+      "rejected", "rejected")
+    val abandon = List("recorded", "inspected", "recorded", "exported", "staged", "recorded", "exported",
+      "abandoned", "staged", "rejected", "rejected", "rejected", "rejected", "recorded", "rejected", "exported",
+      "inspected", "abandoned", "rejected", "inspected")
+    if (rows.length() != 8 or verdicts != List(together, together, separate, handoff, roundTrip, durable, retry, abandon))
+      false
     else {
       val split = rows[2].attempts
       val transfer = rows[3].attempts
       val returned = rows[4].attempts
       val planned = rows[5].attempts
       val retried = rows[6].attempts
+      val abandoned = rows[7].attempts
       rows.indices().forall(i => rows[i].scenario == i) and
         sameRootNotSameCall(rows[0].attempts[1].calls[0], rows[1].attempts[1].calls[0]) and
         sameRootNotSameCall(split[2].calls[0], split[3].calls[0]) and split[0].commit != split[1].commit and
@@ -422,7 +478,8 @@ module recorded_calls_rules {
         planned[2].commit != planned[3].commit and planned[5].commit != planned[6].commit and
         planned[9].commit != planned[11].commit and sameRootNotSameCall(planned[12].calls[1], planned[13].calls[1]) and
         planned[12].calls == planned[21].calls and planned[12].calls == planned[25].calls and
-        retried[2].commit != retried[11].commit and retried[5].commit != retried[14].commit
+        retried[2].commit != retried[11].commit and retried[5].commit != retried[14].commit and
+        abandoned[2].commit != abandoned[13].commit and abandoned[3].commit != abandoned[15].commit
     }
   }
 
@@ -435,7 +492,8 @@ module recorded_calls_rules {
   pure val scaled: Call = { dag: "scale-call", implementation: "example.scale@1", resultNode: "literal-36",
     resultValue: 36, arguments: List(factor, input) }
   pure val recorded: Attempt = { op: "record", args: List("source", "7", "5", "3"), code: 0,
-    quiet: true, diagnosed: false, commit: "commit", calls: List(), expectedCommit: "", producerCommit: "", unchanged: false,
+    quiet: true, diagnosed: false, missingRef: false, commit: "commit", calls: List(),
+    expectedCommit: "", producerCommit: "", unchanged: false,
     removed: -1, expectedResult: "", expectedMain: "", requestCommit: "", requestImplementation: "",
     requestFactor: 0, bundlePresent: false, bundleUnchanged: true,
     publication: { planRef: "", plan: "", stagingRef: "", result: "" } }
@@ -467,7 +525,15 @@ module recorded_calls_rules {
   pure val publication: Publication = { planRef: "plan", plan: "plan", stagingRef: "returned", result: "result" }
   pure val receiptRead: Attempt = { ...recorded, op: "inspect", args: retryRequests[20].args,
     commit: "receipt", unchanged: true, publication: publication }
+  pure val abandoned: Attempt = { ...recorded, op: "abandon_scale_request", args: abandonRequests[7].args,
+    commit: "plan", expectedCommit: "plan" }
   pure val controlsPass = all {
+    abandonVerdict(abandoned, abandonRequests[7], "plan") == "abandoned",
+    abandonVerdict({ ...abandoned, unchanged: true }, abandonRequests[7], "plan") == "wrong_abandonment",
+    abandonVerdict({ ...abandoned, commit: "replacement" }, abandonRequests[7], "plan") == "wrong_abandonment",
+    abandonVerdict({ ...abandoned, expectedCommit: "replacement" }, abandonRequests[7], "plan") == "wrong_selection",
+    absentRefVerdict({ ...recorded, missingRef: true }, "rejected") == "rejected",
+    absentRefVerdict(recorded, "rejected") == "wrong_absence",
     receiptReadVerdict(receiptRead, retryRequests[20], publication) == "inspected",
     receiptReadVerdict({ ...receiptRead, calls: List(summed) }, retryRequests[20], publication) == "wrong_receipt",
     receiptReadVerdict({ ...receiptRead, publication: { ...publication, planRef: "other" } },

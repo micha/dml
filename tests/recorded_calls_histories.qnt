@@ -156,14 +156,34 @@ module recorded_calls_histories {
     source("publish_requested_scale", List("next-plan", "next-plan", "next-returned", "next-result")),
     source("collect", List()),
     source("inspect", List("ack")),
+    source("abandon_scale_request", List("plan", "plan")), // Publication already consumed this pin.
     source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
     source("inspect", List()),
     source("inspect", List("plan")),
     source("inspect", List("returned"))
   )
 
+  // Abandon before the result is staged. The old and replacement plan IDs
+  // are saved under separate receipt aliases even though they use the same ref.
+  pure val abandonRequests: List[Request] = retryRequests.slice(0, 7).concat(List(
+    source("abandon_scale_request", List("plan", "plan")),
+    source("stage_input", List("returned", "result.bundle")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
+    source("inspect", List()),
+    source("inspect", List("ack")),
+    source("inspect", List("plan")),
+    source("request_scale", List("producer", "producer", "plan", "-2", "replacement")),
+    source("abandon_scale_request", List("plan", "plan")),
+    source("export_request", List("plan", "replacement", "replacement.bundle")),
+    source("inspect", List("plan")),
+    source("abandon_scale_request", List("plan", "replacement")),
+    source("inspect", List("plan")),
+    source("inspect", List("returned"))
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
+    .append(abandonRequests)
   action step = histories' = histories
 }

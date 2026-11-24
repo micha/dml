@@ -56,6 +56,7 @@ class ProcessHistory:
             "export_scale": self.export_scale, "publish_scale": self.publish_scale,
             "request_scale": self.request_scale, "export_request": self.export_request,
             "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
+            "abandon_scale_request": self.abandon_scale_request,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -74,8 +75,12 @@ class ProcessHistory:
         bundle_after = bundle.read_bytes() if bundle is not None and bundle.is_file() else None
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="")
+        missing_ref = re.fullmatch(
+            rf"{re.escape(command)}: \('not_found', -?[0-9]+, 'ref was not found'\)", result.stderr.rstrip("\n"),
+        ) is not None
         return {"op": op, "args": list(args), "code": result.returncode, "quiet": not result.stderr,
                 "diagnosed": result.stderr.startswith(f"{command}: ") and "Traceback" not in result.stderr,
+                "missingRef": missing_ref,
                 "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
                 "expectedResult": "", "expectedMain": "", "requestCommit": "",
                 "requestImplementation": "", "requestFactor": 0,
@@ -136,11 +141,19 @@ class ProcessHistory:
                          operands=(pin, result, producer, expected_factor, main))
         return {**row, "expectedResult": result, "expectedCommit": producer, "expectedMain": main}
 
-    def request_scale(self, role, pin, producer_receipt, plan, factor):
+    def request_scale(self, role, pin, producer_receipt, plan, factor, receipt_alias=None):
         row = self.select("request_scale", role, pin, producer_receipt, plan, factor)
+        if receipt_alias is not None:
+            # The alias is only for replay; the CLI still writes the named pin.
+            row["args"].append(receipt_alias)
         if row["commit"]:
-            self.plan_receipts[plan] = row["commit"]
+            self.plan_receipts[plan if receipt_alias is None else receipt_alias] = row["commit"]
         return row
+
+    def abandon_scale_request(self, role, pin, plan_receipt):
+        plan = self.plan_receipts[plan_receipt]
+        row = self.write("abandon_scale_request", (role, pin, plan_receipt), operands=(pin, plan))
+        return {**row, "expectedCommit": plan}
 
     def export_request(self, role, pin, plan_receipt, filename):
         plan = self.plan_receipts[plan_receipt]

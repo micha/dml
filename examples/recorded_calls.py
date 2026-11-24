@@ -381,6 +381,19 @@ def publish_requested_scale(path, plan_pin, plan_commit, returned, result_commit
     return result_commit
 
 
+def abandon_scale_request(path, plan_pin, plan_commit):
+    """Consume the exact local plan pin without publishing or canceling worker work."""
+    _check_commit_id(plan_commit, "plan commit")
+    if type(plan_pin) is not bytes or not REF_NAME.fullmatch(plan_pin):
+        raise ValueError("plan ref must be a valid ASCII ref name in bytes")
+    if plan_pin == MAIN:
+        raise ValueError("plan ref must differ from main")
+    with _write_transaction(path, create=False) as txn:
+        _selected_plan(txn, plan_pin, plan_commit)
+        core.txn_ref_delete_expected(txn, plan_pin, plan_commit)
+    return plan_commit
+
+
 def release_input(path, pin, producer_commit, result_ref):
     """Release the exact producer pin only if the selected result retains it."""
     _check_commit_id(producer_commit)
@@ -613,6 +626,10 @@ def main():
     requested_publisher.add_argument("returned")
     requested_publisher.add_argument("result_commit")
     requested_publisher.add_argument("--receipt-ref", help="keep a source-local receipt for safe retries")
+    abandon = commands.add_parser("abandon-scale-request", help="release the exact local plan without publishing")
+    abandon.add_argument("repo", type=Path)
+    abandon.add_argument("plan_pin")
+    abandon.add_argument("plan_commit")
     release = commands.add_parser("release-input", help="release a staged sum retained by a recorded result")
     release.add_argument("repo", type=Path)
     release.add_argument("pin")
@@ -664,6 +681,9 @@ def main():
             receipt = args.receipt_ref.encode("ascii") if args.receipt_ref is not None else None
             print(publish_requested_scale(args.repo, args.plan_pin.encode("ascii"), plan,
                                           args.returned.encode("ascii"), result, receipt_ref=receipt).hex())
+        elif args.command == "abandon-scale-request":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            print(abandon_scale_request(args.repo, args.plan_pin.encode("ascii"), plan).hex())
         elif args.command == "release-input":
             print(release_input(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                                 args.result_ref.encode("ascii")).hex())

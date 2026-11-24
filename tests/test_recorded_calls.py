@@ -665,6 +665,126 @@ class RecordedCallsTest(unittest.TestCase):
         self.example["stage_input"](self.repo, b"returned", inbound)
         return producer, previous, plan, result
 
+    def test_abandon_releases_only_selected_pin_when_main_has_moved_and_result_is_staged(self):
+        producer, previous, plan, result = self.prepare_receipted_scale()
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", producer)
+            core.txn_ref_create(txn, b"other-plan", plan)
+            core.txn_commit(txn)
+
+        worker_data = self.workspace / "worker" / "data.mdb"
+        worker_before = worker_data.read_bytes()
+        abandon = ("abandon-scale-request", "plan", plan.hex())
+        self.assertEqual(self.expect_success(*abandon).strip(), plan.hex())
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        self.assertIn("not_found", self.expect_failure(*abandon))
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, b"plan")
+            for name, commit in ((b"other-plan", plan), (b"main", producer),
+                                 (b"producer", producer), (b"returned", result)):
+                self.assertEqual(core.txn_ref_get(txn, name), commit)
+
+        # Even with a ready result and the captured main restored, the missing
+        # pin prevents publication. An alias of the same plan cannot substitute.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous)
+            core.txn_commit(txn)
+        before = data.read_bytes()
+        self.assertIn("not_found", self.expect_failure("publish-requested-scale", "plan", plan.hex(),
+                                                      "returned", result.hex(), "--receipt-ref", "ack"))
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, b"ack")
+            self.assertEqual(core.txn_ref_get(txn, b"main"), previous)
+
+        # Once the independent roots are gone, no abandonment record keeps
+        # the private plan or captured main alive; staging still owns its result.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", producer)
+            core.txn_ref_delete_expected(txn, b"other-plan", plan)
+            core.txn_commit(txn)
+        self.assertGreater(self.example["collect"](self.repo), 0)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"returned"), result)
+            for commit in (plan, previous):
+                with self.assertRaises(core.Error) as collected:
+                    view(txn, core.REC_COMMIT, commit)
+                self.assertEqual(collected.exception.args[0], "not_found")
+        self.assertEqual(worker_data.read_bytes(), worker_before)
+
+    def test_abandon_leaves_collection_explicit_without_a_main_or_staged_result(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        pin = b"1" + b"a" * 124 + b"._-"
+        plan = self.example["request_scale"](self.repo, b"producer", producer, pin, 3)
+        request = bytes.fromhex(self.example["inspect"](self.repo, pin)["request_commit"])
+        self.assertEqual(self.example["abandon_scale_request"](self.repo, pin, plan), plan)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, pin)
+            self.assert_missing_ref(txn, b"main")
+            self.assertEqual(core.txn_ref_get(txn, b"producer"), producer)
+            for commit in (plan, request):
+                view(txn, core.REC_COMMIT, commit)
+        self.assertGreater(self.example["collect"](self.repo), 0)
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"producer"), producer)
+            for commit in (plan, request):
+                with self.assertRaises(core.Error) as collected:
+                    view(txn, core.REC_COMMIT, commit)
+                self.assertEqual(collected.exception.args[0], "not_found")
+
+    def test_abandon_rejects_replaced_pin_main_and_malformed_plan_without_writes(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        original = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
+        replacement = self.example["request_scale"](self.repo, b"producer", producer, b"other-plan", 4)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"plan", replacement)
+            core.txn_ref_create(txn, b"main", original)
+            _, original_tree, _ = view(txn, core.REC_COMMIT, original)
+            replacement_view, _, _ = view(txn, core.REC_COMMIT, replacement)
+            # Correct tag and parent count, but the request's DAG differs from the plan's.
+            malformed = put(txn, core.REC_COMMIT, original_tree, core.object_view_parent(replacement_view, 0))
+            core.txn_ref_create(txn, b"malformed", malformed)
+            core.txn_commit(txn)
+
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        abandon = self.example["abandon_scale_request"]
+        for pin, commit, reason in (
+            (b"plan", original, "expected plan commit"),
+            (b"main", original, "plan ref must differ from main"),
+            (b"producer", producer, "expected a scale-plan-v1 commit"),
+            (b"malformed", malformed, "plan DAG does not match"),
+        ):
+            with self.subTest(pin=pin):
+                with self.assertRaisesRegex(ValueError, reason):
+                    abandon(self.repo, pin, commit)
+                self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            for pin, commit in ((b"plan", replacement), (b"main", original),
+                                (b"producer", producer), (b"malformed", malformed)):
+                self.assertEqual(core.txn_ref_get(txn, pin), commit)
+
+    def test_abandon_validates_selection_before_opening_repository(self):
+        class BytesSubclass(bytes):
+            pass
+
+        class UnopenablePath:
+            def __fspath__(self):
+                raise AssertionError("invalid selections must be rejected before opening the repository")
+
+        abandon = self.example["abandon_scale_request"]
+        identifier = bytes(16)
+        invalid_pins = ("plan", bytearray(b"plan"), BytesSubclass(b"plan"), b"", b"-plan", b"plan/name",
+                        b"pl\xc3\xa1n", b"plan\n", b"p" * 129, b"main")
+        for pin in invalid_pins:
+            with self.subTest(pin=pin), self.assertRaisesRegex(ValueError, "plan ref.*(bytes|main)"):
+                abandon(UnopenablePath(), pin, identifier)
+        for commit in (identifier.hex(), bytearray(identifier), BytesSubclass(identifier), b"x" * 15, b"x" * 17):
+            with self.subTest(commit=commit), self.assertRaisesRegex(ValueError, "plan commit.*16-byte ID"):
+                abandon(UnopenablePath(), b"plan", commit)
+
     def test_receipt_retries_without_changes_after_ref_reuse_and_collection(self):
         producer_id, previous_id, plan_id, result_id = self.prepare_receipted_scale()
         plan, result = plan_id.hex(), result_id.hex()
