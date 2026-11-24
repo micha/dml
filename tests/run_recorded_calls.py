@@ -47,11 +47,15 @@ class ProcessHistory:
         self.example = example
         self.sum_receipts = {}
         self.scale_receipts = {}
+        self.plan_receipts = {}
+        self.request_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
             "release_input": self.release_input, "collect": self.collect,
             "export_scale": self.export_scale, "publish_scale": self.publish_scale,
+            "request_scale": self.request_scale, "export_request": self.export_request,
+            "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -73,7 +77,8 @@ class ProcessHistory:
         return {"op": op, "args": list(args), "code": result.returncode, "quiet": not result.stderr,
                 "diagnosed": result.stderr.startswith(f"{command}: ") and "Traceback" not in result.stderr,
                 "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
-                "expectedResult": "", "expectedMain": "",
+                "expectedResult": "", "expectedMain": "", "requestCommit": "",
+                "requestImplementation": "", "requestFactor": 0,
                 "unchanged": before is not None and before == after,
                 "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
 
@@ -130,6 +135,36 @@ class ProcessHistory:
                          operands=(pin, result, producer, expected_factor, main))
         return {**row, "expectedResult": result, "expectedCommit": producer, "expectedMain": main}
 
+    def request_scale(self, role, pin, producer_receipt, plan, factor):
+        row = self.select("request_scale", role, pin, producer_receipt, plan, factor)
+        if row["commit"]:
+            self.plan_receipts[plan] = row["commit"]
+        return row
+
+    def export_request(self, role, pin, plan_receipt, filename):
+        plan = self.plan_receipts[plan_receipt]
+        bundle = self.directory / filename
+        row = self.write("export_request", (role, pin, plan_receipt, filename),
+                         operands=(pin, plan, bundle), bundle=bundle)
+        if row["commit"]:
+            self.request_receipts[plan_receipt] = row["commit"]
+        return {**row, "expectedCommit": plan}
+
+    def work_scale(self, role, pin, request_receipt, result_ref):
+        request = self.request_receipts[request_receipt]
+        row = self.write("work_scale", (role, pin, request_receipt, result_ref),
+                         operands=(pin, request, result_ref))
+        if row["commit"]:
+            self.scale_receipts[role, result_ref] = row["commit"]
+        return {**row, "expectedCommit": request}
+
+    def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt):
+        plan = self.plan_receipts[plan_receipt]
+        result = self.scale_receipts["worker", result_receipt]
+        row = self.write("publish_requested_scale", (role, pin, plan_receipt, returned, result_receipt),
+                         operands=(pin, plan, returned, result))
+        return {**row, "expectedCommit": plan, "expectedResult": result}
+
     def collect(self, role):
         row, output = self.invoke("collect", (role,))
         return {**row, "removed": int(output) if output else -1}
@@ -142,6 +177,14 @@ class ProcessHistory:
             row["calls"] = [call_evidence(call) for call in report["calls"]]
             if "producer_commit" in report:
                 row["producerCommit"] = id_evidence(report["producer_commit"])
+            if "request_commit" in report:
+                row["requestCommit"] = id_evidence(report["request_commit"])
+            if "request_implementation" in report:
+                row["requestImplementation"] = report["request_implementation"]
+                row["requestFactor"] = report["request_factor"]
+            if "expected_main" in report:
+                main = report["expected_main"]
+                row["expectedMain"] = "-" if main is None else id_evidence(main)
         return row
 
 

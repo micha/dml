@@ -5,7 +5,8 @@ module recorded_calls_rules {
   type Call = { dag: str, implementation: str, resultNode: str, resultValue: int, arguments: List[Argument] }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, commit: str, calls: List[Call],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
-    expectedResult: str, expectedMain: str, bundlePresent: bool, bundleUnchanged: bool }
+    expectedResult: str, expectedMain: str, requestCommit: str, requestImplementation: str, requestFactor: int,
+    bundlePresent: bool, bundleUnchanged: bool }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def literal(arg: Argument, name: str, value: int): bool =
@@ -118,11 +119,14 @@ module recorded_calls_rules {
     }
   }
 
-  pure def exportVerdict(attempt: Attempt, request: Request, expected: str): str =
-    if (not(matches(attempt, request)) or attempt.expectedCommit != expected or attempt.commit != expected) "wrong_export"
-    else if (not(attempt.unchanged)) "storage_changed"
+  pure def exportedBundle(attempt: Attempt): str =
+    if (not(attempt.unchanged)) "storage_changed"
     else if (not(attempt.bundlePresent) or attempt.bundleUnchanged) "wrong_bundle"
     else "exported"
+
+  pure def exportVerdict(attempt: Attempt, request: Request, expected: str): str =
+    if (not(matches(attempt, request)) or attempt.expectedCommit != expected or attempt.commit != expected) "wrong_export"
+    else exportedBundle(attempt)
 
   pure def rejectedExport(attempt: Attempt, request: Request, expected: str, existed: bool): str = {
     val verdict = rejectedWriteVerdict(attempt, request, expected)
@@ -237,10 +241,81 @@ module recorded_calls_rules {
     }
   }
 
+  pure def planReadVerdict(readback: Attempt, req: Request, plan: str, portable: str, factor: int,
+                          sumRead: Attempt): str =
+    if (not(matches(readback, req))) "wrong_inspect"
+    else if (not(readback.unchanged)) "storage_changed"
+    else if (readback.commit != plan or readback.requestCommit != portable or readback.expectedMain != "-")
+      "wrong_plan"
+    else if (readback.producerCommit != sumRead.commit or readback.calls != sumRead.calls or
+             readback.requestImplementation != "example.scale@1" or readback.requestFactor != factor)
+      "wrong_request"
+    else "inspected"
+
+  pure def requestedReadVerdict(s: Scenario, readback: Attempt, req: Request, result: str, portable: str,
+                               sumRead: Attempt): str =
+    if (readback.requestCommit != portable) "wrong_request"
+    else scaleReadVerdict(s, readback, req, result, sumRead)
+
+  pure def requestExportVerdict(attempt: Attempt, req: Request, plan: str): str =
+    if (not(matches(attempt, req)) or attempt.expectedCommit != plan or attempt.commit == "" or attempt.commit == plan)
+      "wrong_export"
+    else exportedBundle(attempt)
+
+  pure def durableVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = durableRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val sumRead = attempts[1]
+      val plan = attempts[2].commit
+      val otherPlan = attempts[3].commit
+      val portable = attempts[5].commit
+      val otherPortable = attempts[6].commit
+      val result = attempts[11].commit
+      val otherResult = attempts[9].commit
+      val original: Scenario = { ...selected, b: ("-7", -7) }
+      val revised = { ...original, factor: ("-2", -2) }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(original, sumRead, req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], producer),
+        scaleWriteVerdict(attempts[3], req[3], producer),
+        planReadVerdict(attempts[4], req[4], plan, portable, 3, sumRead),
+        requestExportVerdict(attempts[5], req[5], plan),
+        requestExportVerdict(attempts[6], req[6], otherPlan),
+        stageVerdict(attempts[7], req[7], otherPortable),
+        rejectedWriteVerdict(attempts[8], req[8], portable),
+        scaleWriteVerdict(attempts[9], req[9], otherPortable),
+        stageVerdict(attempts[10], req[10], portable),
+        scaleWriteVerdict(attempts[11], req[11], portable),
+        requestedReadVerdict(original, attempts[12], req[12], result, portable, sumRead),
+        requestedReadVerdict(revised, attempts[13], req[13], otherResult, otherPortable, sumRead),
+        exportVerdict(attempts[14], req[14], result),
+        exportVerdict(attempts[15], req[15], otherResult),
+        stageVerdict(attempts[16], req[16], otherResult),
+        publishVerdict(attempts[17], req[17], otherResult, plan, "", false), // wrong request
+        stageVerdict(attempts[18], req[18], result),
+        publishVerdict(attempts[19], req[19], result, plan, "", false), // stale plan pin
+        publishVerdict(attempts[20], req[20], result, plan, "", false), // stale staging pin
+        requestedReadVerdict(original, attempts[21], req[21], result, portable, sumRead),
+        publishVerdict(attempts[22], req[22], result, plan, "", true),
+        publishVerdict(attempts[23], req[23], otherResult, otherPlan, "", false), // stale main
+        if (matches(attempts[24], req[24]) and attempts[24].removed > 0) "collected" else "wrong_collection",
+        requestedReadVerdict(original, attempts[25], req[25], result, portable, sumRead),
+        rejectedWriteVerdict(attempts[26], req[26], ""), // consumed plan
+        rejectedWriteVerdict(attempts[27], req[27], ""), // consumed staging pin
+        planReadVerdict(attempts[28], req[28], otherPlan, otherPortable, -2, sumRead),
+        requestedReadVerdict(revised, attempts[29], req[29], otherResult, otherPortable, sumRead)
+      )
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 2) returnVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 3) durableVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -260,11 +335,16 @@ module recorded_calls_rules {
       "collected", "inspected", "rejected", "exported", "exported", "staged", "inspected", "rejected", "rejected",
       "published", "rejected", "inspected", "staged", "rejected", "rejected", "rejected", "rejected", "published",
       "collected", "rejected", "inspected", "inspected", "inspected")
-    if (rows.length() != 5 or verdicts != List(together, together, separate, handoff, roundTrip)) false
+    val durable = List("recorded", "inspected", "recorded", "recorded", "inspected", "exported", "exported",
+      "staged", "rejected", "recorded", "staged", "recorded", "inspected", "inspected", "exported", "exported",
+      "staged", "rejected", "staged", "rejected", "rejected", "inspected", "published", "rejected", "collected",
+      "inspected", "rejected", "rejected", "inspected", "inspected")
+    if (rows.length() != 6 or verdicts != List(together, together, separate, handoff, roundTrip, durable)) false
     else {
       val split = rows[2].attempts
       val transfer = rows[3].attempts
       val returned = rows[4].attempts
+      val planned = rows[5].attempts
       rows.indices().forall(i => rows[i].scenario == i) and
         sameRootNotSameCall(rows[0].attempts[1].calls[0], rows[1].attempts[1].calls[0]) and
         sameRootNotSameCall(split[2].calls[0], split[3].calls[0]) and split[0].commit != split[1].commit and
@@ -274,7 +354,10 @@ module recorded_calls_rules {
         transfer[16].calls == transfer[22].calls and returned[0].commit != returned[1].commit and
         returned[5].commit != returned[6].commit and returned[9].calls == returned[14].calls and
         returned[9].calls == returned[19].calls and returned[9].calls == returned[30].calls and
-        sameRootNotSameCall(returned[19].calls[1], returned[28].calls[1])
+        sameRootNotSameCall(returned[19].calls[1], returned[28].calls[1]) and
+        planned[2].commit != planned[3].commit and planned[5].commit != planned[6].commit and
+        planned[9].commit != planned[11].commit and sameRootNotSameCall(planned[12].calls[1], planned[13].calls[1]) and
+        planned[12].calls == planned[21].calls and planned[12].calls == planned[25].calls
     }
   }
 
@@ -288,7 +371,8 @@ module recorded_calls_rules {
     resultValue: 36, arguments: List(factor, input) }
   pure val recorded: Attempt = { op: "record", args: List("source", "7", "5", "3"), code: 0,
     quiet: true, diagnosed: false, commit: "commit", calls: List(), expectedCommit: "", producerCommit: "", unchanged: false,
-    removed: -1, expectedResult: "", expectedMain: "", bundlePresent: false, bundleUnchanged: true }
+    removed: -1, expectedResult: "", expectedMain: "", requestCommit: "", requestImplementation: "",
+    requestFactor: 0, bundlePresent: false, bundleUnchanged: true }
   pure val inspected: Attempt = { ...recorded, op: "inspect", args: List("source"), calls: List(summed, scaled),
     unchanged: true }
   pure def inspectVerdict(readback: Attempt): str =

@@ -506,6 +506,146 @@ class RecordedCallsTest(unittest.TestCase):
             self.assertEqual(core.txn_ref_get(txn, b"main"), producer_id)
             self.assert_missing_ref(txn, b"returned")
 
+    def test_durable_plan_updates_existing_main_without_exporting_it(self):
+        producer = self.expect_success("record-sum", "producer", 7, 5).strip()
+        previous = self.expect_success("record-sum", "main", 12, 0).strip()
+        producer_id, previous_id = bytes.fromhex(producer), bytes.fromhex(previous)
+        plan = self.expect_success("request-scale", "producer", producer, "plan", -3).strip()
+        pending = json.loads(self.expect_success("inspect", "plan"))
+        self.assertEqual(pending["expected_main"], previous)
+        self.assertEqual(pending["producer_commit"], producer)
+        self.assertEqual(pending["request_factor"], -3)
+        self.assertEqual(pending["request_implementation"], "example.scale@1")
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            core.txn_ref_delete_expected(txn, b"producer", producer_id)
+            core.txn_ref_update(txn, b"main", producer_id)
+            core.txn_commit(txn)
+        self.expect_success("collect")  # The plan, not either ref, pins the original state.
+        worker = self.workspace / "worker"
+        outbound = self.workspace / "request.dmlb"
+        inbound = self.workspace / "result.dmlb"
+        request = self.expect_success("export-request", "plan", plan, outbound).strip()
+        self.assertEqual(request, pending["request_commit"])
+        request_id = bytes.fromhex(request)
+        self.assertEqual(self.expect_success("stage-input", "incoming", outbound, repo=worker).strip(), request)
+        with transaction(worker) as txn:
+            self.assert_missing_ref(txn, b"main")
+            for private_id in (bytes.fromhex(plan), previous_id):
+                with self.assertRaises(core.Error) as absent:
+                    core.txn_get_object(txn, core.REC_COMMIT, private_id)
+                self.assertEqual(absent.exception.args[0], "not_found")
+        result = self.expect_success("work-scale", "incoming", request, "result", repo=worker).strip()
+        self.expect_success("export-scale", "result", result, inbound, repo=worker)
+        self.assertEqual(self.expect_success("stage-input", "returned", inbound).strip(), result)
+        worker_report = self.expect_success("inspect", "result", repo=worker)
+        outbound.unlink()
+        inbound.unlink()
+
+        before = (self.repo / "data.mdb").read_bytes()
+        self.assertIn("main does not point to the expected commit",
+                      self.expect_failure("publish-requested-scale", "plan", plan, "returned", result))
+        self.assertEqual((self.repo / "data.mdb").read_bytes(), before)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous_id)
+            core.txn_commit(txn)
+        self.assertEqual(self.expect_success("publish-requested-scale", "plan", plan, "returned", result).strip(),
+                         result)
+        self.assertGreater(int(self.expect_success("collect")), 0)
+        with transaction(self.repo) as txn:
+            result_id, scale, parents = self.snapshot(txn, b"main", b"requested-scale-v1")
+            self.assertEqual((result_id.hex(), parents), (result, (request_id,)))
+            request_view, _, count = view(txn, core.REC_COMMIT, request_id)
+            self.assertEqual(count, 1)
+            self.assertEqual(core.object_view_parent(request_view, 0), producer_id)
+            self.assertEqual(self.node_target(txn, core.txn_lookup_node(txn, scale, b"input"), core.NODE_SUBDAG),
+                             sum_dag)
+            for ref in (b"plan", b"returned", b"producer"):
+                self.assert_missing_ref(txn, ref)
+            for private_id in (bytes.fromhex(plan), previous_id):
+                with self.assertRaises(core.Error) as swept:
+                    core.txn_get_object(txn, core.REC_COMMIT, private_id)
+                self.assertEqual(swept.exception.args[0], "not_found")
+        self.assertEqual(self.expect_success("inspect"), worker_report)
+
+    def test_durable_publication_checks_factor_and_physical_link_on_exact_request(self):
+        producer = self.expect_success("record-sum", "producer", 7, -7).strip()
+        self.expect_success("record-sum", "decoy", 8, -8)
+        plan = self.expect_success("request-scale", "producer", producer, "plan", 3).strip()
+        request = bytes.fromhex(json.loads(self.expect_success("inspect", "plan"))["request_commit"])
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, decoy_dag, _ = self.snapshot(txn, b"decoy", b"recorded-sum-v1")
+            self.assertNotEqual(sum_dag, decoy_dag)
+            self.assertEqual(view(txn, core.REC_DAG, sum_dag)[1], view(txn, core.REC_DAG, decoy_dag)[1])
+            version = literal(txn, core.DATUM_STRING, b"example.scale@1")
+            candidates = {}
+            for pin, factor, source_dag, output in (
+                (b"wrong-factor", -2, sum_dag, 0), (b"wrong-input", 3, decoy_dag, 0),
+                (b"returned", 3, sum_dag, -98),  # Publication checks records, not arithmetic.
+            ):
+                source = put(txn, core.REC_NODE, core.NODE_SUBDAG, source_dag)
+                multiplier = literal(txn, core.DATUM_I64, factor)
+                root = literal(txn, core.DATUM_I64, output)
+                dag = put(txn, core.REC_DAG, root, b"implementation", version, b"input", source,
+                          b"factor", multiplier)
+                tree = put(txn, core.REC_TREE, b"requested-scale-v1", dag)
+                candidates[pin] = put(txn, core.REC_COMMIT, tree, request)
+                core.txn_ref_create(txn, pin, candidates[pin])
+            core.txn_commit(txn)
+
+        before = (self.repo / "data.mdb").read_bytes()
+        for pin, reason in ((b"wrong-factor", "recorded factor does not match"),
+                            (b"wrong-input", "scale input DAG does not match")):
+            with self.subTest(pin=pin):
+                self.assertIn(reason, self.expect_failure("publish-requested-scale", "plan", plan, pin.decode(),
+                                                          candidates[pin].hex()))
+                self.assertEqual((self.repo / "data.mdb").read_bytes(), before)
+        result = candidates[b"returned"].hex()
+        self.assertIn("distinct", self.expect_failure("publish-requested-scale", "plan", plan, "plan", result))
+        self.assertIn("recorded-scale-v1", self.expect_failure("publish-scale", "returned", result, producer, 3, "-"))
+        self.assertEqual((self.repo / "data.mdb").read_bytes(), before)
+        self.assertEqual(self.expect_success("publish-requested-scale", "plan", plan, "returned", result).strip(),
+                         result)
+        report = json.loads(self.expect_success("inspect"))
+        self.assertEqual(report["calls"][1]["result"]["value"], -98)
+
+    def test_request_or_worker_failure_does_not_leave_partial_state(self):
+        producer = self.expect_success("record-sum", "producer", 2, 0).strip()
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for pin, factor, reason in (
+            ("main", 3, "plan ref must differ from main"),
+            ("plan", 1 << 63, "signed 64-bit"),
+        ):
+            with self.subTest(pin=pin):
+                self.assertIn(reason, self.expect_failure("request-scale", "producer", producer, pin, factor))
+                self.assertEqual(data.read_bytes(), before)
+        plan = self.expect_success("request-scale", "producer", producer, "plan", 1 << 62).strip()
+        before = data.read_bytes()
+        self.expect_failure("request-scale", "producer", producer, "plan", 3)
+        self.assertEqual(data.read_bytes(), before)
+        worker = self.workspace / "worker"
+        bundle = self.workspace / "request.dmlb"
+        request = self.expect_success("export-request", "plan", plan, bundle).strip()
+        self.expect_failure("export-request", "producer", plan, self.workspace / "wrong.dmlb")
+        self.assertFalse((self.workspace / "wrong.dmlb").exists())
+        self.expect_success("stage-input", "main", bundle)
+        before = data.read_bytes()
+        self.assertIn("main already points to this request",
+                      self.expect_failure("request-scale", "producer", producer, "second-plan", 1 << 62))
+        self.assertEqual(data.read_bytes(), before)
+        self.expect_success("stage-input", "incoming", bundle, repo=worker)
+        worker_data = worker / "data.mdb"
+        before = worker_data.read_bytes()
+        self.assertIn("example.scale@1 result", self.expect_failure("work-scale", "incoming", request, "result",
+                                                                    repo=worker))
+        self.assertEqual(worker_data.read_bytes(), before)
+        with transaction(worker) as txn:
+            self.assert_missing_ref(txn, b"result")
+            self.assertEqual(core.txn_ref_get(txn, b"incoming").hex(), request)
+
     def test_publish_validates_arguments_before_opening_the_repository(self):
         class BytesSubclass(bytes):
             pass

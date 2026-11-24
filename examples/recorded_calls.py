@@ -5,7 +5,9 @@ Use `record REPO 7 5 3` to make both calls at once, or run
 with the printed commit ID. Read either result with `inspect REPO [REF]`.
 Use `export-sum` and `stage-input` to move a producer to another repository,
 then `export-scale`, `stage-input`, and `publish-scale` to return the result.
-This example's call layouts are not core record types or execution APIs.
+Use `request-scale`, `export-request`, `work-scale`, and `publish-requested-scale`
+when the source should preserve its expectations across invocations.
+These layouts are not core record types or execution APIs.
 """
 
 import argparse
@@ -13,6 +15,7 @@ from contextlib import contextmanager
 import json
 from operator import add, mul
 from pathlib import Path
+from typing import NamedTuple
 
 from daggerml import core
 
@@ -20,10 +23,21 @@ from daggerml import core
 ENTRY = b"recorded-calls-v1"
 SUM_ENTRY = b"recorded-sum-v1"
 SCALE_ENTRY = b"recorded-scale-v1"
+REQUEST_ENTRY = b"scale-request-v1"
+PLAN_ENTRY = b"scale-plan-v1"
+REQUESTED_SCALE_ENTRY = b"requested-scale-v1"
 SUM = b"example.sum@1"
 SCALE = b"example.scale@1"
 MAIN = b"main"
 MAX_BUNDLE_BYTES = 64 * 1024 * 1024  # The core's commit bundle limit.
+
+
+class _ScaleRequest(NamedTuple):
+    commit: bytes
+    dag: bytes
+    producer: bytes
+    sum_dag: bytes
+    factor: int
 
 
 @contextmanager
@@ -175,14 +189,63 @@ def record_scale(path, producer_pin, producer_commit, result_ref, factor):
         return _publish(txn, result_ref, SCALE_ENTRY, scale_call, producer_commit)
 
 
+def _optional_ref(txn, ref):
+    try:
+        return core.txn_ref_get(txn, ref)
+    except core.Error as error:
+        status, _, detail = error.args
+        # A dangling target can also produce not_found; it is not an absent ref.
+        if (status, detail) != ("not_found", "ref was not found"):
+            raise
+        return None
+
+
+def request_scale(path, producer_pin, producer_commit, plan_pin, factor):
+    """Pin the portable request and the source's current main in a local plan."""
+    _check_commit_id(producer_commit)
+    _check_i64(factor, "factor")
+    if type(plan_pin) is not bytes:
+        raise ValueError("plan ref must be bytes")
+    if plan_pin == MAIN:
+        raise ValueError("plan ref must differ from main")
+    with _write_transaction(path, create=False) as txn:
+        _selected_sum(txn, producer_pin, producer_commit)
+        expected_main = _optional_ref(txn, MAIN)
+        operation = _put_literal(txn, core.DATUM_STRING, SCALE)
+        multiplier = _put_literal(txn, core.DATUM_I64, factor)
+        dag = _put_object(txn, core.REC_DAG, operation, b"implementation", operation, b"factor", multiplier)
+        tree = _put_object(txn, core.REC_TREE, REQUEST_ENTRY, dag)
+        request = _put_object(txn, core.REC_COMMIT, tree, producer_commit)
+        if expected_main == request:
+            raise ValueError("main already points to this request; stage requests under a separate ref")
+        parents = (request,) if expected_main is None else (request, expected_main)
+        return _publish(txn, plan_pin, PLAN_ENTRY, dag, *parents)
+
+
+def work_scale(path, incoming, request_commit, result_ref):
+    """Evaluate the exact staged request using its stored arguments."""
+    _check_commit_id(request_commit, "request commit")
+    with _write_transaction(path, create=False) as txn:
+        if core.txn_ref_get(txn, incoming) != request_commit:
+            raise ValueError("incoming ref does not point to the expected request commit")
+        request = _read_request(txn, request_commit)
+        _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
+        scale = _record_scale(txn, request.sum_dag, request.factor)
+        return _publish(txn, result_ref, REQUESTED_SCALE_ENTRY, scale, request_commit)
+
+
+def _write_bundle(bundle_path, bundle):
+    with Path(bundle_path).open("xb") as output:
+        output.write(bundle)
+
+
 def _export_selected(path, pin, commit, bundle_path, select):
     with _repository(path, create=False) as repo:
         with _read_transaction(repo) as txn:
             select(txn, pin, commit)
         # Export by immutable ID in a new snapshot, never by re-resolving the pin.
         bundle = core.repo_export_commit(repo, commit)
-    with Path(bundle_path).open("xb") as output:
-        output.write(bundle)
+    _write_bundle(bundle_path, bundle)
     return commit
 
 
@@ -192,10 +255,23 @@ def export_sum(path, pin, producer_commit, bundle_path):
     return _export_selected(path, pin, producer_commit, bundle_path, _selected_sum)
 
 
+def export_request(path, plan_pin, plan_commit, bundle_path):
+    """Export only the request selected by the exact source-local plan."""
+    _check_commit_id(plan_commit, "plan commit")
+    with _repository(path, create=False) as repo:
+        with _read_transaction(repo) as txn:
+            request, _ = _selected_plan(txn, plan_pin, plan_commit)
+            _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
+        # The plan and its main expectation are not part of the portable closure.
+        bundle = core.repo_export_commit(repo, request.commit)
+    _write_bundle(bundle_path, bundle)
+    return request.commit
+
+
 def _checked_scale(txn, result):
     report = _inspect_snapshot(txn, result)
     producer = report.get("producer_commit")
-    if producer is None:
+    if producer is None or "request_commit" in report:
         raise ValueError("expected a split recorded-scale-v1 commit")
     _, scale = report["calls"]
     return bytes.fromhex(producer), scale["arguments"]["factor"]["value"]
@@ -204,7 +280,9 @@ def _checked_scale(txn, result):
 def _selected_scale(txn, pin, expected):
     if core.txn_ref_get(txn, pin) != expected:
         raise ValueError("result pin does not point to the expected commit")
-    _checked_scale(txn, expected)
+    report = _inspect_snapshot(txn, expected)
+    if "producer_commit" not in report or len(report["calls"]) != 2:
+        raise ValueError("expected a recorded-scale-v1 or requested-scale-v1 result commit")
 
 
 def export_scale(path, pin, result_commit, bundle_path):
@@ -221,6 +299,15 @@ def stage_input(path, pin, bundle_path):
         raise ValueError("commit bundle exceeds 64 MiB")
     with _repository(path, create=True) as repo:
         return core.repo_import_commit_staged(repo, bundle, pin)
+
+
+def _update_main(txn, result_commit, expected_main):
+    if expected_main is None:
+        core.txn_ref_create(txn, MAIN, result_commit)
+    else:
+        if core.txn_ref_get(txn, MAIN) != expected_main:
+            raise ValueError("main does not point to the expected commit")
+        core.txn_ref_update(txn, MAIN, result_commit)
 
 
 def publish_scale(path, returned, result_commit, producer_commit, expected_factor, expected_main):
@@ -241,14 +328,26 @@ def publish_scale(path, returned, result_commit, producer_commit, expected_facto
             raise ValueError("result does not retain the expected producer commit")
         if factor != expected_factor:
             raise ValueError("recorded factor does not match the expected factor")
-        if expected_main is None:
-            core.txn_ref_create(txn, MAIN, result_commit)
-        else:
-            if core.txn_ref_get(txn, MAIN) != expected_main:
-                raise ValueError("main does not point to the expected commit")
-            core.txn_ref_update(txn, MAIN, result_commit)
+        _update_main(txn, result_commit, expected_main)
         # If the ref moved or disappeared, this failure also rolls back main.
         core.txn_ref_delete_expected(txn, returned, result_commit)
+    return result_commit
+
+
+def publish_requested_scale(path, plan_pin, plan_commit, returned, result_commit):
+    """Publish the exact staged result and consume both source-local pins."""
+    _check_commit_id(plan_commit, "plan commit")
+    _check_commit_id(result_commit, "result commit")
+    if type(plan_pin) is not bytes or type(returned) is not bytes:
+        raise ValueError("plan and staging refs must be bytes")
+    if len({plan_pin, returned, MAIN}) != 3:
+        raise ValueError("plan, staging, and main refs must be distinct")
+    with _write_transaction(path, create=False) as txn:
+        request, expected_main = _selected_plan(txn, plan_pin, plan_commit)
+        _inspect_snapshot(txn, result_commit, expected_request=request)
+        _update_main(txn, result_commit, expected_main)
+        core.txn_ref_delete_expected(txn, returned, result_commit)
+        core.txn_ref_delete_expected(txn, plan_pin, plan_commit)
     return result_commit
 
 
@@ -257,7 +356,8 @@ def release_input(path, pin, producer_commit, result_ref):
     _check_commit_id(producer_commit)
     with _write_transaction(path, create=False) as txn:
         result = core.txn_ref_get(txn, result_ref)
-        if _inspect_snapshot(txn, result).get("producer_commit") != producer_commit.hex():
+        producer, _ = _checked_scale(txn, result)
+        if producer != producer_commit:
             raise ValueError("result does not retain the expected producer commit")
         core.txn_ref_delete_expected(txn, pin, producer_commit)
     return producer_commit
@@ -310,22 +410,78 @@ def _sum_dag(snapshot):
     return dag
 
 
-def _inspect_snapshot(txn, commit):
+def _read_request(txn, commit):
+    view, parents, entry, dag = _snapshot(txn, commit)
+    if entry != REQUEST_ENTRY or parents != 1:
+        raise ValueError("expected a scale-request-v1 commit with one producer parent")
+    _, root, count = _object(txn, core.REC_DAG, dag)
+    implementation = core.txn_lookup_node(txn, dag, b"implementation")
+    if count != 2 or root != implementation or _read_literal(txn, implementation, core.DATUM_STRING) != SCALE:
+        raise ValueError("expected scale request for example.scale@1 with a factor")
+    factor = _read_i64(txn, core.txn_lookup_node(txn, dag, b"factor"))
+    producer = core.object_view_parent(view, 0)
+    return _ScaleRequest(commit, dag, producer, _sum_dag(_snapshot(txn, producer)), factor)
+
+
+def _read_plan(txn, commit):
+    view, parents, entry, dag = _snapshot(txn, commit)
+    if entry != PLAN_ENTRY or parents not in (1, 2):
+        raise ValueError("expected a scale-plan-v1 commit with a request and optional main parent")
+    request = _read_request(txn, core.object_view_parent(view, 0))
+    if dag != request.dag:
+        raise ValueError("plan DAG does not match the request DAG")
+    return request, core.object_view_parent(view, 1) if parents == 2 else None
+
+
+def _selected_plan(txn, pin, commit):
+    if core.txn_ref_get(txn, pin) != commit:
+        raise ValueError("plan ref does not point to the expected plan commit")
+    return _read_plan(txn, commit)
+
+
+def _inspect_request(txn, commit, entry):
+    report = {"commit": commit.hex()}
+    if entry == PLAN_ENTRY:
+        request, main = _read_plan(txn, commit)
+        report["expected_main"] = main.hex() if main is not None else None
+    else:
+        request = _read_request(txn, commit)
+    summed, _ = _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
+    return {**report, "request_commit": request.commit.hex(), "producer_commit": request.producer.hex(),
+            "request_implementation": SCALE.decode("ascii"), "request_factor": request.factor, "calls": [summed]}
+
+
+def _inspect_snapshot(txn, commit, *, expected_request=None):
     snapshot = _snapshot(txn, commit)
     view, parents, entry, terminal = snapshot
+    if expected_request is not None and entry != REQUESTED_SCALE_ENTRY:
+        raise ValueError("expected a requested-scale-v1 result commit")
+    if entry in (REQUEST_ENTRY, PLAN_ENTRY):
+        return _inspect_request(txn, commit, entry)
     report = {"commit": commit.hex()}
     if entry == SUM_ENTRY:
         dag = _sum_dag(snapshot)
         summed, _ = _inspect_call(txn, dag, SUM, (b"a", b"b"))
         return {**report, "calls": [summed]}
-    if not ((entry == ENTRY and parents == 0) or (entry == SCALE_ENTRY and parents == 1)):
-        raise ValueError("expected a recorded-calls-v1 or recorded-scale-v1 commit with its required parents")
+    if not ((entry == ENTRY and parents == 0) or (entry in (SCALE_ENTRY, REQUESTED_SCALE_ENTRY) and parents == 1)):
+        raise ValueError("expected a recorded or requested scale commit with its required parents")
     scale, producer = _inspect_call(txn, terminal, SCALE, (b"input", b"factor"), call_input=b"input")
     if entry == SCALE_ENTRY:
         parent = core.object_view_parent(view, 0)
         if _sum_dag(_snapshot(txn, parent)) != producer:
             raise ValueError("scale input DAG does not match the producer parent")
         report["producer_commit"] = parent.hex()
+    if entry == REQUESTED_SCALE_ENTRY:
+        parent = core.object_view_parent(view, 0)
+        if expected_request is not None and expected_request.commit != parent:
+            raise ValueError("result does not retain the expected request commit")
+        request = expected_request if expected_request is not None else _read_request(txn, parent)
+        if producer != request.sum_dag:
+            raise ValueError("scale input DAG does not match the request's producer")
+        if scale["arguments"]["factor"]["value"] != request.factor:
+            raise ValueError("recorded factor does not match the request factor")
+        report["request_commit"] = parent.hex()
+        report["producer_commit"] = request.producer.hex()
     summed, _ = _inspect_call(txn, producer, SUM, (b"a", b"b"))
     return {**report, "calls": [summed, scale]}
 
@@ -385,7 +541,29 @@ def main():
     publisher.add_argument("producer_commit")
     publisher.add_argument("expected_factor", type=int, help="signed 64-bit factor from the source request")
     publisher.add_argument("expected_main", help="required current main commit ID, or '-' if main must be absent")
-    release = commands.add_parser("release-input", help="release a staged pin retained by a recorded result")
+    planner = commands.add_parser("request-scale", help="pin a scale request and the current main expectation")
+    planner.add_argument("repo", type=Path)
+    planner.add_argument("producer_pin")
+    planner.add_argument("producer_commit")
+    planner.add_argument("plan_pin")
+    planner.add_argument("factor", type=int)
+    request_exporter = commands.add_parser("export-request", help="export only the portable request from a plan")
+    request_exporter.add_argument("repo", type=Path)
+    request_exporter.add_argument("plan_pin")
+    request_exporter.add_argument("plan_commit")
+    request_exporter.add_argument("bundle", type=Path)
+    worker = commands.add_parser("work-scale", help="record a scale from the exact staged request")
+    worker.add_argument("repo", type=Path)
+    worker.add_argument("incoming")
+    worker.add_argument("request_commit")
+    worker.add_argument("result_ref")
+    requested_publisher = commands.add_parser("publish-requested-scale", help="publish and consume a staged plan")
+    requested_publisher.add_argument("repo", type=Path)
+    requested_publisher.add_argument("plan_pin")
+    requested_publisher.add_argument("plan_commit")
+    requested_publisher.add_argument("returned")
+    requested_publisher.add_argument("result_commit")
+    release = commands.add_parser("release-input", help="release a staged sum retained by a recorded result")
     release.add_argument("repo", type=Path)
     release.add_argument("pin")
     release.add_argument("producer_commit")
@@ -421,6 +599,20 @@ def main():
             )
             print(publish_scale(args.repo, args.returned.encode("ascii"), result, producer,
                                 args.expected_factor, expected_main).hex())
+        elif args.command == "request-scale":
+            print(request_scale(args.repo, args.producer_pin.encode("ascii"), _parse_commit_id(args.producer_commit),
+                                args.plan_pin.encode("ascii"), args.factor).hex())
+        elif args.command == "export-request":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            print(export_request(args.repo, args.plan_pin.encode("ascii"), plan, args.bundle).hex())
+        elif args.command == "work-scale":
+            request = _parse_commit_id(args.request_commit, "request commit")
+            print(work_scale(args.repo, args.incoming.encode("ascii"), request, args.result_ref.encode("ascii")).hex())
+        elif args.command == "publish-requested-scale":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            result = _parse_commit_id(args.result_commit, "result commit")
+            print(publish_requested_scale(args.repo, args.plan_pin.encode("ascii"), plan,
+                                          args.returned.encode("ascii"), result).hex())
         elif args.command == "release-input":
             print(release_input(args.repo, args.pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                                 args.result_ref.encode("ascii")).hex())

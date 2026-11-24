@@ -96,8 +96,44 @@ module recorded_calls_histories {
     worker("inspect", List("result"))
   )
 
+  // Plan, request, and result operands name earlier receipts of that kind.
+  // Each command is a fresh process. Two plans capture absent main; publishing
+  // either makes the other stale even with the right result staged.
+  pure val durableRequests: List[Request] = List(
+    source("record_sum", List("producer", "7", "-7")),
+    source("inspect", List("producer")),
+    source("request_scale", List("producer", "producer", "plan", "3")),
+    source("request_scale", List("producer", "producer", "other-plan", "-2")),
+    source("inspect", List("plan")),
+    source("export_request", List("plan", "plan", "request.bundle")),
+    source("export_request", List("other-plan", "other-plan", "other-request.bundle")),
+    worker("stage_input", List("other-input", "other-request.bundle")),
+    worker("work_scale", List("other-input", "plan", "result")),
+    worker("work_scale", List("other-input", "other-plan", "other-result")),
+    worker("stage_input", List("incoming", "request.bundle")),
+    worker("work_scale", List("incoming", "plan", "result")),
+    worker("inspect", List("result")),
+    worker("inspect", List("other-result")),
+    worker("export_scale", List("result", "result", "result.bundle")),
+    worker("export_scale", List("other-result", "other-result", "other-result.bundle")),
+    source("stage_input", List("other-return", "other-result.bundle")),
+    source("publish_requested_scale", List("plan", "plan", "other-return", "other-result")),
+    source("stage_input", List("returned", "result.bundle")),
+    source("publish_requested_scale", List("other-plan", "plan", "returned", "result")),
+    source("publish_requested_scale", List("plan", "plan", "other-return", "result")),
+    source("inspect", List("returned")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result")),
+    source("publish_requested_scale", List("other-plan", "other-plan", "other-return", "other-result")),
+    source("collect", List()),
+    source("inspect", List()),
+    source("inspect", List("plan")),
+    source("inspect", List("returned")),
+    source("inspect", List("other-plan")),
+    source("inspect", List("other-return"))
+  )
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
-    .append(splitRequests).append(handoffRequests).append(returnRequests)
+    .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests)
   action step = histories' = histories
 }
