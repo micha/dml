@@ -41,8 +41,8 @@ def view(txn, kind, object_id):
     return core.object_decode(core.txn_get_object(txn, kind, object_id))
 
 
-def put_requested_result(txn, request, producer_dag, factor, output):
-    version = literal(txn, core.DATUM_STRING, b"example.scale@1")
+def put_requested_result(txn, request, producer_dag, factor, output, *, implementation=b"example.scale@1"):
+    version = literal(txn, core.DATUM_STRING, implementation)
     source = put(txn, core.REC_NODE, core.NODE_SUBDAG, producer_dag)
     multiplier = literal(txn, core.DATUM_I64, factor)
     root = literal(txn, core.DATUM_I64, output)
@@ -944,6 +944,127 @@ class RecordedCallsTest(unittest.TestCase):
             with self.subTest(record=name):
                 with self.assertRaises(ValueError):
                     self.example["inspect"](self.repo, name)
+                self.assertEqual(data.read_bytes(), before)
+
+    def test_retained_selection_transfers_without_the_origin_plan_and_publishes_without_result_pin(self):
+        producer, previous, plan, result = self.prepare_receipted_scale()
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            # Make main stale before recording the choice, and leave the old tip reachable only by the plan.
+            core.txn_ref_update(txn, b"main", producer)
+            _, _, (request, _) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            core.txn_commit(txn)
+        choose = self.example["select_scale_result"]
+        selection = choose(self.repo, b"plan", plan, b"returned", result, b"selection")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            actual, dag, parents = self.snapshot(txn, b"selection", b"scale-result-selection-v1")
+            self.assertEqual((actual, parents), (selection, (request, result)))
+            _, root, count = view(txn, core.REC_DAG, dag)
+            self.assertEqual(count, 1)
+            self.assertEqual(root, core.txn_lookup_node(txn, dag, b"result_ref"))
+            self.assertEqual(self.literal_value(txn, root, core.DATUM_STRING), "returned")
+            self.assertEqual(core.txn_ref_get(txn, b"main"), producer)
+            core.txn_ref_delete_expected(txn, b"plan", plan)
+            core.txn_ref_delete_expected(txn, b"returned", result)
+            core.txn_ref_delete_expected(txn, b"producer", producer)
+            core.txn_ref_delete_expected(txn, b"main", producer)
+            core.txn_commit(txn)
+        self.assertGreater(self.example["collect"](self.repo), 0)
+        with transaction(self.repo) as txn:
+            for swept in (plan, previous):
+                with self.assertRaises(core.Error) as error:
+                    view(txn, core.REC_COMMIT, swept)
+                self.assertEqual(error.exception.args[0], "not_found")
+        bundle = self.workspace / "selection.dmlb"
+        repo = core.repo_open(self.repo, False)
+        try:
+            bundle.write_bytes(core.repo_export_commit(repo, selection))
+        finally:
+            core.repo_close(repo)
+        destination = self.workspace / "destination"
+        self.assertEqual(self.example["stage_input"](destination, b"imported", bundle), selection)
+        inspect = self.example["inspect"]
+        self.assertEqual(inspect(destination, b"imported"), {
+            "commit": selection.hex(), "request_commit": request.hex(), "request_implementation": "example.scale@1",
+            "result_commit": result.hex(), "result_ref": "returned",
+        })
+        with transaction(destination, core.TXN_WRITE) as txn:
+            core.txn_ref_create(txn, b"producer", producer)
+            core.txn_commit(txn)
+        new_plan = self.example["request_scale"](destination, b"producer", producer, b"new-plan", 3)
+        self.assertNotEqual(new_plan, plan)
+        publish = self.example["publish_selected_scale"]
+        args = (destination, b"new-plan", new_plan, b"imported", selection, b"returned")
+        self.assertEqual(publish(*args), result)
+        with transaction(destination, core.TXN_WRITE) as txn:
+            proof, _, parents = self.snapshot(txn, b"returned", b"recorded-selected-scale-reuse-v1")
+            self.assertEqual(parents, (new_plan, selection))
+            self.assert_missing_ref(txn, b"new-plan")
+            core.txn_ref_delete_expected(txn, b"main", result)
+            core.txn_ref_create(txn, b"new-plan", new_plan)
+            core.txn_commit(txn)
+        data = destination / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            publish(*args)  # The exact reuse record is occupied, not a receipt.
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(destination, core.TXN_WRITE) as txn:
+            core.txn_ref_delete_expected(txn, b"new-plan", new_plan)
+            core.txn_ref_delete_expected(txn, b"imported", selection)
+            core.txn_ref_delete_expected(txn, b"producer", producer)
+            core.txn_commit(txn)
+        self.example["collect"](destination)
+        self.assertEqual(inspect(destination, b"returned"), {
+            "commit": proof.hex(), "publication_mode": "reuse", "plan_ref": "new-plan",
+            "plan_commit": new_plan.hex(), "selection_ref": "imported", "selection_commit": selection.hex(),
+            "result_commit": result.hex(), "request_commit": request.hex(), "expected_main": None,
+        })
+
+    def test_selection_reader_and_publication_revalidate_raw_selection_parents_and_layout(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        version = b"example.scale@2"
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3, implementation=version)
+        self.example["request_scale"](self.repo, b"producer", producer, b"other-plan", 4, implementation=version)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            _, _, (other_request,) = self.snapshot(txn, b"other-plan", b"scale-plan-v1")
+            result = put_requested_result(txn, request, sum_dag, 3, 36, implementation=version)
+            wrong_version = put_requested_result(txn, request, sum_dag, 3, 36)
+            wrong_parent = put_requested_result(txn, other_request, sum_dag, 3, 36, implementation=version)
+            name = literal(txn, core.DATUM_STRING, b"history")
+            main = literal(txn, core.DATUM_STRING, b"main")
+            number = literal(txn, core.DATUM_I64, 7)
+            field = (b"result_ref", name)
+            good_dag = put(txn, core.REC_DAG, name, *field)
+            cases = (
+                (b"bad-version", good_dag, (request, wrong_version), "expected recorded implementation"),
+                (b"bad-request", good_dag, (request, wrong_parent), "result does not retain the expected request commit"),
+                (b"reversed", good_dag, (result, request), "expected a scale-request-v1|selection does not retain"),
+                (b"missing-parent", good_dag, (request,), "ordered request and result parents"),
+                (b"bad-root", put(txn, core.REC_DAG, number, *field), (request, result), "wrong DAG layout"),
+                (b"bad-name", put(txn, core.REC_DAG, main, b"result_ref", main), (request, result), "invalid result ref"),
+                (b"bad-type", put(txn, core.REC_DAG, number, b"result_ref", number),
+                 (request, result), "wrong datum kind"),
+            )
+            invalid = []
+            for ref, dag, parents, error in cases:
+                tree = put(txn, core.REC_TREE, b"scale-result-selection-v1", dag)
+                selection = put(txn, core.REC_COMMIT, tree, *parents)
+                core.txn_ref_create(txn, ref, selection)
+                invalid.append((ref, selection, error))
+            core.txn_ref_create(txn, b"history", wrong_version)
+            core.txn_commit(txn)
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "expected recorded implementation example.scale@2"):
+            self.example["select_scale_result"](self.repo, b"plan", plan, b"history", wrong_version, b"choice")
+        self.assertEqual(data.read_bytes(), before)
+        for ref, selection, error in invalid:
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(ValueError, error):
+                    self.example["inspect"](self.repo, ref)
+                with self.assertRaisesRegex(ValueError, error):
+                    self.example["publish_selected_scale"](self.repo, b"plan", plan, ref, selection, b"reuse")
                 self.assertEqual(data.read_bytes(), before)
 
     def test_request_or_worker_failure_does_not_leave_partial_state(self):

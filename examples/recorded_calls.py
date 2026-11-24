@@ -32,6 +32,8 @@ REQUESTED_SCALE_ENTRY = b"requested-scale-v1"
 PUBLICATION_ENTRY = b"scale-publication-v1"
 PUBLICATION_FIELDS = (b"plan_ref", b"plan_commit", b"staging_ref", b"result_commit")
 REUSE_ENTRY = b"recorded-scale-reuse-v1"
+SELECTION_ENTRY = b"scale-result-selection-v1"
+SELECTED_REUSE_ENTRY = b"recorded-selected-scale-reuse-v1"
 # The core's ASCII name profile, also used to validate historical ref-name literals.
 REF_NAME = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 COMMIT_HEX = re.compile(rb"[0-9a-f]{32}")
@@ -319,14 +321,15 @@ def stage_input(path, pin, bundle_path):
         return core.repo_import_commit_staged(repo, bundle, pin)
 
 
-def _check_reuse_selection(plan_pin, plan_commit, result_pin, result_commit, output, output_label):
+def _check_reuse_selection(plan_pin, plan_commit, input_pin, input_commit, output, output_label,
+                           *, input_label="result"):
     _check_commit_id(plan_commit, "plan commit")
-    _check_commit_id(result_commit, "result commit")
-    for label, ref in (("plan", plan_pin), ("result", result_pin), (output_label, output)):
+    _check_commit_id(input_commit, f"{input_label} commit")
+    for label, ref in (("plan", plan_pin), (input_label, input_pin), (output_label, output)):
         if type(ref) is not bytes or not REF_NAME.fullmatch(ref):
             raise ValueError(f"{label} ref must be a valid ASCII ref name in bytes")
-    if len({plan_pin, result_pin, output, MAIN}) != 4:
-        raise ValueError(f"plan, result, {output_label}, and main refs must be distinct")
+    if len({plan_pin, input_pin, output, MAIN}) != 4:
+        raise ValueError(f"plan, {input_label}, {output_label}, and main refs must be distinct")
 
 
 def _selected_reuse(txn, plan_pin, plan_commit, result_pin, result_commit):
@@ -334,7 +337,17 @@ def _selected_reuse(txn, plan_pin, plan_commit, result_pin, result_commit):
     if core.txn_ref_get(txn, result_pin) != result_commit:
         raise ValueError("result pin does not point to the expected commit")
     _inspect_snapshot(txn, result_commit, expected_request=request)
-    return expected_main
+    return request, expected_main
+
+
+def select_scale_result(path, plan_pin, plan_commit, result_pin, result_commit, selection_ref):
+    """Record an exact reusable result without publishing or consuming either pin."""
+    _check_reuse_selection(plan_pin, plan_commit, result_pin, result_commit, selection_ref, "selection")
+    with _write_transaction(path, create=False) as txn:
+        request, _ = _selected_reuse(txn, plan_pin, plan_commit, result_pin, result_commit)
+        result_name = _put_literal(txn, core.DATUM_STRING, result_pin)
+        dag = _put_object(txn, core.REC_DAG, result_name, b"result_ref", result_name)
+        return _publish(txn, selection_ref, SELECTION_ENTRY, dag, request.commit, result_commit)
 
 
 def stage_reused_scale(path, plan_pin, plan_commit, result_pin, result_commit, dest_pin):
@@ -424,7 +437,7 @@ def publish_reused_scale(path, plan_pin, plan_commit, result_pin, result_commit,
     """Publish an exact local result and retain the plan and result as evidence of reuse."""
     _check_reuse_selection(plan_pin, plan_commit, result_pin, result_commit, reuse_ref, "reuse")
     with _write_transaction(path, create=False) as txn:
-        expected_main = _selected_reuse(txn, plan_pin, plan_commit, result_pin, result_commit)
+        _, expected_main = _selected_reuse(txn, plan_pin, plan_commit, result_pin, result_commit)
         _update_main(txn, result_commit, expected_main)
         core.txn_ref_delete_expected(txn, plan_pin, plan_commit)
         plan_name = _put_literal(txn, core.DATUM_STRING, plan_pin)
@@ -432,6 +445,24 @@ def publish_reused_scale(path, plan_pin, plan_commit, result_pin, result_commit,
         dag = _put_object(txn, core.REC_DAG, plan_name, b"plan_ref", plan_name, b"result_ref", result_name)
         _publish(txn, reuse_ref, REUSE_ENTRY, dag, plan_commit, result_commit)
     return result_commit
+
+
+def publish_selected_scale(path, plan_pin, plan_commit, selection_ref, selection_commit, reuse_ref):
+    """Use the exact retained selection and record how it was used, atomically."""
+    _check_reuse_selection(plan_pin, plan_commit, selection_ref, selection_commit, reuse_ref, "reuse",
+                           input_label="selection")
+    with _write_transaction(path, create=False) as txn:
+        request, expected_main = _selected_plan(txn, plan_pin, plan_commit)
+        if core.txn_ref_get(txn, selection_ref) != selection_commit:
+            raise ValueError("selection ref does not point to the expected selection commit")
+        _, result, _ = _read_result_selection(txn, selection_commit, expected_request=request)
+        _update_main(txn, result, expected_main)
+        core.txn_ref_delete_expected(txn, plan_pin, plan_commit)
+        plan_name = _put_literal(txn, core.DATUM_STRING, plan_pin)
+        selection_name = _put_literal(txn, core.DATUM_STRING, selection_ref)
+        dag = _put_object(txn, core.REC_DAG, plan_name, b"plan_ref", plan_name, b"selection_ref", selection_name)
+        _publish(txn, reuse_ref, SELECTED_REUSE_ENTRY, dag, plan_commit, selection_commit)
+    return result
 
 
 def abandon_scale_request(path, plan_pin, plan_commit):
@@ -566,24 +597,51 @@ def _read_publication(txn, commit):
     return fields
 
 
-def _inspect_reuse_publication(txn, commit, view, parents, dag):
+def _read_result_selection(txn, commit, *, expected_request=None):
+    view, parents, entry, dag = _snapshot(txn, commit)
+    if entry != SELECTION_ENTRY or parents != 2:
+        raise ValueError("expected a scale-result-selection-v1 commit with ordered request and result parents")
+    _, root, count = _object(txn, core.REC_DAG, dag)
+    if count != 1 or root != core.txn_lookup_node(txn, dag, b"result_ref"):
+        raise ValueError("result selection has the wrong DAG layout")
+    result_pin = _read_literal(txn, root, core.DATUM_STRING)
+    if not REF_NAME.fullmatch(result_pin) or result_pin == MAIN:
+        raise ValueError("result selection has an invalid result ref name")
+    request_id = core.object_view_parent(view, 0)
+    if expected_request is not None and request_id != expected_request.commit:
+        raise ValueError("selection does not retain the expected request commit")
+    request = _read_request(txn, request_id) if expected_request is None else expected_request
+    result = core.object_view_parent(view, 1)
+    _inspect_snapshot(txn, result, expected_request=request)
+    return request, result, result_pin
+
+
+def _inspect_reuse_publication(txn, commit, view, parents, dag, *, selected):
     if parents != 2:
-        raise ValueError("reuse record must have ordered plan and result parents")
+        ends = "selection" if selected else "result"
+        raise ValueError(f"reuse record must have ordered plan and {ends} parents")
     _, root, count = _object(txn, core.REC_DAG, dag)
     if count != 2 or root != core.txn_lookup_node(txn, dag, b"plan_ref"):
         raise ValueError("reuse record has the wrong DAG layout")
     plan_pin = _read_literal(txn, root, core.DATUM_STRING)
-    result_pin = _read_literal(txn, core.txn_lookup_node(txn, dag, b"result_ref"), core.DATUM_STRING)
-    if not (REF_NAME.fullmatch(plan_pin) and REF_NAME.fullmatch(result_pin) and len({plan_pin, result_pin, MAIN}) == 3):
+    input_field = b"selection_ref" if selected else b"result_ref"
+    input_pin = _read_literal(txn, core.txn_lookup_node(txn, dag, input_field), core.DATUM_STRING)
+    if not (REF_NAME.fullmatch(plan_pin) and REF_NAME.fullmatch(input_pin) and len({plan_pin, input_pin, MAIN}) == 3):
         raise ValueError("reuse record has invalid ref names")
     plan = core.object_view_parent(view, 0)
-    result = core.object_view_parent(view, 1)
+    target = core.object_view_parent(view, 1)
     request, expected_main = _read_plan(txn, plan)
-    _inspect_snapshot(txn, result, expected_request=request)
+    refs = {input_field.decode("ascii"): input_pin.decode("ascii")}
+    if selected:
+        _, result, _ = _read_result_selection(txn, target, expected_request=request)
+        refs["selection_commit"] = target.hex()
+    else:
+        result = target
+        _inspect_snapshot(txn, result, expected_request=request)
     return {
         "commit": commit.hex(), "publication_mode": "reuse",
         "plan_ref": plan_pin.decode("ascii"), "plan_commit": plan.hex(),
-        "result_ref": result_pin.decode("ascii"), "result_commit": result.hex(),
+        **refs, "result_commit": result.hex(),
         "request_commit": request.commit.hex(),
         "expected_main": expected_main.hex() if expected_main is not None else None,
     }
@@ -600,8 +658,13 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
     if entry == PUBLICATION_ENTRY:
         fields = _read_publication(txn, commit)
         return {**report, **{name.decode("ascii"): value.decode("ascii") for name, value in fields.items()}}
-    if entry == REUSE_ENTRY:
-        return _inspect_reuse_publication(txn, commit, view, parents, terminal)
+    if entry == SELECTION_ENTRY:
+        request, result, result_pin = _read_result_selection(txn, commit)
+        return {**report, "request_commit": request.commit.hex(),
+                "request_implementation": request.implementation.decode("ascii"),
+                "result_commit": result.hex(), "result_ref": result_pin.decode("ascii")}
+    if entry in (REUSE_ENTRY, SELECTED_REUSE_ENTRY):
+        return _inspect_reuse_publication(txn, commit, view, parents, terminal, selected=entry == SELECTED_REUSE_ENTRY)
     if entry == SUM_ENTRY:
         dag = _sum_dag(snapshot)
         summed, _ = _inspect_call(txn, dag, SUM, (b"a", b"b"))
@@ -720,6 +783,14 @@ def main():
     reuse_publisher.add_argument("repo", type=Path)
     for name in ("plan_pin", "plan_commit", "result_pin", "result_commit", "reuse_ref"):
         reuse_publisher.add_argument(name)
+    chooser = commands.add_parser("select-scale-result", help="retain a pinned result without publishing it")
+    chooser.add_argument("repo", type=Path)
+    for name in ("plan_pin", "plan_commit", "result_pin", "result_commit", "selection_ref"):
+        chooser.add_argument(name)
+    selection_publisher = commands.add_parser("publish-selected-scale", help="publish from a selection and record reuse")
+    selection_publisher.add_argument("repo", type=Path)
+    for name in ("plan_pin", "plan_commit", "selection_ref", "selection_commit", "reuse_ref"):
+        selection_publisher.add_argument(name)
     abandon = commands.add_parser("abandon-scale-request", help="release the exact local plan without publishing")
     abandon.add_argument("repo", type=Path)
     abandon.add_argument("plan_pin")
@@ -786,6 +857,17 @@ def main():
             result = _parse_commit_id(args.result_commit, "result commit")
             print(publish_reused_scale(args.repo, args.plan_pin.encode("ascii"), plan, args.result_pin.encode("ascii"),
                                        result, args.reuse_ref.encode("ascii")).hex())
+        elif args.command == "select-scale-result":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            result = _parse_commit_id(args.result_commit, "result commit")
+            print(select_scale_result(args.repo, args.plan_pin.encode("ascii"), plan, args.result_pin.encode("ascii"),
+                                      result, args.selection_ref.encode("ascii")).hex())
+        elif args.command == "publish-selected-scale":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            selection = _parse_commit_id(args.selection_commit, "selection commit")
+            result = publish_selected_scale(args.repo, args.plan_pin.encode("ascii"), plan,
+                                            args.selection_ref.encode("ascii"), selection, args.reuse_ref.encode("ascii"))
+            print(result.hex())
         elif args.command == "abandon-scale-request":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             print(abandon_scale_request(args.repo, args.plan_pin.encode("ascii"), plan).hex())

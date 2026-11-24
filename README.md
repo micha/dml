@@ -374,6 +374,48 @@ retained result pin. A plan pin that is absent or changed after abandonment
 blocks reuse and fresh publication of that selection. Abandonment does not
 remove staging refs already created.
 
+#### Save a result selection before publication
+
+Once the [durable request's result](#save-a-scale-request-before-sending-it) is
+staged locally under `returned`, you can save the choice without publishing it:
+
+```sh
+selection=$(python examples/recorded_calls.py select-scale-result ./origin pending "$plan" returned "$result" chosen)
+python examples/recorded_calls.py inspect ./origin chosen
+```
+
+Creation checks the exact plan and result pins, including the request parent,
+implementation, factor, and producer edge. It creates only the fresh `chosen`
+ref and does not check or update `main` or consume either input pin. The new
+commit has the portable request and selected result as ordered parents. Keeping
+`chosen` retains both through collection; it adds no edge to the original plan
+or its saved `main`. Inspection reports the saved request, version, and result
+IDs and the historical result ref name; it does not resolve that name.
+
+To publish from the saved selection, supply its exact ref and commit ID. The
+original result pin need not exist. You can use a different plan for the same
+exact portable request, for example after abandoning the original plan:
+
+```sh
+python examples/recorded_calls.py abandon-scale-request ./origin pending "$plan"
+new_plan=$(python examples/recorded_calls.py request-scale ./origin producer "$producer" next-plan 3)
+python examples/recorded_calls.py publish-selected-scale ./origin next-plan "$new_plan" chosen "$selection" reuse-001
+python examples/recorded_calls.py inspect ./origin reuse-001
+```
+
+This example uses the default implementation; keep the original version when
+creating the new plan. Publication rechecks the exact selection, request and
+implementation and the new plan's saved `main`. In one transaction it sets
+`main` to the original result, consumes only the publishing plan, and creates a
+fresh reuse record with that plan and the selection as ordered parents. A
+stale pin, mismatched request or version, changed `main`, or occupied output ref
+rejects without changes. For each command the three supplied ref names must be
+distinct from one another and from `main`. Even an identical occupied output
+rejects; neither command is a retry receipt.
+
+Selections do not run work, verify arithmetic, search for alternatives, or
+change automatically when a result is staged or published.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).
