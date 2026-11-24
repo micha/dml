@@ -253,6 +253,13 @@ the different choices after the attempt pins are removed and collection runs.
 Focused tests check ordered parents, rollback, malformed predecessor chains,
 and retention when only the adopted version is pinned.
 
+The [intent policy history](../README.md#set-a-reuse-default-for-the-scale-intent)
+checks both defaults and overrides using the real CLI. It distinguishes a
+missing selection from a moved selection, checks that fresh routes ignore a
+moved slot, and verifies that reuse reports the original attempt and leaves no
+live plan. Replay checks atomic rejection and decision readback after
+collection. Focused checks exercise record shape and malformed history.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -495,5 +502,21 @@ With Java and Quint 0.34.0 (the 0.33.1 replay shell lacks observation search):
 ```sh
 mkdir -p build/recorded-adoption-tlc
 (cd build/recorded-adoption-tlc && quint verify ../../tests/recorded_adoption_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the intent policy decision design with TLC
+
+The [policy model](recorded_policy_design.qnt) explores one portable request,
+two eligible selection versions sharing an attempt, several unusable slot
+states, and at most two decisions. It checks the route table, exact version
+matching, rollback, and immutable decision history across policy changes. It
+abstracts native framing, UUID generation, dispatch, and collection.
+
+With Java and Quint 0.34.0:
+
+```sh
+mkdir -p build/recorded-policy-tlc
+(cd build/recorded-policy-tlc && quint verify ../../tests/recorded_policy_design.qnt \
   --backend=tlc --search-observations)
 ```

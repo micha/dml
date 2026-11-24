@@ -8,6 +8,9 @@ module recorded_calls_rules {
   type Selection = { resultRef: str, result: str }
   type SelectedPublication = { mode: str, planRef: str, plan: str, selectionRef: str, selection: str, result: str }
   type Occurrence = { id: str, commit: str, result: str, historicalRef: str }
+  type Policy = { defaultMode: str, previous: str }
+  type Decision = { id: str, canonicalId: bool, policy: str, defaultMode: str, override: str, route: str,
+    reason: str, plan: str, planRef: str, selectionRef: str, selection: str, result: str }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
     commit: str, calls: List[Call],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
@@ -15,7 +18,7 @@ module recorded_calls_rules {
     requestCommit: str,
     requestImplementation: str, requestFactor: int, bundlePresent: bool, bundleUnchanged: bool, publication: Publication,
     reusePublication: ReusePublication, selection: Selection, selectedPublication: SelectedPublication,
-    occurrence: Occurrence }
+    occurrence: Occurrence, policy: Policy, expectedPolicy: str, decision: Decision }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def literal(arg: Argument, name: str, value: int): bool =
@@ -259,9 +262,13 @@ module recorded_calls_rules {
 
   pure def planReadVerdict(readback: Attempt, req: Request, plan: str, portable: str, factor: int,
                           sumRead: Attempt, implementation: str): str =
+    planReadWithTip(readback, req, plan, portable, factor, sumRead, implementation, "-")
+
+  pure def planReadWithTip(readback: Attempt, req: Request, plan: str, portable: str, factor: int,
+                          sumRead: Attempt, implementation: str, priorTip: str): str =
     if (not(matches(readback, req))) "wrong_inspect"
     else if (not(readback.unchanged)) "storage_changed"
-    else if (readback.commit != plan or readback.requestCommit != portable or readback.expectedMain != "-")
+    else if (readback.commit != plan or readback.requestCommit != portable or readback.expectedMain != priorTip)
       "wrong_plan"
     else if (readback.producerCommit != sumRead.commit or readback.calls != sumRead.calls or
              readback.requestImplementation != implementation or readback.requestFactor != factor)
@@ -879,6 +886,120 @@ module recorded_calls_rules {
     }
   }
 
+  pure val noOccurrence: Occurrence = { id: "", commit: "", result: "", historicalRef: "" }
+
+  pure def intentVerdict(write: Attempt, req: Request, producer: str, policy: str, selection: str,
+                         accepted: bool): str =
+    if (write.expectedPolicy != policy or write.expectedSelection != selection) "wrong_intent_guard"
+    else if (not(accepted)) rejectedWriteVerdict(write, req, producer)
+    else if (write.unchanged) "decision_not_written"
+    else scaleWriteVerdict(write, req, producer)
+
+  pure def decisionReadVerdict(read: Attempt, req: Request, commit: str, portable: str, priorTip: str,
+                              expected: Decision, occurrence: Occurrence): str =
+    if (not(matches(read, req)) or not(read.unchanged) or read.commit != commit or read.calls != List())
+      "wrong_inspect"
+    else if (read.requestCommit != portable or read.expectedMain != priorTip or read.occurrence != occurrence)
+      "wrong_decision_lineage"
+    else if (read.decision.id == "" or (expected.id != "" and read.decision.id != expected.id) or
+      read.decision != { ...expected, id: read.decision.id }) "wrong_decision"
+    else "inspected"
+
+  pure def policyHistoryVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = policyRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val plan = attempts[2].commit
+      val portable = attempts[3].commit
+      val result = attempts[5].commit
+      val first = attempts[6].commit
+      val second = attempts[7].commit
+      val base = attempts[12].commit
+      val alternate = attempts[13].commit
+      val active = attempts[14].commit
+      val old = attempts[15].commit
+      val reuse = attempts[16].commit
+      val execute = attempts[17].commit
+      val nextPlan = attempts[35].commit
+      val firstAttempt: Occurrence = { id: occurrenceA, commit: first, result: result, historicalRef: "" }
+      val defaultReuse: Decision = { id: "", canonicalId: true, policy: reuse, defaultMode: "reuse-by-default",
+        override: "default", route: "reuse-selected", reason: "default-selection", plan: plan, planRef: "",
+        selectionRef: "active", selection: active, result: result }
+      val forcedFresh: Decision = { ...defaultReuse, override: "fresh", route: "execute-fresh",
+        reason: "override-fresh", plan: nextPlan, planRef: "forced-plan", selectionRef: "", selection: "", result: "" }
+      val defaultExecute: Decision = { ...forcedFresh, policy: execute, defaultMode: "execute-by-default",
+        override: "default", reason: "default-execution", planRef: "default-plan" }
+      val forcedReuse: Decision = { ...defaultReuse, policy: execute, defaultMode: "execute-by-default",
+        override: "reuse-selected", reason: "override-selected-reuse", plan: nextPlan }
+      val fallback: Decision = { ...forcedFresh, override: "default", reason: "default-no-selection",
+        planRef: "fallback-plan", selectionRef: "empty" }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(selected, attempts[1], req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], producer),
+        requestExportVerdict(attempts[3], req[3], plan),
+        stageVerdict(attempts[4], req[4], portable),
+        scaleWriteVerdict(attempts[5], req[5], portable),
+        scaleWriteVerdict(attempts[6], req[6], portable),
+        scaleWriteVerdict(attempts[7], req[7], portable),
+        exportVerdict(attempts[8], req[8], first),
+        exportVerdict(attempts[9], req[9], second),
+        stageVerdict(attempts[10], req[10], first),
+        stageVerdict(attempts[11], req[11], second),
+        selectAttemptVerdict(attempts[12], req[12], plan, first, true),
+        adoptVerdict(attempts[13], req[13], base, second, true),
+        adoptVerdict(attempts[14], req[14], alternate, first, true),
+        scaleWriteVerdict(attempts[15], req[15], ""),
+        scaleWriteVerdict(attempts[16], req[16], old),
+        scaleWriteVerdict(attempts[17], req[17], reuse),
+        if (matches(attempts[18], req[18]) and attempts[18].unchanged and attempts[18].commit == execute and
+          attempts[18].policy == { defaultMode: "execute-by-default", previous: reuse }) "inspected"
+        else "wrong_policy",
+        intentVerdict(attempts[19], req[19], producer, old, active, false),
+        intentVerdict(attempts[20], req[20], producer, reuse, "", false),
+        intentVerdict(attempts[21], req[21], producer, reuse, active, false),
+        intentVerdict(attempts[22], req[22], producer, reuse, base, false),
+        intentVerdict(attempts[23], req[23], producer, reuse, "", false),
+        intentVerdict(attempts[24], req[24], producer, reuse, "", false),
+        intentVerdict(attempts[25], req[25], producer, reuse, active, false),
+        intentVerdict(attempts[26], req[26], producer, reuse, active, true),
+        decisionReadVerdict(attempts[27], req[27], attempts[26].commit, portable, "-", defaultReuse, firstAttempt),
+        absentRefVerdict(attempts[28], rejectedWriteVerdict(attempts[28], req[28], "")),
+        versionedRequestedRead(selected, attempts[29], req[29], result, portable, attempts[1], scaleV2),
+        intentVerdict(attempts[30], req[30], producer, reuse, active, false),
+        intentVerdict(attempts[31], req[31], producer, reuse, base, false),
+        absentRefVerdict(attempts[32], rejectedWriteVerdict(attempts[32], req[32], "")),
+        intentVerdict(attempts[33], req[33], producer, reuse, base, true),
+        decisionReadVerdict(attempts[34], req[34], attempts[33].commit, portable, result, forcedFresh, noOccurrence),
+        planReadWithTip(attempts[35], req[35], nextPlan, portable, 3, attempts[1], scaleV2, result),
+        intentVerdict(attempts[36], req[36], producer, execute, base, true),
+        decisionReadVerdict(attempts[37], req[37], attempts[36].commit, portable, result, defaultExecute, noOccurrence),
+        intentVerdict(attempts[38], req[38], producer, execute, active, true),
+        decisionReadVerdict(attempts[39], req[39], attempts[38].commit, portable, result, forcedReuse, firstAttempt),
+        intentVerdict(attempts[40], req[40], producer, reuse, "", true),
+        decisionReadVerdict(attempts[41], req[41], attempts[40].commit, portable, result, fallback, noOccurrence),
+        if (attempts[42].commit == portable) requestExportVerdict(attempts[42], req[42], nextPlan)
+        else "wrong_request_commit",
+        if (attempts[43].commit == result) scaleWriteVerdict(attempts[43], req[43], portable)
+        else "wrong_result_commit",
+        dropVerdict(attempts[44], req[44], reuse),
+        dropVerdict(attempts[45], req[45], old),
+        dropVerdict(attempts[46], req[46], execute),
+        dropVerdict(attempts[47], req[47], base),
+        dropVerdict(attempts[48], req[48], alternate),
+        dropVerdict(attempts[49], req[49], active),
+        dropVerdict(attempts[50], req[50], first),
+        dropVerdict(attempts[51], req[51], second),
+        collectVerdict(attempts[52], req[52]),
+        decisionReadVerdict(attempts[53], req[53], attempts[26].commit, portable, "-",
+          { ...defaultReuse, id: attempts[27].decision.id }, firstAttempt),
+        decisionReadVerdict(attempts[54], req[54], attempts[40].commit, portable, result,
+          { ...fallback, id: attempts[41].decision.id }, noOccurrence)
+      )
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -892,6 +1013,7 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 9) selectionHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 10) attemptHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 11) adoptionHistoryVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 12) policyHistoryVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -950,8 +1072,14 @@ module recorded_calls_rules {
       "inspected", "rejected", "released", "released", "released", "collected", "rejected", "published",
       "inspected", "recorded", "published", "inspected", "recorded", "published", "inspected", "inspected",
       "inspected", "inspected"))
+    val policies = occurrences.slice(0, 8).concat(List("exported", "exported", "staged", "staged", "selected",
+      "adopted", "adopted", "recorded", "recorded", "recorded", "inspected", "rejected", "rejected", "rejected",
+      "rejected", "rejected", "rejected", "rejected", "recorded", "inspected", "rejected", "inspected", "rejected",
+      "rejected", "rejected", "recorded", "inspected", "inspected", "recorded", "inspected", "recorded", "inspected",
+      "recorded", "inspected", "exported", "recorded", "released", "released", "released", "released", "released",
+      "released", "released", "released", "collected", "inspected", "inspected"))
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
-      reuse, reusePublication, versioned, selections, occurrences, adoptions)
+      reuse, reusePublication, versioned, selections, occurrences, adoptions, policies)
     if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
@@ -969,7 +1097,14 @@ module recorded_calls_rules {
       val adopted = rows[13].attempts
       val versionsOfChoice = Set(adopted[9].commit, adopted[22].commit, adopted[25].commit, adopted[26].commit)
       val executed = Set(adopted[5].commit, adopted[6].commit, adopted[11].commit, adopted[12].commit)
+      val decided = rows[14].attempts
+      val occurrenceIds = Set(27, 34, 37, 39, 41).map(index => decided[index].decision.id)
+      val decisionCommits = Set(26, 33, 36, 38, 40).map(index => decided[index].commit)
       rows.indices().forall(i => rows[i].scenario == i) and
+        occurrenceIds.size() == 5 and decisionCommits.size() == 5 and
+        Set(decided[15].commit, decided[16].commit, decided[17].commit).size() == 3 and
+        Set(decided[12].commit, decided[13].commit, decided[14].commit).size() == 3 and
+        decided[2].commit != decided[35].commit and
         sameRootNotSameCall(rows[0].attempts[1].calls[0], rows[1].attempts[1].calls[0]) and
         sameRootNotSameCall(split[2].calls[0], split[3].calls[0]) and split[0].commit != split[1].commit and
         split[7].commit != split[9].commit and transfer[0].commit != transfer[1].commit and
@@ -1024,7 +1159,9 @@ module recorded_calls_rules {
     reusePublication: { mode: "", planRef: "", plan: "", resultRef: "", result: "" },
     selection: { resultRef: "", result: "" },
     selectedPublication: { mode: "", planRef: "", plan: "", selectionRef: "", selection: "", result: "" },
-    occurrence: { id: "", commit: "", result: "", historicalRef: "" } }
+    occurrence: noOccurrence, policy: { defaultMode: "", previous: "" }, expectedPolicy: "",
+    decision: { id: "", canonicalId: false, policy: "", defaultMode: "", override: "", route: "",
+      reason: "", plan: "", planRef: "", selectionRef: "", selection: "", result: "" } }
   pure val inspected: Attempt = { ...recorded, op: "inspect", args: List("source"), calls: List(summed, scaled),
     unchanged: true }
   pure def inspectVerdict(readback: Attempt): str =
@@ -1081,7 +1218,21 @@ module recorded_calls_rules {
     previousSelection: "base", occurrence: { ...savedOccurrence, historicalRef: "returned-b" } }
   pure def checkAdoption(read: Attempt): str = choiceReadVerdict(read, adoptionRequests[27], "chosen", "request",
     { ...savedOccurrence, historicalRef: "returned-b" }, "base")
+  pure val savedDecision: Decision = { id: occurrenceC, canonicalId: true, policy: "policy",
+    defaultMode: "reuse-by-default", override: "default", route: "reuse-selected", reason: "default-selection",
+    plan: "plan", planRef: "", selectionRef: "active", selection: "selection", result: "same-result" }
+  pure val decisionRead: Attempt = { ...occurrenceRead, args: policyRequests[27].args,
+    commit: "decision", expectedMain: "-", decision: savedDecision }
+  pure def checkDecision(read: Attempt): str = decisionReadVerdict(read, policyRequests[27], "decision", "request",
+    "-", savedDecision, savedOccurrence)
   pure val controlsPass = all {
+    checkDecision(decisionRead) == "inspected",
+    checkDecision({ ...decisionRead, decision: { ...savedDecision, id: occurrenceA } }) == "wrong_decision",
+    checkDecision({ ...decisionRead, decision: { ...savedDecision, policy: "other-policy" } }) == "wrong_decision",
+    checkDecision({ ...decisionRead, decision: { ...savedDecision, selection: "other-selection" } }) == "wrong_decision",
+    checkDecision({ ...decisionRead, decision: { ...savedDecision, planRef: "unexpected-plan-ref" } }) == "wrong_decision",
+    checkDecision({ ...decisionRead, occurrence: { ...savedOccurrence, commit: "other-attempt" } })
+      == "wrong_decision_lineage",
     checkAdoption(adoptionRead) == "inspected",
     checkAdoption({ ...adoptionRead, previousSelection: "other-selection" }) == "wrong_predecessor",
     checkOccurrence(occurrenceRead) == "inspected",
