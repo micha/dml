@@ -267,9 +267,54 @@ module recorded_calls_histories {
     source("inspect", List("saved"))
   )
 
+  // Select against exact pins, including a plan whose saved main is stale.
+  // Consume the origin plan and result pin, replace main, and collect before
+  // publishing with a fresh plan. The old result ref can even name the proof.
+  pure val selectionRequests: List[Request] = versionRequests.slice(0, 19).concat(List(
+    source("select_scale_result", List("v2", "v2", "older", "v1-result", "chosen-v2")),
+    source("select_scale_result", List("v2", "v2", "saved", "v1-result", "chosen-v2")),
+    source("select_scale_result", List("v2", "v2", "saved", "v2-result", "chosen-v2")),
+    source("select_scale_result", List("v2", "v2", "saved", "v2-result", "chosen-v2")),
+    source("inspect", List("chosen-v2")),
+    source("inspect", List()),
+    source("inspect", List("v2")),
+    source("inspect", List("saved")),
+    source("select_scale_result", List("v1", "v1", "older", "v1-result", "chosen-v1")),
+    source("publish_selected_scale", List("v2", "v2", "chosen-v1", "chosen-v1", "proof")),
+    source("publish_requested_scale", List("v1", "v1", "older", "v1-result")),
+    source("stage_input", List("also-saved", "v2-result.bundle")),
+    source("select_scale_result", List("v2", "v2", "also-saved", "v2-result", "stale-main-choice")),
+    source("publish_selected_scale", List("v2", "v2", "chosen-v2", "chosen-v2", "proof")),
+    source("inspect", List("proof")),
+    source("abandon_scale_request", List("v2", "v2")),
+    source("request_scale", List("producer", "producer", "v2-bridge", "3", "--implementation", "example.scale@2")),
+    source("select_scale_result", List("v2-bridge", "v2", "saved", "v2-result", "stale-plan-choice")),
+    source("publish_requested_scale", List("v2-bridge", "v2-bridge", "also-saved", "v2-result")),
+    source("request_scale", List("producer", "producer", "v2-current", "3", "--implementation", "example.scale@2")),
+    source("publish_requested_scale", List("v2-current", "v2-current", "saved", "v2-result")),
+    source("inspect", List("saved")),
+    source("request_scale", List("producer", "producer", "v1-bridge", "3")),
+    source("stage_input", List("older", "v1-result.bundle")),
+    source("publish_requested_scale", List("v1-bridge", "v1-bridge", "older", "v1-result")),
+    source("collect", List()),
+    source("inspect", List("chosen-v2")),
+    source("request_scale", List("producer", "producer", "fresh-v2", "3", "--implementation", "example.scale@2")),
+    // Same request and result as chosen-v2, but a different selection ID.
+    source("publish_selected_scale", List("fresh-v2", "fresh-v2", "stale-main-choice", "chosen-v2", "saved")),
+    source("publish_selected_scale", List("fresh-v2", "fresh-v2", "chosen-v2", "chosen-v2", "chosen-v1")),
+    source("publish_selected_scale", List("fresh-v2", "fresh-v2", "chosen-v2", "chosen-v2", "saved")),
+    source("inspect", List("saved")),
+    source("inspect", List()),
+    source("inspect", List("chosen-v2")),
+    source("inspect", List("chosen-v1")),
+    source("inspect", List("fresh-v2")),
+    source("publish_selected_scale", List("fresh-v2", "fresh-v2", "chosen-v2", "chosen-v2", "saved"))
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
+    .append(selectionRequests)
   action step = histories' = histories
 }

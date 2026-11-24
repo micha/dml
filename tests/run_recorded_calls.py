@@ -49,6 +49,7 @@ class ProcessHistory:
         self.scale_receipts = {}
         self.plan_receipts = {}
         self.request_receipts = {}
+        self.selection_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
@@ -57,7 +58,8 @@ class ProcessHistory:
             "request_scale": self.request_scale, "export_request": self.export_request,
             "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
             "abandon_scale_request": self.abandon_scale_request, "stage_reused_scale": self.stage_reused_scale,
-            "publish_reused_scale": self.publish_reused_scale,
+            "publish_reused_scale": self.publish_reused_scale, "select_scale_result": self.select_scale_result,
+            "publish_selected_scale": self.publish_selected_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -83,10 +85,13 @@ class ProcessHistory:
                 "diagnosed": result.stderr.startswith(f"{command}: ") and "Traceback" not in result.stderr,
                 "missingRef": missing_ref,
                 "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
-                "expectedResult": "", "expectedMain": "", "requestCommit": "",
+                "expectedResult": "", "expectedSelection": "", "expectedMain": "", "requestCommit": "",
                 "requestImplementation": "", "requestFactor": 0,
                 "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
                 "reusePublication": {"mode": "", "planRef": "", "plan": "", "resultRef": "", "result": ""},
+                "selection": {"resultRef": "", "result": ""},
+                "selectedPublication": {"mode": "", "planRef": "", "plan": "", "selectionRef": "",
+                                        "selection": "", "result": ""},
                 "unchanged": before is not None and before == after,
                 "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
 
@@ -190,6 +195,21 @@ class ProcessHistory:
     def publish_reused_scale(self, *args):
         return self.select_reuse("publish_reused_scale", *args)
 
+    def select_scale_result(self, role, plan_pin, plan_receipt, result_pin, result_receipt, selection_ref):
+        row = self.select_reuse("select_scale_result", role, plan_pin, plan_receipt, result_pin, result_receipt,
+                                selection_ref)
+        if row["commit"]:
+            self.selection_receipts[selection_ref] = row["commit"]
+        return row
+
+    def publish_selected_scale(self, role, plan_pin, plan_receipt, selection_ref, selection_receipt, reuse_ref):
+        plan = self.plan_receipts[plan_receipt]
+        selection = self.selection_receipts[selection_receipt]
+        args = (role, plan_pin, plan_receipt, selection_ref, selection_receipt, reuse_ref)
+        row = self.write("publish_selected_scale", args,
+                         operands=(plan_pin, plan, selection_ref, selection, reuse_ref))
+        return {**row, "expectedCommit": plan, "expectedSelection": selection}
+
     def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt, receipt_ref=None):
         plan = self.plan_receipts[plan_receipt]
         result = self.scale_receipts["worker", result_receipt]
@@ -212,7 +232,13 @@ class ProcessHistory:
             row["commit"] = id_evidence(report["commit"])
             if "calls" in report:
                 row["calls"] = [call_evidence(call) for call in report["calls"]]
-            if "publication_mode" in report:
+            if "selection_commit" in report:
+                row["selectedPublication"] = {
+                    "mode": report["publication_mode"], "planRef": report["plan_ref"],
+                    "plan": id_evidence(report["plan_commit"]), "selectionRef": report["selection_ref"],
+                    "selection": id_evidence(report["selection_commit"]), "result": id_evidence(report["result_commit"]),
+                }
+            elif "publication_mode" in report:
                 row["reusePublication"] = {
                     "mode": report["publication_mode"], "planRef": report["plan_ref"],
                     "plan": id_evidence(report["plan_commit"]), "resultRef": report["result_ref"],
@@ -221,12 +247,15 @@ class ProcessHistory:
             elif "plan_commit" in report:
                 row["publication"] = {"planRef": report["plan_ref"], "plan": id_evidence(report["plan_commit"]),
                                       "stagingRef": report["staging_ref"], "result": id_evidence(report["result_commit"])}
+            elif "result_ref" in report:
+                row["selection"] = {"resultRef": report["result_ref"], "result": id_evidence(report["result_commit"])}
             if "producer_commit" in report:
                 row["producerCommit"] = id_evidence(report["producer_commit"])
             if "request_commit" in report:
                 row["requestCommit"] = id_evidence(report["request_commit"])
             if "request_implementation" in report:
                 row["requestImplementation"] = report["request_implementation"]
+            if "request_factor" in report:
                 row["requestFactor"] = report["request_factor"]
             if "expected_main" in report:
                 main = report["expected_main"]

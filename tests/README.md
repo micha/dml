@@ -225,6 +225,15 @@ and reuse, then publishes and reuses the matching `@2` result. The focused
 checks reject an imported request for an unsupported version and a result
 with the exact request parent but the wrong recorded implementation.
 
+The [durable selection history](../README.md#save-a-result-selection-before-publication)
+checks that selection works with stale `main`, and that publication through a
+new plan still uses the original result after its pin disappears and collection
+runs. It distinguishes two selection IDs for the same request and result,
+rejects cross-version reuse and occupied outputs without writes, and inspects
+both the selection and the completed reuse record. Focused tests check raw
+malformed records, cross-repository transfer, and which parents survive
+collection.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -415,5 +424,22 @@ Run separately from CI with Java and Quint 0.34.0 or a compatible release:
 ```sh
 mkdir -p build/recorded-version-selection-tlc
 (cd build/recorded-version-selection-tlc && quint verify ../../tests/recorded_version_selection_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the durable result selection design with TLC
+
+The [durable selection model](recorded_durable_selection_design.qnt) has one
+name per ref role, two supported versions, and valid and malformed selection
+records. Other writers can move refs between transactions. The model checks
+exact pin and request matching, separation of selection from publication,
+and atomic publication or rejection. It fixes the historical result-ref name
+and abstracts record encoding, transfer, GC, and native failures. It checks
+safety, not liveness. The command first checks the invariants exhaustively,
+then searches for witnesses to the declared observations.
+
+```sh
+mkdir -p build/recorded-durable-selection-tlc
+(cd build/recorded-durable-selection-tlc && quint verify ../../tests/recorded_durable_selection_design.qnt \
   --backend=tlc --search-observations)
 ```
