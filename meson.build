@@ -112,6 +112,8 @@ if get_option('quint_tests')
     args: ['-B', files('tests/test_recorded_calls.py')],
     env: binding_env,
     depends: public_python_core,
+    # Suite budget for many CLI launches; Python still bounds each subprocess.
+    timeout: 90,
   )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
