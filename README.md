@@ -319,6 +319,36 @@ still acknowledge that success. Abandonment itself creates no receipt. Use
 fresh plan names for new requests: recreating the same name at the same content
 ID makes an old selection valid again.
 
+#### Reuse an explicitly selected local scale result
+
+If a result for the exact request is already pinned in the source repository,
+you can skip dispatch, execution, and bundle transfer for the new plan. To
+retain a result in the durable-request example, import `scale.dml` under
+`saved-result` instead of `returned`, then stage it for publication like this:
+
+```sh
+python examples/recorded_calls.py stage-reused-scale ./origin pending "$plan" saved-result "$result" returned
+python examples/recorded_calls.py publish-requested-scale ./origin pending "$plan" returned "$result"
+```
+
+Keep `saved-result` and the original result ID for later plans. The plan ID may
+change when a new plan captures a different `main`; the portable request ID must
+still match exactly. The command does not search for a result, match by numeric
+value, rerun a call, verify arithmetic, or authenticate a worker.
+
+Staging checks both pins at their supplied IDs and validates the result against
+the plan's request in one transaction. It prints the existing result ID and
+creates only the new staging ref. The plan, result, staging, and `main` names
+must be distinct. An occupied staging ref is rejected even if it already
+points to the result. Neither success nor rejection consumes the original
+result pin.
+
+Staging does not check or update `main`. Publication still uses the plan's
+saved `main` expectation and removes the plan and staging pins, not the
+retained result pin. A plan pin that is absent or changed after abandonment
+blocks reuse and fresh publication of that selection. Abandonment does not
+remove staging refs already created.
+
 ### Install and link the C library
 
 For example, install the headers and static library under a local prefix:

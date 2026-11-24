@@ -56,7 +56,7 @@ class ProcessHistory:
             "export_scale": self.export_scale, "publish_scale": self.publish_scale,
             "request_scale": self.request_scale, "export_request": self.export_request,
             "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
-            "abandon_scale_request": self.abandon_scale_request,
+            "abandon_scale_request": self.abandon_scale_request, "stage_reused_scale": self.stage_reused_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -171,6 +171,14 @@ class ProcessHistory:
         if row["commit"]:
             self.scale_receipts[role, result_ref] = row["commit"]
         return {**row, "expectedCommit": request}
+
+    def stage_reused_scale(self, role, plan_pin, plan_receipt, result_pin, result_receipt, dest):
+        plan = self.plan_receipts[plan_receipt]
+        # The original worker result, never the local staging receipt.
+        result = self.scale_receipts["worker", result_receipt]
+        row = self.write("stage_reused_scale", (role, plan_pin, plan_receipt, result_pin, result_receipt, dest),
+                         operands=(plan_pin, plan, result_pin, result, dest))
+        return {**row, "expectedCommit": plan, "expectedResult": result}
 
     def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt, receipt_ref=None):
         plan = self.plan_receipts[plan_receipt]
