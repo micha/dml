@@ -267,6 +267,36 @@ the request and both calls. The consumed plan no longer retains the old tip.
 These are content IDs, not attempt IDs, and the example does not search for or
 automatically reuse results.
 
+#### Retry publication if its acknowledgment was lost
+
+For a publication you may need to retry, choose a fresh source-local receipt ref
+before the first attempt. Save the ref name with the exact plan and result IDs
+and their pin names. Use the following command **instead of** the one-shot
+publication above:
+
+```sh
+python examples/recorded_calls.py publish-requested-scale ./origin pending "$plan" returned "$result" \
+  --receipt-ref scale-ack-001
+```
+
+The first successful call creates the receipt in the same transaction that
+updates `main` and consumes both pins. If the process exits before you see its
+output, rerun the same command. It prints the same result ID without changing
+committed state, even if `main` has moved, the old pin names have been reused, or
+collection has removed the result. Success acknowledges the prior publication;
+it does not mean the result is still current. If the first transaction did not
+commit, there is no receipt, and all the original publication guards still apply.
+
+`inspect ./origin scale-ack-001` reports the saved IDs and pin names. The four
+ref names (`main`, plan, staging, and receipt) must be distinct. An occupied
+receipt ref with different names, IDs, or an invalid receipt rejects without
+changes. Keep the receipt ref intact and use a fresh name for each new attempt.
+Receipts record IDs as literals, so they do not keep the plan, old `main`, or
+superseded result alive. They are not part of the worker bundles and are not
+proof against someone who can write arbitrary refs or objects in the source.
+Omitting `--receipt-ref` keeps one-shot behavior; you cannot add a receipt to
+recover a publication that already committed without one.
+
 ### Install and link the C library
 
 For example, install the headers and static library under a local prefix:

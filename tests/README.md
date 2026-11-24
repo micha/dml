@@ -183,6 +183,14 @@ forged factor or input edge under the right request parent, and directly check
 that the published worker result, request, producer commit, and sub-DAG edge
 survive collection.
 
+The [publication retry history](../README.md#retry-publication-if-its-acknowledgment-was-lost)
+checks first publication, a matching retry, rejection under a missing or occupied
+key, and a retry after a second publication and collection. The retry must return
+the first result ID without changing committed bytes or the newer tip. The focused
+tests also check atomic rollback of a tentative receipt, reused pin names, a retry
+with all first-publication guards satisfied again, and physical reclamation of the
+old commits despite the retained receipt.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -273,3 +281,25 @@ mkdir -p build/recorded-request-tlc
 Observations include restart after staging, equal-output substitution, a forged
 factor under the correct request, rollback after each tentative ref write, and
 readback after collection. Run this design check separately from CI.
+
+#### Check the publication retry design with TLC
+
+The [retry model](recorded_publication_retry_design.qnt) starts after staging.
+It has one retained receipt key, two pairs of pin names, two exact plans with
+different `main` expectations, and both matching and mismatching results.
+Another writer may move `main` and recreate pins at the same or different IDs.
+The model uses abstract immutable closures and treats first publication as one
+transaction, independent of whether the caller observes the acknowledgment.
+It checks safety only and does not model rewriting a retained receipt or
+corrupting storage.
+
+```sh
+mkdir -p build/recorded-publication-retry-tlc
+(cd build/recorded-publication-retry-tlc && quint verify ../../tests/recorded_publication_retry_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+Observations include a retry despite a moved `main` and collected objects, a
+no-op retry with every original guard satisfied again, conflicts under the
+same key, rejection when only `main` matches, and rollback without a receipt.
+Run this design check separately from CI.

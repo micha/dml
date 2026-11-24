@@ -132,8 +132,38 @@ module recorded_calls_histories {
     source("inspect", List("other-return"))
   )
 
+  // Each repeat is a fresh process. A second valid result supersedes main,
+  // then collection and retry leave the newer publication in place.
+  pure val retryRequests: List[Request] = List(
+    source("record_sum", List("producer", "7", "-7")),
+    source("inspect", List("producer")),
+    source("request_scale", List("producer", "producer", "plan", "3")),
+    source("export_request", List("plan", "plan", "request.bundle")),
+    worker("stage_input", List("incoming", "request.bundle")),
+    worker("work_scale", List("incoming", "plan", "result")),
+    worker("export_scale", List("result", "result", "result.bundle")),
+    source("stage_input", List("returned", "result.bundle")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "missing-ack")),
+    source("request_scale", List("producer", "producer", "next-plan", "-2")),
+    source("export_request", List("next-plan", "next-plan", "next-request.bundle")),
+    worker("stage_input", List("next-input", "next-request.bundle")),
+    worker("work_scale", List("next-input", "next-plan", "next-result")),
+    worker("export_scale", List("next-result", "next-result", "next-result.bundle")),
+    source("stage_input", List("next-returned", "next-result.bundle")),
+    source("publish_requested_scale", List("next-plan", "next-plan", "next-returned", "next-result", "ack")),
+    source("publish_requested_scale", List("next-plan", "next-plan", "next-returned", "next-result")),
+    source("collect", List()),
+    source("inspect", List("ack")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
+    source("inspect", List()),
+    source("inspect", List("plan")),
+    source("inspect", List("returned"))
+  )
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
-    .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests)
+    .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
   action step = histories' = histories
 }
