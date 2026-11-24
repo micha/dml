@@ -9,6 +9,8 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 
+from daggerml import core
+
 from run_histories import (
     absolute_path,
     add_quint_arguments,
@@ -40,6 +42,26 @@ def call_evidence(call):
     }
 
 
+def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True):
+    command = op.replace("_", "-")
+    missing_ref = re.fullmatch(
+        rf"{re.escape(command)}: \('not_found', -?[0-9]+, 'ref was not found'\)", stderr.rstrip("\n"),
+    ) is not None
+    return {"op": op, "args": list(args), "code": code, "quiet": not stderr,
+            "diagnosed": stderr.startswith(f"{command}: ") and "Traceback" not in stderr,
+            "missingRef": missing_ref,
+            "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
+            "expectedResult": "", "expectedSelection": "", "expectedAttempt": "", "expectedMain": "",
+            "requestCommit": "", "requestImplementation": "", "requestFactor": 0,
+            "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
+            "reusePublication": {"mode": "", "planRef": "", "plan": "", "resultRef": "", "result": ""},
+            "selection": {"resultRef": "", "result": ""},
+            "selectedPublication": {"mode": "", "planRef": "", "plan": "", "selectionRef": "",
+                                    "selection": "", "result": ""},
+            "occurrence": {"id": "", "commit": "", "result": "", "historicalRef": ""},
+            "unchanged": unchanged, "bundlePresent": bundle_present, "bundleUnchanged": bundle_unchanged}
+
+
 class ProcessHistory:
     def __init__(self, directory, example):
         self.directory = directory
@@ -50,6 +72,7 @@ class ProcessHistory:
         self.plan_receipts = {}
         self.request_receipts = {}
         self.selection_receipts = {}
+        self.attempt_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
@@ -59,7 +82,9 @@ class ProcessHistory:
             "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
             "abandon_scale_request": self.abandon_scale_request, "stage_reused_scale": self.stage_reused_scale,
             "publish_reused_scale": self.publish_reused_scale, "select_scale_result": self.select_scale_result,
-            "publish_selected_scale": self.publish_selected_scale,
+            "publish_selected_scale": self.publish_selected_scale, "work_scale_attempt": self.work_scale_attempt,
+            "export_scale_attempt": self.export_scale_attempt, "select_scale_attempt": self.select_scale_attempt,
+            "drop_ref": self.drop_ref,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -78,22 +103,10 @@ class ProcessHistory:
         bundle_after = bundle.read_bytes() if bundle is not None and bundle.is_file() else None
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="")
-        missing_ref = re.fullmatch(
-            rf"{re.escape(command)}: \('not_found', -?[0-9]+, 'ref was not found'\)", result.stderr.rstrip("\n"),
-        ) is not None
-        return {"op": op, "args": list(args), "code": result.returncode, "quiet": not result.stderr,
-                "diagnosed": result.stderr.startswith(f"{command}: ") and "Traceback" not in result.stderr,
-                "missingRef": missing_ref,
-                "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
-                "expectedResult": "", "expectedSelection": "", "expectedMain": "", "requestCommit": "",
-                "requestImplementation": "", "requestFactor": 0,
-                "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
-                "reusePublication": {"mode": "", "planRef": "", "plan": "", "resultRef": "", "result": ""},
-                "selection": {"resultRef": "", "result": ""},
-                "selectedPublication": {"mode": "", "planRef": "", "plan": "", "selectionRef": "",
-                                        "selection": "", "result": ""},
-                "unchanged": before is not None and before == after,
-                "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
+        row = evidence(op, args, code=result.returncode, stderr=result.stderr,
+                       unchanged=before is not None and before == after,
+                       bundle_present=bundle_after is not None, bundle_unchanged=bundle_before == bundle_after)
+        return row, result.stdout
 
     def write(self, op, args, **options):
         row, output = self.invoke(op, args, **options)
@@ -181,6 +194,53 @@ class ProcessHistory:
             self.scale_receipts[role, result_ref] = row["commit"]
         return {**row, "expectedCommit": request}
 
+    def work_scale_attempt(self, role, pin, request_receipt, attempt_ref, occurrence_id):
+        request = self.request_receipts[request_receipt]
+        args = (role, pin, request_receipt, attempt_ref, occurrence_id)
+        row = self.write("work_scale_attempt", args, operands=(pin, request, attempt_ref, occurrence_id))
+        if row["commit"]:
+            self.attempt_receipts[attempt_ref] = row["commit"]
+        return {**row, "expectedCommit": request}
+
+    def export_scale_attempt(self, role, pin, attempt_receipt, filename):
+        commit = self.attempt_receipts[attempt_receipt]
+        bundle = self.directory / filename
+        row = self.write("export_scale_attempt", (role, pin, attempt_receipt, filename),
+                         operands=(pin, commit, bundle), bundle=bundle)
+        return {**row, "expectedCommit": commit}
+
+    def select_scale_attempt(self, role, plan_pin, plan_receipt, attempt_pin, attempt_receipt, selection_ref, alias=None):
+        plan = self.plan_receipts[plan_receipt]
+        attempt = self.attempt_receipts[attempt_receipt]
+        args = (role, plan_pin, plan_receipt, attempt_pin, attempt_receipt, selection_ref)
+        if alias is not None:
+            args += (alias,)
+        row = self.write("select_scale_attempt", args, operands=(plan_pin, plan, attempt_pin, attempt, selection_ref))
+        if row["commit"]:
+            self.selection_receipts[alias if alias is not None else selection_ref] = row["commit"]
+        return {**row, "expectedCommit": plan, "expectedAttempt": attempt}
+
+    def drop_ref(self, role, pin, kind, receipt):
+        # Fixture only: simulate a separate ref owner without adding a CLI command.
+        receipts = {"attempt": self.attempt_receipts, "selection": self.selection_receipts}
+        expected = receipts[kind][receipt]
+        path = self.repos[role]
+        data = path / "data.mdb"
+        before = data.read_bytes()
+        repo = core.repo_open(path, False)
+        try:
+            txn = core.txn_begin(repo, core.TXN_WRITE)
+            try:
+                core.txn_ref_delete_expected(txn, pin.encode("ascii"), bytes.fromhex(expected))
+                core.txn_commit(txn)
+            finally:
+                core.txn_abort(txn)
+        finally:
+            core.repo_close(repo)
+        row = evidence("drop_ref", (role, pin, kind, receipt), code=0, stderr="",
+                       unchanged=before == data.read_bytes())
+        return {**row, "expectedCommit": expected}
+
     def select_reuse(self, op, role, plan_pin, plan_receipt, result_pin, result_receipt, output):
         plan = self.plan_receipts[plan_receipt]
         # The original worker result, never the local staging receipt.
@@ -249,6 +309,11 @@ class ProcessHistory:
                                       "stagingRef": report["staging_ref"], "result": id_evidence(report["result_commit"])}
             elif "result_ref" in report:
                 row["selection"] = {"resultRef": report["result_ref"], "result": id_evidence(report["result_commit"])}
+            if "attempt_id" in report:
+                row["occurrence"] = {
+                    "id": report["attempt_id"], "commit": id_evidence(report.get("attempt_commit", report["commit"])),
+                    "result": id_evidence(report["result_commit"]), "historicalRef": report.get("attempt_ref", ""),
+                }
             if "producer_commit" in report:
                 row["producerCommit"] = id_evidence(report["producer_commit"])
             if "request_commit" in report:

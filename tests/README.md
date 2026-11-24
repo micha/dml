@@ -234,6 +234,16 @@ both the selection and the completed reuse record. Focused tests check raw
 malformed records, cross-repository transfer, and which parents survive
 collection.
 
+The [execution attempt history](../README.md#distinguish-two-executions-of-the-same-request)
+executes the same saved `@2` request twice in separate worker processes and
+transfers the two distinct attempt commits. Both retain the same result ID
+printed by `work-scale`. The runner uses exact native ref deletions as fixture
+steps to simulate another writer. Quint checks rejection without writes after
+the attempt or selection pin is replaced by a same-result occurrence and checks
+publication from the surviving choice after collection. Focused tests check
+ordered parents, malformed nested records and UUIDs, and reachability with the
+reuse ref as the sole root.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -441,5 +451,23 @@ then searches for witnesses to the declared observations.
 ```sh
 mkdir -p build/recorded-durable-selection-tlc
 (cd build/recorded-durable-selection-tlc && quint verify ../../tests/recorded_durable_selection_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the execution attempt design with TLC
+
+The [attempt model](recorded_attempt_design.qnt) uses two supported versions,
+two canonical UUID symbols, two worker outputs, and one origin ref per role
+plus a second staged attempt. It checks that distinct occurrences can keep the
+same result ID, that exact pins and nested request/implementation checks govern
+selection and publication, and that occupied outputs or stale guards preserve
+committed state. The model searches for publication after collection of the
+unselected attempt as well as readback with only the choice or reuse ref. It
+abstracts packed records and bundles, UUID syntax, arithmetic, and native
+failures. This is a safety check, not liveness or proof of execution.
+
+```sh
+mkdir -p build/recorded-attempt-tlc
+(cd build/recorded-attempt-tlc && quint verify ../../tests/recorded_attempt_design.qnt \
   --backend=tlc --search-observations)
 ```

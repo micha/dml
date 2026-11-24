@@ -13,6 +13,8 @@ from daggerml import core
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "recorded_calls.py"
+ATTEMPT_A = b"a0000000-0000-4000-8000-000000000001"
+ATTEMPT_B = b"b0000000-0000-4000-8000-000000000002"
 
 
 @contextmanager
@@ -1065,6 +1067,160 @@ class RecordedCallsTest(unittest.TestCase):
                     self.example["inspect"](self.repo, ref)
                 with self.assertRaisesRegex(ValueError, error):
                     self.example["publish_selected_scale"](self.repo, b"plan", plan, ref, selection, b"reuse")
+                self.assertEqual(data.read_bytes(), before)
+
+    def test_attempt_edges_keep_one_of_two_executions_of_the_same_result(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            core.txn_ref_create(txn, b"incoming", request)
+            core.txn_commit(txn)
+
+        work = self.example["work_scale_attempt"]
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            work(self.repo, b"incoming", request, b"producer", ATTEMPT_A)
+        self.assertEqual(data.read_bytes(), before)
+        result = self.example["work_scale"](self.repo, b"incoming", request, b"legacy-result")
+        first = work(self.repo, b"incoming", request, b"first", ATTEMPT_A)
+        second = work(self.repo, b"incoming", request, b"second", ATTEMPT_B)
+        duplicate = work(self.repo, b"incoming", request, b"duplicate", ATTEMPT_A)
+        self.assertNotEqual(first, second)
+        self.assertEqual(first, duplicate)
+        select = self.example["select_scale_attempt"]
+        selection = select(self.repo, b"plan", plan, b"first", first, b"chosen")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            for pin, attempt, label in ((b"first", first, ATTEMPT_A), (b"second", second, ATTEMPT_B)):
+                actual, dag, parents = self.snapshot(txn, pin, b"scale-attempt-v1")
+                self.assertEqual((actual, parents), (attempt, (request, result)))
+                _, root, count = view(txn, core.REC_DAG, dag)
+                self.assertEqual((count, root), (1, core.txn_lookup_node(txn, dag, b"attempt_id")))
+                self.assertEqual(self.literal_value(txn, root, core.DATUM_STRING), label.decode("ascii"))
+            actual, dag, parents = self.snapshot(txn, b"chosen", b"scale-attempt-selection-v1")
+            self.assertEqual((actual, parents), (selection, (request, first)))
+            _, root, count = view(txn, core.REC_DAG, dag)
+            self.assertEqual((count, root), (1, core.txn_lookup_node(txn, dag, b"attempt_ref")))
+            self.assertEqual(self.literal_value(txn, root, core.DATUM_STRING), "first")
+            self.assertEqual(core.txn_ref_get(txn, b"plan"), plan)
+            self.assert_missing_ref(txn, b"main")
+            for pin, expected in ((b"first", first), (b"second", second), (b"duplicate", duplicate),
+                                  (b"legacy-result", result), (b"incoming", request)):
+                core.txn_ref_delete_expected(txn, pin, expected)
+            core.txn_commit(txn)
+
+        self.assertGreater(self.example["collect"](self.repo), 0)
+        with transaction(self.repo) as txn:
+            with self.assertRaisesRegex(core.Error, "not_found"):
+                view(txn, core.REC_COMMIT, second)
+            for commit in (first, request, result):
+                core.txn_get_object(txn, core.REC_COMMIT, commit)
+        publish = self.example["publish_selected_scale"]
+        self.assertEqual(publish(self.repo, b"plan", plan, b"chosen", selection, b"reuse"), result)
+        self.assertEqual(self.example["collect"](self.repo), 0)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            reuse, _, parents = self.snapshot(txn, b"reuse", b"recorded-selected-scale-reuse-v1")
+            self.assertEqual(parents, (plan, selection))
+            self.assertEqual(core.txn_ref_get(txn, b"main"), result)
+            self.assert_missing_ref(txn, b"plan")
+            core.txn_ref_delete_expected(txn, b"main", result)
+            core.txn_ref_delete_expected(txn, b"chosen", selection)
+            core.txn_ref_delete_expected(txn, b"producer", producer)
+            core.txn_commit(txn)
+        self.example["collect"](self.repo)
+        self.assertEqual(self.example["inspect"](self.repo, b"reuse"), {
+            "commit": reuse.hex(), "publication_mode": "reuse", "plan_ref": "plan", "plan_commit": plan.hex(),
+            "selection_ref": "chosen", "selection_commit": selection.hex(), "request_commit": request.hex(),
+            "result_commit": result.hex(), "attempt_commit": first.hex(), "attempt_id": ATTEMPT_A.decode("ascii"),
+            "expected_main": None,
+        })
+
+    def test_attempt_selection_rechecks_nested_request_version_and_shapes(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        planner = self.example["request_scale"]
+        version = b"example.scale@2"
+        plan = planner(self.repo, b"producer", producer, b"plan", 3, implementation=version)
+        planner(self.repo, b"producer", producer, b"other-plan", 4, implementation=version)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            _, _, (other_request,) = self.snapshot(txn, b"other-plan", b"scale-plan-v1")
+            result = put_requested_result(txn, request, sum_dag, 3, 36, implementation=version)
+            wrong_version = put_requested_result(txn, request, sum_dag, 3, 36)
+            other_result = put_requested_result(txn, other_request, sum_dag, 4, 36, implementation=version)
+
+            def tree_for(entry, field, value):
+                node = literal(txn, core.DATUM_STRING, value)
+                dag = put(txn, core.REC_DAG, node, field, node)
+                return put(txn, core.REC_TREE, entry, dag)
+
+            attempt_tree = tree_for(b"scale-attempt-v1", b"attempt_id", ATTEMPT_A)
+            malformed_tree = tree_for(b"scale-attempt-v1", b"attempt_id", ATTEMPT_A.upper())
+            selection_tree = tree_for(b"scale-attempt-selection-v1", b"attempt_ref", b"historical")
+            invalid = []
+            for name, tree, parents, reason in (
+                (b"wrong-version", attempt_tree, (request, wrong_version), "expected recorded implementation"),
+                (b"wrong-result", attempt_tree, (request, other_result), "result does not retain the expected request"),
+                (b"wrong-request", attempt_tree, (other_request, other_result),
+                 "attempt does not retain the expected request"),
+                (b"wrong-count", attempt_tree, (request,), "ordered request and result parents"),
+                (b"wrong-id", malformed_tree, (request, result), "canonical lowercase UUIDv4"),
+            ):
+                attempt = put(txn, core.REC_COMMIT, tree, *parents)
+                selection = put(txn, core.REC_COMMIT, selection_tree, request, attempt)
+                selection_ref = b"select-" + name
+                core.txn_ref_create(txn, name, attempt)
+                core.txn_ref_create(txn, selection_ref, selection)
+                invalid.append((name, attempt, selection_ref, selection, reason))
+            good = put(txn, core.REC_COMMIT, attempt_tree, request, result)
+            malformed = tree_for(b"scale-attempt-selection-v1", b"attempt_ref", b"main")
+            for pin, tree, parents, reason in (
+                (b"bad-history", malformed, (request, good), "invalid attempt ref"),
+                (b"not-attempt", selection_tree, (request, result), "expected a scale-attempt-v1"),
+            ):
+                selection = put(txn, core.REC_COMMIT, tree, *parents)
+                core.txn_ref_create(txn, pin, selection)
+                invalid.append((None, None, pin, selection, reason))
+            core.txn_commit(txn)
+
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for attempt_ref, attempt, selection_ref, selection, reason in invalid:
+            with self.subTest(ref=selection_ref):
+                if attempt_ref is not None:
+                    with self.assertRaisesRegex(ValueError, reason):
+                        self.example["select_scale_attempt"](self.repo, b"plan", plan, attempt_ref, attempt, b"new")
+                with self.assertRaisesRegex(ValueError, reason):
+                    self.example["inspect"](self.repo, selection_ref)
+                with self.assertRaisesRegex(ValueError, reason):
+                    self.example["publish_selected_scale"](self.repo, b"plan", plan, selection_ref, selection, b"reuse")
+                self.assertEqual(data.read_bytes(), before)
+
+    def test_attempt_work_rejects_invalid_identity_stale_ref_and_overflow_atomically(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        self.example["request_scale"](self.repo, b"producer", producer, b"plan", 1 << 62)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            core.txn_ref_create(txn, b"incoming", request)
+            core.txn_commit(txn)
+        work = self.example["work_scale_attempt"]
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for incoming, commit, output, identity, reason in (
+            (b"incoming", request, b"attempt", ATTEMPT_A.upper(), "canonical lowercase UUIDv4"),
+            (b"incoming", request, b"attempt", ATTEMPT_A.replace(b"-8000-", b"-7000-"), "UUIDv4"),
+            (b"incoming", request, b"attempt", ATTEMPT_A.decode("ascii"), "UUIDv4"),
+            (b"incoming", request, b"incoming", ATTEMPT_A, "distinct"),
+            (b"incoming", request, b"main", ATTEMPT_A, "distinct"),
+            (b"incoming", request, b"-invalid", ATTEMPT_A, "valid ASCII ref name"),
+            (b"incoming", b"short", b"attempt", ATTEMPT_A, "16-byte ID"),
+            (b"incoming", producer, b"attempt", ATTEMPT_A, "expected request commit"),
+            (b"incoming", request, b"attempt", ATTEMPT_A, "signed 64-bit integer"),
+        ):
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    work(self.repo, incoming, commit, output, identity)
                 self.assertEqual(data.read_bytes(), before)
 
     def test_request_or_worker_failure_does_not_leave_partial_state(self):

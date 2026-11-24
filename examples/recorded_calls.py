@@ -9,6 +9,8 @@ Use `request-scale`, `export-request`, `work-scale`, and `publish-requested-scal
 when the source should preserve its expectations across invocations.
 Use `stage-reused-scale` to stage an existing result, or `publish-reused-scale`
 to publish it directly and retain a separate reuse record.
+Use `work-scale-attempt` and `select-scale-attempt` to distinguish executions
+of the same request without changing the result's identity.
 These layouts are not core record types or execution APIs.
 """
 
@@ -33,10 +35,13 @@ PUBLICATION_ENTRY = b"scale-publication-v1"
 PUBLICATION_FIELDS = (b"plan_ref", b"plan_commit", b"staging_ref", b"result_commit")
 REUSE_ENTRY = b"recorded-scale-reuse-v1"
 SELECTION_ENTRY = b"scale-result-selection-v1"
+ATTEMPT_ENTRY = b"scale-attempt-v1"
+ATTEMPT_SELECTION_ENTRY = b"scale-attempt-selection-v1"
 SELECTED_REUSE_ENTRY = b"recorded-selected-scale-reuse-v1"
 # The core's ASCII name profile, also used to validate historical ref-name literals.
 REF_NAME = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 COMMIT_HEX = re.compile(rb"[0-9a-f]{32}")
+UUID4 = re.compile(rb"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
 SUM = b"example.sum@1"
 SCALE_V1 = b"example.scale@1"
 SCALE_V2 = b"example.scale@2"
@@ -51,6 +56,20 @@ class _ScaleRequest(NamedTuple):
     sum_dag: bytes
     implementation: bytes
     factor: int
+
+
+class _ScaleAttempt(NamedTuple):
+    commit: bytes
+    request: _ScaleRequest
+    result: bytes
+    attempt_id: bytes
+
+
+class _ScaleSelection(NamedTuple):
+    request: _ScaleRequest
+    result: bytes
+    historical_ref: bytes
+    attempt: _ScaleAttempt | None = None
 
 
 @contextmanager
@@ -159,9 +178,13 @@ def _record_scale(txn, sum_call, factor, *, implementation=SCALE_V1):
     return _record_call(txn, implementation, mul, ((b"input", source), (b"factor", multiplier)), call_input=b"input")
 
 
-def _publish(txn, ref, entry, dag, *parents):
+def _put_snapshot(txn, entry, dag, *parents):
     tree = _put_object(txn, core.REC_TREE, entry, dag)
-    commit = _put_object(txn, core.REC_COMMIT, tree, *parents)
+    return _put_object(txn, core.REC_COMMIT, tree, *parents)
+
+
+def _publish(txn, ref, entry, dag, *parents):
+    commit = _put_snapshot(txn, entry, dag, *parents)
     core.txn_ref_create(txn, ref, commit)
     return commit
 
@@ -188,6 +211,16 @@ def record_sum(path, pin, a, b):
 def _check_commit_id(commit, label="producer commit"):
     if type(commit) is not bytes or len(commit) != 16:
         raise ValueError(f"{label} must be a 16-byte ID")
+
+
+def _check_ref_name(ref, label):
+    if type(ref) is not bytes or not REF_NAME.fullmatch(ref):
+        raise ValueError(f"{label} ref must be a valid ASCII ref name in bytes")
+
+
+def _check_attempt_id(attempt_id):
+    if type(attempt_id) is not bytes or not UUID4.fullmatch(attempt_id):
+        raise ValueError("attempt ID must be a canonical lowercase UUIDv4 in bytes")
 
 
 def _selected_sum(txn, pin, expected):
@@ -242,16 +275,37 @@ def request_scale(path, producer_pin, producer_commit, plan_pin, factor, *, impl
         return _publish(txn, plan_pin, PLAN_ENTRY, dag, *parents)
 
 
+def _work_requested_scale(txn, incoming, request_commit):
+    if core.txn_ref_get(txn, incoming) != request_commit:
+        raise ValueError("incoming ref does not point to the expected request commit")
+    request = _read_request(txn, request_commit)
+    _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
+    scale = _record_scale(txn, request.sum_dag, request.factor, implementation=request.implementation)
+    return _put_snapshot(txn, REQUESTED_SCALE_ENTRY, scale, request_commit)
+
+
 def work_scale(path, incoming, request_commit, result_ref):
     """Evaluate the exact staged request using its stored arguments."""
     _check_commit_id(request_commit, "request commit")
     with _write_transaction(path, create=False) as txn:
-        if core.txn_ref_get(txn, incoming) != request_commit:
-            raise ValueError("incoming ref does not point to the expected request commit")
-        request = _read_request(txn, request_commit)
-        _inspect_call(txn, request.sum_dag, SUM, (b"a", b"b"))
-        scale = _record_scale(txn, request.sum_dag, request.factor, implementation=request.implementation)
-        return _publish(txn, result_ref, REQUESTED_SCALE_ENTRY, scale, request_commit)
+        result = _work_requested_scale(txn, incoming, request_commit)
+        core.txn_ref_create(txn, result_ref, result)
+    return result
+
+
+def work_scale_attempt(path, incoming, request_commit, attempt_ref, attempt_id):
+    """Evaluate a pinned request and retain this occurrence, not a separate result pin."""
+    _check_commit_id(request_commit, "request commit")
+    _check_attempt_id(attempt_id)
+    _check_ref_name(incoming, "incoming")
+    _check_ref_name(attempt_ref, "attempt")
+    if len({incoming, attempt_ref, MAIN}) != 3:
+        raise ValueError("incoming, attempt, and main refs must be distinct")
+    with _write_transaction(path, create=False) as txn:
+        result = _work_requested_scale(txn, incoming, request_commit)
+        identity = _put_literal(txn, core.DATUM_STRING, attempt_id)
+        dag = _put_object(txn, core.REC_DAG, identity, b"attempt_id", identity)
+        return _publish(txn, attempt_ref, ATTEMPT_ENTRY, dag, request_commit, result)
 
 
 def _write_bundle(bundle_path, bundle):
@@ -311,6 +365,13 @@ def export_scale(path, pin, result_commit, bundle_path):
     return _export_selected(path, pin, result_commit, bundle_path, _selected_scale)
 
 
+def export_scale_attempt(path, pin, attempt_commit, bundle_path):
+    """Export the exact selected attempt, its result, and its request closure."""
+    _check_commit_id(attempt_commit, "attempt commit")
+    _check_ref_name(pin, "attempt")
+    return _export_selected(path, pin, attempt_commit, bundle_path, _selected_attempt)
+
+
 def stage_input(path, pin, bundle_path):
     """Import a bundle under a new local pin and return its actual root ID."""
     with Path(bundle_path).open("rb") as source:
@@ -326,8 +387,7 @@ def _check_reuse_selection(plan_pin, plan_commit, input_pin, input_commit, outpu
     _check_commit_id(plan_commit, "plan commit")
     _check_commit_id(input_commit, f"{input_label} commit")
     for label, ref in (("plan", plan_pin), (input_label, input_pin), (output_label, output)):
-        if type(ref) is not bytes or not REF_NAME.fullmatch(ref):
-            raise ValueError(f"{label} ref must be a valid ASCII ref name in bytes")
+        _check_ref_name(ref, label)
     if len({plan_pin, input_pin, output, MAIN}) != 4:
         raise ValueError(f"plan, {input_label}, {output_label}, and main refs must be distinct")
 
@@ -348,6 +408,18 @@ def select_scale_result(path, plan_pin, plan_commit, result_pin, result_commit, 
         result_name = _put_literal(txn, core.DATUM_STRING, result_pin)
         dag = _put_object(txn, core.REC_DAG, result_name, b"result_ref", result_name)
         return _publish(txn, selection_ref, SELECTION_ENTRY, dag, request.commit, result_commit)
+
+
+def select_scale_attempt(path, plan_pin, plan_commit, attempt_ref, attempt_commit, selection_ref):
+    """Retain the exact attempt for the plan's request without publishing it."""
+    _check_reuse_selection(plan_pin, plan_commit, attempt_ref, attempt_commit, selection_ref, "selection",
+                           input_label="attempt")
+    with _write_transaction(path, create=False) as txn:
+        request, _ = _selected_plan(txn, plan_pin, plan_commit)
+        _selected_attempt(txn, attempt_ref, attempt_commit, expected_request=request)
+        name = _put_literal(txn, core.DATUM_STRING, attempt_ref)
+        dag = _put_object(txn, core.REC_DAG, name, b"attempt_ref", name)
+        return _publish(txn, selection_ref, ATTEMPT_SELECTION_ENTRY, dag, request.commit, attempt_commit)
 
 
 def stage_reused_scale(path, plan_pin, plan_commit, result_pin, result_commit, dest_pin):
@@ -455,14 +527,14 @@ def publish_selected_scale(path, plan_pin, plan_commit, selection_ref, selection
         request, expected_main = _selected_plan(txn, plan_pin, plan_commit)
         if core.txn_ref_get(txn, selection_ref) != selection_commit:
             raise ValueError("selection ref does not point to the expected selection commit")
-        _, result, _ = _read_result_selection(txn, selection_commit, expected_request=request)
-        _update_main(txn, result, expected_main)
+        selection = _read_scale_selection(txn, selection_commit, expected_request=request)
+        _update_main(txn, selection.result, expected_main)
         core.txn_ref_delete_expected(txn, plan_pin, plan_commit)
         plan_name = _put_literal(txn, core.DATUM_STRING, plan_pin)
         selection_name = _put_literal(txn, core.DATUM_STRING, selection_ref)
         dag = _put_object(txn, core.REC_DAG, plan_name, b"plan_ref", plan_name, b"selection_ref", selection_name)
         _publish(txn, reuse_ref, SELECTED_REUSE_ENTRY, dag, plan_commit, selection_commit)
-    return result
+    return selection.result
 
 
 def abandon_scale_request(path, plan_pin, plan_commit):
@@ -597,23 +669,58 @@ def _read_publication(txn, commit):
     return fields
 
 
-def _read_result_selection(txn, commit, *, expected_request=None):
-    view, parents, entry, dag = _snapshot(txn, commit)
-    if entry != SELECTION_ENTRY or parents != 2:
-        raise ValueError("expected a scale-result-selection-v1 commit with ordered request and result parents")
+def _read_single_string(txn, dag, field, label):
     _, root, count = _object(txn, core.REC_DAG, dag)
-    if count != 1 or root != core.txn_lookup_node(txn, dag, b"result_ref"):
-        raise ValueError("result selection has the wrong DAG layout")
-    result_pin = _read_literal(txn, root, core.DATUM_STRING)
-    if not REF_NAME.fullmatch(result_pin) or result_pin == MAIN:
-        raise ValueError("result selection has an invalid result ref name")
+    if count != 1 or root != core.txn_lookup_node(txn, dag, field):
+        raise ValueError(f"{label} has the wrong DAG layout")
+    return _read_literal(txn, root, core.DATUM_STRING)
+
+
+def _read_scale_attempt(txn, commit, *, expected_request=None):
+    view, parents, entry, dag = _snapshot(txn, commit)
+    if entry != ATTEMPT_ENTRY or parents != 2:
+        raise ValueError("expected a scale-attempt-v1 commit with ordered request and result parents")
+    attempt_id = _read_single_string(txn, dag, b"attempt_id", "scale attempt")
+    _check_attempt_id(attempt_id)
+    request_id = core.object_view_parent(view, 0)
+    if expected_request is not None and request_id != expected_request.commit:
+        raise ValueError("attempt does not retain the expected request commit")
+    request = _read_request(txn, request_id) if expected_request is None else expected_request
+    result = core.object_view_parent(view, 1)
+    _inspect_snapshot(txn, result, expected_request=request)
+    return _ScaleAttempt(commit, request, result, attempt_id)
+
+
+def _selected_attempt(txn, pin, commit, *, expected_request=None):
+    if core.txn_ref_get(txn, pin) != commit:
+        raise ValueError("attempt ref does not point to the expected attempt commit")
+    return _read_scale_attempt(txn, commit, expected_request=expected_request)
+
+
+def _read_scale_selection(txn, commit, *, expected_request=None):
+    view, parents, entry, dag = _snapshot(txn, commit)
+    if entry not in (SELECTION_ENTRY, ATTEMPT_SELECTION_ENTRY):
+        raise ValueError("expected a scale result or attempt selection commit")
+    kind = "attempt" if entry == ATTEMPT_SELECTION_ENTRY else "result"
+    if parents != 2:
+        raise ValueError(f"expected a {entry.decode('ascii')} commit with ordered request and {kind} parents")
+    historical_ref = _read_single_string(txn, dag, f"{kind}_ref".encode("ascii"), f"{kind} selection")
+    if not REF_NAME.fullmatch(historical_ref) or historical_ref == MAIN:
+        raise ValueError(f"{kind} selection has an invalid {kind} ref name")
     request_id = core.object_view_parent(view, 0)
     if expected_request is not None and request_id != expected_request.commit:
         raise ValueError("selection does not retain the expected request commit")
     request = _read_request(txn, request_id) if expected_request is None else expected_request
-    result = core.object_view_parent(view, 1)
-    _inspect_snapshot(txn, result, expected_request=request)
-    return request, result, result_pin
+    target = core.object_view_parent(view, 1)
+    if entry == ATTEMPT_SELECTION_ENTRY:
+        attempt = _read_scale_attempt(txn, target, expected_request=request)
+        return _ScaleSelection(request, attempt.result, historical_ref, attempt)
+    _inspect_snapshot(txn, target, expected_request=request)
+    return _ScaleSelection(request, target, historical_ref)
+
+
+def _attempt_identity(attempt):
+    return {"attempt_commit": attempt.commit.hex(), "attempt_id": attempt.attempt_id.decode("ascii")}
 
 
 def _inspect_reuse_publication(txn, commit, view, parents, dag, *, selected):
@@ -633,8 +740,11 @@ def _inspect_reuse_publication(txn, commit, view, parents, dag, *, selected):
     request, expected_main = _read_plan(txn, plan)
     refs = {input_field.decode("ascii"): input_pin.decode("ascii")}
     if selected:
-        _, result, _ = _read_result_selection(txn, target, expected_request=request)
+        selection = _read_scale_selection(txn, target, expected_request=request)
+        result = selection.result
         refs["selection_commit"] = target.hex()
+        if selection.attempt is not None:
+            refs.update(_attempt_identity(selection.attempt))
     else:
         result = target
         _inspect_snapshot(txn, result, expected_request=request)
@@ -658,11 +768,20 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
     if entry == PUBLICATION_ENTRY:
         fields = _read_publication(txn, commit)
         return {**report, **{name.decode("ascii"): value.decode("ascii") for name, value in fields.items()}}
-    if entry == SELECTION_ENTRY:
-        request, result, result_pin = _read_result_selection(txn, commit)
-        return {**report, "request_commit": request.commit.hex(),
-                "request_implementation": request.implementation.decode("ascii"),
-                "result_commit": result.hex(), "result_ref": result_pin.decode("ascii")}
+    if entry == ATTEMPT_ENTRY:
+        attempt = _read_scale_attempt(txn, commit)
+        return {**report, "request_commit": attempt.request.commit.hex(),
+                "request_implementation": attempt.request.implementation.decode("ascii"),
+                "result_commit": attempt.result.hex(), "attempt_id": attempt.attempt_id.decode("ascii")}
+    if entry in (SELECTION_ENTRY, ATTEMPT_SELECTION_ENTRY):
+        selection = _read_scale_selection(txn, commit)
+        report.update(request_commit=selection.request.commit.hex(),
+                      request_implementation=selection.request.implementation.decode("ascii"),
+                      result_commit=selection.result.hex())
+        if selection.attempt is None:
+            return {**report, "result_ref": selection.historical_ref.decode("ascii")}
+        return {**report, **_attempt_identity(selection.attempt),
+                "attempt_ref": selection.historical_ref.decode("ascii")}
     if entry in (REUSE_ENTRY, SELECTED_REUSE_ENTRY):
         return _inspect_reuse_publication(txn, commit, view, parents, terminal, selected=entry == SELECTED_REUSE_ENTRY)
     if entry == SUM_ENTRY:
@@ -743,6 +862,11 @@ def main():
     scale_exporter.add_argument("result_ref")
     scale_exporter.add_argument("result_commit")
     scale_exporter.add_argument("bundle", type=Path)
+    attempt_exporter = commands.add_parser("export-scale-attempt", help="export an exact pinned attempt and result")
+    attempt_exporter.add_argument("repo", type=Path)
+    attempt_exporter.add_argument("attempt_ref")
+    attempt_exporter.add_argument("attempt_commit")
+    attempt_exporter.add_argument("bundle", type=Path)
     publisher = commands.add_parser("publish-scale", help="publish the selected scale and release its staging ref")
     publisher.add_argument("repo", type=Path)
     publisher.add_argument("returned")
@@ -768,6 +892,10 @@ def main():
     worker.add_argument("incoming")
     worker.add_argument("request_commit")
     worker.add_argument("result_ref")
+    attempt_worker = commands.add_parser("work-scale-attempt", help="run a staged request and record its occurrence")
+    attempt_worker.add_argument("repo", type=Path)
+    for name in ("incoming", "request_commit", "attempt_ref", "attempt_id"):
+        attempt_worker.add_argument(name)
     reuse = commands.add_parser("stage-reused-scale", help="stage a pinned local result for the exact request")
     reuse.add_argument("repo", type=Path)
     for name in ("plan_pin", "plan_commit", "result_pin", "result_commit", "dest_pin"):
@@ -787,6 +915,10 @@ def main():
     chooser.add_argument("repo", type=Path)
     for name in ("plan_pin", "plan_commit", "result_pin", "result_commit", "selection_ref"):
         chooser.add_argument(name)
+    attempt_chooser = commands.add_parser("select-scale-attempt", help="retain a pinned attempt without publishing")
+    attempt_chooser.add_argument("repo", type=Path)
+    for name in ("plan_pin", "plan_commit", "attempt_ref", "attempt_commit", "selection_ref"):
+        attempt_chooser.add_argument(name)
     selection_publisher = commands.add_parser("publish-selected-scale", help="publish from a selection and record reuse")
     selection_publisher.add_argument("repo", type=Path)
     for name in ("plan_pin", "plan_commit", "selection_ref", "selection_commit", "reuse_ref"):
@@ -823,6 +955,9 @@ def main():
         elif args.command == "export-scale":
             result = _parse_commit_id(args.result_commit, "result commit")
             print(export_scale(args.repo, args.result_ref.encode("ascii"), result, args.bundle).hex())
+        elif args.command == "export-scale-attempt":
+            attempt = _parse_commit_id(args.attempt_commit, "attempt commit")
+            print(export_scale_attempt(args.repo, args.attempt_ref.encode("ascii"), attempt, args.bundle).hex())
         elif args.command == "publish-scale":
             result = _parse_commit_id(args.result_commit, "result commit")
             producer = _parse_commit_id(args.producer_commit)
@@ -841,6 +976,11 @@ def main():
         elif args.command == "work-scale":
             request = _parse_commit_id(args.request_commit, "request commit")
             print(work_scale(args.repo, args.incoming.encode("ascii"), request, args.result_ref.encode("ascii")).hex())
+        elif args.command == "work-scale-attempt":
+            request = _parse_commit_id(args.request_commit, "request commit")
+            attempt = work_scale_attempt(args.repo, args.incoming.encode("ascii"), request,
+                                         args.attempt_ref.encode("ascii"), args.attempt_id.encode("utf-8"))
+            print(attempt.hex())
         elif args.command == "stage-reused-scale":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             result = _parse_commit_id(args.result_commit, "result commit")
@@ -862,6 +1002,11 @@ def main():
             result = _parse_commit_id(args.result_commit, "result commit")
             print(select_scale_result(args.repo, args.plan_pin.encode("ascii"), plan, args.result_pin.encode("ascii"),
                                       result, args.selection_ref.encode("ascii")).hex())
+        elif args.command == "select-scale-attempt":
+            plan = _parse_commit_id(args.plan_commit, "plan commit")
+            attempt = _parse_commit_id(args.attempt_commit, "attempt commit")
+            print(select_scale_attempt(args.repo, args.plan_pin.encode("ascii"), plan, args.attempt_ref.encode("ascii"),
+                                       attempt, args.selection_ref.encode("ascii")).hex())
         elif args.command == "publish-selected-scale":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             selection = _parse_commit_id(args.selection_commit, "selection commit")

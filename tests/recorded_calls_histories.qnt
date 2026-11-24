@@ -311,10 +311,52 @@ module recorded_calls_histories {
     source("publish_selected_scale", List("fresh-v2", "fresh-v2", "chosen-v2", "chosen-v2", "saved"))
   ))
 
+  pure val occurrenceA = "00000000-0000-4000-8000-000000000001"
+  pure val occurrenceB = "00000000-0000-4000-8000-000000000002"
+
+  // Two independent worker invocations retain the same deterministic result.
+  // Recreate staging and selection refs with the other occurrence. Earlier
+  // receipts still select their immutable IDs, not the new ref targets.
+  pure val attemptRequests: List[Request] = List(
+    source("record_sum", List("producer", "7", "5")),
+    source("inspect", List("producer")),
+    source("request_scale", List("producer", "producer", "plan", "3", "--implementation", "example.scale@2")),
+    source("export_request", List("plan", "plan", "request.bundle")),
+    worker("stage_input", List("incoming", "request.bundle")),
+    worker("work_scale", List("incoming", "plan", "legacy-result")),
+    worker("work_scale_attempt", List("incoming", "plan", "attempt-a", occurrenceA)),
+    worker("work_scale_attempt", List("incoming", "plan", "attempt-b", occurrenceB)),
+    worker("work_scale_attempt", List("incoming", "plan", "attempt-a", occurrenceA)),
+    worker("inspect", List("attempt-a")),
+    worker("inspect", List("attempt-b")),
+    worker("export_scale_attempt", List("attempt-a", "attempt-a", "a.bundle")),
+    worker("export_scale_attempt", List("attempt-b", "attempt-b", "b.bundle")),
+    source("stage_input", List("returned", "a.bundle")),
+    source("select_scale_attempt", List("plan", "plan", "returned", "attempt-a", "chosen", "first-choice")),
+    source("select_scale_attempt", List("plan", "plan", "returned", "attempt-a", "chosen")),
+    source("drop_ref", List("returned", "attempt", "attempt-a")),
+    source("stage_input", List("returned", "b.bundle")),
+    source("select_scale_attempt", List("plan", "plan", "returned", "attempt-a", "would-choose")),
+    source("drop_ref", List("chosen", "selection", "first-choice")),
+    source("select_scale_attempt", List("plan", "plan", "returned", "attempt-b", "chosen", "second-choice")),
+    source("publish_selected_scale", List("plan", "plan", "chosen", "first-choice", "reuse")),
+    source("drop_ref", List("returned", "attempt", "attempt-b")),
+    source("collect", List()),
+    source("inspect", List("chosen")),
+    source("request_scale", List("producer", "producer", "parallel", "3", "--implementation", "example.scale@2")),
+    source("publish_selected_scale", List("plan", "plan", "chosen", "second-choice", "reuse")),
+    source("publish_selected_scale", List("parallel", "parallel", "chosen", "second-choice", "another-reuse")),
+    source("inspect", List()),
+    source("inspect", List("reuse")),
+    source("inspect", List("chosen")),
+    source("inspect", List("plan")),
+    source("inspect", List("returned"))
+  )
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
-    .append(selectionRequests)
+    .append(selectionRequests).append(attemptRequests)
   action step = histories' = histories
 }
