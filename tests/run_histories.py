@@ -16,6 +16,8 @@ from replay_core import Suite
 # Meson separately bounds the complete replay and verdict run.
 HISTORY_TIMEOUT = 60
 VERDICT_TIMEOUT = 120
+# Large nested literals make Quint's type/effect analysis disproportionately slow.
+EVIDENCE_BATCH_SIZE = 16
 
 
 def absolute_path(path):
@@ -95,6 +97,12 @@ def replay_history(suite, directory, requests):
         return {"attempts": attempts}
 
 
+def quint_record(fields):
+    if not all(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*", key) for key in fields):
+        raise ValueError(f"Cannot encode Quint evidence record fields: {short_repr(list(fields))}")
+    return "{ " + ", ".join(f"{key}: {expression}" for key, expression in fields.items()) + " }"
+
+
 def quint_literal(value):
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -104,11 +112,35 @@ def quint_literal(value):
     # printable ASCII without quotes or backslashes; adapters can hex-encode bytes.
     if isinstance(value, str) and re.fullmatch(r"[\x20-\x21\x23-\x5b\x5d-\x7e]*", value):
         return json.dumps(value)
-    if isinstance(value, dict) and all(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*", key) for key in value):
-        return "{ " + ", ".join(f"{key}: {quint_literal(item)}" for key, item in value.items()) + " }"
+    if isinstance(value, dict):
+        return quint_record({key: quint_literal(item) for key, item in value.items()})
     if isinstance(value, list):
         return "List(" + ", ".join(map(quint_literal, value)) + ")"
     raise ValueError(f"Cannot encode Quint evidence value: {short_repr(value)}")
+
+
+def quint_evidence(observations):
+    """Declare small batches, then assemble typed rows in replay order."""
+    lines = []
+    rows = []
+    for history, row in enumerate(observations):
+        attempts = row["attempts"]
+        batches = []
+        for start in range(0, len(attempts), EVIDENCE_BATCH_SIZE):
+            batch = f"evidenceBatch{history}_{start}"
+            batches.append(batch)
+            lines.append(f"  pure val {batch} = {quint_literal(attempts[start:start + EVIDENCE_BATCH_SIZE])}\n")
+        fields = {key: quint_literal(value) for key, value in row.items() if key != "attempts"}
+        if len(batches) == 1:
+            fields["attempts"] = batches[0]
+        else:
+            batch_list = ", ".join(batches)
+            fields["attempts"] = f"List({batch_list}).foldl(List(), (out, batch) => out.concat(batch))"
+        name = f"evidenceHistory{history}"
+        rows.append(name)
+        lines.append(f"  pure val {name}: Observation = {quint_record(fields)}\n")
+    lines.append(f"  pure val evidence: List[Observation] = List({', '.join(rows)})\n")
+    return "".join(lines)
 
 
 def evaluate(quint, rules, directory, observations, imports=()):
@@ -121,11 +153,11 @@ def evaluate(quint, rules, directory, observations, imports=()):
             raise ValueError(f"Duplicate or reserved Quint module path: {source.name}")
         copyfile(source, destination)
     module = directory / "trace_observations.qnt"
-    rows = ",\n    ".join(map(quint_literal, observations))
+    evidence = quint_evidence(observations)
     module.write_text(
         'module trace_observations {\n'
         f'  import {rules.stem}.* from "./{rules.stem}"\n'
-        f'  pure val evidence: List[Observation] = List(\n    {rows}\n  )\n'
+        f'{evidence}'
         '  var verdicts: List[List[str]]\n'
         '  var accepting: List[List[bool]]\n'
         '  var coverage: bool\n'

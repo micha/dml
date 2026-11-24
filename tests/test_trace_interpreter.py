@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from replay_core import CoreHistory, bundle_items
-from run_histories import check_verdicts, replay_history
+from run_histories import check_verdicts, quint_evidence, replay_history
 from trace_support import Replay
 
 
@@ -102,6 +102,22 @@ class TraceInterpreterTest(unittest.TestCase):
                               (header + frame[:-1], "frame"), (header + frame + b"x", "trailing")):
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 bundle_items(data)
+
+    def test_quint_evidence_batches_attempts_without_reordering_histories(self):
+        observations = [
+            {"attempts": [{"value": i} for i in range(17)], "scenario": 4},
+            {"attempts": [{"value": 21}], "scenario": 7},
+        ]
+        first_batch = ", ".join(f"{{ value: {i} }}" for i in range(16))
+        self.assertEqual(quint_evidence(observations).splitlines(), [
+            f"  pure val evidenceBatch0_0 = List({first_batch})",
+            "  pure val evidenceBatch0_16 = List({ value: 16 })",
+            "  pure val evidenceHistory0: Observation = { scenario: 4, attempts: "
+            "List(evidenceBatch0_0, evidenceBatch0_16).foldl(List(), (out, batch) => out.concat(batch)) }",
+            "  pure val evidenceBatch1_0 = List({ value: 21 })",
+            "  pure val evidenceHistory1: Observation = { scenario: 7, attempts: evidenceBatch1_0 }",
+            "  pure val evidence: List[Observation] = List(evidenceHistory0, evidenceHistory1)",
+        ])
 
     def test_missing_step_verdict_fails(self):
         histories = [[{"op": "read_value", "args": []}]]
