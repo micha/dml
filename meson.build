@@ -107,6 +107,12 @@ if get_option('quint_tests')
     env: binding_env,
     depends: public_python_core,
   )
+  test(
+    'recorded-calls-boundaries', python,
+    args: ['-B', files('tests/test_recorded_calls.py')],
+    env: binding_env,
+    depends: public_python_core,
+  )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
@@ -196,6 +202,16 @@ with tempfile.TemporaryDirectory() as tmp:
     'provenance-handoff', python,
     args: ['-B', files('tests/run_provenance_handoff.py'), quint.full_path(), provenance_handoff, handoff_fixture,
            files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')] + quint_args,
+    timeout: replay_timeout,
+  )
+
+  test(
+    'recorded-calls', python,
+    args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
+           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_rules.qnt')]
+          + quint_args,
+    env: binding_env,
+    depends: public_python_core,
     timeout: replay_timeout,
   )
 

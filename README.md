@@ -53,8 +53,8 @@ Pass `DML_QUINT_SCRIPT=` to switch an existing build back to `quint` on `PATH`.
 
 This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
-[provenance handoff integration](tests/README.md#process-integration), and focused
-interpreter, Python binding, integrity, native boundary, and fault tests.
+[provenance handoff and recorded-calls integrations](tests/README.md#process-integration),
+and focused interpreter, Python binding, integrity, boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
 Quint request. Ref replay uses public `daggerml.core`; the other core replay
 suites still use a private test binding. Quint checks observations against the
@@ -88,6 +88,37 @@ CLI, C development files, or historical `daggerml` application modules. The
 standalone C build does not require Python headers; pass `-Dpython_bindings=true`
 to also build and install the binding with Meson. See the
 [Python contract](docs/spec-next/python.md) for supported operations and an example.
+
+### Record two composed calls in Python
+
+With the [public binding installed](#install-the-python-binding), run the
+[recorded-calls example](examples/recorded_calls.py) from the checkout. Use a new
+repository path with an existing parent directory:
+
+```sh
+python examples/recorded_calls.py record ./calls-repo 7 5 3
+python examples/recorded_calls.py inspect ./calls-repo
+```
+
+`record` computes `sum(7, 5)` and then `scale(sum_result, 3)`. It prints the ID of
+an initial commit published to `main` in the same write transaction as both calls.
+The inputs and results must fit signed 64-bit integers. Arithmetic overflow aborts
+the write and leaves the initialized repository without a published snapshot.
+
+This is an application convention using ordinary DML objects, not a new core
+record type. The commit's sole tree entry, `recorded-calls-v1`, selects the scale
+DAG. Each call DAG's root is its result literal and its `implementation` binding
+names the versioned operation. Sum binds `a` and `b`. Scale binds `factor` and an
+`input` sub-DAG node that points to the exact sum DAG. Scale reads its first
+argument through this edge, not by looking up the scalar value.
+
+`inspect` opens a read transaction and prints JSON with the commit ID and both
+calls in dependency order. It follows the stored edge and reports argument and
+result values and node IDs without executing or verifying either operation. The
+versioned names identify implementations by example convention, not by code
+fingerprint or attestation. IDs identify immutable records, not distinct execution
+attempts; recording identical calls can produce the same IDs. Inspection leaves
+committed data unchanged; the repository still uses LMDB's normal locking.
 
 ### Install and link the C library
 

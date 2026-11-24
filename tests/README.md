@@ -92,6 +92,8 @@ arbitrary bytes as lowercase hex in evidence.
 
 ## Process integration
 
+### Provenance handoff
+
 Start with [the Quint handoff histories](handoff_histories.qnt) for the expected
 workflow and [the evidence rules](handoff_rules.qnt) for how a run is judged.
 The histories cover request selection, transfer and restart, no-clobber export,
@@ -125,3 +127,18 @@ python3 -B tests/run_provenance_handoff.py "$(command -v quint)" \
   "$run_dir/provenance_handoff" "$run_dir/handoff_fixture" \
   tests/handoff_histories.qnt tests/handoff_rules.qnt
 ```
+
+### Recorded calls
+
+The [Python example](../README.md#record-two-composed-calls-in-python) uses the
+public binding. The [workflow runner](run_recorded_calls.py) launches separate
+record and inspect processes and observes the JSON report and committed LMDB
+bytes. Quint supplies the [input histories](recorded_calls_histories.qnt) and
+[judges the report](recorded_calls_rules.qnt). Two different sets of inputs
+produce the same sum literal; the scale input must identify the producer DAG,
+not just the literal shared by both sums.
+
+The [focused tests](test_recorded_calls.py) independently read the stored graph
+with the public binding. They exercise overflow rollback and inspect a synthetic
+commit with incorrect arithmetic to show that inspection reports recorded values
+without recomputing. Both checks run in the opt-in Meson gate.
