@@ -111,13 +111,15 @@ if get_option('quint_tests')
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
   )
+  # Includes native replay in addition to the bounded Quint verdict process.
+  replay_timeout = 210
   test(
     'quint-refs', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
            files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'] + quint_args,
     env: binding_env,
     depends: public_python_core,
-    timeout: 150,
+    timeout: replay_timeout,
   )
   retention_modules = ['--quint-module', files('tests/retention_fixture.qnt'),
                        '--quint-module', files('tests/retention_rules.qnt')]
@@ -130,7 +132,7 @@ if get_option('quint_tests')
       'quint-' + suite[0], python,
       args: ['-B', trace_interpreter, quint.full_path(), private_python_core, lmdb_inventory,
              files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2] + quint_args,
-      timeout: 150,
+      timeout: replay_timeout,
     )
   endforeach
 
@@ -194,7 +196,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'provenance-handoff', python,
     args: ['-B', files('tests/run_provenance_handoff.py'), quint.full_path(), provenance_handoff, handoff_fixture,
            files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')] + quint_args,
-    timeout: 150,
+    timeout: replay_timeout,
   )
 
   transfer_fault_subject = static_library(

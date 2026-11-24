@@ -12,9 +12,10 @@ from tempfile import TemporaryDirectory
 from replay_core import Suite
 
 
-# The transfer model checks hundreds of steps with exact packed rows. Meson
-# also bounds the total replay and verdict time.
-TIMEOUT = 60
+# Evaluating all live observations is heavier than loading the request histories.
+# Meson separately bounds the complete replay and verdict run.
+HISTORY_TIMEOUT = 60
+VERDICT_TIMEOUT = 120
 
 
 def absolute_path(path):
@@ -31,12 +32,12 @@ def quint_command(args):
     return [args.quint] if args.quint_script is None else [args.quint, args.quint_script]
 
 
-def quint_state(quint, source, output, fields, init="init"):
+def quint_state(quint, source, output, fields, *, timeout, init="init"):
     output.unlink(missing_ok=True)
     result = subprocess.run(
         [*quint, "run", source, "--backend=typescript", f"--init={init}",
          "--max-samples=1", "--max-steps=0", "--seed=1", "--verbosity=0", f"--out-itf={output}"],
-        capture_output=True, text=True, timeout=TIMEOUT,
+        capture_output=True, text=True, timeout=timeout,
     )
     if result.returncode or not output.is_file():
         raise ValueError(f"Quint failed for {source.name}/{init}:\n{result.stdout}{result.stderr}")
@@ -52,7 +53,7 @@ def read_histories(quint, source, output, initializers):
     histories = []
     groups = []
     for init in initializers:
-        group = quint_state(quint, source, output, {"histories"}, init)["histories"]
+        group = quint_state(quint, source, output, {"histories"}, timeout=HISTORY_TIMEOUT, init=init)["histories"]
         if not isinstance(group, list) or not group:
             raise ValueError(f"{init}: expected a nonempty list of histories")
         if group in groups:
@@ -144,7 +145,7 @@ def evaluate(quint, rules, directory, observations, imports=()):
         '}\n', encoding="utf-8",
     )
     return quint_state(quint, module, directory / "verdicts.itf.json",
-                       {"verdicts", "accepting", "coverage", "controls"})
+                       {"verdicts", "accepting", "coverage", "controls"}, timeout=VERDICT_TIMEOUT)
 
 
 def check_verdicts(histories, observations, state):
