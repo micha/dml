@@ -17,10 +17,24 @@ from replay_core import Suite
 TIMEOUT = 60
 
 
+def absolute_path(path):
+    # Preserve the intended path if Meson passes a relative build artifact.
+    return Path(path).absolute()
+
+
+def add_quint_arguments(parser):
+    parser.add_argument("quint", type=absolute_path, help="Quint executable (or Node with --quint-script)")
+    parser.add_argument("--quint-script", type=absolute_path, help="run this Quint JavaScript entry point with Node")
+
+
+def quint_command(args):
+    return [args.quint] if args.quint_script is None else [args.quint, args.quint_script]
+
+
 def quint_state(quint, source, output, fields, init="init"):
     output.unlink(missing_ok=True)
     result = subprocess.run(
-        [quint, "run", source, "--backend=typescript", f"--init={init}",
+        [*quint, "run", source, "--backend=typescript", f"--init={init}",
          "--max-samples=1", "--max-steps=0", "--seed=1", "--verbosity=0", f"--out-itf={output}"],
         capture_output=True, text=True, timeout=TIMEOUT,
     )
@@ -166,22 +180,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--init", action="append", help="history initializer (default: init)")
     parser.add_argument("--quint-module", type=Path, action="append", default=[], help="local Quint rules import")
-    # Preserve the intended path if Meson passes a relative build artifact.
-    def absolute_path(path):
-        return Path(path).absolute()
-
-    parser.add_argument("quint", type=absolute_path)
+    add_quint_arguments(parser)
     parser.add_argument("binding", help="daggerml.core import or path to the private replay extension")
     for argument in ("scanner", "histories", "rules"):
         parser.add_argument(argument, type=absolute_path)
     args = parser.parse_args()
+    quint = quint_command(args)
     with TemporaryDirectory(prefix="dml-histories-") as tmp:
         directory = Path(tmp)
-        histories = read_histories(args.quint, args.histories, directory / "histories.itf.json", args.init or ["init"])
+        histories = read_histories(quint, args.histories, directory / "histories.itf.json", args.init or ["init"])
         suite = Suite(args.binding, args.scanner)
         observations = [replay_history(suite, directory / f"history-{index}", history)
                         for index, history in enumerate(histories, 1)]
-        state = evaluate(args.quint, args.rules, directory, observations, args.quint_module)
+        state = evaluate(quint, args.rules, directory, observations, args.quint_module)
         check_verdicts(histories, observations, state)
 
 

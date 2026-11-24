@@ -8,18 +8,18 @@ branch. [Build and validation](../README.md#build-and-validation) owns commands;
 
 ## Current gate
 
-Run `scripts/check.sh` on the final relevant sources. CI runs the same build on
-Linux, macOS, and Windows and retains Meson logs. This build-only gate establishes
-neither test coverage nor runtime correctness. Run `scripts/check.sh --quint` for
-changes to the replay suite or to covered behavior: ref creation, atomic snapshot
-publication and rollback, caller-side conditional publication, binary commit
-transfer and the staged result round trip, read-only integrity and reachability
-checks, and explicit transactional garbage collection. This also runs focused
-interpreter and Python binding tests, native integrity and collection fault checks, and native
-transfer boundary and fault tests, plus Quint's separate provenance handoff
-workflow checks against the C example.
-See [Quint behavior checks](../README.md#quint-behavior-checks) for tooling. CI does not
-currently run these runtime checks.
+Run `scripts/check.sh --quint` on the final relevant sources. CI runs this gate
+on Linux, macOS, and Windows and retains Meson logs. It covers ref creation,
+atomic snapshot publication and rollback, caller-side conditional publication,
+binary commit transfer and the staged result round trip, read-only integrity and
+reachability checks, and explicit transactional garbage collection. It also runs
+focused interpreter and Python binding tests, native integrity and collection
+fault checks, native transfer boundary and fault tests, and Quint's separate
+provenance handoff workflow checks against the C example.
+
+Without `--quint`, the command only compiles the C core; that does not validate
+runtime behavior. See [Quint behavior checks](../README.md#quint-behavior-checks)
+for tooling. The CI gate does not measure coverage or build the Python wheel.
 
 The suites and coverage reports described at
 [`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete)

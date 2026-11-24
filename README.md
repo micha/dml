@@ -20,8 +20,8 @@ wraps from `subprojects/`. Run the [build check](docs/validation-policy.md) with
 scripts/check.sh
 ```
 
-This configures and compiles a debug build in `build/core-check/`. The CI matrix
-runs this build-only check; it does not run behavioral tests or measure coverage.
+This configures and compiles a debug build in `build/core-check/` without running
+tests. The CI matrix uses `--quint` to build and run the checks below.
 
 ### Quint behavior checks
 
@@ -40,6 +40,17 @@ npm install --prefix build/quint-tool --no-save --ignore-scripts @informalsystem
 PATH="$PWD/build/quint-tool/node_modules/.bin:$PATH" scripts/check.sh --quint
 ```
 
+On Windows, use the MSYS2 UCRT64 toolchain, including Python and Node. To bypass
+npm launchers, point `DML_QUINT_SCRIPT` at the installed JavaScript entry point
+(as CI does on every runner):
+
+```sh
+DML_QUINT_SCRIPT=build/quint-tool/node_modules/@informalsystems/quint/dist/src/cli.js \
+  ./scripts/check.sh --quint
+```
+
+Pass `DML_QUINT_SCRIPT=` to switch an existing build back to `quint` on `PATH`.
+
 This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
 [provenance handoff integration](tests/README.md#process-integration), and focused
@@ -57,8 +68,9 @@ retention after releasing `incoming`. The staging suite checks that a staged
 result survives collection even when publication is stale, and that a rejected
 import leaves no new objects or refs. The collection suite checks ref ordering,
 rollback, and exact persisted removals. Native checks exercise damaged repositories,
-allocation failures, and deletion failures. These checks are local and opt-in; they
-do not measure coverage.
+allocation failures, and deletion failures. These checks run in CI on Linux and
+macOS (x86-64 and ARM64) and Windows (x86-64). CI does not measure coverage or
+build a Python wheel.
 
 ### Install the Python binding
 

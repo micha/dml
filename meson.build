@@ -79,7 +79,18 @@ if get_option('python_bindings') or get_option('quint_tests')
 endif
 
 if get_option('quint_tests')
-  quint = find_program('quint')
+  quint_script = get_option('quint_script')
+  quint_args = []
+  if quint_script == ''
+    quint = find_program('quint')
+  else
+    quint = find_program(build_machine.system() == 'windows' ? 'node.exe' : 'node')
+    quint_script = meson.project_source_root() / quint_script
+    if not import('fs').is_file(quint_script)
+      error('Quint JavaScript entry point not found: ' + quint_script)
+    endif
+    quint_args = ['--quint-script', quint_script]
+  endif
   trace_interpreter = files('tests/run_histories.py')
   test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
   private_python_core = python.extension_module(
@@ -103,7 +114,7 @@ if get_option('quint_tests')
   test(
     'quint-refs', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
-           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'],
+           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: 150,
@@ -118,18 +129,23 @@ if get_option('quint_tests')
     test(
       'quint-' + suite[0], python,
       args: ['-B', trace_interpreter, quint.full_path(), private_python_core, lmdb_inventory,
-             files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2],
+             files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2] + quint_args,
       timeout: 150,
     )
   endforeach
 
   # Instrument the test copies only, never the installed library.
+  fault_header = meson.current_source_dir() / 'tests/fault_allocators.h'
+  force_fault_header = ['-include', fault_header]
+  if meson.get_compiler('c').get_argument_syntax() == 'msvc'
+    force_fault_header = ['/FI' + fault_header]
+  endif
   repo_check_fault_subject = static_library(
     'repo_check_fault_subject', 'src/repo_check.c', 'src/object_id.c', 'src/repo.c',
     include_directories: dml_inc,
     dependencies: vendor_headers,
     c_args: ['-Dmalloc=dml_check_fault_malloc', '-Drealloc=dml_check_fault_realloc',
-             '-Dmdb_del=dml_check_fault_del'],
+             '-Dmdb_del=dml_check_fault_del'] + force_fault_header,
   )
   repo_check = executable(
     'repo_check', 'tests/repo_check.c',
@@ -177,7 +193,7 @@ with tempfile.TemporaryDirectory() as tmp:
   test(
     'provenance-handoff', python,
     args: ['-B', files('tests/run_provenance_handoff.py'), quint.full_path(), provenance_handoff, handoff_fixture,
-           files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')],
+           files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')] + quint_args,
     timeout: 150,
   )
 
@@ -185,7 +201,8 @@ with tempfile.TemporaryDirectory() as tmp:
     'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
     include_directories: dml_inc,
     dependencies: vendor_headers,
-    c_args: ['-Dmalloc=dml_fault_malloc', '-Dcalloc=dml_fault_calloc', '-Drealloc=dml_fault_realloc'],
+    c_args: ['-Dmalloc=dml_fault_malloc', '-Dcalloc=dml_fault_calloc', '-Drealloc=dml_fault_realloc'] +
+            force_fault_header,
   )
   transfer_faults = executable(
     'transfer_faults', 'tests/transfer_faults.c',

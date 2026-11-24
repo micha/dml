@@ -6,6 +6,7 @@ case "${1:-}" in
   -h|--help)
     echo "Usage: scripts/check.sh [--quint]"
     echo "Configure and build the C core. With --quint, also run behavior and native fault checks."
+    echo "Set DML_QUINT_SCRIPT to run a Quint JavaScript entry point with Node (empty resets it)."
     exit 0
     ;;
   --quint)
@@ -25,6 +26,9 @@ setup_args=(--wrap-mode=forcefallback -Dbuildtype=debug)
 if [ "$quint_tests" = true ]; then
   build_dir="$root_dir/build/core-check-quint"
   setup_args+=(-Dquint_tests=true)
+  if [ "${DML_QUINT_SCRIPT+x}" = x ]; then
+    setup_args+=("-Dquint_script=$DML_QUINT_SCRIPT")
+  fi
 fi
 if [ -f "$build_dir/meson-private/coredata.dat" ]; then
   setup_args+=(--reconfigure)

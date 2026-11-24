@@ -7,7 +7,15 @@ import re
 import subprocess
 from tempfile import TemporaryDirectory
 
-from run_histories import check_verdicts, evaluate, read_histories, replay_history
+from run_histories import (
+    absolute_path,
+    add_quint_arguments,
+    check_verdicts,
+    evaluate,
+    quint_command,
+    read_histories,
+    replay_history,
+)
 
 
 def file_bytes(path):
@@ -102,18 +110,20 @@ class Processes:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("quint", "example", "fixture", "histories", "rules"):
-        parser.add_argument(name, type=lambda path: Path(path).absolute())
+    add_quint_arguments(parser)
+    for name in ("example", "fixture", "histories", "rules"):
+        parser.add_argument(name, type=absolute_path)
     args = parser.parse_args()
+    quint = quint_command(args)
     with TemporaryDirectory(prefix="dml-handoff-") as tmp:
         directory = Path(tmp)
-        histories = read_histories(args.quint, args.histories, directory / "histories.itf.json", ["init"])
+        histories = read_histories(quint, args.histories, directory / "histories.itf.json", ["init"])
         suite = Processes(args.example, args.fixture)
         observations = [
             {**replay_history(suite, directory / f"history-{index}", requests), "scenario": index}
             for index, requests in enumerate(histories)
         ]
-        state = evaluate(args.quint, args.rules, directory, observations, [args.histories])
+        state = evaluate(quint, args.rules, directory, observations, [args.histories])
         check_verdicts(histories, observations, state)
 
 
