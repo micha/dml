@@ -416,6 +416,53 @@ rejects; neither command is a retry receipt.
 Selections do not run work, verify arithmetic, search for alternatives, or
 change automatically when a result is staged or published.
 
+#### Distinguish two executions of the same request
+
+Use the [saved request workflow](#save-a-scale-request-before-sending-it) through
+`export-request`, then run it in two fresh worker repositories. Each worker
+writes a result and an attempt commit together, but only the attempt gets a ref:
+
+```sh
+for worker in worker-a worker-b; do
+  python examples/recorded_calls.py stage-input "./$worker" incoming ./request.dml
+  attempt_id=$(python -c 'from uuid import uuid4; print(uuid4())')
+  attempt=$(python examples/recorded_calls.py work-scale-attempt "./$worker" incoming "$request" attempt "$attempt_id")
+  python examples/recorded_calls.py export-scale-attempt "./$worker" attempt "$attempt" "./$worker.dml"
+  python examples/recorded_calls.py stage-input ./origin "$worker" "./$worker.dml"
+  python examples/recorded_calls.py inspect ./origin "$worker"
+  if [ "$worker" = worker-a ]; then first_attempt=$attempt; fi
+done
+```
+
+`work-scale-attempt` takes a caller-supplied lowercase UUIDv4. Generate a fresh
+one for each independent execution. An attempt's ordered parents are the
+portable request and the unchanged `requested-scale-v1` result, so the two runs
+can have the same `result_commit` but different attempt commit IDs. Reusing the
+UUID with the same request and result yields the same attempt commit ID; there
+is no UUID registry, retry protocol, or proof of execution. `export-scale-attempt`
+exports the exact attempt with its full closure to a new file. Keep the attempt
+commit ID from the worker independently of the staging receipt.
+
+Choose the first attempt by its exact commit ID, then publish from the choice:
+
+```sh
+chosen=$(python examples/recorded_calls.py select-scale-attempt ./origin pending "$plan" worker-a "$first_attempt" chosen)
+python examples/recorded_calls.py publish-selected-scale ./origin pending "$plan" chosen "$chosen" reuse-001
+python examples/recorded_calls.py inspect ./origin reuse-001
+```
+
+The selection retains the request and the chosen attempt, not the plan or the
+other attempt. Its `attempt_ref` is historical: the selection works after the
+original attempt pin disappears and collection runs. When both attempt pins
+are gone, retaining a shared result does not keep the unselected attempt alive.
+As with result selections, selection does not check `main` or consume either
+input pin. Publication checks the exact plan, selection, request, result and
+implementation, and the plan's saved `main`. It publishes the original result
+and consumes only the plan. The reuse record identifies the selected attempt;
+publication neither runs work nor records another attempt. Work, selection and
+publication require distinct refs (also distinct from `main`) and reject an
+occupied output, even at the same ID.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).
