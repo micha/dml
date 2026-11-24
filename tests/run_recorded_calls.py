@@ -57,6 +57,7 @@ class ProcessHistory:
             "request_scale": self.request_scale, "export_request": self.export_request,
             "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
             "abandon_scale_request": self.abandon_scale_request, "stage_reused_scale": self.stage_reused_scale,
+            "publish_reused_scale": self.publish_reused_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -85,6 +86,7 @@ class ProcessHistory:
                 "expectedResult": "", "expectedMain": "", "requestCommit": "",
                 "requestImplementation": "", "requestFactor": 0,
                 "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
+                "reusePublication": {"mode": "", "planRef": "", "plan": "", "resultRef": "", "result": ""},
                 "unchanged": before is not None and before == after,
                 "bundlePresent": bundle_after is not None, "bundleUnchanged": bundle_before == bundle_after}, result.stdout
 
@@ -172,13 +174,19 @@ class ProcessHistory:
             self.scale_receipts[role, result_ref] = row["commit"]
         return {**row, "expectedCommit": request}
 
-    def stage_reused_scale(self, role, plan_pin, plan_receipt, result_pin, result_receipt, dest):
+    def select_reuse(self, op, role, plan_pin, plan_receipt, result_pin, result_receipt, output):
         plan = self.plan_receipts[plan_receipt]
         # The original worker result, never the local staging receipt.
         result = self.scale_receipts["worker", result_receipt]
-        row = self.write("stage_reused_scale", (role, plan_pin, plan_receipt, result_pin, result_receipt, dest),
-                         operands=(plan_pin, plan, result_pin, result, dest))
+        row = self.write(op, (role, plan_pin, plan_receipt, result_pin, result_receipt, output),
+                         operands=(plan_pin, plan, result_pin, result, output))
         return {**row, "expectedCommit": plan, "expectedResult": result}
+
+    def stage_reused_scale(self, *args):
+        return self.select_reuse("stage_reused_scale", *args)
+
+    def publish_reused_scale(self, *args):
+        return self.select_reuse("publish_reused_scale", *args)
 
     def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt, receipt_ref=None):
         plan = self.plan_receipts[plan_receipt]
@@ -202,7 +210,13 @@ class ProcessHistory:
             row["commit"] = id_evidence(report["commit"])
             if "calls" in report:
                 row["calls"] = [call_evidence(call) for call in report["calls"]]
-            if "plan_commit" in report:
+            if "publication_mode" in report:
+                row["reusePublication"] = {
+                    "mode": report["publication_mode"], "planRef": report["plan_ref"],
+                    "plan": id_evidence(report["plan_commit"]), "resultRef": report["result_ref"],
+                    "result": id_evidence(report["result_commit"]),
+                }
+            elif "plan_commit" in report:
                 row["publication"] = {"planRef": report["plan_ref"], "plan": id_evidence(report["plan_commit"]),
                                       "stagingRef": report["staging_ref"], "result": id_evidence(report["result_commit"])}
             if "producer_commit" in report:

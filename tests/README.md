@@ -208,6 +208,14 @@ same ID. It also checks that a moved `main` blocks publication but not staging,
 that abandonment blocks both commands, and that the original result and
 receipt survive unchanged.
 
+The [recorded reuse publication history](../README.md#publish-reuse-with-a-durable-record)
+publishes the same result ID first from a freshly staged bundle, then by explicit
+reuse. Only the reuse path leaves an inspectable record. Replay also checks
+that stale `main` and abandoned plans cannot leave a record, that the result pin
+survives, and that `main` still reports the original graph. Focused tests inspect
+the record's parent edges and check retention after collection and rollback on
+an occupied reuse ref.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -360,3 +368,25 @@ mkdir -p build/recorded-result-reuse-tlc
 Observations include a moved `main`, rejection after abandonment, publication
 after removal of the original result pin, and separately malformed or stale
 selections. Run this design check separately from CI.
+
+#### Check the recorded reuse publication design with TLC
+
+The [reuse publication model](recorded_reuse_publication_design.qnt) has one
+slot for each ref role, three valid plans for the same request with distinct
+`main` expectations, two eligible results, and separate malformed or mismatched
+selections. Other writers may move or restore pins between transactions. The
+model checks safety: atomic publication or rollback, competition for the plan
+with abandonment and ordinary staged publication, and retention through both
+ordered record parents. It abstracts record encoding and native errors, models
+collection as a final readback, and does not model manually replacing the reuse
+ref or retrying a publication receipt.
+
+```sh
+mkdir -p build/recorded-reuse-publication-tlc
+(cd build/recorded-reuse-publication-tlc && quint verify ../../tests/recorded_reuse_publication_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+Observations include reuse without a change to the `main` target, rollback after
+each tentative write, rejection under an occupied ref at the exact record ID,
+and readback with the reuse ref as the sole root. Run this separately from CI.

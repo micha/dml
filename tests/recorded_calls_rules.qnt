@@ -4,11 +4,12 @@ module recorded_calls_rules {
   type Argument = { name: str, node: str, value: int, producer: str }
   type Call = { dag: str, implementation: str, resultNode: str, resultValue: int, arguments: List[Argument] }
   type Publication = { planRef: str, plan: str, stagingRef: str, result: str }
+  type ReusePublication = { mode: str, planRef: str, plan: str, resultRef: str, result: str }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
     commit: str, calls: List[Call],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
     expectedResult: str, expectedMain: str, requestCommit: str, requestImplementation: str, requestFactor: int,
-    bundlePresent: bool, bundleUnchanged: bool, publication: Publication }
+    bundlePresent: bool, bundleUnchanged: bool, publication: Publication, reusePublication: ReusePublication }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def literal(arg: Argument, name: str, value: int): bool =
@@ -473,6 +474,59 @@ module recorded_calls_rules {
     }
   }
 
+  pure def reuseRecordVerdict(readback: Attempt, req: Request, expected: ReusePublication,
+                              portable: str, priorTip: str): str =
+    if (not(matches(readback, req))) "wrong_inspect"
+    else if (not(readback.unchanged)) "storage_changed"
+    else if (readback.commit == "" or readback.commit == expected.plan or readback.commit == expected.result or
+      readback.reusePublication != expected or readback.requestCommit != portable or
+      readback.expectedMain != priorTip or readback.calls.length() != 0) "wrong_reuse_record"
+    else "inspected"
+
+  pure def reusePublicationVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = reusePublicationRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val sumRead = attempts[1]
+      val plan = attempts[2].commit
+      val portable = attempts[3].commit
+      val result = attempts[5].commit
+      val parallel = attempts[9].commit
+      val nextPlan = attempts[17].commit
+      val original: Scenario = { ...selected, b: ("-7", -7) }
+      val proof: ReusePublication = { mode: "reuse", planRef: "next-plan", plan: nextPlan,
+                                      resultRef: "saved-result", result: result }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(original, sumRead, req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], producer),
+        requestExportVerdict(attempts[3], req[3], plan),
+        stageVerdict(attempts[4], req[4], portable),
+        scaleWriteVerdict(attempts[5], req[5], portable),
+        exportVerdict(attempts[6], req[6], result),
+        stageVerdict(attempts[7], req[7], result),
+        stageVerdict(attempts[8], req[8], result),
+        scaleWriteVerdict(attempts[9], req[9], producer),
+        publishVerdict(attempts[10], req[10], result, plan, "", true),
+        requestedReadVerdict(original, attempts[11], req[11], result, portable, sumRead),
+        absentRefVerdict(attempts[12], rejectedWriteVerdict(attempts[12], req[12], "")),
+        publishVerdict(attempts[13], req[13], result, parallel, "", false), // stale main
+        absentRefVerdict(attempts[14], rejectedWriteVerdict(attempts[14], req[14], "")),
+        abandonVerdict(attempts[15], req[15], parallel),
+        absentRefVerdict(attempts[16], publishVerdict(attempts[16], req[16], result, parallel, "", false)),
+        scaleWriteVerdict(attempts[17], req[17], producer),
+        publishVerdict(attempts[18], req[18], result, nextPlan, "", true),
+        reuseRecordVerdict(attempts[19], req[19], proof, portable, result),
+        requestedReadVerdict(original, attempts[20], req[20], result, portable, sumRead),
+        requestedReadVerdict(original, attempts[21], req[21], result, portable, sumRead),
+        absentRefVerdict(attempts[22], rejectedWriteVerdict(attempts[22], req[22], "")),
+        receiptReadVerdict(attempts[23], req[23],
+          { planRef: "plan", plan: plan, stagingRef: "returned", result: result })
+      )
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -481,6 +535,7 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 4) retryHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 5) abandonHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 6) reuseHistoryVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 7) reusePublicationVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -516,8 +571,12 @@ module recorded_calls_rules {
       "staged", "inspected", "recorded", "recorded", "rejected", "rejected", "rejected", "reused", "rejected",
       "published", "rejected", "rejected", "reused", "rejected", "abandoned", "rejected", "rejected", "inspected",
       "recorded", "reused", "published", "inspected", "inspected", "inspected")
-    if (rows.length() != 9 or
-      verdicts != List(together, together, separate, handoff, roundTrip, durable, retry, abandon, reuse)) false
+    val reusePublication = List("recorded", "inspected", "recorded", "exported", "staged", "recorded", "exported",
+      "staged", "staged", "recorded", "published", "inspected", "rejected", "rejected", "rejected", "abandoned",
+      "rejected", "recorded", "published", "inspected", "inspected", "inspected", "rejected", "inspected")
+    val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
+      reuse, reusePublication)
+    if (rows.length() != 10 or verdicts != expected) false
     else {
       val split = rows[2].attempts
       val transfer = rows[3].attempts
@@ -526,6 +585,7 @@ module recorded_calls_rules {
       val retried = rows[6].attempts
       val abandoned = rows[7].attempts
       val reused = rows[8].attempts
+      val reusePublished = rows[9].attempts
       rows.indices().forall(i => rows[i].scenario == i) and
         sameRootNotSameCall(rows[0].attempts[1].calls[0], rows[1].attempts[1].calls[0]) and
         sameRootNotSameCall(split[2].calls[0], split[3].calls[0]) and split[0].commit != split[1].commit and
@@ -543,7 +603,10 @@ module recorded_calls_rules {
         abandoned[2].commit != abandoned[13].commit and abandoned[3].commit != abandoned[15].commit and
         reused[2].commit == reused[9].commit and reused[2].commit != reused[10].commit and
         reused[2].commit != reused[25].commit and reused[8].calls == reused[24].calls and
-        reused[8].calls == reused[28].calls and reused[8].calls == reused[29].calls
+        reused[8].calls == reused[28].calls and reused[8].calls == reused[29].calls and
+        reusePublished[2].commit == reusePublished[9].commit and
+        reusePublished[2].commit != reusePublished[17].commit and
+        reusePublished[11].calls == reusePublished[20].calls and reusePublished[20].calls == reusePublished[21].calls
     }
   }
 
@@ -560,7 +623,8 @@ module recorded_calls_rules {
     expectedCommit: "", producerCommit: "", unchanged: false,
     removed: -1, expectedResult: "", expectedMain: "", requestCommit: "", requestImplementation: "",
     requestFactor: 0, bundlePresent: false, bundleUnchanged: true,
-    publication: { planRef: "", plan: "", stagingRef: "", result: "" } }
+    publication: { planRef: "", plan: "", stagingRef: "", result: "" },
+    reusePublication: { mode: "", planRef: "", plan: "", resultRef: "", result: "" } }
   pure val inspected: Attempt = { ...recorded, op: "inspect", args: List("source"), calls: List(summed, scaled),
     unchanged: true }
   pure def inspectVerdict(readback: Attempt): str =
@@ -593,7 +657,20 @@ module recorded_calls_rules {
     commit: "plan", expectedCommit: "plan" }
   pure val reused: Attempt = { ...recorded, op: "stage_reused_scale", args: reuseRequests[14].args,
     expectedCommit: "plan", expectedResult: "result", commit: "result" }
+  pure val reuseProof: ReusePublication = { mode: "reuse", planRef: "next-plan", plan: "next-plan-id",
+    resultRef: "saved-result", result: "result" }
+  pure val reuseRead: Attempt = { ...recorded, op: "inspect", args: reusePublicationRequests[19].args,
+    commit: "reuse-record", unchanged: true, requestCommit: "request", expectedMain: "prior",
+    reusePublication: reuseProof }
+  pure def checkReuseProof(readback: Attempt): str =
+    reuseRecordVerdict(readback, reusePublicationRequests[19], reuseProof, "request", "prior")
   pure val controlsPass = all {
+    checkReuseProof(reuseRead) == "inspected",
+    checkReuseProof({ ...reuseRead, reusePublication: { ...reuseProof, mode: "" } }) == "wrong_reuse_record",
+    checkReuseProof({ ...reuseRead, reusePublication: { ...reuseProof, result: "other" } }) == "wrong_reuse_record",
+    checkReuseProof({ ...reuseRead, reusePublication: { ...reuseProof, plan: "other" } }) == "wrong_reuse_record",
+    checkReuseProof({ ...reuseRead, requestCommit: "other" }) == "wrong_reuse_record",
+    checkReuseProof({ ...reuseRead, expectedMain: "other" }) == "wrong_reuse_record",
     reuseStageVerdict(reused, reuseRequests[14], "plan", "result", true) == "reused",
     reuseStageVerdict({ ...reused, expectedResult: "other" }, reuseRequests[14], "plan", "result", true)
       == "wrong_selection",

@@ -626,7 +626,7 @@ class RecordedCallsTest(unittest.TestCase):
         report = json.loads(self.expect_success("inspect"))
         self.assertEqual(report["calls"][1]["result"]["value"], -98)
 
-    def test_stage_reused_scale_rejects_malformed_plan_and_inconsistent_results(self):
+    def test_reuse_commands_reject_malformed_plan_and_inconsistent_results(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
         self.example["record_sum"](self.repo, b"decoy", 9, 3)
         plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
@@ -656,7 +656,6 @@ class RecordedCallsTest(unittest.TestCase):
                 core.txn_ref_create(txn, pin, commit)
             core.txn_commit(txn)
 
-        stage = self.example["stage_reused_scale"]
         data = self.repo / "data.mdb"
         before = data.read_bytes()
         cases = (
@@ -666,11 +665,13 @@ class RecordedCallsTest(unittest.TestCase):
             (b"plan", plan, b"wrong-producer", "scale input DAG does not match"),
             (b"plan", plan, b"wrong-request", "result does not retain the expected request commit"),
         )
-        for plan_pin, plan_commit, result_pin, reason in cases:
-            with self.subTest(plan=plan_pin, result=result_pin):
-                with self.assertRaisesRegex(ValueError, reason):
-                    stage(self.repo, plan_pin, plan_commit, result_pin, candidates[result_pin], b"dest")
-                self.assertEqual(data.read_bytes(), before)
+        for command in ("stage_reused_scale", "publish_reused_scale"):
+            reuse = self.example[command]
+            for plan_pin, plan_commit, result_pin, reason in cases:
+                with self.subTest(command=command, plan=plan_pin, result=result_pin):
+                    with self.assertRaisesRegex(ValueError, reason):
+                        reuse(self.repo, plan_pin, plan_commit, result_pin, candidates[result_pin], b"dest")
+                    self.assertEqual(data.read_bytes(), before)
         with transaction(self.repo) as txn:
             self.assert_missing_ref(txn, b"dest")
             self.assert_missing_ref(txn, b"main")
@@ -721,7 +722,7 @@ class RecordedCallsTest(unittest.TestCase):
                 self.assert_missing_ref(txn, pin)
         self.assertEqual(json.loads(self.expect_success("inspect")), history)
 
-    def test_stage_reused_scale_validates_ids_and_all_ref_slots_before_opening_repository(self):
+    def test_reuse_commands_validate_ids_and_all_ref_slots_before_opening_repository(self):
         class BytesSubclass(bytes):
             pass
 
@@ -729,30 +730,185 @@ class RecordedCallsTest(unittest.TestCase):
             def __fspath__(self):
                 raise AssertionError("invalid selections must be rejected before opening the repository")
 
-        stage = self.example["stage_reused_scale"]
         identifier = bytes(16)
         selection = (b"plan", identifier, b"history", identifier, b"dest")
         invalid_refs = ("ref", bytearray(b"ref"), BytesSubclass(b"ref"), b"", b"-ref", b"ref/name",
                         b"r\xc3\xa9f", b"ref\n", b"x" * 129)
-        for index, label in ((0, "plan"), (2, "result"), (4, "destination")):
-            for invalid in invalid_refs:
-                args = list(selection)
-                args[index] = invalid
-                with self.subTest(ref=label, invalid=invalid):
-                    with self.assertRaisesRegex(ValueError, f"{label} ref.*ASCII.*bytes"):
-                        stage(UnopenablePath(), *args)
-        for plan, result, dest in ((b"main", b"history", b"dest"), (b"plan", b"main", b"dest"),
-                                   (b"plan", b"history", b"main"), (b"plan", b"plan", b"dest"),
-                                   (b"plan", b"history", b"history"), (b"plan", b"history", b"plan")):
-            with self.subTest(plan=plan, result=result, dest=dest), self.assertRaisesRegex(ValueError, "distinct"):
-                stage(UnopenablePath(), plan, identifier, result, identifier, dest)
-        for index, label in ((1, "plan"), (3, "result")):
-            for invalid in (identifier.hex(), bytearray(identifier), BytesSubclass(identifier), b"x" * 15, b"x" * 17):
-                args = list(selection)
-                args[index] = invalid
-                with self.subTest(commit=label, invalid=invalid):
-                    with self.assertRaisesRegex(ValueError, f"{label} commit.*16-byte ID"):
-                        stage(UnopenablePath(), *args)
+        aliases = ((b"main", b"history", b"dest"), (b"plan", b"main", b"dest"),
+                   (b"plan", b"history", b"main"), (b"plan", b"plan", b"dest"),
+                   (b"plan", b"history", b"history"), (b"plan", b"history", b"plan"))
+        for command, output_ref in (("stage_reused_scale", "destination"), ("publish_reused_scale", "reuse")):
+            reuse = self.example[command]
+            for index, label in ((0, "plan"), (2, "result"), (4, output_ref)):
+                for invalid in invalid_refs:
+                    args = list(selection)
+                    args[index] = invalid
+                    with self.subTest(command=command, ref=label, invalid=invalid):
+                        with self.assertRaisesRegex(ValueError, f"{label} ref.*ASCII.*bytes"):
+                            reuse(UnopenablePath(), *args)
+            for plan, result, dest in aliases:
+                with self.subTest(command=command, plan=plan, result=result, dest=dest):
+                    with self.assertRaisesRegex(ValueError, "distinct"):
+                        reuse(UnopenablePath(), plan, identifier, result, identifier, dest)
+            for index, label in ((1, "plan"), (3, "result")):
+                for invalid in (identifier.hex(), bytearray(identifier), BytesSubclass(identifier), b"x" * 15, b"x" * 17):
+                    args = list(selection)
+                    args[index] = invalid
+                    with self.subTest(command=command, commit=label, invalid=invalid):
+                        with self.assertRaisesRegex(ValueError, f"{label} commit.*16-byte ID"):
+                            reuse(UnopenablePath(), *args)
+
+    def test_publish_reused_scale_retains_historical_edges_without_reexecuting(self):
+        producer = self.example["record_sum"](self.repo, b"producer", (1 << 63) - 1, 0)
+        previous = self.example["record_sum"](self.repo, b"main", 2, 0)
+        plan_pin = b"1" + b"a" * 124 + b"._-"
+        plan = self.example["request_scale"](self.repo, b"producer", producer, plan_pin, 3)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, _, (request, captured) = self.snapshot(txn, plan_pin, b"scale-plan-v1")
+            self.assertEqual(captured, previous)
+            # Execution would overflow. Both results match structurally, but only
+            # the explicitly selected result belongs in main and the reuse record.
+            result = put_requested_result(txn, request, sum_dag, 3, -98)
+            alternate = put_requested_result(txn, request, sum_dag, 3, 99)
+            core.txn_ref_create(txn, b"history", result)
+            core.txn_ref_create(txn, b"staged", alternate)
+            core.txn_commit(txn)
+        stored = self.example["inspect"](self.repo, b"history")
+        self.assertEqual(stored["calls"][1]["result"]["value"], -98)
+        publish = self.example["publish_reused_scale"]
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "result pin does not point to the expected commit"):
+            publish(self.repo, plan_pin, plan, b"history", alternate, b"reuse")
+        self.assertEqual(data.read_bytes(), before)
+
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", producer)
+            core.txn_commit(txn)
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "main does not point to the expected commit"):
+            publish(self.repo, plan_pin, plan, b"history", result, b"reuse")
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_update(txn, b"main", previous)
+            core.txn_commit(txn)
+        self.assertEqual(publish(self.repo, plan_pin, plan, b"history", result, b"reuse"), result)
+
+        with transaction(self.repo) as txn:
+            record, dag, parents = self.snapshot(txn, b"reuse", b"recorded-scale-reuse-v1")
+            self.assertEqual(parents, (plan, result))
+            _, root, bindings = view(txn, core.REC_DAG, dag)
+            self.assertEqual(bindings, 2)
+            self.assertEqual(root, core.txn_lookup_node(txn, dag, b"plan_ref"))
+            self.assertEqual(self.literal_value(txn, root, core.DATUM_STRING), plan_pin.decode("ascii"))
+            result_node = core.txn_lookup_node(txn, dag, b"result_ref")
+            self.assertEqual(self.literal_value(txn, result_node, core.DATUM_STRING), "history")
+            self.assert_missing_ref(txn, plan_pin)
+            for ref, expected in ((b"main", result), (b"history", result), (b"staged", alternate)):
+                self.assertEqual(core.txn_ref_get(txn, ref), expected)
+        report = {"commit": record.hex(), "publication_mode": "reuse", "plan_ref": plan_pin.decode("ascii"),
+                  "plan_commit": plan.hex(), "result_ref": "history", "result_commit": result.hex(),
+                  "request_commit": request.hex(), "expected_main": previous.hex()}
+        self.assertEqual(self.example["inspect"](self.repo), stored)
+        self.assertEqual(self.example["inspect"](self.repo, b"reuse"), report)
+
+        replacement = self.example["record_sum"](self.repo, b"replacement", 6, 0)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            # Historical names can now refer to unrelated objects. No ref but
+            # reuse reaches either parent, or the plan's captured old main.
+            for ref in (b"main", b"history"):
+                core.txn_ref_update(txn, ref, replacement)
+            core.txn_ref_create(txn, plan_pin, replacement)
+            core.txn_ref_delete_expected(txn, b"staged", alternate)
+            core.txn_ref_delete_expected(txn, b"producer", producer)
+            core.txn_commit(txn)
+        self.assertGreater(self.example["collect"](self.repo), 0)
+        self.assertEqual(self.example["inspect"](self.repo, b"reuse"), report)
+        with transaction(self.repo) as txn:
+            for commit in (plan, result, previous, request, producer):
+                view(txn, core.REC_COMMIT, commit)
+            with self.assertRaises(core.Error) as swept:
+                view(txn, core.REC_COMMIT, alternate)
+            self.assertEqual(swept.exception.args[0], "not_found")
+
+    def test_publish_reused_scale_rejects_occupied_ref_even_with_exact_intent(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            result = put_requested_result(txn, request, sum_dag, 3, 36)
+            core.txn_ref_create(txn, b"history", result)
+            core.txn_ref_create(txn, b"reuse", producer)
+            core.txn_commit(txn)
+        publish = self.example["publish_reused_scale"]
+        selection = (self.repo, b"plan", plan, b"history", result, b"reuse")
+        data = self.repo / "data.mdb"
+
+        def reject_occupied(target):
+            before = data.read_bytes()
+            with self.assertRaisesRegex(core.Error, "ref already exists"):
+                publish(*selection)
+            self.assertEqual(data.read_bytes(), before)
+            with transaction(self.repo) as txn:
+                self.assert_missing_ref(txn, b"main")
+                for pin, expected in ((b"plan", plan), (b"history", result), (b"reuse", target)):
+                    self.assertEqual(core.txn_ref_get(txn, pin), expected)
+
+        reject_occupied(producer)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_delete_expected(txn, b"reuse", producer)
+            core.txn_commit(txn)
+        self.assertEqual(publish(*selection), result)
+        self.assertIsNone(self.example["inspect"](self.repo, b"reuse")["expected_main"])
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            record = core.txn_ref_get(txn, b"reuse")
+            self.assert_missing_ref(txn, b"plan")
+            self.assertEqual(core.txn_ref_get(txn, b"history"), result)
+            # Restore both guards so only occupancy of the identical record
+            # can cause the next request to fail; it is not a retry key.
+            core.txn_ref_delete_expected(txn, b"main", result)
+            core.txn_ref_create(txn, b"plan", plan)
+            core.txn_commit(txn)
+        reject_occupied(record)
+
+    def test_inspect_rejects_malformed_reuse_record_and_inconsistent_result(self):
+        producer, _, plan, result = self.prepare_receipted_scale()
+        self.example["request_scale"](self.repo, b"producer", producer, b"other-plan", 4)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, sum_dag, _ = self.snapshot(txn, b"producer", b"recorded-sum-v1")
+            _, _, (wrong_request, _) = self.snapshot(txn, b"other-plan", b"scale-plan-v1")
+            other_result = put_requested_result(txn, wrong_request, sum_dag, 4, 48)
+            plan_node = literal(txn, core.DATUM_STRING, b"plan")
+            result_node = literal(txn, core.DATUM_STRING, b"returned")
+            main_node = literal(txn, core.DATUM_STRING, b"main")
+            invalid_node = literal(txn, core.DATUM_STRING, b"invalid/name")
+            number_node = literal(txn, core.DATUM_I64, 7)
+            fields = (b"plan_ref", plan_node, b"result_ref", result_node)
+            good = put(txn, core.REC_DAG, plan_node, *fields)
+            cases = {
+                b"reversed-parents": (good, (result, plan)),
+                b"missing-parent": (good, (plan,)),
+                b"wrong-request": (good, (plan, other_result)),
+                b"wrong-dag-root": (put(txn, core.REC_DAG, result_node, *fields), (plan, result)),
+                b"extra-binding": (put(txn, core.REC_DAG, plan_node, *fields, b"extra", number_node), (plan, result)),
+            }
+            for name, value in ((b"invalid-name", invalid_node), (b"main-alias", main_node),
+                                (b"plan-alias", plan_node), (b"wrong-type", number_node)):
+                dag = put(txn, core.REC_DAG, plan_node, b"plan_ref", plan_node, b"result_ref", value)
+                cases[name] = (dag, (plan, result))
+            for name, (dag, parents) in cases.items():
+                tree = put(txn, core.REC_TREE, b"recorded-scale-reuse-v1", dag)
+                core.txn_ref_create(txn, name, put(txn, core.REC_COMMIT, tree, *parents))
+            core.txn_commit(txn)
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for name in cases:
+            with self.subTest(record=name):
+                with self.assertRaises(ValueError):
+                    self.example["inspect"](self.repo, name)
+                self.assertEqual(data.read_bytes(), before)
 
     def test_request_or_worker_failure_does_not_leave_partial_state(self):
         producer = self.expect_success("record-sum", "producer", 2, 0).strip()
