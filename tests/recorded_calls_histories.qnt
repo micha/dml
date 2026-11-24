@@ -211,9 +211,31 @@ module recorded_calls_histories {
     source("inspect", List("ack"))
   ))
 
+  // Ordinary publication and recorded reuse select the same result ID. Only
+  // the latter leaves a reuse record. No work or transfer follows publication.
+  pure val reusePublicationRequests: List[Request] = retryRequests.slice(0, 7).concat(List(
+    source("stage_input", List("saved-result", "result.bundle")),
+    source("stage_input", List("returned", "result.bundle")),
+    source("request_scale", List("producer", "producer", "parallel", "3")),
+    source("publish_requested_scale", List("plan", "plan", "returned", "result", "ack")),
+    source("inspect", List()),
+    source("inspect", List("reuse-proof")),
+    source("publish_reused_scale", List("parallel", "parallel", "saved-result", "result", "reuse-proof")),
+    source("inspect", List("reuse-proof")),
+    source("abandon_scale_request", List("parallel", "parallel")),
+    source("publish_reused_scale", List("parallel", "parallel", "saved-result", "result", "reuse-proof")),
+    source("request_scale", List("producer", "producer", "next-plan", "3")),
+    source("publish_reused_scale", List("next-plan", "next-plan", "saved-result", "result", "reuse-proof")),
+    source("inspect", List("reuse-proof")),
+    source("inspect", List()),
+    source("inspect", List("saved-result")),
+    source("inspect", List("next-plan")),
+    source("inspect", List("ack"))
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
-    .append(abandonRequests).append(reuseRequests)
+    .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests)
   action step = histories' = histories
 }

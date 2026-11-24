@@ -349,6 +349,38 @@ retained result pin. A plan pin that is absent or changed after abandonment
 blocks reuse and fresh publication of that selection. Abandonment does not
 remove staging refs already created.
 
+#### Publish reuse with a durable record
+
+Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).
+Keep the original result pinned locally (skip `stage-input` if it is already
+under `saved-result`), then make a new plan for the same producer and factor:
+
+```sh
+python examples/recorded_calls.py stage-input ./origin saved-result ./scale.dml
+plan=$(python examples/recorded_calls.py request-scale ./origin producer "$producer" next-plan 3)
+python examples/recorded_calls.py publish-reused-scale ./origin next-plan "$plan" saved-result "$result" reuse-001
+python examples/recorded_calls.py inspect ./origin
+python examples/recorded_calls.py inspect ./origin reuse-001
+```
+
+There is no new dispatch, execution, or staging step for the new plan. Supply
+its exact ID and the original worker result ID, not the import receipt. In one
+transaction, `publish-reused-scale` checks the exact plan and result pins, the
+request and its producer edge and factor, and the plan's saved `main`. It sets
+`main` to the same result commit, consumes only the plan pin, and creates a
+fresh reuse ref. All four ref names must be distinct. A stale selection or
+occupied reuse ref leaves committed state unchanged, even if the occupied ref
+already holds the same record. This is not a retry acknowledgment.
+
+`inspect ./origin` still reports the original result. `inspect ./origin reuse-001`
+reports `publication_mode: "reuse"`, the original pin names, and the exact plan,
+request, result, and captured `main`. The separate record is an ordinary commit
+with the plan and result as its ordered parents. Keep its ref to retain those
+commits, their dependencies, and the captured old `main` (if any) through
+collection, even after the live refs move. This records how publication selected
+the result; it does not prove the result's age, authenticate a worker, or verify
+arithmetic. Ordinary staged publication does not create this record.
+
 ### Install and link the C library
 
 For example, install the headers and static library under a local prefix:
