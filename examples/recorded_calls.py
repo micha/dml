@@ -10,7 +10,8 @@ when the source should preserve its expectations across invocations.
 Use `stage-reused-scale` to stage an existing result, or `publish-reused-scale`
 to publish it directly and retain a separate reuse record.
 Use `work-scale-attempt` and `select-scale-attempt` to distinguish executions
-of the same request without changing the result's identity.
+of the same request without changing the result's identity. Use
+`adopt-scale-attempt` to record a new version of a choice without moving it.
 These layouts are not core record types or execution APIs.
 """
 
@@ -37,6 +38,7 @@ REUSE_ENTRY = b"recorded-scale-reuse-v1"
 SELECTION_ENTRY = b"scale-result-selection-v1"
 ATTEMPT_ENTRY = b"scale-attempt-v1"
 ATTEMPT_SELECTION_ENTRY = b"scale-attempt-selection-v1"
+ADOPTION_ENTRY = b"scale-attempt-adoption-v1"
 SELECTED_REUSE_ENTRY = b"recorded-selected-scale-reuse-v1"
 # The core's ASCII name profile, also used to validate historical ref-name literals.
 REF_NAME = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
@@ -70,6 +72,7 @@ class _ScaleSelection(NamedTuple):
     result: bytes
     historical_ref: bytes
     attempt: _ScaleAttempt | None = None
+    previous: bytes | None = None
 
 
 @contextmanager
@@ -422,6 +425,28 @@ def select_scale_attempt(path, plan_pin, plan_commit, attempt_ref, attempt_commi
         return _publish(txn, selection_ref, ATTEMPT_SELECTION_ENTRY, dag, request.commit, attempt_commit)
 
 
+def adopt_scale_attempt(path, basis_ref, basis_commit, attempt_ref, attempt_commit, selection_ref):
+    """Create a new version of an attempt choice without changing its basis."""
+    _check_commit_id(basis_commit, "basis selection commit")
+    _check_commit_id(attempt_commit, "attempt commit")
+    for label, ref in (("basis", basis_ref), ("attempt", attempt_ref), ("selection", selection_ref)):
+        _check_ref_name(ref, label)
+    if len({basis_ref, attempt_ref, selection_ref, MAIN}) != 4:
+        raise ValueError("basis, attempt, selection, and main refs must be distinct")
+    with _write_transaction(path, create=False) as txn:
+        if core.txn_ref_get(txn, basis_ref) != basis_commit:
+            raise ValueError("basis ref does not point to the expected selection commit")
+        basis = _read_scale_selection(txn, basis_commit)
+        if basis.attempt is None:
+            raise ValueError("adoption basis must be an attempt selection")
+        attempt = _selected_attempt(txn, attempt_ref, attempt_commit, expected_request=basis.request)
+        if attempt.commit == basis.attempt.commit:
+            raise ValueError("adoption must change the selected attempt commit")
+        name = _put_literal(txn, core.DATUM_STRING, attempt_ref)
+        dag = _put_object(txn, core.REC_DAG, name, b"attempt_ref", name)
+        return _publish(txn, selection_ref, ADOPTION_ENTRY, dag, basis_commit, attempt_commit)
+
+
 def stage_reused_scale(path, plan_pin, plan_commit, result_pin, result_commit, dest_pin):
     """Stage an exact local result for a plan without executing or publishing it."""
     _check_reuse_selection(plan_pin, plan_commit, result_pin, result_commit, dest_pin, "destination")
@@ -698,7 +723,14 @@ def _selected_attempt(txn, pin, commit, *, expected_request=None):
 
 
 def _read_scale_selection(txn, commit, *, expected_request=None):
-    view, parents, entry, dag = _snapshot(txn, commit)
+    snapshot = _snapshot(txn, commit)
+    if snapshot[2] == ADOPTION_ENTRY:
+        return _read_scale_adoption(txn, snapshot, expected_request)
+    return _read_initial_selection(txn, snapshot, expected_request)
+
+
+def _read_initial_selection(txn, snapshot, expected_request):
+    view, parents, entry, dag = snapshot
     if entry not in (SELECTION_ENTRY, ATTEMPT_SELECTION_ENTRY):
         raise ValueError("expected a scale result or attempt selection commit")
     kind = "attempt" if entry == ATTEMPT_SELECTION_ENTRY else "result"
@@ -717,6 +749,36 @@ def _read_scale_selection(txn, commit, *, expected_request=None):
         return _ScaleSelection(request, attempt.result, historical_ref, attempt)
     _inspect_snapshot(txn, target, expected_request=request)
     return _ScaleSelection(request, target, historical_ref)
+
+
+def _read_scale_adoption(txn, snapshot, expected_request):
+    # Follow parents iteratively so the validity of a chain does not depend on
+    # Python's recursion limit. Validate every version, not just the current choice.
+    head = None
+    newer_attempt = None
+    while snapshot[2] == ADOPTION_ENTRY:
+        view, parents, _, dag = snapshot
+        if parents != 2:
+            raise ValueError("expected a scale-attempt-adoption-v1 commit with ordered selection and attempt parents")
+        historical_ref = _read_single_string(txn, dag, b"attempt_ref", "attempt adoption")
+        if not REF_NAME.fullmatch(historical_ref) or historical_ref == MAIN:
+            raise ValueError("attempt adoption has an invalid attempt ref name")
+        previous = core.object_view_parent(view, 0)
+        attempt = _read_scale_attempt(txn, core.object_view_parent(view, 1), expected_request=expected_request)
+        if attempt.commit == newer_attempt:
+            raise ValueError("adoption must change the selected attempt commit")
+        if head is None:
+            head = _ScaleSelection(attempt.request, attempt.result, historical_ref, attempt, previous)
+        expected_request = attempt.request
+        newer_attempt = attempt.commit
+        snapshot = _snapshot(txn, previous)
+
+    if snapshot[2] != ATTEMPT_SELECTION_ENTRY:
+        raise ValueError("adoption history must start with an attempt selection")
+    initial = _read_initial_selection(txn, snapshot, expected_request)
+    if initial.attempt.commit == newer_attempt:
+        raise ValueError("adoption must change the selected attempt commit")
+    return head
 
 
 def _attempt_identity(attempt):
@@ -773,13 +835,15 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
         return {**report, "request_commit": attempt.request.commit.hex(),
                 "request_implementation": attempt.request.implementation.decode("ascii"),
                 "result_commit": attempt.result.hex(), "attempt_id": attempt.attempt_id.decode("ascii")}
-    if entry in (SELECTION_ENTRY, ATTEMPT_SELECTION_ENTRY):
+    if entry in (SELECTION_ENTRY, ATTEMPT_SELECTION_ENTRY, ADOPTION_ENTRY):
         selection = _read_scale_selection(txn, commit)
         report.update(request_commit=selection.request.commit.hex(),
                       request_implementation=selection.request.implementation.decode("ascii"),
                       result_commit=selection.result.hex())
         if selection.attempt is None:
             return {**report, "result_ref": selection.historical_ref.decode("ascii")}
+        if selection.previous is not None:
+            report["previous_selection_commit"] = selection.previous.hex()
         return {**report, **_attempt_identity(selection.attempt),
                 "attempt_ref": selection.historical_ref.decode("ascii")}
     if entry in (REUSE_ENTRY, SELECTED_REUSE_ENTRY):
@@ -919,6 +983,10 @@ def main():
     attempt_chooser.add_argument("repo", type=Path)
     for name in ("plan_pin", "plan_commit", "attempt_ref", "attempt_commit", "selection_ref"):
         attempt_chooser.add_argument(name)
+    adopter = commands.add_parser("adopt-scale-attempt", help="record a new version of an attempt selection")
+    adopter.add_argument("repo", type=Path)
+    for name in ("basis_ref", "basis_commit", "attempt_ref", "attempt_commit", "selection_ref"):
+        adopter.add_argument(name)
     selection_publisher = commands.add_parser("publish-selected-scale", help="publish from a selection and record reuse")
     selection_publisher.add_argument("repo", type=Path)
     for name in ("plan_pin", "plan_commit", "selection_ref", "selection_commit", "reuse_ref"):
@@ -1007,6 +1075,11 @@ def main():
             attempt = _parse_commit_id(args.attempt_commit, "attempt commit")
             print(select_scale_attempt(args.repo, args.plan_pin.encode("ascii"), plan, args.attempt_ref.encode("ascii"),
                                        attempt, args.selection_ref.encode("ascii")).hex())
+        elif args.command == "adopt-scale-attempt":
+            basis = _parse_commit_id(args.basis_commit, "basis selection commit")
+            attempt = _parse_commit_id(args.attempt_commit, "attempt commit")
+            print(adopt_scale_attempt(args.repo, args.basis_ref.encode("ascii"), basis,
+                                      args.attempt_ref.encode("ascii"), attempt, args.selection_ref.encode("ascii")).hex())
         elif args.command == "publish-selected-scale":
             plan = _parse_commit_id(args.plan_commit, "plan commit")
             selection = _parse_commit_id(args.selection_commit, "selection commit")

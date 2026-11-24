@@ -1197,6 +1197,151 @@ class RecordedCallsTest(unittest.TestCase):
                     self.example["publish_selected_scale"](self.repo, b"plan", plan, selection_ref, selection, b"reuse")
                 self.assertEqual(data.read_bytes(), before)
 
+    def prepare_adoption(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        plan = self.example["request_scale"](self.repo, b"producer", producer, b"plan", 3)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, _, (request,) = self.snapshot(txn, b"plan", b"scale-plan-v1")
+            core.txn_ref_create(txn, b"incoming", request)
+            core.txn_commit(txn)
+        work = self.example["work_scale_attempt"]
+        first = work(self.repo, b"incoming", request, b"first", ATTEMPT_A)
+        initial = self.example["select_scale_attempt"](self.repo, b"plan", plan, b"first", first, b"chosen")
+        second = work(self.repo, b"incoming", request, b"second", ATTEMPT_B)
+        return producer, plan, request, first, second, initial
+
+    def test_adoption_without_plan_retains_ordered_history_and_rolls_back_on_occupied_output(self):
+        producer, plan, request, first, second, initial = self.prepare_adoption()
+        self.example["abandon_scale_request"](self.repo, b"plan", plan)
+        adopt = self.example["adopt_scale_attempt"]
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            adopt(self.repo, b"chosen", initial, b"second", second, b"producer")
+        self.assertEqual(data.read_bytes(), before)
+
+        newer = adopt(self.repo, b"chosen", initial, b"second", second, b"changed")
+        before = data.read_bytes()
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            adopt(self.repo, b"chosen", initial, b"second", second, b"changed")
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            actual, dag, parents = self.snapshot(txn, b"changed", b"scale-attempt-adoption-v1")
+            self.assertEqual((actual, parents), (newer, (initial, second)))
+            _, root, count = view(txn, core.REC_DAG, dag)
+            self.assertEqual((count, root), (1, core.txn_lookup_node(txn, dag, b"attempt_ref")))
+            self.assertEqual(self.literal_value(txn, root, core.DATUM_STRING), "second")
+            self.assertEqual(core.txn_ref_get(txn, b"producer"), producer)
+            self.assert_missing_ref(txn, b"plan")
+            self.assert_missing_ref(txn, b"main")
+            for ref, expected in ((b"first", first), (b"second", second), (b"chosen", initial),
+                                  (b"incoming", request)):
+                core.txn_ref_delete_expected(txn, ref, expected)
+            core.txn_commit(txn)
+        self.assertGreater(self.example["collect"](self.repo), 0)
+        with transaction(self.repo) as txn:
+            for commit in (initial, first, second):
+                view(txn, core.REC_COMMIT, commit)
+        report = self.example["inspect"](self.repo, b"changed")
+        self.assertEqual(report["previous_selection_commit"], initial.hex())
+        self.assertEqual(report["attempt_commit"], second.hex())
+
+    def test_adoption_and_reuse_validate_the_whole_typed_version_chain(self):
+        producer, plan, request, first, second, initial = self.prepare_adoption()
+        # Alternate implementation deliberately computes the same scalar value.
+        self.example["request_scale"](self.repo, b"producer", producer, b"other-plan", 3,
+                                      implementation=b"example.scale@2")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, _, (other_request,) = self.snapshot(txn, b"other-plan", b"scale-plan-v1")
+            core.txn_ref_create(txn, b"other-request", other_request)
+            core.txn_commit(txn)
+        other = self.example["work_scale_attempt"](self.repo, b"other-request", other_request, b"other", ATTEMPT_B)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            def named_tree(entry, field, value):
+                node = literal(txn, core.DATUM_STRING, value)
+                return put(txn, core.REC_TREE, entry, put(txn, core.REC_DAG, node, field, node))
+
+            tree = named_tree(b"scale-attempt-adoption-v1", b"attempt_ref", b"historical")
+            bad_tree = named_tree(b"scale-attempt-adoption-v1", b"attempt_ref", b"main")
+            _, _, (_, result) = self.snapshot(txn, b"first", b"scale-attempt-v1")
+            legacy_tree = named_tree(b"scale-result-selection-v1", b"result_ref", b"result")
+            legacy = put(txn, core.REC_COMMIT, legacy_tree, request, result)
+            core.txn_ref_create(txn, b"legacy", legacy)
+            duplicate = put(txn, core.REC_COMMIT, tree, initial, first)
+            wrong_request = put(txn, core.REC_COMMIT, tree, initial, other)
+            bad_name = put(txn, core.REC_COMMIT, bad_tree, initial, second)
+            invalid = []
+            for ref, parents, reason in (
+                (b"single-parent", (initial,), "ordered selection and attempt parents"),
+                (b"swapped-parents", (second, initial), "expected a scale-attempt-v1"),
+                (b"legacy-root", (legacy, second), "history must start with an attempt selection"),
+                (b"duplicate-middle", (duplicate, second), "must change the selected attempt commit"),
+                (b"other-middle", (wrong_request, second), "attempt does not retain the expected request"),
+                (b"bad-name-middle", (bad_name, first), "invalid attempt ref name"),
+            ):
+                commit = put(txn, core.REC_COMMIT, tree, *parents)
+                core.txn_ref_create(txn, ref, commit)
+                invalid.append((ref, commit, reason))
+            core.txn_commit(txn)
+
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        adopt = self.example["adopt_scale_attempt"]
+        for basis_ref, basis, attempt_ref, attempt, reason in (
+            (b"legacy", legacy, b"second", second, "basis must be an attempt selection"),
+            (b"chosen", initial, b"other", other, "attempt does not retain the expected request"),
+        ):
+            with self.assertRaisesRegex(ValueError, reason):
+                adopt(self.repo, basis_ref, basis, attempt_ref, attempt, b"next")
+            self.assertEqual(data.read_bytes(), before)
+        for ref, commit, reason in invalid:
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(ValueError, reason):
+                    adopt(self.repo, ref, commit, b"second", second, b"next")
+                with self.assertRaisesRegex(ValueError, reason):
+                    self.example["inspect"](self.repo, ref)
+                with self.assertRaisesRegex(ValueError, reason):
+                    self.example["publish_selected_scale"](self.repo, b"plan", plan, ref, commit, b"reuse")
+                self.assertEqual(data.read_bytes(), before)
+
+    def test_adoption_inspects_a_chain_longer_than_default_python_recursion_limit(self):
+        _, _, _, first, second, initial = self.prepare_adoption()
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            name = literal(txn, core.DATUM_STRING, b"historical")
+            dag = put(txn, core.REC_DAG, name, b"attempt_ref", name)
+            tree = put(txn, core.REC_TREE, b"scale-attempt-adoption-v1", dag)
+            tip = initial
+            for i in range(1025):
+                previous = tip
+                tip = put(txn, core.REC_COMMIT, tree, previous, second if i % 2 == 0 else first)
+            core.txn_ref_create(txn, b"tip", tip)
+            core.txn_commit(txn)
+        report = self.example["inspect"](self.repo, b"tip")
+        self.assertEqual(report["commit"], tip.hex())
+        self.assertEqual(report["previous_selection_commit"], previous.hex())
+        self.assertEqual(report["attempt_commit"], second.hex())
+
+    def test_adoption_validates_all_argument_slots_before_opening_repository(self):
+        commit = b"\x00" * 16
+        adopt = self.example["adopt_scale_attempt"]
+        for basis, old, incoming, attempt, output, reason in (
+            (b"chosen", b"short", b"incoming", commit, b"next", "basis selection commit"),
+            (b"chosen", commit, b"incoming", b"short", b"next", "attempt commit"),
+            (b"-", commit, b"incoming", commit, b"next", "basis ref"),
+            (b"chosen", commit, "incoming", commit, b"next", "attempt ref"),
+            (b"chosen", commit, b"incoming", commit, b"-", "selection ref"),
+            (b"chosen", commit, b"chosen", commit, b"next", "distinct"),
+            (b"chosen", commit, b"incoming", commit, b"chosen", "distinct"),
+            (b"chosen", commit, b"incoming", commit, b"incoming", "distinct"),
+            (b"main", commit, b"incoming", commit, b"next", "distinct"),
+            (b"chosen", commit, b"main", commit, b"next", "distinct"),
+            (b"chosen", commit, b"incoming", commit, b"main", "distinct"),
+        ):
+            with self.subTest(basis=basis, incoming=incoming, output=output, reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    adopt(self.repo, basis, old, incoming, attempt, output)
+                self.assertFalse(self.repo.exists())
+
     def test_attempt_work_rejects_invalid_identity_stale_ref_and_overflow_atomically(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
         self.example["request_scale"](self.repo, b"producer", producer, b"plan", 1 << 62)

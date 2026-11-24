@@ -313,6 +313,7 @@ module recorded_calls_histories {
 
   pure val occurrenceA = "00000000-0000-4000-8000-000000000001"
   pure val occurrenceB = "00000000-0000-4000-8000-000000000002"
+  pure val occurrenceC = "00000000-0000-4000-8000-000000000003"
 
   // Two independent worker invocations retain the same deterministic result.
   // Recreate staging and selection refs with the other occurrence. Earlier
@@ -353,10 +354,55 @@ module recorded_calls_histories {
     source("inspect", List("returned"))
   )
 
+  // Execute twice more after the original choice, then adopt on sibling refs.
+  // A reversion to the exact first attempt is still a different selection.
+  pure val adoptionRequests: List[Request] = attemptRequests.slice(0, 7).concat(List(
+    worker("export_scale_attempt", List("attempt-a", "attempt-a", "a.bundle")),
+    source("stage_input", List("returned-a", "a.bundle")),
+    source("select_scale_attempt", List("plan", "plan", "returned-a", "attempt-a", "base")),
+    source("inspect", List("base")),
+    worker("work_scale_attempt", List("incoming", "plan", "attempt-b", occurrenceB)),
+    worker("work_scale_attempt", List("incoming", "plan", "attempt-c", occurrenceC)),
+    worker("inspect", List("attempt-b")),
+    worker("inspect", List("attempt-c")),
+    worker("export_scale_attempt", List("attempt-b", "attempt-b", "b.bundle")),
+    worker("export_scale_attempt", List("attempt-c", "attempt-c", "c.bundle")),
+    source("stage_input", List("returned-b", "b.bundle")),
+    source("stage_input", List("returned-c", "c.bundle")),
+    source("inspect", List("base")),
+    source("adopt_scale_attempt", List("base", "base", "returned-a", "attempt-a", "left")),
+    source("adopt_scale_attempt", List("base", "base", "returned-b", "attempt-c", "left")),
+    source("adopt_scale_attempt", List("base", "base", "returned-b", "attempt-b", "left")),
+    source("adopt_scale_attempt", List("left", "base", "returned-c", "attempt-c", "right")),
+    source("adopt_scale_attempt", List("base", "base", "returned-b", "attempt-b", "left")),
+    source("adopt_scale_attempt", List("base", "base", "returned-c", "attempt-c", "right")),
+    source("adopt_scale_attempt", List("left", "left", "returned-a", "attempt-a", "reverted")),
+    source("inspect", List("left")),
+    source("inspect", List("right")),
+    source("inspect", List("reverted")),
+    source("inspect", List()),
+    source("drop_ref", List("returned-a", "attempt", "attempt-a")),
+    source("drop_ref", List("returned-b", "attempt", "attempt-b")),
+    source("drop_ref", List("returned-c", "attempt", "attempt-c")),
+    source("collect", List()),
+    source("publish_selected_scale", List("plan", "plan", "reverted", "base", "old-reuse")),
+    source("publish_selected_scale", List("plan", "plan", "base", "base", "old-reuse")),
+    source("inspect", List("old-reuse")),
+    source("request_scale", List("producer", "producer", "left-plan", "3", "--implementation", "example.scale@2")),
+    source("publish_selected_scale", List("left-plan", "left-plan", "left", "left", "left-reuse")),
+    source("inspect", List("left-reuse")),
+    source("request_scale", List("producer", "producer", "right-plan", "3", "--implementation", "example.scale@2")),
+    source("publish_selected_scale", List("right-plan", "right-plan", "right", "right", "right-reuse")),
+    source("inspect", List("right-reuse")),
+    source("inspect", List("old-reuse")),
+    source("inspect", List()),
+    source("inspect", List("base"))
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
-    .append(selectionRequests).append(attemptRequests)
+    .append(selectionRequests).append(attemptRequests).append(adoptionRequests)
   action step = histories' = histories
 }

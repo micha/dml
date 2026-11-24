@@ -52,7 +52,7 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "missingRef": missing_ref,
             "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
             "expectedResult": "", "expectedSelection": "", "expectedAttempt": "", "expectedMain": "",
-            "requestCommit": "", "requestImplementation": "", "requestFactor": 0,
+            "previousSelection": "", "requestCommit": "", "requestImplementation": "", "requestFactor": 0,
             "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
             "reusePublication": {"mode": "", "planRef": "", "plan": "", "resultRef": "", "result": ""},
             "selection": {"resultRef": "", "result": ""},
@@ -84,7 +84,7 @@ class ProcessHistory:
             "publish_reused_scale": self.publish_reused_scale, "select_scale_result": self.select_scale_result,
             "publish_selected_scale": self.publish_selected_scale, "work_scale_attempt": self.work_scale_attempt,
             "export_scale_attempt": self.export_scale_attempt, "select_scale_attempt": self.select_scale_attempt,
-            "drop_ref": self.drop_ref,
+            "adopt_scale_attempt": self.adopt_scale_attempt, "drop_ref": self.drop_ref,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -220,6 +220,15 @@ class ProcessHistory:
             self.selection_receipts[alias if alias is not None else selection_ref] = row["commit"]
         return {**row, "expectedCommit": plan, "expectedAttempt": attempt}
 
+    def adopt_scale_attempt(self, role, basis_ref, basis_receipt, attempt_ref, attempt_receipt, selection_ref):
+        basis = self.selection_receipts[basis_receipt]
+        attempt = self.attempt_receipts[attempt_receipt]
+        args = (role, basis_ref, basis_receipt, attempt_ref, attempt_receipt, selection_ref)
+        row = self.write("adopt_scale_attempt", args, operands=(basis_ref, basis, attempt_ref, attempt, selection_ref))
+        if row["commit"]:
+            self.selection_receipts[selection_ref] = row["commit"]
+        return {**row, "expectedCommit": basis, "expectedAttempt": attempt}
+
     def drop_ref(self, role, pin, kind, receipt):
         # Fixture only: simulate a separate ref owner without adding a CLI command.
         receipts = {"attempt": self.attempt_receipts, "selection": self.selection_receipts}
@@ -314,6 +323,8 @@ class ProcessHistory:
                     "id": report["attempt_id"], "commit": id_evidence(report.get("attempt_commit", report["commit"])),
                     "result": id_evidence(report["result_commit"]), "historicalRef": report.get("attempt_ref", ""),
                 }
+            if "previous_selection_commit" in report:
+                row["previousSelection"] = id_evidence(report["previous_selection_commit"])
             if "producer_commit" in report:
                 row["producerCommit"] = id_evidence(report["producer_commit"])
             if "request_commit" in report:

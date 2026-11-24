@@ -430,7 +430,7 @@ for worker in worker-a worker-b; do
   python examples/recorded_calls.py export-scale-attempt "./$worker" attempt "$attempt" "./$worker.dml"
   python examples/recorded_calls.py stage-input ./origin "$worker" "./$worker.dml"
   python examples/recorded_calls.py inspect ./origin "$worker"
-  if [ "$worker" = worker-a ]; then first_attempt=$attempt; fi
+  if [ "$worker" = worker-a ]; then first_attempt=$attempt; else second_attempt=$attempt; fi
 done
 ```
 
@@ -462,6 +462,37 @@ and consumes only the plan. The reuse record identifies the selected attempt;
 publication neither runs work nor records another attempt. Work, selection and
 publication require distinct refs (also distinct from `main`) and reject an
 occupied output, even at the same ID.
+
+#### Record a new version of an attempt selection
+
+After [selecting the first attempt](#distinguish-two-executions-of-the-same-request),
+keep `chosen` for the original choice. If you want to select the second attempt
+instead on another branch, use its commit ID from the worker:
+
+```sh
+adopted=$(python examples/recorded_calls.py adopt-scale-attempt ./origin chosen "$chosen" worker-b "$second_attempt" adopted)
+python examples/recorded_calls.py inspect ./origin adopted
+next_plan=$(python examples/recorded_calls.py request-scale ./origin producer "$producer" next-plan 3)
+python examples/recorded_calls.py publish-selected-scale ./origin next-plan "$next_plan" adopted "$adopted" reuse-002
+python examples/recorded_calls.py inspect ./origin reuse-002
+```
+
+The new selection commit has ordered parents `(previous selection, replacement
+attempt)`. `inspect` shows its `previous_selection_commit` and the exact attempt
+chosen now. The input pins are checked against the supplied IDs but are not
+moved or consumed. The fresh output ref must differ from both input refs and
+`main`, and it cannot already exist. The replacement must match the exact
+portable request and differ from the current attempt commit; equal results are
+allowed. You can explicitly reselect an older attempt if it differs from the
+current choice. A result-only selection cannot be used as a basis.
+
+These are named branches of a single selection history, not changes to `main`.
+Adoption neither needs a plan nor runs work. Fresh work never adopts its own
+result. Each branch keeps its own choice; publishing still takes an exact
+selection ref and commit ID, revalidates its history, and consumes only the
+publishing plan. An adopted version retains its predecessor versions and their
+attempts through collection even without the original pins. A reuse record in
+turn retains the exact version used, not whatever its old ref points to later.
 
 #### Publish reuse with a durable record
 
