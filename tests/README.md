@@ -287,6 +287,17 @@ checks exercise the live-key cap after removal, same-attempt and result-only
 rejections, rollback on occupied output, and malformed deltas that cannot be
 hidden by later removal.
 
+The [recorded argument maps example](../docs/recorded-argument-maps.md) uses a
+[separate Quint history](argument_maps_histories.qnt). The same typed map from
+literal `42` and returned `42` reuses the original `double@1` result for a new
+`double@2` request. Changed keys, types, values, and stale pins are tested
+separately. The runner collects CLI reports and an independent LMDB inventory;
+Quint checks request, result, attempt, and getter counts, exact ref effects,
+and both constructions on a replica containing only the transferred hit ref.
+The [focused tests](test_argument_maps.py) exercise duplicate canonical keys,
+forged sources and getter links, one-key adoption/removal, poisoned table
+history, caps, and rollback after a late output-ref collision.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -608,5 +619,21 @@ and Quint 0.34.0:
 ```sh
 mkdir -p build/recorded-intent-reuse-tlc
 (cd build/recorded-intent-reuse-tlc && quint verify ../../tests/recorded_intent_reuse_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the argument-map design with TLC
+
+The [argument-map model](recorded_argument_maps_design.qnt) uses five
+constructions, two active rows at most, and a one-edit, one-request, optional
+inspection sequence. It checks that equal typed maps can share a result
+without replacing provenance, that changed values/types/keys miss, and that
+stale pins, poisoned rows, forged decisions, and late faults do not publish.
+It abstracts native framing, execution, and transfer; it does not prove
+liveness. Use Java and Quint 0.34.0 and check that all ten observations are found:
+
+```sh
+mkdir -p build/argument-map-tlc
+(cd build/argument-map-tlc && quint verify ../../tests/recorded_argument_maps_design.qnt \
   --backend=tlc --search-observations)
 ```

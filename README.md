@@ -53,7 +53,7 @@ Pass `DML_QUINT_SCRIPT=` to switch an existing build back to `quint` on `PATH`.
 
 This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
-[provenance handoff and recorded-calls integrations](tests/README.md#process-integration),
+[provenance handoff, recorded calls, and argument-map integrations](tests/README.md#process-integration),
 and focused interpreter, Python binding, integrity, boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
 Quint request. Ref replay uses public `daggerml.core`; the other core replay
@@ -756,6 +756,10 @@ match the requested implementation. After removal, a reuse-by-default miss
 leaves a fresh plan and `main` unchanged; `--override reuse-selected` fails.
 Use unused output names as in the previous example. Existing single-slot and
 implementation-scoped commands still require an exact implementation match.
+
+For reuse across different derivations of the same typed value, see the separate
+[recorded argument maps example](docs/recorded-argument-maps.md). It keeps both
+constructions and distinguishes the new request from the attempt that ran.
 
 #### Publish reuse with a durable record
 
