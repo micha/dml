@@ -119,6 +119,20 @@ class TraceInterpreterTest(unittest.TestCase):
             "  pure val evidence: List[Observation] = List(evidenceHistory0, evidenceHistory1)",
         ])
 
+    def test_quint_evidence_shares_defaults_without_changing_live_values(self):
+        defaults = {"value": 0, "details": {"ok": False}}
+        observations = [{"attempts": [defaults, {"value": 1, "details": {"ok": True}},
+                                      {"value": 0, "details": {"ok": 0}}]}]
+        lines = quint_evidence(observations, attempt_defaults=defaults).splitlines()
+        self.assertEqual(lines[:2], [
+            "  pure val evidenceDefaults = { value: 0, details: { ok: false } }",
+            "  pure val evidenceBatch0_0 = List(evidenceDefaults, { ...evidenceDefaults, value: 1, details: { ok: true } },"
+            " { ...evidenceDefaults, details: { ok: 0 } })",
+        ])
+        for different in ({"value": 0}, {**defaults, "other": 0}):
+            with self.subTest(different=different), self.assertRaisesRegex(ValueError, "fields do not match"):
+                quint_evidence([{"attempts": [different]}], attempt_defaults=defaults)
+
     def test_missing_step_verdict_fails(self):
         histories = [[{"op": "read_value", "args": []}]]
         evidence = [{"attempts": [{"value": "a"}]}]
