@@ -275,7 +275,7 @@ static PyObject *txn_abort(PyObject *self, PyObject *capsule) {
   Py_RETURN_NONE;
 }
 
-static int read_map_input(PyObject *value, dml_map_array *map, dml_datum_map_entry **allocated) {
+static int read_map_input(PyObject *value, dml_map_array *map, void **allocated) {
   bool tuple = PyTuple_Check(value);
   if (!tuple && !PyList_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "map entries must be a list or tuple");
@@ -302,18 +302,50 @@ static int read_map_input(PyObject *value, dml_map_array *map, dml_datum_map_ent
   return 1;
 }
 
+static int read_list_input(PyObject *value, dml_id_array *list, void **allocated) {
+  bool tuple = PyTuple_Check(value);
+  if (!tuple && !PyList_Check(value)) {
+    PyErr_SetString(PyExc_TypeError, "list members must be a list or tuple");
+    return 0;
+  }
+  Py_ssize_t count = tuple ? PyTuple_GET_SIZE(value) : PyList_GET_SIZE(value);
+  if (count == 0) return 1;
+  dml_object_id *ids = PyMem_Calloc((size_t)count, sizeof(*ids));
+  if (ids == NULL) {
+    PyErr_NoMemory();
+    return 0;
+  }
+  *allocated = ids;
+  for (Py_ssize_t i = 0; i < count; i++) {
+    PyObject *item = tuple ? PyTuple_GET_ITEM(value, i) : PyList_GET_ITEM(value, i);
+    if (!read_id(item, &ids[i])) return 0;
+  }
+  *list = (dml_id_array){.items = ids, .count = (size_t)count};
+  return 1;
+}
+
 static PyObject *datum_encode(PyObject *self, PyObject *args) {
   int kind;
   PyObject *value;
   if (!PyArg_ParseTuple(args, "iO", &kind, &value)) return NULL;
   dml_datum_input input = {.kind = (dml_datum_kind)kind};
-  dml_datum_map_entry *allocated = NULL;
-  if (kind == DML_DATUM_I64) {
+  void *allocated = NULL;
+  if (kind == DML_DATUM_NULL) {
+    if (value != Py_None) {
+      PyErr_SetString(PyExc_TypeError, "NULL datum value must be None");
+      return NULL;
+    }
+  } else if (kind == DML_DATUM_I64) {
     long long number = PyLong_AsLongLong(value);
     if (number == -1 && PyErr_Occurred()) return NULL;
     input.value.i64 = (int64_t)number;
-  } else if (kind == DML_DATUM_STRING) {
+  } else if (kind == DML_DATUM_STRING || kind == DML_DATUM_URI) {
     if (!read_bytes(value, &input.value.bytes)) return NULL;
+  } else if (kind == DML_DATUM_LIST) {
+    if (!read_list_input(value, &input.value.ids, &allocated)) {
+      PyMem_Free(allocated);
+      return NULL;
+    }
   } else if (kind == DML_DATUM_MAP) {
     if (!read_map_input(value, &input.value.map, &allocated)) {
       PyMem_Free(allocated);
@@ -683,6 +715,45 @@ static PyObject *datum_decode(PyObject *self, PyObject *record) {
   return Py_BuildValue("(y#i)", (const char *)view.payload, (Py_ssize_t)view.payload_len, (int)view.kind);
 }
 
+static PyObject *datum_member(PyObject *self, const dml_datum_view *view, size_t index) {
+  dml_error error = {0};
+  if (view->kind == DML_DATUM_LIST) {
+    dml_object_id id;
+    dml_status status = dml_datum_view_id(view, index, &id, &error);
+    return status == DML_OK ? id_bytes(&id) : raise_status(self, status, &error);
+  }
+  dml_datum_map_entry entry;
+  dml_status status = dml_datum_view_map_entry(view, index, &entry, &error);
+  if (status != DML_OK) return raise_status(self, status, &error);
+  return Py_BuildValue("(y#y#)", (const char *)entry.key.bytes, (Py_ssize_t)sizeof(entry.key.bytes),
+                       (const char *)entry.value.bytes, (Py_ssize_t)sizeof(entry.value.bytes));
+}
+
+static PyObject *datum_members(PyObject *self, PyObject *record) {
+  dml_bytes packed;
+  if (!read_bytes(record, &packed)) return NULL;
+  dml_datum_view view;
+  dml_error error = {0};
+  dml_status status = dml_datum_decode(packed.data, packed.len, &view, &error);
+  if (status != DML_OK) return raise_status(self, status, &error);
+  if (view.kind != DML_DATUM_LIST && view.kind != DML_DATUM_MAP) {
+    PyErr_SetString(PyExc_ValueError, "datum members require a LIST or MAP");
+    return NULL;
+  }
+  /* Each validated member occupies bytes in the original Python bytes object. */
+  PyObject *members = PyTuple_New((Py_ssize_t)view.count);
+  if (members == NULL) return NULL;
+  for (size_t i = 0; i < view.count; i++) {
+    PyObject *member = datum_member(self, &view, i);
+    if (member == NULL) {
+      Py_DECREF(members);
+      return NULL;
+    }
+    PyTuple_SET_ITEM(members, (Py_ssize_t)i, member);
+  }
+  return members;
+}
+
 static PyObject *txn_lookup_node(PyObject *self, PyObject *args) {
   PyObject *capsule, *id_obj, *name_obj;
   if (!PyArg_ParseTuple(args, "OOO", &capsule, &id_obj, &name_obj)) return NULL;
@@ -769,6 +840,7 @@ static PyMethodDef methods[] = {
   {"txn_ref_delete_expected", txn_ref_delete_expected, METH_VARARGS, NULL},
   {"txn_get_datum", txn_get_datum, METH_VARARGS, NULL},
   {"datum_decode", datum_decode, METH_O, NULL},
+  {"datum_members", datum_members, METH_O, NULL},
   {"txn_lookup_node", txn_lookup_node, METH_VARARGS, NULL},
   {"repo_export_commit", repo_export_commit, METH_VARARGS, NULL},
   {"repo_import_commit_staged", repo_import_commit_staged, METH_VARARGS, NULL},
@@ -819,8 +891,11 @@ PyMODINIT_FUNC MODULE_INIT(void) {
   if (state->error == NULL || PyModule_AddObjectRef(self, "Error", state->error) < 0 ||
       PyModule_AddIntConstant(self, "TXN_READ", DML_TXN_READ) < 0 ||
       PyModule_AddIntConstant(self, "TXN_WRITE", DML_TXN_WRITE) < 0 ||
+      PyModule_AddIntConstant(self, "DATUM_NULL", DML_DATUM_NULL) < 0 ||
       PyModule_AddIntConstant(self, "DATUM_I64", DML_DATUM_I64) < 0 ||
       PyModule_AddIntConstant(self, "DATUM_STRING", DML_DATUM_STRING) < 0 ||
+      PyModule_AddIntConstant(self, "DATUM_URI", DML_DATUM_URI) < 0 ||
+      PyModule_AddIntConstant(self, "DATUM_LIST", DML_DATUM_LIST) < 0 ||
       PyModule_AddIntConstant(self, "DATUM_MAP", DML_DATUM_MAP) < 0 ||
       PyModule_AddIntConstant(self, "REC_NODE", DML_REC_NODE) < 0 ||
       PyModule_AddIntConstant(self, "REC_DAG", DML_REC_DAG) < 0 ||
