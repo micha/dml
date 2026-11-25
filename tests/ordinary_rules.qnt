@@ -128,6 +128,16 @@ module ordinary_rules {
     and published(a, output, record(a, "add-attempt").id, previous, previous)
   pure def missPrefix(a: Attempt, cap: Native, expected: List[Input], innerMode: str, selected: str,
       previous: str): bool = addPrefix(a, cap, expected, innerMode, selected, previous, a.args[3])
+  pure def overflowStart(a: Attempt, cap: Native, previous: str): bool = {
+    val q = record(a, "outer-request")
+    val start = record(a, "start")
+    a.code == 1 and a.error == "add result is not a signed 64-bit integer" and a.commit == "" and a.report == List()
+      and a.created.length() == 2
+      and a.profiles == List("builtin-arguments-v1", "builtin-literal-v1", "builtin-literal-v1")
+      and outerQ(q, cap, ab(9223372036854775807, 1), fresh, "", fresh, "")
+      and native(start, List(q.id)) and start.attempt != ""
+      and published(a, a.args[3], start.id, previous, previous)
+  }
   pure def outerHit(a: Attempt, cap: Native, first: Attempt, previous: str): bool = {
     val q = record(a, "outer-request")
     val t = record(a, "hit")
@@ -160,6 +170,12 @@ module ordinary_rules {
       and report(a, "/trace/1", "operation") == finish.result.trace[1].dag
       and report(a, "/double/trace/0", "operation") == past.result.trace[0].dag
   }
+  pure def startReport(a: Attempt, call: Attempt): bool =
+    a.commit == call.head and report(a, "", "status") == "start"
+      and report(a, "", "attempt") == record(call, "start").id
+      and outerReport(a, "/requested", record(call, "outer-request"))
+      and report(a, "/add", "attempt") == "" and report(a, "/double", "attempt") == ""
+      and report(a, "", "return_dag") == ""
   pure def prefixReport(a: Attempt, call: Attempt): bool =
     a.commit == call.head and report(a, "", "status") == "add"
       and outerReport(a, "/requested", record(call, "outer-request"))
@@ -323,11 +339,12 @@ module ordinary_rules {
       event("outer-return", List(result), List())
     )
   }
-  pure def ownershipAccepted(rows: List[Attempt], i: int): bool = {
+  pure def executionAccepted(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
     val cap = record(rows[1], "capture")
     val call = rows[2]
-    if (a.code != 0 or a.error != "") false
+    if (i == 6) overflowStart(a, cap, call.commit)
+    else if (a.code != 0 or a.error != "") false
     else if (i == 0) defaultsStep(a, "", v1) and a.main == ""
     else if (i == 1) captureStep(a, rows[0], "")
     else if (i == 2) addChain(a, cap, ab(13, 29), fresh, "", fresh, "")
@@ -335,15 +352,32 @@ module ordinary_rules {
     else if (i == 3) terminalReport(a, call, call, call, "finished")
       and report(a, "/add/requested", "inputs") == record(call, "outer-request").inputs.dag
       and report(a, "/add", "return_dag") == record(call, "add-attempt").result.dag
+    else if (i == 4) outerHit(a, cap, call, call.commit)
+    else if (i == 5) terminalReport(a, rows[4], call, call, "hit")
+    else if (i == 7) startReport(a, rows[6])
+    else if (i == 8) terminalReport(a, call, call, call, "finished")
     else false
   }
 
+  pure def executionVerdict(rows: List[Attempt], i: int): str = {
+    val calls = rows[i].calls
+    // Overflow enters add but does not return a node to the outer adapter.
+    val expected = if (i == 2) ownedHandoff else if (i == 6) ownedHandoff.slice(0, 3) else List()
+    if (not(executionAccepted(rows, i))) "wrong_execution_history"
+    else if (calls == expected) "ok"
+    else if (i == 2) "wrong_owned_node_handoff"
+    else if (i == 4 or i == 5) "executed_adapter_on_reuse"
+    else if (i == 6) "wrong_add_overflow_execution"
+    else "unexpected_adapter_execution"
+  }
+
   pure def observedStep(a: Attempt, request: Request): str = {
-    val read = request.op == "inspect" or request.op == "retire"
+    val inspect = request.op == "inspect" or request.op == "inspect_observed"
+    val read = inspect or request.op == "retire"
     if (a.op != request.op or a.args != request.args) "wrong_step"
     else if (not(a.preserved)) "changed_historical_records"
     else if (read and (not(a.unchanged) or a.created != List() or a.refs != List())) "inspection_wrote_records"
-    else if (a.op == "inspect" and a.commit != "" and a.commit != a.head) "wrong_inspection_pin"
+    else if (inspect and a.commit != "" and a.commit != a.head) "wrong_inspection_pin"
     else "ok"
   }
   pure def historyVerdicts(row: Observation): List[str] = {
@@ -360,13 +394,9 @@ module ordinary_rules {
         else if (i == 6) "wrong_pinned_double_producer"
         else "wrong_bookmark_interleaving")
     })
-    else if (rows.length() == ownership.length()) range(0, ownership.length()).foldl(List(), (out, i) => {
-      val observed = observedStep(rows[i], ownership[i])
-      val expectedCalls = if (i == 2) ownedHandoff else List()
-      out.append(if (observed != "ok") observed
-        else if (not(ownershipAccepted(rows, i))) "wrong_owned_call_history"
-        else if (rows[i].calls != expectedCalls) "wrong_owned_node_handoff"
-        else "ok")
+    else if (rows.length() == execution.length()) range(0, execution.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], execution[i])
+      out.append(if (observed != "ok") observed else executionVerdict(rows, i))
     })
     else List("missing_steps")
   }
@@ -374,7 +404,7 @@ module ordinary_rules {
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
     evidence.length() == 3 and verdicts.length() == 3
       and verdicts[0].length() == story.length() and verdicts[1].length() == pinning.length()
-      and verdicts[2].length() == ownership.length()
+      and verdicts[2].length() == execution.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (accepted, result) => accepted and verdictAccepted(result)))
       and report(evidence[0].attempts[9], "", "status") == "hit"
       and record(evidence[0].attempts[10], "double-hit").id != ""

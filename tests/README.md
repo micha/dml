@@ -368,11 +368,13 @@ keeps the new request's add source and the old producer's original add source.
 It also checks retained prefixes after failure and read-only transferred
 inspection. A separate pinning history moves the double selection with a native
 write transaction after add commits and before double starts. Quint checks that
-the live call still uses the original producing attempt. The ownership history
-records in-process object identities and checks one outer call, add on the
-original arguments node, and double on the exact MAP made from add's returned
-node. Quint checks these handoffs alongside the persisted call history and
-inspection report.
+the live call still uses the original producing attempt. The execution history
+records in-process adapter entries and object identities. Quint checks one
+outer call, add on the original arguments node, and double on the exact MAP
+made from add's returned node. An outer hit and its inspection execute neither
+adapter. An overflowing add never reaches double, keeps only the start phase,
+and leaves `main` on the earlier successful call. Replay checks these live
+observations alongside native records and read-only inspection.
 [Focused tests](test_ordinary_calls.py) cover adapter failures and inject late
 update failures after real native writes.
 

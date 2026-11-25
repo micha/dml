@@ -2,7 +2,7 @@
 
 import argparse
 from collections import deque
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from functools import partial
 from importlib import import_module
 import json
@@ -56,6 +56,12 @@ class CallTrace:
 
     def record(self, op, *objects, labels=()):
         self.events.append({"op": op, "handles": [self.token(obj) for obj in objects], "labels": list(labels)})
+
+    @contextmanager
+    def adapters(self, example):
+        with patch.object(example, "_double_sum", self.outer(example._double_sum)), \
+                patch.object(example, "_leaf_call", self.leaf(example._leaf_call)):
+            yield
 
     def outer(self, adapter):
         def observe(arguments, get, make_arguments, invoke, add, double):
@@ -194,7 +200,7 @@ class History:
         self.receipts = {}
         self.operations = {op: self.command(op) for op in ("defaults", "capture", "invoke", "select_double", "inspect")}
         self.operations.update(replicate=self.replicate, retire=self.retire, graft=self.graft,
-                               invoke_observed=self.invoke_observed)
+                               invoke_observed=self.invoke_observed, inspect_observed=self.inspect_observed)
 
     def inventory(self, path):
         if not (path / "data.mdb").is_file():
@@ -248,23 +254,42 @@ class History:
                                  error=process.stderr.strip())
         return invoke
 
-    def invoke_observed(self, role, capture, expected, output, a, b):
+    def invoke_observed(self, role, capture, expected, output, a, b, *selection):
         example = import_module(self.script.stem)
         path = self.directory / role
         before = self.inventory(path)
         trace = CallTrace()
+        outer = example.Selection()
+        if selection:
+            mode, ref, selected = selection
+            outer = example.Selection(mode.encode("ascii"), ref.encode("ascii"), bytes.fromhex(self.resolve(selected)))
         commit, code, error = "", 0, ""
-        with patch.object(example, "_double_sum", trace.outer(example._double_sum)), \
-                patch.object(example, "_leaf_call", trace.leaf(example._leaf_call)):
+        with trace.adapters(example):
             try:
                 commit = example.invoke(path, capture.encode("ascii"), bytes.fromhex(self.resolve(expected)),
-                                        output.encode("ascii"), int(a), int(b)).hex()
+                                        output.encode("ascii"), int(a), int(b), outer=outer).hex()
             except (ValueError, OverflowError, core.Error) as failure:
                 code, error = 1, str(failure)
         after = self.inventory(path)
-        return self.evidence("invoke_observed", (role, capture, expected, output, a, b), before, after,
+        return self.evidence("invoke_observed", (role, capture, expected, output, a, b, *selection), before, after,
                              commit=commit, head=after.refs.get(output, ""), code=code, error=error,
                              calls=trace.events)
+
+    def inspect_observed(self, role, ref, expected):
+        example = import_module(self.script.stem)
+        path = self.directory / role
+        before = self.inventory(path)
+        trace = CallTrace()
+        report, code, error = None, 0, ""
+        with trace.adapters(example):
+            try:
+                report = example.inspect(path, ref.encode("ascii"), expected=bytes.fromhex(self.resolve(expected)))
+            except (ValueError, OverflowError, core.Error) as failure:
+                code, error = 1, str(failure)
+        after = self.inventory(path)
+        return self.evidence("inspect_observed", (role, ref, expected), before, after,
+                             commit=report["commit"] if report is not None else "", head=after.refs.get(ref, ""),
+                             report=report, code=code, error=error, calls=trace.events)
 
     def invoke_live(self, actor, role, capture, expected, output, a, b, mode, selected_ref, selected,
                     *, interleaving, editor_rows):
