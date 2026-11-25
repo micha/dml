@@ -319,6 +319,27 @@ mkdir -p build/recorded-builtins-tlc
 Use Java and Quint 0.34.0 or newer for this standalone design check. Confirm
 that all observations were reached; a checker exit alone is not coverage.
 
+The [composed node calls replay](composition_histories.qnt) validates a
+[recorded add-to-double workflow](../docs/composed-node-calls.md) with eight
+requests and six fresh attempts. It checks that repeated and swapped adds
+converge on the same downstream MAP value, that reused work retains its original
+producer and trace, and that changed inputs cause fresh work. The replay checks
+read-only inspection of a transferred hit and rejects inconsistent producer
+pins and input source edges. [Focused tests](test_composition.py) check I64
+overflow, a late attempt ref collision, an equal-value getter-key graft, and
+a hit that would recreate the producing request.
+
+The [finite composition model](recorded_composition_design.qnt) covers producer
+pins, atomic decisions, rollback, and requested versus producing history. It
+models IDs and fixture values, not the native encoder or Python arithmetic.
+Run it with Java and Quint 0.34.0 or newer; confirm all 18 observations are reached:
+
+```sh
+mkdir -p build/recorded-composition-tlc
+(cd build/recorded-composition-tlc && quint verify ../../tests/recorded_composition_design.qnt \
+  --backend=tlc --search-observations)
+```
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
