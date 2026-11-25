@@ -272,6 +272,13 @@ not change the historical decision. Focused tests cover exact pins, rollback
 on occupied output, malformed declaration ancestry, and a replica with no live
 intent, plan, or evidence refs.
 
+The [multi-input history](../README.md#keep-reusable-results-for-multiple-scale-requests)
+checks that exact request keys coexist and one-key adoption preserves the other
+entry and the old branch. It covers routing, rollback, and pinned inspection
+after collection and after transfer to a replica without input refs. Focused tests cover the 16-entry limit, malformed nonmatching
+ancestry, unrelated intent lineages, and decisions that claim a hit from a
+historical table that lacks the key.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -566,5 +573,19 @@ With Java and Quint 0.34.0:
 ```sh
 mkdir -p build/recorded-supersession-tlc
 (cd build/recorded-supersession-tlc && quint verify ../../tests/recorded_supersession_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the multi-input reuse design with TLC
+
+The [multi-input model](recorded_multi_input_design.qnt) uses two versions,
+separate intent lineages, exact request and attempt IDs, and a two-key cap to
+check insertion, one-key adoption, atomic routing, rollback and pinned
+inspection. It abstracts record framing, transfer, collection and worker
+execution. Use Java and Quint 0.34.0:
+
+```sh
+mkdir -p build/recorded-multi-input-tlc
+(cd build/recorded-multi-input-tlc && quint verify ../../tests/recorded_multi_input_design.qnt \
   --backend=tlc --search-observations)
 ```
