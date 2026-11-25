@@ -298,6 +298,27 @@ The [focused tests](test_argument_maps.py) exercise duplicate canonical keys,
 forged sources and getter links, one-key adoption/removal, poisoned table
 history, caps, and rollback after a late output-ref collision.
 
+The [versioned built-ins replay](builtins_histories.qnt) runs the
+[installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
+still works after promotion, v1 and v2 return the same value from the same
+argument node with different operation IDs, equal MAPs reuse only the original
+ordinary result, and a changed MAP runs a new attempt. Quint checks native
+commit counts, full-inventory rollback on late ref collisions, and distinct
+requested and producing edges. A read-only CLI verifies the transferred hit
+closure and rejects two equal-value trace grafts. [Focused runtime tests](test_builtins.py)
+check handler routing, type and lifetime boundaries, and poisoned-scope rollback.
+The [finite design model](recorded_builtins_design.qnt) checks routing and exact
+source/trace association separately from native encoding and arithmetic:
+
+```sh
+mkdir -p build/recorded-builtins-tlc
+(cd build/recorded-builtins-tlc && quint verify ../../tests/recorded_builtins_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+Use Java and Quint 0.34.0 or newer for this standalone design check. Confirm
+that all observations were reached; a checker exit alone is not coverage.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer

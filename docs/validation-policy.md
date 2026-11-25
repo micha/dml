@@ -15,7 +15,8 @@ binary commit transfer and the staged result round trip, read-only integrity and
 reachability checks, and explicit transactional garbage collection. It also runs
 focused interpreter and Python binding tests, native integrity and collection
 fault checks, native transfer boundary and fault tests, and separate Quint
-workflow checks against the C handoff and Python recorded-calls examples.
+workflow checks against the C handoff and Python recorded examples, including
+versioned built-ins.
 
 Without `--quint`, the command only compiles the C core; that does not validate
 runtime behavior. See [Quint behavior checks](../README.md#quint-behavior-checks)
