@@ -13,7 +13,9 @@ Use `work-scale-attempt` and `select-scale-attempt` to distinguish executions
 of the same request without changing the result's identity. Use
 `adopt-scale-attempt` to record a new version of a choice without moving it.
 Use `define-scale-policy` and `request-policy-scale` to record why a request
-uses an existing result or needs fresh work.
+uses an existing result or needs fresh work. Use `define-scale-intent` and
+`request-intent-scale` to choose the implementation from a pinned definition
+before applying that reuse policy.
 These layouts are not core record types or execution APIs.
 """
 
@@ -45,6 +47,9 @@ ADOPTION_ENTRY = b"scale-attempt-adoption-v1"
 SELECTED_REUSE_ENTRY = b"recorded-selected-scale-reuse-v1"
 POLICY_ENTRY = b"scale-intent-policy-v1"
 DECISION_ENTRY = b"scale-request-decision-v1"
+INTENT_ENTRY = b"scale-intent-definition-v1"
+INTENT_DECISION_ENTRY = b"scale-intent-decision-v1"
+INTENT_FIELDS = (b"default_implementation", b"policy_default", b"v1_selection_ref", b"v2_selection_ref")
 REUSE_DEFAULT = b"reuse-by-default"
 EXECUTE_DEFAULT = b"execute-by-default"
 USE_DEFAULT = b"default"
@@ -83,6 +88,13 @@ class _ScaleSelection(NamedTuple):
     historical_ref: bytes
     attempt: _ScaleAttempt | None = None
     previous: bytes | None = None
+
+
+class _ScaleIntent(NamedTuple):
+    default_implementation: bytes
+    policy_default: bytes
+    v1_selection_ref: bytes
+    v2_selection_ref: bytes
 
 
 @contextmanager
@@ -323,6 +335,54 @@ def define_scale_policy(path, policy_ref, policy_default, *, basis_ref=None, bas
         return _publish(txn, policy_ref, POLICY_ENTRY, dag, *parents)
 
 
+def _check_intent_refs(*refs):
+    for label, ref in refs:
+        _check_ref_name(ref, label)
+    if len({MAIN, *(ref for _, ref in refs)}) != len(refs) + 1:
+        raise ValueError("intent, basis, producer, plan, decision, selection slots, and main refs must be distinct")
+
+
+def define_scale_intent(path, intent_ref, default_implementation, *, policy_default=None, v1_selection_ref=None,
+                        v2_selection_ref=None, basis_ref=None, basis_commit=None):
+    """Pin a scale definition, or version just the default implementation of an exact basis."""
+    _check_scale_implementation(default_implementation)
+    if (basis_ref is None) != (basis_commit is None):
+        raise ValueError("intent basis requires both a ref and commit ID")
+    refs = [("intent", intent_ref)]
+    if basis_ref is None:
+        _check_policy_default(policy_default)
+        refs.extend((("v1 selection", v1_selection_ref), ("v2 selection", v2_selection_ref)))
+    else:
+        _check_commit_id(basis_commit, "intent basis commit")
+        if any(value is not None for value in (policy_default, v1_selection_ref, v2_selection_ref)):
+            raise ValueError("an intent version inherits its reuse default and selection slots from its basis")
+        refs.append(("intent basis", basis_ref))
+    _check_intent_refs(*refs)
+    with _write_transaction(path, create=False) as txn:
+        if basis_ref is not None:
+            basis, _ = _selected_intent(txn, basis_ref, basis_commit)
+            _check_intent_refs(*refs, ("v1 selection", basis.v1_selection_ref), ("v2 selection", basis.v2_selection_ref))
+            intent = basis._replace(default_implementation=default_implementation)
+        else:
+            intent = _ScaleIntent(default_implementation, policy_default, v1_selection_ref, v2_selection_ref)
+        nodes = [_put_literal(txn, core.DATUM_STRING, value) for value in intent]
+        bindings = [field for pair in zip(INTENT_FIELDS, nodes) for field in pair]
+        dag = _put_object(txn, core.REC_DAG, nodes[0], *bindings)
+        parents = () if basis_commit is None else (basis_commit,)
+        return _publish(txn, intent_ref, INTENT_ENTRY, dag, *parents)
+
+
+def _resolve_intent_implementation(intent, requested):
+    if type(requested) is bytes and requested == USE_DEFAULT:
+        return intent.default_implementation, b"default-implementation"
+    _check_scale_implementation(requested)
+    return requested, b"explicit-implementation"
+
+
+def _intent_slot(intent, implementation):
+    return intent.v1_selection_ref if implementation == SCALE_V1 else intent.v2_selection_ref
+
+
 def _check_policy_request_refs(producer_pin, policy_ref, plan_pin, decision_ref, selection_ref, selection_commit):
     refs = [("producer", producer_pin), ("policy", policy_ref), ("plan", plan_pin), ("decision", decision_ref)]
     if selection_commit is not None:
@@ -359,12 +419,33 @@ def _policy_reason(policy_default, override, *, selected):
     return b"default-selection" if selected else b"default-no-selection"
 
 
-def _put_policy_decision(txn, decision_ref, fields, *parents):
+def _put_scale_decision(txn, decision_ref, entry, fields, *parents):
     fields = {b"decision_id": str(uuid4()).encode("ascii"), **fields}
     nodes = {name: _put_literal(txn, core.DATUM_STRING, value) for name, value in fields.items()}
     bindings = [field for pair in nodes.items() for field in pair]
     dag = _put_object(txn, core.REC_DAG, nodes[b"decision_id"], *bindings)
-    return _publish(txn, decision_ref, DECISION_ENTRY, dag, *parents)
+    return _publish(txn, decision_ref, entry, dag, *parents)
+
+
+def _decide_scale(txn, producer, factor, implementation, plan_pin, decision_ref, *, entry, definition, policy_default,
+                  override, selection_ref, selection_commit, fields):
+    consulted = _resolve_policy_selection(txn, policy_default, override, selection_ref, selection_commit)
+    reusing = consulted is not None and selection_commit is not None
+    reason = _policy_reason(policy_default, override, selected=reusing)
+    expected_main = _optional_ref(txn, MAIN)
+    plan = _put_scale_plan(txn, producer, factor, implementation, expected_main)
+    fields = {b"override": override, b"reason": reason, **fields}
+    if consulted is not None:
+        fields[b"selection_ref"] = consulted
+    if reusing:
+        if _optional_ref(txn, plan_pin) is not None:
+            raise ValueError("plan output ref is already occupied")
+        request, _ = _read_plan(txn, plan)
+        selection = _read_scale_selection(txn, selection_commit, expected_request=request)
+        _update_main(txn, selection.result, expected_main)
+        return _put_scale_decision(txn, decision_ref, entry, fields, plan, definition, selection_commit)
+    core.txn_ref_create(txn, plan_pin, plan)
+    return _put_scale_decision(txn, decision_ref, entry, {**fields, b"plan_ref": plan_pin}, plan, definition)
 
 
 def request_policy_scale(path, producer_pin, producer_commit, policy_ref, policy_commit, plan_pin, decision_ref,
@@ -380,23 +461,36 @@ def request_policy_scale(path, producer_pin, producer_commit, policy_ref, policy
     with _write_transaction(path, create=False) as txn:
         _selected_sum(txn, producer_pin, producer_commit)
         policy_default, _ = _selected_policy(txn, policy_ref, policy_commit)
-        consulted = _resolve_policy_selection(txn, policy_default, override, selection_ref, selection_commit)
-        reusing = consulted is not None and selection_commit is not None
-        reason = _policy_reason(policy_default, override, selected=reusing)
-        expected_main = _optional_ref(txn, MAIN)
-        plan = _put_scale_plan(txn, producer_commit, factor, implementation, expected_main)
-        fields = {b"override": override, b"reason": reason}
-        if consulted is not None:
-            fields[b"selection_ref"] = consulted
-        if reusing:
-            if _optional_ref(txn, plan_pin) is not None:
-                raise ValueError("plan output ref is already occupied")
-            request, _ = _read_plan(txn, plan)
-            selection = _read_scale_selection(txn, selection_commit, expected_request=request)
-            _update_main(txn, selection.result, expected_main)
-            return _put_policy_decision(txn, decision_ref, fields, plan, policy_commit, selection_commit)
-        core.txn_ref_create(txn, plan_pin, plan)
-        return _put_policy_decision(txn, decision_ref, {**fields, b"plan_ref": plan_pin}, plan, policy_commit)
+        return _decide_scale(
+            txn, producer_commit, factor, implementation, plan_pin, decision_ref,
+            entry=DECISION_ENTRY, definition=policy_commit, policy_default=policy_default,
+            override=override, selection_ref=selection_ref, selection_commit=selection_commit, fields={},
+        )
+
+
+def request_intent_scale(path, producer_pin, producer_commit, intent_ref, intent_commit, plan_pin, decision_ref,
+                         factor, *, implementation=USE_DEFAULT, override=USE_DEFAULT, selection_commit=None):
+    """Resolve the implementation from an exact intent version before deciding whether to reuse."""
+    _check_commit_id(producer_commit)
+    _check_commit_id(intent_commit, "intent commit")
+    _check_i64(factor, "factor")
+    _check_policy_override(override)
+    if selection_commit is not None:
+        _check_commit_id(selection_commit, "selection commit")
+    refs = (("producer", producer_pin), ("intent", intent_ref), ("plan", plan_pin), ("decision", decision_ref))
+    _check_intent_refs(*refs)
+    with _write_transaction(path, create=False) as txn:
+        _selected_sum(txn, producer_pin, producer_commit)
+        intent, _ = _selected_intent(txn, intent_ref, intent_commit)
+        _check_intent_refs(*refs, ("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
+        chosen, reason = _resolve_intent_implementation(intent, implementation)
+        fields = {b"implementation_override": implementation, b"implementation_reason": reason}
+        return _decide_scale(
+            txn, producer_commit, factor, chosen, plan_pin, decision_ref,
+            entry=INTENT_DECISION_ENTRY, definition=intent_commit, policy_default=intent.policy_default,
+            override=override, selection_ref=_intent_slot(intent, chosen), selection_commit=selection_commit,
+            fields=fields,
+        )
 
 
 def _work_requested_scale(txn, incoming, request_commit):
@@ -842,44 +936,98 @@ def _selected_policy(txn, ref, commit):
     return _read_scale_policy(txn, commit)
 
 
-def _inspect_policy_decision(txn, commit, view, parents, dag):
+def _read_string_field(txn, dag, name):
+    return _read_literal(txn, core.txn_lookup_node(txn, dag, name), core.DATUM_STRING)
+
+
+def _read_scale_intent(txn, commit):
+    head = None
+    while commit is not None:
+        view, parents, entry, dag = _snapshot(txn, commit)
+        if entry != INTENT_ENTRY or parents not in (0, 1):
+            raise ValueError("expected a scale-intent-definition-v1 commit with an optional intent parent")
+        _, root, count = _object(txn, core.REC_DAG, dag)
+        if count != len(INTENT_FIELDS) or root != core.txn_lookup_node(txn, dag, INTENT_FIELDS[0]):
+            raise ValueError("scale intent definition has the wrong DAG layout")
+        intent = _ScaleIntent(*(_read_string_field(txn, dag, name) for name in INTENT_FIELDS))
+        _check_scale_implementation(intent.default_implementation)
+        _check_policy_default(intent.policy_default)
+        _check_intent_refs(("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
+        commit = core.object_view_parent(view, 0) if parents else None
+        if head is None:
+            head = intent, commit
+        elif intent != head[0]._replace(default_implementation=intent.default_implementation):
+            raise ValueError("an intent version must preserve its reuse default and selection slots")
+    return head
+
+
+def _selected_intent(txn, ref, commit):
+    if core.txn_ref_get(txn, ref) != commit:
+        raise ValueError("intent ref does not point to the expected intent commit")
+    return _read_scale_intent(txn, commit)
+
+
+def _inspect_scale_decision(txn, commit, view, parents, entry, dag):
+    label = "intent" if entry == INTENT_DECISION_ENTRY else "policy"
     if parents not in (2, 3):
-        raise ValueError("policy decision must have ordered plan, policy, and optional selection parents")
+        raise ValueError(f"{label} decision must have ordered plan, {label}, and optional selection parents")
     _, root, count = _object(txn, core.REC_DAG, dag)
     if root != core.txn_lookup_node(txn, dag, b"decision_id"):
-        raise ValueError("policy decision must have its decision ID as root")
+        raise ValueError(f"{label} decision must have its decision ID as root")
     identity = _read_literal(txn, root, core.DATUM_STRING)
     _check_uuid4(identity, "decision ID")
 
     def read_field(name):
-        return _read_literal(txn, core.txn_lookup_node(txn, dag, name), core.DATUM_STRING)
+        return _read_string_field(txn, dag, name)
 
-    plan, policy = (core.object_view_parent(view, i) for i in range(2))
+    plan, definition = (core.object_view_parent(view, i) for i in range(2))
     request, expected_main = _read_plan(txn, plan)
     if expected_main == request.commit:
-        raise ValueError("policy decision plan cannot expect its own request as main")
-    policy_default, _ = _read_scale_policy(txn, policy)
+        raise ValueError(f"{label} decision plan cannot expect its own request as main")
+    intent = None
+    field_count = 3
+    if entry == INTENT_DECISION_ENTRY:
+        intent, _ = _read_scale_intent(txn, definition)
+        policy_default = intent.policy_default
+        requested = read_field(b"implementation_override")
+        chosen, implementation_reason = _resolve_intent_implementation(intent, requested)
+        if chosen != request.implementation or implementation_reason != read_field(b"implementation_reason"):
+            raise ValueError("intent decision does not match the resolved implementation")
+        details = {"intent_commit": definition.hex(), "request_implementation": chosen.decode("ascii"),
+                   "implementation_override": requested.decode("ascii"),
+                   "implementation_reason": implementation_reason.decode("ascii")}
+        field_count += 2
+    else:
+        policy_default, _ = _read_scale_policy(txn, definition)
+        details = {"policy_commit": definition.hex()}
     override = read_field(b"override")
     _check_policy_override(override)
     reusing = parents == 3
     reason = _policy_reason(policy_default, override, selected=reusing)
     consulted = reusing or reason == b"default-no-selection"
-    if count != 3 + int(not reusing) + int(consulted) or read_field(b"reason") != reason:
-        raise ValueError("policy decision fields do not match the resolved policy")
-    report = {"commit": commit.hex(), "decision_id": identity.decode("ascii"),
-              "policy_commit": policy.hex(), "policy_default": policy_default.decode("ascii"),
-              "override": override.decode("ascii"), "reason": reason.decode("ascii"),
-              "action": "reuse-selected" if reusing else "execute-fresh",
+    if count != field_count + int(not reusing) + int(consulted) or read_field(b"reason") != reason:
+        raise ValueError(f"{label} decision fields do not match the resolved policy")
+    report = {"commit": commit.hex(), "decision_id": identity.decode("ascii"), **details,
+              "policy_default": policy_default.decode("ascii"), "override": override.decode("ascii"),
+              "reason": reason.decode("ascii"), "action": "reuse-selected" if reusing else "execute-fresh",
               "plan_commit": plan.hex(), "request_commit": request.commit.hex(),
               "expected_main": expected_main.hex() if expected_main is not None else None}
     names = {MAIN}
-    for field, present in ((b"plan_ref", not reusing), (b"selection_ref", consulted)):
-        if present:
-            name = read_field(field)
-            if not REF_NAME.fullmatch(name) or name in names:
-                raise ValueError("policy decision has invalid or aliased ref names")
-            names.add(name)
-            report[field.decode("ascii")] = name.decode("ascii")
+    if not reusing:
+        plan_ref = read_field(b"plan_ref")
+        if intent is not None:
+            names.update((intent.v1_selection_ref, intent.v2_selection_ref))
+        if not REF_NAME.fullmatch(plan_ref) or plan_ref in names:
+            raise ValueError(f"{label} decision has invalid or aliased ref names")
+        report["plan_ref"] = plan_ref.decode("ascii")
+    if consulted:
+        slot = read_field(b"selection_ref")
+        if intent is not None:
+            if slot != _intent_slot(intent, chosen):
+                raise ValueError("intent decision does not name the resolved selection slot")
+        elif not REF_NAME.fullmatch(slot) or slot == MAIN or (not reusing and slot == plan_ref):
+            raise ValueError(f"{label} decision has invalid or aliased ref names")
+        report["selection_ref"] = slot.decode("ascii")
     if reusing:
         selection_commit = core.object_view_parent(view, 2)
         selection = _read_scale_selection(txn, selection_commit, expected_request=request)
@@ -1023,8 +1171,12 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
         if previous is not None:
             report["previous_policy_commit"] = previous.hex()
         return report
-    if entry == DECISION_ENTRY:
-        return _inspect_policy_decision(txn, commit, view, parents, terminal)
+    if entry == INTENT_ENTRY:
+        intent, previous = _read_scale_intent(txn, commit)
+        fields = {name.decode("ascii"): value.decode("ascii") for name, value in zip(INTENT_FIELDS, intent)}
+        return {**report, **fields, "previous_intent_commit": previous.hex() if previous is not None else None}
+    if entry in (DECISION_ENTRY, INTENT_DECISION_ENTRY):
+        return _inspect_scale_decision(txn, commit, view, parents, entry, terminal)
     if entry == PUBLICATION_ENTRY:
         fields = _read_publication(txn, commit)
         return {**report, **{name.decode("ascii"): value.decode("ascii") for name, value in fields.items()}}
@@ -1159,6 +1311,23 @@ def main():
     policy_request.add_argument("--override", choices=("default", "fresh", "reuse-selected"), default="default")
     policy_request.add_argument("--selection", help="explicit slot for a reuse path")
     policy_request.add_argument("--selection-commit", help="expected slot commit; omit to expect absence")
+    intent = commands.add_parser("define-scale-intent", help="pin a version of the scale implementation default")
+    intent.add_argument("repo", type=Path)
+    intent.add_argument("intent_ref")
+    intent.add_argument("default_implementation")
+    intent.add_argument("--reuse-default", choices=("reuse-by-default", "execute-by-default"))
+    intent.add_argument("--v1-selection", help="v1 selection slot for an initial definition")
+    intent.add_argument("--v2-selection", help="v2 selection slot for an initial definition")
+    intent.add_argument("--basis-ref")
+    intent.add_argument("--basis-commit")
+    intent_request = commands.add_parser("request-intent-scale", help="resolve an implementation before reuse")
+    intent_request.add_argument("repo", type=Path)
+    for name in ("producer_pin", "producer_commit", "intent_ref", "intent_commit", "plan_pin", "decision_ref"):
+        intent_request.add_argument(name)
+    intent_request.add_argument("factor", type=int)
+    intent_request.add_argument("--implementation", default="default", help="override the pinned default version")
+    intent_request.add_argument("--override", choices=("default", "fresh", "reuse-selected"), default="default")
+    intent_request.add_argument("--selection-commit", help="expected commit in the resolved slot, or omit for absence")
     request_exporter = commands.add_parser("export-request", help="export only the portable request from a plan")
     request_exporter.add_argument("repo", type=Path)
     request_exporter.add_argument("plan_pin")
@@ -1267,6 +1436,29 @@ def main():
                 args.plan_pin.encode("ascii"), args.decision_ref.encode("ascii"), args.factor,
                 implementation=args.implementation.encode("utf-8"), override=args.override.encode("ascii"),
                 selection_ref=selection_ref, selection_commit=selection_commit,
+            )
+            print(decision.hex())
+        elif args.command == "define-scale-intent":
+            basis_commit = (_parse_commit_id(args.basis_commit, "intent basis commit")
+                            if args.basis_commit is not None else None)
+            definition = define_scale_intent(
+                args.repo, args.intent_ref.encode("ascii"), args.default_implementation.encode("utf-8"),
+                policy_default=args.reuse_default.encode("ascii") if args.reuse_default is not None else None,
+                v1_selection_ref=args.v1_selection.encode("ascii") if args.v1_selection is not None else None,
+                v2_selection_ref=args.v2_selection.encode("ascii") if args.v2_selection is not None else None,
+                basis_ref=args.basis_ref.encode("ascii") if args.basis_ref is not None else None,
+                basis_commit=basis_commit,
+            )
+            print(definition.hex())
+        elif args.command == "request-intent-scale":
+            selection_commit = (_parse_commit_id(args.selection_commit, "selection commit")
+                                if args.selection_commit is not None else None)
+            decision = request_intent_scale(
+                args.repo, args.producer_pin.encode("ascii"), _parse_commit_id(args.producer_commit),
+                args.intent_ref.encode("ascii"), _parse_commit_id(args.intent_commit, "intent commit"),
+                args.plan_pin.encode("ascii"), args.decision_ref.encode("ascii"), args.factor,
+                implementation=args.implementation.encode("utf-8"), override=args.override.encode("ascii"),
+                selection_commit=selection_commit,
             )
             print(decision.hex())
         elif args.command == "export-request":

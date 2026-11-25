@@ -260,6 +260,11 @@ moved slot, and verifies that reuse reports the original attempt and leaves no
 live plan. Replay checks atomic rejection and decision readback after
 collection. Focused checks exercise record shape and malformed history.
 
+The [implementation default history](../README.md#choose-an-implementation-from-a-pinned-intent-definition)
+checks that pinned versions choose independently, an explicit implementation
+can still reuse, and an exact but incompatible selection cannot satisfy a
+request. It exercises atomic rejection and offline decision inspection.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -518,5 +523,23 @@ With Java and Quint 0.34.0:
 ```sh
 mkdir -p build/recorded-policy-tlc
 (cd build/recorded-policy-tlc && quint verify ../../tests/recorded_policy_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the implementation default design with TLC
+
+The [implementation default model](recorded_implementation_default_design.qnt)
+uses two implementations for a fixed producer and factor, two selection
+slots, three valid definitions, and at most two sequential decisions. It
+checks that a new definition leaves the old one usable, that implementation
+choice precedes the reuse decision, and that rejection preserves repository
+state. Ref names, native framing, ID generation, and worker execution are
+outside this safety model.
+
+With Java and Quint 0.34.0:
+
+```sh
+mkdir -p build/recorded-implementation-tlc
+(cd build/recorded-implementation-tlc && quint verify ../../tests/recorded_implementation_default_design.qnt \
   --backend=tlc --search-observations)
 ```

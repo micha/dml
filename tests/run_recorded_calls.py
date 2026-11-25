@@ -60,8 +60,11 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
                                     "selection": "", "result": ""},
             "occurrence": {"id": "", "commit": "", "result": "", "historicalRef": ""},
             "policy": {"defaultMode": "", "previous": ""}, "expectedPolicy": "",
-            "decision": {"id": "", "canonicalId": False, "policy": "", "defaultMode": "", "override": "", "route": "",
-                         "reason": "", "plan": "", "planRef": "", "selectionRef": "", "selection": "", "result": ""},
+            "intent": {"implementation": "", "defaultMode": "", "v1Selection": "", "v2Selection": "", "previous": ""},
+            "expectedIntent": "",
+            "decision": {"id": "", "canonicalId": False, "policy": "", "intent": "", "defaultMode": "", "override": "",
+                         "route": "", "reason": "", "plan": "", "planRef": "", "selectionRef": "", "selection": "",
+                         "result": "", "implementationOverride": "", "implementationReason": ""},
             "unchanged": unchanged, "bundlePresent": bundle_present, "bundleUnchanged": bundle_unchanged}
 
 
@@ -77,6 +80,7 @@ class ProcessHistory:
         self.selection_receipts = {}
         self.attempt_receipts = {}
         self.policy_receipts = {}
+        self.intent_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
@@ -90,6 +94,7 @@ class ProcessHistory:
             "export_scale_attempt": self.export_scale_attempt, "select_scale_attempt": self.select_scale_attempt,
             "adopt_scale_attempt": self.adopt_scale_attempt, "drop_ref": self.drop_ref,
             "define_scale_policy": self.define_scale_policy, "request_policy_scale": self.request_policy_scale,
+            "define_scale_intent": self.define_scale_intent, "request_intent_scale": self.request_intent_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -265,10 +270,42 @@ class ProcessHistory:
         row = self.write("request_policy_scale", args, operands=operands)
         return {**row, "expectedCommit": producer, "expectedPolicy": policy, "expectedSelection": expected_selection}
 
+    def define_scale_intent(self, role, intent_ref, implementation, *definition):
+        expected = ""
+        operands = [intent_ref, implementation]
+        if len(definition) == 2:
+            basis_ref, receipt = definition
+            expected = self.intent_receipts[receipt]
+            operands.extend(("--basis-ref", basis_ref, "--basis-commit", expected))
+        else:
+            reuse, v1_slot, v2_slot = definition
+            operands.extend(("--reuse-default", reuse, "--v1-selection", v1_slot, "--v2-selection", v2_slot))
+        row = self.write("define_scale_intent", (role, intent_ref, implementation, *definition), operands=operands)
+        if row["commit"]:
+            self.intent_receipts[intent_ref] = row["commit"]
+        return {**row, "expectedCommit": expected}
+
+    def request_intent_scale(self, role, producer_ref, producer_receipt, intent_ref, intent_receipt,
+                             plan_ref, decision_ref, factor, implementation, override, selection):
+        producer = self.sum_receipts["source", producer_receipt]
+        intent = self.intent_receipts[intent_receipt]
+        args = (role, producer_ref, producer_receipt, intent_ref, intent_receipt, plan_ref, decision_ref,
+                factor, implementation, override, selection)
+        operands = [producer_ref, producer, intent_ref, intent, plan_ref, decision_ref, factor]
+        if implementation != "default":
+            operands.extend(("--implementation", implementation))
+        if override != "default":
+            operands.extend(("--override", override))
+        expected_selection = "" if selection == "-" else self.selection_receipts[selection]
+        if expected_selection:
+            operands.extend(("--selection-commit", expected_selection))
+        row = self.write("request_intent_scale", args, operands=operands)
+        return {**row, "expectedCommit": producer, "expectedIntent": intent, "expectedSelection": expected_selection}
+
     def drop_ref(self, role, pin, kind, receipt):
         # Fixture only: simulate a separate ref owner without adding a CLI command.
         receipts = {"attempt": self.attempt_receipts, "selection": self.selection_receipts,
-                    "policy": self.policy_receipts}
+                    "policy": self.policy_receipts, "intent": self.intent_receipts}
         expected = receipts[kind][receipt]
         path = self.repos[role]
         data = path / "data.mdb"
@@ -343,15 +380,25 @@ class ProcessHistory:
                 canonical_id = re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
                                             decision_id) is not None
                 row["decision"] = {
-                    "id": decision_id, "canonicalId": canonical_id, "policy": id_evidence(report["policy_commit"]),
+                    "id": decision_id, "canonicalId": canonical_id,
+                    "policy": id_evidence(report["policy_commit"]) if "policy_commit" in report else "",
+                    "intent": id_evidence(report["intent_commit"]) if "intent_commit" in report else "",
                     "defaultMode": report["policy_default"], "override": report["override"],
                     "route": report["action"], "reason": report["reason"], "plan": id_evidence(report["plan_commit"]),
                     "planRef": report.get("plan_ref", ""), "selectionRef": report.get("selection_ref", ""),
                     "selection": id_evidence(report["selection_commit"]) if "selection_commit" in report else "",
                     "result": id_evidence(report["result_commit"]) if "result_commit" in report else "",
+                    "implementationOverride": report.get("implementation_override", ""),
+                    "implementationReason": report.get("implementation_reason", ""),
                 }
                 if "plan_ref" in report:
                     self.plan_receipts[report["plan_ref"]] = row["decision"]["plan"]
+            elif "default_implementation" in report:
+                previous = report["previous_intent_commit"]
+                row["intent"] = {"implementation": report["default_implementation"],
+                                 "defaultMode": report["policy_default"], "v1Selection": report["v1_selection_ref"],
+                                 "v2Selection": report["v2_selection_ref"],
+                                 "previous": "" if previous is None else id_evidence(previous)}
             elif "policy_default" in report:
                 row["policy"] = {"defaultMode": report["policy_default"], "previous":
                                  id_evidence(report["previous_policy_commit"]) if "previous_policy_commit" in report else ""}

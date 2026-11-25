@@ -1467,6 +1467,127 @@ class RecordedCallsTest(unittest.TestCase):
         self.assertNotIn("selection_ref", report)
         self.assertNotIn("selection_commit", report)
 
+    def test_intent_readers_revalidate_definition_lineage_and_implementation_decision(self):
+        producer, _, _, _, _, chosen = self.prepare_adoption()
+        define = self.example["define_scale_intent"]
+        decide = self.example["request_intent_scale"]
+        inspect = self.example["inspect"]
+        v1, v2 = b"example.scale@1", b"example.scale@2"
+        basis = define(self.repo, b"basis", v1, policy_default=b"reuse-by-default",
+                       v1_selection_ref=b"chosen", v2_selection_ref=b"chosen-b")
+        right = define(self.repo, b"right", v2, basis_ref=b"basis", basis_commit=basis)
+        decision = decide(self.repo, b"producer", producer, b"right", right, b"plan-b", b"miss", 3)
+        report = inspect(self.repo, b"miss")
+        self.assertEqual((report["request_implementation"], report["selection_ref"]), (v2.decode(), "chosen-b"))
+        self.assertNotIn("selection_commit", report)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            plan, _, (request,) = self.snapshot(txn, b"plan-b", b"scale-plan-v1")
+            stored, _, parents = self.snapshot(txn, b"miss", b"scale-intent-decision-v1")
+            self.assertEqual((stored, parents, report["request_commit"]), (decision, (plan, right), request.hex()))
+            _, _, parents = self.snapshot(txn, b"right", b"scale-intent-definition-v1")
+            self.assertEqual(parents, (basis,))
+
+            def record(ref, entry, fields, root, *parents):
+                nodes = {key: literal(txn, core.DATUM_STRING, value) for key, value in fields.items()}
+                bindings = [value for pair in nodes.items() for value in pair]
+                dag = put(txn, core.REC_DAG, nodes[root], *bindings)
+                tree = put(txn, core.REC_TREE, entry, dag)
+                commit = put(txn, core.REC_COMMIT, tree, *parents)
+                core.txn_ref_create(txn, ref, commit)
+                return commit
+
+            definitions = {b"default_implementation": v2, b"policy_default": b"reuse-by-default",
+                           b"v1_selection_ref": b"chosen", b"v2_selection_ref": b"chosen-b"}
+            definition_entry = b"scale-intent-definition-v1"
+            invalid = []
+            for ref, fields, parent, error in (
+                (b"changed-policy", {b"policy_default": b"execute-by-default"}, basis, "preserve its reuse default"),
+                (b"changed-slot", {b"v1_selection_ref": b"another"}, basis, "preserve its reuse default"),
+                (b"aliased-slots", {b"v1_selection_ref": b"chosen-b"}, basis, "must be distinct"),
+                (b"unknown-version", {b"default_implementation": b"typo"}, basis, "unsupported scale implementation"),
+                (b"wrong-ancestor", {}, producer, "optional intent parent"),
+            ):
+                commit = record(ref, definition_entry, {**definitions, **fields}, b"default_implementation", parent)
+                invalid.append((ref, commit, error))
+
+            fields = {b"decision_id": ATTEMPT_A, b"override": b"default", b"reason": b"default-no-selection",
+                      b"implementation_override": b"default", b"implementation_reason": b"default-implementation",
+                      b"plan_ref": b"plan-b", b"selection_ref": b"chosen-b"}
+            reuse_fields = {key: value for key, value in fields.items() if key != b"plan_ref"}
+            for ref, forged, parents, error in (
+                (b"wrong-definition", {**fields, b"selection_ref": b"chosen"},
+                 (plan, basis), "resolved implementation"),
+                (b"wrong-override", {**fields, b"selection_ref": b"chosen", b"implementation_override": v1,
+                                     b"implementation_reason": b"explicit-implementation"},
+                 (plan, right), "resolved implementation"),
+                (b"wrong-reason", {**fields, b"implementation_override": v2}, (plan, right), "resolved implementation"),
+                (b"wrong-slot", {**fields, b"selection_ref": b"chosen"}, (plan, right), "resolved selection slot"),
+                (b"aliased-plan", {**fields, b"plan_ref": b"chosen"}, (plan, right), "invalid or aliased ref names"),
+                (b"foreign-selection", {**reuse_fields, b"reason": b"default-selection"},
+                 (plan, right, chosen), "selection does not retain the expected request"),
+            ):
+                commit = record(ref, b"scale-intent-decision-v1", forged, b"decision_id", *parents)
+                invalid.append((ref, commit, error))
+            core.txn_commit(txn)
+
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for ref, _, error in invalid:
+            with self.subTest(ref=ref), self.assertRaisesRegex(ValueError, error):
+                inspect(self.repo, ref)
+        bad_ref, bad_commit, error = next(row for row in invalid if row[0] == b"wrong-ancestor")
+        with self.assertRaisesRegex(ValueError, error):
+            define(self.repo, b"child", v1, basis_ref=bad_ref, basis_commit=bad_commit)
+        with self.assertRaisesRegex(ValueError, error):
+            decide(self.repo, b"producer", producer, bad_ref, bad_commit, b"unused-plan", b"unused", 3, override=b"fresh")
+        self.assertEqual(data.read_bytes(), before)
+
+    def test_intent_fresh_routes_ignore_slot_and_an_explicit_reuse_overrides_execute_default(self):
+        producer, _, request, first, _, chosen = self.prepare_adoption()
+        define = self.example["define_scale_intent"]
+        decide = self.example["request_intent_scale"]
+        inspect = self.example["inspect"]
+        v1, v2 = b"example.scale@1", b"example.scale@2"
+        intent = define(self.repo, b"intent", v2, policy_default=b"execute-by-default",
+                        v1_selection_ref=b"chosen", v2_selection_ref=b"not-selection")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_create(txn, b"not-selection", producer)
+            core.txn_commit(txn)
+
+        def ask(plan_ref, decision_ref, factor=3, **options):
+            return decide(self.repo, b"producer", producer, b"intent", intent, plan_ref, decision_ref, factor, **options)
+
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "expected a scale result or attempt selection"):
+            ask(b"unused", b"bad", override=b"reuse-selected", selection_commit=producer)
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            ask(b"rolled-back", b"plan", factor=4, override=b"fresh", selection_commit=chosen)
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, b"rolled-back")
+            self.assert_missing_ref(txn, b"main")
+
+        for plan_ref, decision_ref, override, reason in (
+            (b"default-plan", b"default-decision", b"default", "default-execution"),
+            (b"fresh-plan", b"fresh-decision", b"fresh", "override-fresh"),
+        ):
+            ask(plan_ref, decision_ref, override=override, selection_commit=chosen)
+            report = inspect(self.repo, decision_ref)
+            self.assertEqual((report["request_implementation"], report["reason"]), (v2.decode(), reason))
+            self.assertNotIn("selection_ref", report)
+            self.assertNotIn("selection_commit", report)
+
+        ask(b"unused", b"reused", implementation=v1, override=b"reuse-selected", selection_commit=chosen)
+        report = inspect(self.repo, b"reused")
+        self.assertEqual((report["request_commit"], report["attempt_commit"]), (request.hex(), first.hex()))
+        self.assertEqual((report["implementation_reason"], report["reason"]),
+                         ("explicit-implementation", "override-selected-reuse"))
+        with transaction(self.repo) as txn:
+            self.assertEqual(core.txn_ref_get(txn, b"main").hex(), report["result_commit"])
+            self.assertEqual(core.txn_ref_get(txn, b"not-selection"), producer)
+            self.assert_missing_ref(txn, b"unused")
+
     def test_attempt_work_rejects_invalid_identity_stale_ref_and_overflow_atomically(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
         self.example["request_scale"](self.repo, b"producer", producer, b"plan", 1 << 62)

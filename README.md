@@ -547,6 +547,47 @@ records the slot observed at request time, not a claim about its current
 contents. Policy versions and decisions do not change the portable request or
 result IDs. The legacy commands do not consult policies.
 
+#### Choose an implementation from a pinned intent definition
+
+Continue with the v1 selection at `adopted` from
+[versioned attempt selection](#record-a-new-version-of-an-attempt-selection).
+An intent definition pins the reuse mode, a default scale implementation, and
+one named selection slot per implementation. Publish a new version to change
+the default without moving the old definition or changing either slot:
+
+```sh
+calls() { python examples/recorded_calls.py "$@"; }
+intent_v1=$(calls define-scale-intent ./origin intent-v1 example.scale@1 \
+  --reuse-default reuse-by-default --v1-selection adopted --v2-selection selected-v2)
+intent_v2=$(calls define-scale-intent ./origin intent-v2 example.scale@2 \
+  --basis-ref intent-v1 --basis-commit "$intent_v1")
+
+# v2 is the default. Its slot is absent, so this creates a fresh v2 plan.
+calls request-intent-scale ./origin producer "$producer" intent-v2 "$intent_v2" plan-v2 decision-v2 3
+calls inspect ./origin decision-v2
+
+# Explicitly choose v1 without overriding the reuse mode.
+calls request-intent-scale ./origin producer "$producer" intent-v2 "$intent_v2" unused-v1 decision-v1 3 \
+  --implementation example.scale@1 --selection-commit "$adopted"
+calls inspect ./origin decision-v1
+```
+
+Pinning `intent-v1` and omitting `--implementation` still chooses v1. The
+implementation override is independent of `--override default|fresh|reuse-selected`.
+When the reuse path consults a slot, supply the exact `--selection-commit`, or
+omit it to require absence. A v1 selection in the v2 slot is an error, even if
+both implementations return the same value. Fresh-only paths read neither
+slot, and a reuse path never reads the other implementation's slot.
+
+The command prints a decision commit ID. Inspection explains the implementation
+choice and the reuse decision from retained history, not live refs. The
+[policy request rules](#set-a-reuse-default-for-the-scale-intent) still apply to
+atomic publication and fresh plans; both declared slot names must also be
+separate from the other refs in the request. Use the existing export and worker
+commands for fresh work, and select its result explicitly if wanted. Neither
+command dispatches work or changes a selection, and neither changes the IDs or
+layouts of portable requests and results.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).

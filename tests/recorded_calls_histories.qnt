@@ -455,10 +455,73 @@ module recorded_calls_histories {
     source("inspect", List("fallback-decision"))
   ))
 
+  pure def implementationIntent(definition: str, receipt: str, plan: str, decision: str,
+                               implementation: str, override: str, selection: str): Request =
+    source("request_intent_scale", List("producer", "producer", definition, receipt, plan, decision, "3",
+      implementation, override, selection))
+
+  // Fork the default from one basis, but keep both separately declared slots.
+  // Both versions compute 36 with the same inputs; the requests are not interchangeable.
+  pure val implementationIntentRequests: List[Request] = attemptRequests.slice(0, 2).concat(List(
+    source("define_scale_intent", List("basis", "example.scale@1", "reuse-by-default", "chosen-a", "chosen-b")),
+    source("define_scale_intent", List("left", "example.scale@1", "basis", "basis")),
+    source("define_scale_intent", List("right", "example.scale@2", "basis", "basis")),
+    source("inspect", List("left")),
+    source("inspect", List("right")),
+    implementationIntent("left", "left", "plan-a", "fresh-a", "default", "default", "-"),
+    source("inspect", List("fresh-a")),
+    source("export_request", List("plan-a", "plan-a", "request-a.bundle")),
+    worker("stage_input", List("incoming-a", "request-a.bundle")),
+    worker("work_scale_attempt", List("incoming-a", "plan-a", "attempt-a", occurrenceA)),
+    worker("export_scale_attempt", List("attempt-a", "attempt-a", "a.bundle")),
+    source("stage_input", List("returned-a", "a.bundle")),
+    source("select_scale_attempt", List("plan-a", "plan-a", "returned-a", "attempt-a", "chosen-a")),
+    source("select_scale_attempt", List("plan-a", "plan-a", "returned-a", "attempt-a", "chosen-b", "foreign")),
+    implementationIntent("right", "right", "no-b-plan", "reuse-b", "default", "default", "foreign"),
+    implementationIntent("right", "right", "no-a-plan", "reuse-a", "example.scale@1", "default", "-"),
+    implementationIntent("right", "right", "no-a-plan", "reuse-a", "example.scale@1", "default", "chosen-a"),
+    source("inspect", List("reuse-a")),
+    source("inspect", List()),
+    implementationIntent("left", "basis", "plan-b", "fresh-b", "default", "default", "chosen-a"),
+    implementationIntent("right", "right", "plan-b", "fresh-b", "typo", "fresh", "-"),
+    source("drop_ref", List("chosen-b", "selection", "foreign")),
+    implementationIntent("right", "right", "plan-b", "fresh-b", "default", "default", "-"),
+    source("inspect", List("fresh-b")),
+    source("export_request", List("plan-b", "plan-b", "request-b.bundle")),
+    worker("stage_input", List("incoming-b", "request-b.bundle")),
+    worker("work_scale_attempt", List("incoming-b", "plan-b", "attempt-b", occurrenceB)),
+    worker("export_scale_attempt", List("attempt-b", "attempt-b", "b.bundle")),
+    source("stage_input", List("returned-b", "b.bundle")),
+    implementationIntent("right", "right", "no-b-plan", "reuse-b", "default", "reuse-selected", "-"),
+    source("select_scale_attempt", List("plan-b", "plan-b", "returned-b", "attempt-b", "chosen-b")),
+    implementationIntent("right", "right", "no-b-plan", "reuse-b", "default", "default", "foreign"),
+    implementationIntent("right", "right", "no-b-plan", "reuse-a", "default", "default", "chosen-b"),
+    implementationIntent("right", "right", "no-b-plan", "reuse-b", "default", "default", "chosen-b"),
+    source("inspect", List("reuse-b")),
+    source("inspect", List()),
+    implementationIntent("left", "left", "no-a-plan", "left-a", "default", "default", "chosen-a"),
+    source("inspect", List("left-a")),
+    source("drop_ref", List("left", "intent", "left")),
+    source("drop_ref", List("right", "intent", "right")),
+    source("drop_ref", List("basis", "intent", "basis")),
+    source("drop_ref", List("chosen-a", "selection", "chosen-a")),
+    source("drop_ref", List("chosen-b", "selection", "chosen-b")),
+    source("drop_ref", List("returned-a", "attempt", "attempt-a")),
+    source("drop_ref", List("returned-b", "attempt", "attempt-b")),
+    source("collect", List()),
+    source("inspect", List("reuse-a")),
+    source("inspect", List("reuse-b")),
+    source("inspect", List("fresh-b")),
+    source("inspect", List("no-a-plan")),
+    source("inspect", List("no-b-plan")),
+    source("inspect", List())
+  ))
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
+    .append(implementationIntentRequests)
   action step = histories' = histories
 }
