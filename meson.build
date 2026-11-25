@@ -267,6 +267,12 @@ with tempfile.TemporaryDirectory() as tmp:
   )
 
   test(
+    'ordinary-call-boundaries', python,
+    args: ['-B', files('tests/test_ordinary_calls.py'), lmdb_inventory],
+    env: binding_env,
+    depends: public_python_core,
+  )
+  test(
     'closure-boundaries', python,
     args: ['-B', files('tests/test_closures.py'), lmdb_inventory],
     env: binding_env,
@@ -277,6 +283,16 @@ with tempfile.TemporaryDirectory() as tmp:
     args: ['-B', files('tests/run_closures.py'), quint.full_path(),
            files('examples/recorded_closures.py'), lmdb_inventory,
            files('tests/closure_histories.qnt', 'tests/closure_rules.qnt')] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
+  test(
+    'recorded-ordinary-calls', python,
+    args: ['-B', files('tests/run_ordinary_calls.py'), quint.full_path(),
+           files('examples/recorded_ordinary_calls.py'), lmdb_inventory,
+           files('tests/ordinary_histories.qnt', 'tests/ordinary_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,

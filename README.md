@@ -770,6 +770,9 @@ without losing the distinction between the requested and original producers.
 The [closure-bound dependencies walkthrough](docs/closure-bound-dependencies.md#walkthrough)
 pins getter versions and a scale source before invocation, then reuses by
 captured value without replacing the producer's capture.
+The [captured ordinary calls walkthrough](docs/captured-ordinary-calls.md#walkthrough)
+lets the callable itself invoke captured add and double, with separate reuse
+and producer history at each level.
 
 #### Publish reuse with a durable record
 

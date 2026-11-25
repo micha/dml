@@ -16,7 +16,8 @@ reachability checks, and explicit transactional garbage collection. It also runs
 focused interpreter and Python binding tests, native integrity and collection
 fault checks, native transfer boundary and fault tests, and separate Quint
 workflow checks against the C handoff and Python recorded examples, including
-versioned built-ins, composed node calls, and closure-bound dependencies.
+versioned built-ins, composed node calls, closure-bound dependencies, and
+captured ordinary calls.
 
 Without `--quint`, the command only compiles the C core; that does not validate
 runtime behavior. See [Quint behavior checks](../README.md#quint-behavior-checks)

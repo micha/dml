@@ -361,6 +361,29 @@ mkdir -p build/recorded-closures-tlc
   --backend=tlc --search-observations)
 ```
 
+The [captured ordinary call replay](ordinary_histories.qnt) exercises the real
+[synchronous example](../docs/captured-ordinary-calls.md): captured targets
+survive changing defaults; an outer hit skips both children; an inner hit
+keeps the new request's add source and the old producer's original add source.
+It also checks retained prefixes after failure and read-only transferred
+inspection. [Focused tests](test_ordinary_calls.py) observe actual logical
+calls, move a selection between committed phases, and inject late update
+failures after real native writes.
+
+The [finite ordinary call model](recorded_ordinary_design.qnt) bounds each
+path to one new outer request, two call slots, two capture versions, four MAP
+values, and one historical success. It checks pinning, ordered publication,
+rollback to the last committed phase, and requested versus producing history.
+It uses symbolic IDs and an overflow sentinel; it does not model encoding,
+Python handles, or processes. Run with Java and Quint 0.34.0 or newer and
+confirm all 15 observations are reached:
+
+```sh
+mkdir -p build/recorded-ordinary-tlc
+(cd build/recorded-ordinary-tlc && quint verify ../../tests/recorded_ordinary_design.qnt \
+  --backend=tlc --search-observations)
+```
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
