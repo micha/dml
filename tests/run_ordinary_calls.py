@@ -36,8 +36,54 @@ NO_ENV = {"dag": "", "map": "", "mapSource": "", "list": "", "listSource": "",
           "add": "", "addMap": "", "double": "", "doubleMap": ""}
 EMPTY = {"op": "", "args": [], "commit": "", "code": 0, "error": "", "head": "", "main": "",
          "refs": [], "created": [], "profiles": [], "report": [], "unchanged": True, "preserved": True,
-         "transfer": False, "addedObjects": False}
+         "transfer": False, "addedObjects": False, "calls": []}
 EDITOR_OPS = {"txn_begin", "txn_ref_update", "txn_commit"}
+
+
+class CallTrace:
+    """Give each observed object a token on first sight, without comparing values."""
+
+    def __init__(self):
+        self.events = []
+        self._objects = []
+
+    def token(self, obj):
+        for index, observed in enumerate(self._objects):
+            if obj is observed:
+                return index
+        self._objects.append(obj)  # Keep objects alive across the whole observation.
+        return len(self._objects) - 1
+
+    def record(self, op, *objects, labels=()):
+        self.events.append({"op": op, "handles": [self.token(obj) for obj in objects], "labels": list(labels)})
+
+    def outer(self, adapter):
+        def observe(arguments, get, make_arguments, invoke, add, double):
+            def observed_map(entries):
+                self.record("make-arguments", *entries.values(), labels=(key.decode("ascii") for key in entries))
+                result = make_arguments(entries)
+                self.record("arguments-return", result)
+                return result
+
+            def observed_invoke(target, node):
+                self.record("invoke", target, node)
+                result = invoke(target, node)
+                self.record("invoke-return", result)
+                return result
+
+            self.record("outer", arguments, add, double)
+            result = adapter(arguments, get, observed_map, observed_invoke, add, double)
+            self.record("outer-return", result)
+            return result
+
+        return observe
+
+    def leaf(self, adapter):
+        def observe(kind, arguments, ops):
+            self.record("leaf", labels=(kind.decode("ascii"),))
+            return adapter(kind, arguments, ops)
+
+        return observe
 
 
 class Inventory(ClosureInventory):
@@ -147,7 +193,8 @@ class History:
         self.scanner = scanner
         self.receipts = {}
         self.operations = {op: self.command(op) for op in ("defaults", "capture", "invoke", "select_double", "inspect")}
-        self.operations.update(replicate=self.replicate, retire=self.retire, graft=self.graft)
+        self.operations.update(replicate=self.replicate, retire=self.retire, graft=self.graft,
+                               invoke_observed=self.invoke_observed)
 
     def inventory(self, path):
         if not (path / "data.mdb").is_file():
@@ -161,7 +208,7 @@ class History:
                 core.txn_abort(txn)
 
     def evidence(self, op, args, before, after, *, commit="", head="", report=None, code=0, error="",
-                 transfer=False, remember=True):
+                 transfer=False, remember=True, calls=()):
         if commit and not IDENTITY.fullmatch(commit):
             raise ValueError(f"expected a commit ID, got {commit!r}")
         if remember:
@@ -178,7 +225,8 @@ class History:
                 "created": [after.commits[key] for key in sorted(after.commits.keys() - before.commits.keys())],
                 "profiles": after.added_builtin_profiles(before), "report": flat_report(report or {}),
                 "unchanged": before.rows == after.rows, "preserved": preserved, "transfer": transfer,
-                "addedObjects": any(key.startswith(OBJECT_PREFIX) for key in after.rows.keys() - before.rows.keys())}
+                "addedObjects": any(key.startswith(OBJECT_PREFIX) for key in after.rows.keys() - before.rows.keys()),
+                "calls": list(calls)}
 
     def resolve(self, arg):
         return RECEIPT.sub(lambda match: self.receipts[match[1]], arg)
@@ -199,6 +247,24 @@ class History:
                                  head=after.refs.get(ref, ""), report=report, code=process.returncode,
                                  error=process.stderr.strip())
         return invoke
+
+    def invoke_observed(self, role, capture, expected, output, a, b):
+        example = import_module(self.script.stem)
+        path = self.directory / role
+        before = self.inventory(path)
+        trace = CallTrace()
+        commit, code, error = "", 0, ""
+        with patch.object(example, "_double_sum", trace.outer(example._double_sum)), \
+                patch.object(example, "_leaf_call", trace.leaf(example._leaf_call)):
+            try:
+                commit = example.invoke(path, capture.encode("ascii"), bytes.fromhex(self.resolve(expected)),
+                                        output.encode("ascii"), int(a), int(b)).hex()
+            except (ValueError, OverflowError, core.Error) as failure:
+                code, error = 1, str(failure)
+        after = self.inventory(path)
+        return self.evidence("invoke_observed", (role, capture, expected, output, a, b), before, after,
+                             commit=commit, head=after.refs.get(output, ""), code=code, error=error,
+                             calls=trace.events)
 
     def invoke_live(self, actor, role, capture, expected, output, a, b, mode, selected_ref, selected,
                     *, interleaving, editor_rows):

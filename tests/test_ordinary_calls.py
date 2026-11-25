@@ -31,46 +31,6 @@ class OrdinaryCallsTest(unittest.TestCase):
     def inventory(self):
         return scan_inventory(SCANNER, self.repo)
 
-    def test_logical_func_calls_captured_leaves_with_exact_owned_nodes(self):
-        outer = example._double_sum
-        called, leaves = [], []
-
-        def trace_outer(arguments, get, make_arguments, invoke, add, double):
-            add_results, downstream_maps = [], []
-
-            def trace_map(entries):
-                self.assertIs(entries[b"x"], add_results[0])
-                downstream_maps.append(make_arguments(entries))
-                return downstream_maps[0]
-
-            def trace_call(target, node):
-                called.append(target)
-                if target is add:
-                    self.assertIs(node, arguments)
-                    add_results.append(invoke(target, node))
-                    return add_results[0]
-                self.assertIs(target, double)
-                self.assertIs(node, downstream_maps[0])
-                return invoke(target, node)
-
-            result = outer(arguments, get, trace_map, trace_call, add, double)
-            self.assertEqual(called, [add, double])
-            return result
-
-        leaf = example._leaf_call
-
-        def trace_leaf(kind, arguments, ops):
-            leaves.append(kind)
-            return leaf(kind, arguments, ops)
-
-        with patch.object(example, "_double_sum", trace_outer), patch.object(example, "_leaf_call", trace_leaf):
-            self.invoke()
-        self.assertEqual(leaves, [example.ADD, example.DOUBLE])
-        result = self.inspect(b"call")
-        self.assertEqual(result["value"], 84)
-        self.assertEqual(result["add"]["requested"]["inputs"], result["requested"]["inputs"])
-        self.assertEqual(result["double"]["requested"]["upstream_return"], result["add"]["return_dag"])
-
     def test_outer_hit_and_inspection_do_not_invoke_either_adapter(self):
         first = self.invoke()
         selected = example.Selection(example.REQUIRE, b"call", first)
