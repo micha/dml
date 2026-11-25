@@ -275,17 +275,50 @@ static PyObject *txn_abort(PyObject *self, PyObject *capsule) {
   Py_RETURN_NONE;
 }
 
+static int read_map_input(PyObject *value, dml_map_array *map, dml_datum_map_entry **allocated) {
+  bool tuple = PyTuple_Check(value);
+  if (!tuple && !PyList_Check(value)) {
+    PyErr_SetString(PyExc_TypeError, "map entries must be a list or tuple");
+    return 0;
+  }
+  Py_ssize_t count = tuple ? PyTuple_GET_SIZE(value) : PyList_GET_SIZE(value);
+  if (count == 0) return 1;
+  dml_datum_map_entry *entries = PyMem_Calloc((size_t)count, sizeof(*entries));
+  if (entries == NULL) {
+    PyErr_NoMemory();
+    return 0;
+  }
+  *allocated = entries;
+  for (Py_ssize_t i = 0; i < count; i++) {
+    PyObject *pair = tuple ? PyTuple_GET_ITEM(value, i) : PyList_GET_ITEM(value, i);
+    if (!PyTuple_Check(pair) || PyTuple_GET_SIZE(pair) != 2) {
+      PyErr_SetString(PyExc_TypeError, "each map entry must be a (key ID, value ID) tuple");
+      return 0;
+    }
+    if (!read_id(PyTuple_GET_ITEM(pair, 0), &entries[i].key) ||
+        !read_id(PyTuple_GET_ITEM(pair, 1), &entries[i].value)) return 0;
+  }
+  *map = (dml_map_array){.items = entries, .count = (size_t)count};
+  return 1;
+}
+
 static PyObject *datum_encode(PyObject *self, PyObject *args) {
   int kind;
   PyObject *value;
   if (!PyArg_ParseTuple(args, "iO", &kind, &value)) return NULL;
   dml_datum_input input = {.kind = (dml_datum_kind)kind};
+  dml_datum_map_entry *allocated = NULL;
   if (kind == DML_DATUM_I64) {
     long long number = PyLong_AsLongLong(value);
     if (number == -1 && PyErr_Occurred()) return NULL;
     input.value.i64 = (int64_t)number;
   } else if (kind == DML_DATUM_STRING) {
     if (!read_bytes(value, &input.value.bytes)) return NULL;
+  } else if (kind == DML_DATUM_MAP) {
+    if (!read_map_input(value, &input.value.map, &allocated)) {
+      PyMem_Free(allocated);
+      return NULL;
+    }
   } else {
     PyErr_SetString(PyExc_ValueError, "unsupported datum encoder kind");
     return NULL;
@@ -293,6 +326,7 @@ static PyObject *datum_encode(PyObject *self, PyObject *args) {
   dml_buffer packed = {0};
   dml_error error = {0};
   dml_status status = dml_datum_encode(&input, &packed, &error);
+  PyMem_Free(allocated);
   return status == DML_OK ? take_buffer(&packed) : raise_status(self, status, &error);
 }
 
@@ -787,6 +821,7 @@ PyMODINIT_FUNC MODULE_INIT(void) {
       PyModule_AddIntConstant(self, "TXN_WRITE", DML_TXN_WRITE) < 0 ||
       PyModule_AddIntConstant(self, "DATUM_I64", DML_DATUM_I64) < 0 ||
       PyModule_AddIntConstant(self, "DATUM_STRING", DML_DATUM_STRING) < 0 ||
+      PyModule_AddIntConstant(self, "DATUM_MAP", DML_DATUM_MAP) < 0 ||
       PyModule_AddIntConstant(self, "REC_NODE", DML_REC_NODE) < 0 ||
       PyModule_AddIntConstant(self, "REC_DAG", DML_REC_DAG) < 0 ||
       PyModule_AddIntConstant(self, "REC_TREE", DML_REC_TREE) < 0 ||

@@ -65,12 +65,17 @@ Arguments are positional. Functions without a listed result return `None`.
 | `txn_put_datum(txn, packed)`, `txn_put_object(txn, type, packed)` | The stored object's ID. |
 | `txn_get_datum(txn, id)`, `txn_get_object(txn, type, id)` | The packed record. |
 | `txn_lookup_node(txn, dag, name)` | Node ID from the named binding in `dag`. |
-| `datum_encode(kind, value)` | Packed datum. Exposed input kinds: `DATUM_I64` (signed 64-bit integer) and `DATUM_STRING` (UTF-8 bytes). |
-| `datum_decode(packed)` | `(payload_bytes, kind)`; payload is canonical bytes, not a converted Python value. |
+| `datum_encode(kind, value)` | Packed datum. Inputs: `DATUM_I64` (signed 64-bit integer), `DATUM_STRING` (UTF-8 bytes), or `DATUM_MAP` (list or tuple of `(key_id, value_id)` tuples). |
+| `datum_decode(packed)` | `(payload_bytes, kind)`; payload is canonical [packed bytes](records.md#packed-representation), not a converted Python value. |
 | `object_encode(type, ...)` | Packed object; see operand shapes below. |
 | `object_decode(packed)` | `(view, reference_id, count)`; reference and count follow [`dml_object_view`](../../include/dml/object.h). |
 | `object_view_entry(view, index)` | `(dag_id, name)` for a tree; index is zero-based. |
 | `object_view_parent(view, index)` | Parent commit ID for a commit; index is zero-based. |
+
+For `DATUM_MAP`, both IDs in a pair MUST be datum IDs represented as 16-byte
+`bytes`. The [C encoder](records.md#datum-model) sorts keys and rejects duplicate
+key IDs. `datum_encode` needs no repository; `txn_put_datum` checks that each ID
+resolves to a datum. `datum_decode` does not resolve those IDs.
 
 `object_encode` accepts these operands after the record type:
 
