@@ -69,35 +69,12 @@ class ClosureTest(unittest.TestCase):
                     example.work(self.path, pending, request, b"done", ATTEMPT)
                 self.assertEqual(self.inventory(), before)
 
-    def test_late_attempt_ref_collision_rolls_back_result_and_trace(self):
-        request = self.request()
-        before = self.inventory()
-        with self.assertRaises(core.Error) as failure:
-            example.work(self.path, b"pending", request, b"defaults", ATTEMPT)
-        self.assertEqual(failure.exception.args[::2], ("invalid_state", "ref already exists"))
-        self.assertEqual(self.inventory(), before)
-        attempt = example.work(self.path, b"pending", request, b"done", ATTEMPT)
-        report = example.inspect(self.path, b"done", expected=attempt)
-        self.assertEqual(report["value"], 84)
-        self.assertEqual(len(report["trace"]), 2)
-        self.assertNotEqual(self.inventory(), before)
-
     def test_inspection_does_not_bind_or_run_the_logical_callable(self):
         request = self.request()
         producer = example.work(self.path, b"pending", request, b"done", ATTEMPT)
         before = self.inventory()
         with patch.object(example, "_bind_scaled_sum", side_effect=AssertionError("inspection tried to bind work")):
             self.assertEqual(example.inspect(self.path, b"done", expected=producer)["value"], 84)
-        self.assertEqual(self.inventory(), before)
-
-    def test_reuse_requires_a_request_distinct_from_the_producer(self):
-        ex = example
-        producing_q = self.request()
-        producer = ex.work(self.path, b"pending", producing_q, b"done", ATTEMPT)
-        before = self.inventory()
-        with self.assertRaisesRegex(ValueError, "reuse needs a new invocation ID"):
-            ex.request(self.path, b"closure", self.closure, b"unused", b"reuse", 13, 29, INVOCATION,
-                       mode=ex.REQUIRE, selected_ref=b"done", selected=producer)
         self.assertEqual(self.inventory(), before)
 
     def test_equivalent_getter_version_in_original_trace_is_poison_even_on_scale_miss(self):

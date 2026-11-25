@@ -64,8 +64,8 @@ module closure_histories {
     require("c2", "unused4", "d4", "4"),                                        // 22
     inspect("source", "d4"),                                                      // 23
     fresh("c2", "q5", "d5", "5"),                                                // 24
-    work("q5", "t3", "7"),                                                        // 25 late work
-    work("q5", "t5", "5"),                                                        // 26
+    work("q5", "t3", "5"),                                                        // 25 occupied attempt ref
+    work("q5", "t5", "5"),                                                        // 26 retry with the same attempt ID
     inspect("source", "t5"),                                                      // 27
     require("c3", "bad-q", "bad-d", "7"),                                       // 28 changed scale, require miss
     request("c3", "@c3", "q6", "d6", "13", "29", "6",
