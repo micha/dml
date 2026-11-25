@@ -100,98 +100,101 @@ module composition_rules {
       and a.selection == original.selection and historicalRead(a, original)
 
   pure val rejected = Map(
-    12 -> "compose: upstream ref does not match the expected commit or absence",
-    13 -> "compose: invalid_state: ref already exists",
-    15 -> "request-double: invalid_state: ref already exists",
-    16 -> "request-double: pending request ref does not match the expected commit or absence",
-    29 -> "request-double: no selected double attempt for the argument MAP",
-    30 -> "request-double: selection ref does not match the expected commit or absence",
-    31 -> "request-double: attempt has the wrong ordinary func",
-    37 -> "request-double: composition producer does not match its pinned attempt",
-    44 -> "inspect: composition input does not use the exact producer return DAG",
-    46 -> "inspect: composition producer does not match its pinned attempt",
-    48 -> "inspect: composition producer does not match its pinned attempt")
+    2 -> "work: invalid_state: ref already exists",
+    13 -> "compose: upstream ref does not match the expected commit or absence",
+    14 -> "compose: invalid_state: ref already exists",
+    16 -> "request-double: invalid_state: ref already exists",
+    17 -> "request-double: pending request ref does not match the expected commit or absence",
+    27 -> "work: invalid_state: ref already exists",
+    31 -> "request-double: no selected double attempt for the argument MAP",
+    32 -> "request-double: selection ref does not match the expected commit or absence",
+    33 -> "request-double: attempt has the wrong ordinary func",
+    39 -> "request-double: composition producer does not match its pinned attempt",
+    46 -> "inspect: composition input does not use the exact producer return DAG",
+    48 -> "inspect: composition producer does not match its pinned attempt",
+    50 -> "inspect: composition producer does not match its pinned attempt")
 
   pure def accepted(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
-    val old = rows[8]
+    val old = rows[9]
     val r = record(a, "request").id
     if (i == 0) a.created.length() == 1 and native(a, "config", List()) and record(a, "config").id == a.commit
       and a.refs == List(createdRef("config", a.commit))
-    else if (i == 1 or i == 9 or i == 19 or i == 25) qrow(a, rows[0].commit, a.args[3])
-    else if (Set(2, 7, 10, 20, 26, 34).contains(i)) {
-      val q = if (i == 7) record(rows[5], "request").id
-        else if (i == 34) record(rows[32], "request").id else rows[i - 1].commit
+    else if (i == 1 or i == 10 or i == 20 or i == 26) qrow(a, rows[0].commit, a.args[3])
+    else if (Set(3, 8, 11, 21, 28, 36).contains(i)) {
+      val q = if (i == 3 or i == 28) rows[i - 2].commit // Retry the request from before the rejection.
+        else if (i == 8) record(rows[6], "request").id
+        else if (i == 36) record(rows[34], "request").id else rows[i - 1].commit
       trow(a, q, a.args[3], rows[i - 1].main)
-        and (if (i == 10) a.profiles == List() else Set("builtin-operation-v1", "builtin-trace-v1",
+        and (if (i == 11) a.profiles == List() else Set("builtin-operation-v1", "builtin-trace-v1",
           "builtin-return-v1").forall(p => a.profiles.foldl(false, (seen, actual) => seen or actual == p)))
-    } else if (i == 3) workRead(a, rows[2], rows[1], addFunc, 42)
-    else if (i == 11) workRead(a, rows[10], rows[9], addFunc, 42)
-      and a.producing.map == rows[3].producing.map and a.producing.inputs == rows[3].producing.inputs
-      and a.producing.request != rows[3].producing.request and a.attempt != rows[3].attempt
-      and a.result != rows[3].result and a.outer == rows[3].outer and a.trace == rows[3].trace
-    else if (i == 21) workRead(a, rows[20], rows[19], addFunc, 42)
-      and a.producing.map != rows[3].producing.map and a.producing.inputs != rows[3].producing.inputs
-      and a.outer != rows[3].outer and sourceDag(a.producing.sources, "a") == sourceDag(rows[3].producing.sources, "b")
-      and sourceDag(a.producing.sources, "b") == sourceDag(rows[3].producing.sources, "a")
-    else if (i == 27) workRead(a, rows[26], rows[25], addFunc, 43)
-      and a.producing.map != rows[3].producing.map and a.producing.map != rows[21].producing.map
-    else if (i == 4) crow(a, rows[2].commit, "c2")
-    else if (i == 14) crow(a, rows[10].commit, "c4") and record(a, "composition").inputs == record(rows[4], "composition").inputs
-      and record(a, "composition").dag != record(rows[4], "composition").dag
-    else if (i == 22) crow(a, rows[20].commit, "c6") and record(a, "composition").inputs != record(rows[4], "composition").inputs
-    else if (i == 28) crow(a, rows[26].commit, "c8")
-    else if (i == 5) drow(a, rows[4].commit, "", List(createdRef("d2", a.commit), createdRef("q2", r)))
-    else if (i == 6) pendingRead(a, rows[5], rows[4], rows[3], "")
-    else if (i == 8) workRead(a, rows[7], rows[5], doubleFunc, 84) and a.producing == rows[6].requested
-    else if (i == 17 or i == 23) {
-      val c = if (i == 17) 14 else 22
+    } else if (i == 4) workRead(a, rows[3], rows[1], addFunc, 42)
+    else if (i == 12) workRead(a, rows[11], rows[10], addFunc, 42)
+      and a.producing.map == rows[4].producing.map and a.producing.inputs == rows[4].producing.inputs
+      and a.producing.request != rows[4].producing.request and a.attempt != rows[4].attempt
+      and a.result != rows[4].result and a.outer == rows[4].outer and a.trace == rows[4].trace
+    else if (i == 22) workRead(a, rows[21], rows[20], addFunc, 42)
+      and a.producing.map != rows[4].producing.map and a.producing.inputs != rows[4].producing.inputs
+      and a.outer != rows[4].outer and sourceDag(a.producing.sources, "a") == sourceDag(rows[4].producing.sources, "b")
+      and sourceDag(a.producing.sources, "b") == sourceDag(rows[4].producing.sources, "a")
+    else if (i == 29) workRead(a, rows[28], rows[26], addFunc, 43)
+      and a.producing.map != rows[4].producing.map and a.producing.map != rows[22].producing.map
+    else if (i == 5) crow(a, rows[3].commit, "c2")
+    else if (i == 15) crow(a, rows[11].commit, "c4") and record(a, "composition").inputs == record(rows[5], "composition").inputs
+      and record(a, "composition").dag != record(rows[5], "composition").dag
+    else if (i == 23) crow(a, rows[21].commit, "c6") and record(a, "composition").inputs != record(rows[5], "composition").inputs
+    else if (i == 30) crow(a, rows[28].commit, "c8")
+    else if (i == 6) drow(a, rows[5].commit, "", List(createdRef("d2", a.commit), createdRef("q2", r)))
+    else if (i == 7) pendingRead(a, rows[6], rows[5], rows[4], "")
+    else if (i == 9) workRead(a, rows[8], rows[6], doubleFunc, 84) and a.producing == rows[7].requested
+    else if (i == 18 or i == 24) {
+      val c = if (i == 18) 15 else 23
       a.profiles == List() and drow(a, rows[c].commit, old.attempt,
         List(createdRef(a.args[4], a.commit), ref("main", rows[i - 1].main, old.result)))
-    } else if (i == 18) hit(a, rows[17], rows[14], rows[11], old)
+    } else if (i == 19) hit(a, rows[18], rows[15], rows[12], old)
       and a.requested.inputs == a.producing.inputs and a.requested.sources == a.producing.sources
-    else if (i == 24) hit(a, rows[23], rows[22], rows[21], old)
+    else if (i == 25) hit(a, rows[24], rows[23], rows[22], old)
       and a.requested.inputs != a.producing.inputs and a.requested.sources != a.producing.sources
-    else if (i == 32) drow(a, rows[28].commit, old.attempt, List(createdRef("d8", a.commit), createdRef("q8", r)))
-    else if (i == 33) pendingRead(a, rows[32], rows[28], rows[27], old.attempt)
-      and a.requested.map != old.producing.map and a.main == rows[27].result
-    else if (i == 35) workRead(a, rows[34], rows[32], doubleFunc, 86) and a.producing == rows[33].requested
+    else if (i == 34) drow(a, rows[30].commit, old.attempt, List(createdRef("d8", a.commit), createdRef("q8", r)))
+    else if (i == 35) pendingRead(a, rows[34], rows[30], rows[29], old.attempt)
+      and a.requested.map != old.producing.map and a.main == rows[29].result
+    else if (i == 37) workRead(a, rows[36], rows[34], doubleFunc, 86) and a.producing == rows[35].requested
       and a.counts == List(8, 6, 6, 4, 4)
-      and List(3, 8, 11, 21, 27, 35).foldl(0, (sum, j) => sum + rows[j].trace.length()) == 10
-    else if (i == 36) {
+      and List(4, 9, 12, 22, 29, 37).foldl(0, (sum, j) => sum + rows[j].trace.length()) == 10
+    else if (i == 38) {
       val c = record(a, "composition")
       val t = record(a, "attempt")
       val result = record(a, "result")
-      a.created.length() == 4 and native(a, "composition", List(rows[11].attempt))
-        and c.dag == record(rows[4], "composition").dag and c.pin == rows[3].attempt
-        and c.inputs == record(rows[4], "composition").inputs and t.dag == record(rows[7], "attempt").dag
+      a.created.length() == 4 and native(a, "composition", List(rows[12].attempt))
+        and c.dag == record(rows[5], "composition").dag and c.pin == rows[4].attempt
+        and c.inputs == record(rows[5], "composition").inputs and t.dag == record(rows[8], "attempt").dag
         and native(a, "request", List(c.id)) and native(a, "result", List(r)) and native(a, "attempt", List(r, result.id))
         and t.id == a.commit and a.refs == List(createdRef("poison", a.commit))
-    } else if (i == 38 or i == 39) {
-      val d = if (i == 38) rows[17].commit else rows[23].commit
+    } else if (i == 40 or i == 41) {
+      val d = if (i == 40) rows[18].commit else rows[24].commit
       a.transfer and a.commit == d and a.counts == List(4, 3, 3, 2, 1) and a.created.length() == 14
         and a.refs == List(createdRef(a.args[2], d))
-    } else if (i == 40) a.transfer and a.commit == "" and a.unchanged and a.refs == List()
-    else if (i == 41) replicaRead(a, rows[18])
-    else if (i == 42) replicaRead(a, rows[24])
-    else if (i == 43) {
+    } else if (i == 42) a.transfer and a.commit == "" and a.unchanged and a.refs == List()
+    else if (i == 43) replicaRead(a, rows[19])
+    else if (i == 44) replicaRead(a, rows[25])
+    else if (i == 45) {
       val c = record(a, "composition")
-      val base = record(rows[22], "composition")
+      val base = record(rows[23], "composition")
       a.created.length() == 1 and native(a, "composition", base.parents) and c.id == a.commit and c.pin == base.pin
-        and c.inputs == record(rows[4], "composition").inputs and c.inputs != base.inputs
+        and c.inputs == record(rows[5], "composition").inputs and c.inputs != base.inputs
         and a.refs == List(createdRef("source-graft", a.commit))
-    } else if (i == 45) {
+    } else if (i == 47) {
       val c = record(a, "composition")
-      val base = record(rows[14], "composition")
-      a.created.length() == 1 and native(a, "composition", List(rows[3].attempt)) and c.id == a.commit
+      val base = record(rows[15], "composition")
+      a.created.length() == 1 and native(a, "composition", List(rows[4].attempt)) and c.id == a.commit
         and c.dag == base.dag and c.pin == base.pin and c.inputs == base.inputs
         and a.refs == List(createdRef("parent-graft", a.commit))
-    } else if (i == 47) {
-      val poison = rows[36]
+    } else if (i == 49) {
+      val poison = rows[38]
       val d = record(a, "decision")
       a.created.length() == 5 and a.profiles == List() and d.id == a.commit
-        and d.dag == record(rows[17], "decision").dag
-        and native(a, "decision", List(record(rows[17], "request").id, poison.commit))
+        and d.dag == record(rows[18], "decision").dag
+        and native(a, "decision", List(record(rows[18], "request").id, poison.commit))
         and poison.created.foldl(true, (ok, row) => ok and
           a.created.foldl(false, (found, other) => found or row == other))
         and a.refs == List(createdRef("history-graft", a.commit))
@@ -204,8 +207,10 @@ module composition_rules {
     if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
     else if (not(a.preserved)) "changed_historical_records"
     else if (rejected.keys().contains(i)) {
+      val mainIntact = if (i == 2) a.main == "" and rows[1].main == ""
+        else if (i == 27) a.main == rows[26].main and a.main == rows[9].result else true
       if (a.code == 1 and a.error == rejected.get(i) and a.commit == "" and a.unchanged
-          and a.created == List() and a.refs == List()) "ok" else "wrong_rejection_or_rollback"
+          and a.created == List() and a.refs == List() and mainIntact) "ok" else "wrong_rejection_or_rollback"
     } else if (a.code != 0 or a.error != "" or (a.op != "retire" and a.commit == "")) "unexpected_failure"
     else if (a.unchanged != Set("inspect", "retire").contains(a.op)) "wrong_write_boundary"
     else if (not(accepted(rows, i))) "wrong_native_or_reported_provenance"
@@ -219,8 +224,8 @@ module composition_rules {
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
     evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == story.length()
       and verdicts[0].foldl(true, (ok, value) => ok and verdictAccepted(value))
-      and evidence[0].attempts[18].outcome == "reuse" and evidence[0].attempts[24].outcome == "reuse"
-      and evidence[0].attempts[33].outcome == "pending" and evidence[0].attempts[42].unchanged
+      and evidence[0].attempts[19].outcome == "reuse" and evidence[0].attempts[25].outcome == "reuse"
+      and evidence[0].attempts[35].outcome == "pending" and evidence[0].attempts[44].unchanged
 
   pure val q: Q = { ...noQ, request: "old-q", func: doubleFunc, composition: "old-c", map: "same-map",
     upstream: { ...noUpstream, attempt: "old-add" } }

@@ -31,21 +31,6 @@ class CompositionTest(unittest.TestCase):
     def add(self, a, b):
         return example.request_add(self.path, b"config", self.config, b"add", a, b, INVOCATION)
 
-    def test_late_attempt_ref_collision_rolls_back_new_result_and_trace(self):
-        request = self.add(13, 29)
-        # Reuse the occupied config name, but only after authoring a new result
-        # and moving main inside the transaction. Nothing from work may survive.
-        before = self.inventory()
-        with self.assertRaises(core.Error) as failure:
-            example.work(self.path, b"add", request, b"config", ATTEMPT)
-        self.assertEqual(failure.exception.args[::2], ("invalid_state", "ref already exists"))
-        self.assertEqual(self.inventory(), before)
-        attempt = example.work(self.path, b"add", request, b"done", ATTEMPT)
-        report = example.inspect(self.path, b"done", expected=attempt)
-        self.assertEqual(report["value"], 42)
-        self.assertEqual(len(report["trace"]), 2)
-        self.assertNotEqual(self.inventory(), before)
-
     def test_same_value_named_getter_key_is_not_the_recorded_literal_path(self):
         request = self.add(13, 29)
         ex = example
