@@ -97,13 +97,10 @@ def replay_history(suite, directory, requests):
         return {"attempts": attempts}
 
 
-def quint_record(fields, *, base=None):
+def quint_record(fields):
     if not all(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*", key) for key in fields):
         raise ValueError(f"Cannot encode Quint evidence record fields: {short_repr(list(fields))}")
-    entries = [f"{key}: {expression}" for key, expression in fields.items()]
-    if base is not None:
-        entries.insert(0, f"...{base}")
-    return "{ " + ", ".join(entries) + " }"
+    return "{ " + ", ".join(f"{key}: {expression}" for key, expression in fields.items()) + " }"
 
 
 def quint_literal(value):
@@ -124,25 +121,9 @@ def quint_literal(value):
 
 def quint_evidence(observations, *, attempt_defaults=None):
     """Declare small batches, then assemble typed rows in replay order."""
-    lines = []
-    default_fields = {}
     if attempt_defaults is not None:
-        default_fields = {key: quint_literal(value) for key, value in attempt_defaults.items()}
-        lines.append(f"  pure val evidenceDefaults = {quint_record(default_fields)}\n")
-
-    def encode_attempt(attempt):
-        if attempt_defaults is None:
-            return quint_literal(attempt)
-        if attempt.keys() != attempt_defaults.keys():
-            raise ValueError("Quint attempt fields do not match evidence defaults")
-        # Share identical fields without changing any live value. Compare the
-        # encoded expressions so bools and ints with equal Python values differ.
-        overrides = {key: expression for key, value in attempt.items()
-                     if (expression := quint_literal(value)) != default_fields[key]}
-        if not overrides:
-            return "evidenceDefaults"
-        return quint_record(overrides, base="evidenceDefaults")
-
+        return quint_columnar_evidence(observations, attempt_defaults)
+    lines = []
     rows = []
     for history, row in enumerate(observations):
         attempts = row["attempts"]
@@ -150,7 +131,7 @@ def quint_evidence(observations, *, attempt_defaults=None):
         for start in range(0, len(attempts), EVIDENCE_BATCH_SIZE):
             batch = f"evidenceBatch{history}_{start}"
             batches.append(batch)
-            expressions = ", ".join(map(encode_attempt, attempts[start:start + EVIDENCE_BATCH_SIZE]))
+            expressions = ", ".join(map(quint_literal, attempts[start:start + EVIDENCE_BATCH_SIZE]))
             lines.append(f"  pure val {batch} = List({expressions})\n")
         fields = {key: quint_literal(value) for key, value in row.items() if key != "attempts"}
         if len(batches) == 1:
@@ -161,6 +142,56 @@ def quint_evidence(observations, *, attempt_defaults=None):
         name = f"evidenceHistory{history}"
         rows.append(name)
         lines.append(f"  pure val {name}: Observation = {quint_record(fields)}\n")
+    lines.append(f"  pure val evidence: List[Observation] = List({', '.join(rows)})\n")
+    return "".join(lines)
+
+
+def quint_columnar_evidence(observations, attempt_defaults):
+    """Reconstruct full Attempt records from sparse columns in one typed constructor."""
+    defaults = {key: quint_literal(value) for key, value in attempt_defaults.items()}
+    columns = {key: [] for key in defaults}
+    rows = []
+    offset = 0
+    for row in observations:
+        attempts = row["attempts"]
+        fields = {key: quint_literal(value) for key, value in row.items() if key != "attempts"}
+        fields["attempts"] = f"evidenceRange({offset}, {offset + len(attempts)})"
+        rows.append(quint_record(fields))
+        for attempt in attempts:
+            if attempt.keys() != defaults.keys():
+                raise ValueError("Quint attempt fields do not match evidence defaults")
+            for key, value in attempt.items():
+                # Compare encoded expressions: equal Python bools and ints differ in Quint.
+                expression = quint_literal(value)
+                if expression != defaults[key]:
+                    columns[key].append(f"{offset} -> {expression}")
+            offset += 1
+
+    lines = []
+    fields = {}
+    # Avoid inferring and unifying one wide record type per step. A bounded
+    # literal per column batch also limits the size of each inference problem.
+    column_batch_size = 32
+    for key, entries in columns.items():
+        source = f"evidenceColumn_{key}"
+        if not entries:
+            fields[key] = defaults[key]
+            continue
+        batches = []
+        for start in range(0, len(entries), column_batch_size):
+            batch = f"evidenceBatch_{key}_{start}"
+            batches.append(batch)
+            literals = ", ".join(entries[start:start + column_batch_size])
+            lines.append(f"  pure val {batch} = Map({literals})\n")
+        if len(batches) == 1:
+            source = batches[0]
+        else:
+            lines.append(f"  pure val {source} = List({', '.join(batches)}).foldl(Map(), (out, batch) => "
+                         "batch.keys().fold(out, (acc, key) => acc.put(key, batch.get(key))))\n")
+        fields[key] = f"if ({source}.keys().contains(i)) {source}.get(i) else {defaults[key]}"
+    lines.append(f"  pure def evidenceAt(i: int): Attempt = {quint_record(fields)}\n")
+    lines.append("  pure def evidenceRange(start: int, end: int): List[Attempt] = "
+                 "range(start, end).foldl(List(), (out, i) => out.append(evidenceAt(i)))\n")
     lines.append(f"  pure val evidence: List[Observation] = List({', '.join(rows)})\n")
     return "".join(lines)
 

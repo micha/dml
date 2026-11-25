@@ -658,14 +658,14 @@ def main():
         started = monotonic()
         histories = read_histories(quint, args.histories, directory / "histories.itf.json", ["init"])
         loaded = monotonic()
-        print(f"Loaded {len(histories)} recorded-call histories in {loaded - started:.2f}s", flush=True)
+        print(f"Loaded {len(histories)} recorded-call histories in {loaded - started:.2f}s", file=sys.stderr, flush=True)
         observations = observe_histories(Processes(args.example), directory, histories)
         replayed = monotonic()
-        print(f"Collected recorded-call observations in {replayed - loaded:.2f}s", flush=True)
-        # Repeated empty optional fields otherwise dominate Quint's analysis time.
+        print(f"Collected recorded-call observations in {replayed - loaded:.2f}s", file=sys.stderr, flush=True)
+        # Sparse columns keep the full evidence without repeating its wide type for each step.
         defaults = evidence("", (), code=0, stderr="", unchanged=False)
         state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=defaults)
-        print(f"Evaluated recorded-call observations in {monotonic() - replayed:.2f}s", flush=True)
+        print(f"Evaluated recorded-call observations in {monotonic() - replayed:.2f}s", file=sys.stderr, flush=True)
         check_verdicts(histories, observations, state)
 
 
