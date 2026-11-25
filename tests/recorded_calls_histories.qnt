@@ -563,11 +563,103 @@ module recorded_calls_histories {
   pure val supersessionRequests = implementationIntentRequests.slice(0, implementationIntentSetupLength)
     .concat(advisoryRequests)
 
+  pure def tableRequest(producer: str, intent: str, plan: str, decision: str, table: str, receipt: str,
+                        implementation: str, override: str): Request =
+    source("request_table_scale", List(producer, intent, intent, plan, decision, "3", table, receipt,
+      implementation, override))
+
+  pure def fromTable(producer: str, plan: str, decision: str, table: str): Request =
+    tableRequest(producer, "left", plan, decision, table, table, "default", "default")
+
+  pure def editTable(basis: str, selection: str, output: str, mode: str): Request =
+    source("update_scale_reuse_table", List(basis, basis, selection, selection, output, mode))
+
+  // A and B have different producer DAGs and the same stored scalar (12).
+  pure val tableBuildRequests: List[Request] = List(
+    worker("inspect", List("attempt-a")),
+    source("record_sum", List("decoy", "8", "4")),
+    source("inspect", List("decoy")),
+    source("define_scale_reuse_table", List("left", "left", "example.scale@1", "empty")),
+    source("inspect", List("empty")),
+    editTable("empty", "chosen-a", "table-a", "insert"),
+    fromTable("decoy", "table-plan-b", "miss-b", "table-a"),
+    source("inspect", List("miss-b")),
+    source("export_request", List("table-plan-b", "table-plan-b", "request-b.bundle")),
+    worker("stage_input", List("incoming-b", "request-b.bundle")),
+    worker("work_scale_attempt", List("incoming-b", "table-plan-b", "attempt-b", occurrenceB)),
+    worker("inspect", List("attempt-b")),
+    worker("export_scale_attempt", List("attempt-b", "attempt-b", "b.bundle")),
+    source("stage_input", List("returned-b", "b.bundle")),
+    source("select_scale_attempt", List("table-plan-b", "table-plan-b", "returned-b", "attempt-b", "second-choice")),
+    editTable("table-a", "second-choice", "table-ab", "insert"),
+    source("inspect", List("table-ab"))
+  )
+
+  pure val tableRoutingRequests: List[Request] = List(
+    tableRequest("producer", "right", "unused", "wrong-version", "table-ab", "table-ab", "default", "default"),
+    tableRequest("producer", "right", "unused", "hit-a", "table-ab", "table-ab", "example.scale@1", "default"),
+    source("inspect", List("hit-a")),
+    source("inspect", List()),
+    fromTable("decoy", "unused", "hit-b", "table-ab"),
+    source("inspect", List("hit-b")),
+    source("inspect", List()),
+    tableRequest("producer", "left", "unused", "blocked", "table-ab", "table-a", "default", "default"),
+    tableRequest("producer", "left", "unused", "blocked", "table-ab", "-", "default", "default"),
+    tableRequest("decoy", "left", "unused", "blocked", "table-a", "table-a", "default", "reuse-selected"),
+    tableRequest("producer", "left", "unused", "blocked", "decoy", "sum:decoy", "default", "default"),
+    tableRequest("producer", "left", "forced-plan", "forced-a", "decoy", "sum:decoy", "default", "fresh"),
+    source("inspect", List("forced-a")),
+    source("export_request", List("forced-plan", "forced-plan", "fresh-a.bundle")),
+    worker("work_scale_attempt", List("incoming-a", "forced-plan", "attempt-c", occurrenceC)),
+    worker("inspect", List("attempt-c")),
+    worker("export_scale_attempt", List("attempt-c", "attempt-c", "c.bundle")),
+    source("stage_input", List("returned-c", "c.bundle")),
+    source("select_scale_attempt", List("forced-plan", "forced-plan", "returned-c", "attempt-c", "replacement")),
+    editTable("table-a", "second-choice", "table-next", "adopt"),
+    editTable("table-ab", "chosen-a", "table-next", "adopt"),
+    editTable("table-ab", "replacement", "empty", "adopt"),
+    editTable("table-ab", "replacement", "table-next", "adopt"),
+    source("inspect", List("table-next")),
+    tableRequest("producer", "left", "unused", "adopted-a", "table-next", "table-next", "default", "reuse-selected"),
+    source("inspect", List("adopted-a")),
+    fromTable("decoy", "unused", "retained-b", "table-next"),
+    source("inspect", List("retained-b")),
+    fromTable("producer", "unused", "hit-a", "table-next"), // occupied decision: cannot partially publish A
+    fromTable("producer", "unused", "retained-a", "table-ab"),
+    source("inspect", List("retained-a")),
+    tableRequest("producer", "left", "absent-plan", "no-table", "uncreated", "-", "default", "default"),
+    source("inspect", List("no-table")),
+    source("inspect", List("unused"))
+  )
+
+  pure val tableOfflineRequests: List[Request] = List(
+    source("drop_ref", List("empty", "table", "empty")),
+    source("drop_ref", List("table-a", "table", "table-a")),
+    source("drop_ref", List("table-ab", "table", "table-ab")),
+    source("drop_ref", List("table-next", "table", "table-next")),
+    source("drop_ref", List("chosen-a", "selection", "chosen-a")),
+    source("drop_ref", List("second-choice", "selection", "second-choice")),
+    source("drop_ref", List("replacement", "selection", "replacement")),
+    source("drop_ref", List("returned-a", "attempt", "attempt-a")),
+    source("drop_ref", List("returned-b", "attempt", "attempt-b")),
+    source("drop_ref", List("returned-c", "attempt", "attempt-c")),
+    source("drop_ref", List("left", "intent", "left")),
+    source("collect", List()),
+    source("inspect", List("adopted-a")),
+    source("inspect", List("retained-a")),
+    source("inspect", List("miss-b")),
+    source("replicate_decision", List("retained-a", "offline")),
+    { op: "inspect", args: List("replica", "offline") }
+  )
+
+  pure val multiInputRequests = implementationIntentRequests.slice(0, implementationIntentSetupLength)
+    .concat(tableBuildRequests).concat(tableRoutingRequests).concat(tableOfflineRequests)
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
-    .append(implementationIntentRequests).append(supersessionRequests)
+    .append(implementationIntentRequests).append(supersessionRequests).append(multiInputRequests)
   action step = histories' = histories
 }

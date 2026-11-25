@@ -631,6 +631,78 @@ Each view relates the actual request implementation to the declaration as
 snapshot, not that the implementation has no defects. Malformed declarations
 and unrelated knowledge are errors, not absence.
 
+#### Keep reusable results for multiple scale requests
+
+Continue from [versioned attempt selection](#record-a-new-version-of-an-attempt-selection)
+with `chosen` and `adopted` for factor `3` and an intent such as `intent-v1`
+from [the pinned intent example](#choose-an-implementation-from-a-pinned-intent-definition).
+A reuse table is separate from the intent's single-selection slots:
+
+```sh
+empty=$(calls define-scale-reuse-table ./origin intent-v1 "$intent_v1" example.scale@1 table-empty)
+one=$(calls update-scale-reuse-table ./origin table-empty "$empty" chosen "$chosen" table-one insert)
+
+# This exact request has no entry yet. The decision leaves a fresh plan.
+calls request-table-scale ./origin producer "$producer" intent-v1 "$intent_v1" plan-two miss-two 2 \
+  --table table-one --table-commit "$one"
+calls inspect ./origin miss-two
+```
+
+Use `plan_commit` from that inspection with the [request export and worker
+steps](#distinguish-two-executions-of-the-same-request) to run and return one
+attempt for factor `2`. Select it as `selected-two`, using the `plan-two` pin.
+With its selection commit ID in `selected_two`:
+
+```sh
+two=$(calls update-scale-reuse-table ./origin table-one "$one" selected-two "$selected_two" table-two insert)
+new=$(calls update-scale-reuse-table ./origin table-two "$two" adopted "$adopted" table-new adopt)
+
+# Reuse the newer factor-3 attempt or the unchanged factor-2 attempt.
+calls request-table-scale ./origin producer "$producer" intent-v1 "$intent_v1" unused-three hit-three 3 \
+  --table table-new --table-commit "$new"
+calls request-table-scale ./origin producer "$producer" intent-v1 "$intent_v1" unused-two hit-two 2 \
+  --table table-new --table-commit "$new"
+calls inspect ./origin hit-three
+calls inspect ./origin table-two   # still selects the original factor-3 attempt
+calls inspect ./origin table-new
+```
+
+The key is the exact **portable request commit** (producer commit,
+implementation version, and factor), not the caller's plan, result value, or
+attempt ID. An empty table retains its defining intent version and is scoped to
+that intent's lineage and one implementation. Each update retains the exact
+previous table and an attempt selection as ordered parents. `insert` requires
+an absent key; `adopt` requires a present key and a different attempt commit,
+even if both attempts produced the same result. The 16-key limit bounds the
+number of entries, not the number of updates; there is no eviction.
+Result-only selections are not table entries. Updates neither
+run work nor modify a previous table, an input pin, or `main`.
+
+| Route | Effect |
+| --- | --- |
+| `default` with `reuse-by-default`, exact hit | Publish the existing result and retain a new decision, without leaving a live plan or recording another attempt. |
+| `default` with `reuse-by-default`, valid miss or expected absent table | Retain a fresh plan and decision; leave `main` unchanged. |
+| `reuse-selected` | Require an exact hit, regardless of the pinned reuse default. |
+| `fresh` or `default` with `execute-by-default` | Retain a fresh plan and decision without looking up the supplied table ref. |
+
+On paths that consult the table, give its expected commit, or omit
+`--table-commit` to require that `--table` name an absent ref. A pin mismatch,
+wrong lineage or implementation, or a malformed delta anywhere in the table
+history is an error, not a miss. The other implementation's slot and any
+other tables are never searched. `--implementation` is independent of the
+reuse override. Refs in each operation must be distinct and not `main`;
+only an explicit selection input to a table update can use a reserved
+legacy slot. Both request output names must be unused even on a hit.
+Each request is one transaction; it never updates a table or dispatches work.
+
+The decision retains the plan, exact intent, and table when a present table
+was consulted, even on a miss. `inspect` explains the choice from this history
+without resolving old refs. It supports the same historical and supplied
+supersession views as the single-slot intent decision. An absent-table decision
+records the name with no table parent; it says nothing about the name today.
+Portable requests and results, single-slot commands, and native record layouts
+are unchanged.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).

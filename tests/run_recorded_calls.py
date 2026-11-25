@@ -55,6 +55,15 @@ def advisory_evidence(view):
             "declaration": declaration_evidence(view["declaration"])}
 
 
+def table_evidence(report):
+    return {"intent": id_evidence(report["table_intent_commit"]),
+            "implementation": report["table_implementation"],
+            "previous": id_evidence(report["previous_table_commit"]) if report["previous_table_commit"] else "",
+            "entries": [{"request": id_evidence(request), "selection": id_evidence(entry["selection_commit"]),
+                         "result": id_evidence(entry["result_commit"]), "attempt": id_evidence(entry["attempt_commit"]),
+                         "attemptId": entry["attempt_id"]} for request, entry in sorted(report["entries"].items())]}
+
+
 def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True):
     command = op.replace("_", "-")
     missing_ref = re.fullmatch(
@@ -75,6 +84,8 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "policy": {"defaultMode": "", "previous": ""}, "expectedPolicy": "",
             "intent": {"implementation": "", "defaultMode": "", "v1Selection": "", "v2Selection": "", "previous": ""},
             "expectedIntent": "", "expectedEvidence": "", "definitionAdvisory": False,
+            "expectedTable": "", "tableRef": "", "tableCommit": "",
+            "reuseTable": {"intent": "", "implementation": "", "previous": "", "entries": []},
             "supersession": declaration_evidence(None),
             "asKnownThen": {"intent": "", "relation": "", "declaration": declaration_evidence(None)},
             "knowledgeView": {"intent": "", "relation": "", "declaration": declaration_evidence(None)},
@@ -87,7 +98,7 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
 class ProcessHistory:
     def __init__(self, directory, example):
         self.directory = directory
-        self.repos = {role: directory / role for role in ("source", "worker")}
+        self.repos = {role: directory / role for role in ("source", "worker", "replica")}
         self.example = example
         self.sum_receipts = {}
         self.scale_receipts = {}
@@ -97,6 +108,8 @@ class ProcessHistory:
         self.attempt_receipts = {}
         self.policy_receipts = {}
         self.intent_receipts = {}
+        self.table_receipts = {}
+        self.decision_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
@@ -112,6 +125,9 @@ class ProcessHistory:
             "define_scale_policy": self.define_scale_policy, "request_policy_scale": self.request_policy_scale,
             "define_scale_intent": self.define_scale_intent, "request_intent_scale": self.request_intent_scale,
             "declare_scale_supersession": self.declare_scale_supersession,
+            "define_scale_reuse_table": self.define_scale_reuse_table,
+            "update_scale_reuse_table": self.update_scale_reuse_table,
+            "request_table_scale": self.request_table_scale, "replicate_decision": self.replicate_decision,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -330,10 +346,71 @@ class ProcessHistory:
         row = self.write("request_intent_scale", args, operands=operands)
         return {**row, "expectedCommit": producer, "expectedIntent": intent, "expectedSelection": expected_selection}
 
+    def define_scale_reuse_table(self, role, intent_ref, intent_receipt, implementation, output):
+        intent = self.intent_receipts[intent_receipt]
+        args = (role, intent_ref, intent_receipt, implementation, output)
+        row = self.write("define_scale_reuse_table", args, operands=(intent_ref, intent, implementation, output))
+        if row["commit"]:
+            self.table_receipts[output] = row["commit"]
+        return {**row, "expectedIntent": intent}
+
+    def update_scale_reuse_table(self, role, basis_ref, basis_receipt, selection_ref, selection_receipt, output, mode):
+        basis = self.table_receipts[basis_receipt]
+        selection = self.selection_receipts[selection_receipt]
+        args = (role, basis_ref, basis_receipt, selection_ref, selection_receipt, output, mode)
+        row = self.write("update_scale_reuse_table", args, operands=(basis_ref, basis, selection_ref, selection, output, mode))
+        if row["commit"]:
+            self.table_receipts[output] = row["commit"]
+        return {**row, "expectedTable": basis, "expectedSelection": selection}
+
+    def request_table_scale(self, role, producer_ref, intent_ref, intent_receipt, plan_ref, decision_ref, factor,
+                            table_ref, table_receipt, implementation, override):
+        producer = self.sum_receipts["source", producer_ref]
+        intent = self.intent_receipts[intent_receipt]
+        if table_receipt == "-":
+            table = ""
+        elif table_receipt.startswith("sum:"):
+            table = self.sum_receipts[role, table_receipt.removeprefix("sum:")]
+        else:
+            table = self.table_receipts[table_receipt]
+        args = (role, producer_ref, intent_ref, intent_receipt, plan_ref, decision_ref, factor, table_ref, table_receipt,
+                implementation, override)
+        operands = [producer_ref, producer, intent_ref, intent, plan_ref, decision_ref, factor, "--table", table_ref]
+        if table:
+            operands.extend(("--table-commit", table))
+        if implementation != "default":
+            operands.extend(("--implementation", implementation))
+        if override != "default":
+            operands.extend(("--override", override))
+        row = self.write("request_table_scale", args, operands=operands)
+        if row["commit"]:
+            self.decision_receipts[decision_ref] = row["commit"]
+        return {**row, "expectedCommit": producer, "expectedIntent": intent, "expectedTable": table}
+
+    def replicate_decision(self, role, decision_receipt, pin):
+        # Fixture only: transfer the exact decision closure, without any of its ref names.
+        commit = self.decision_receipts[decision_receipt]
+        path = self.repos[role]
+        data = path / "data.mdb"
+        before = data.read_bytes()
+        source = core.repo_open(path, False)
+        try:
+            bundle = core.repo_export_commit(source, bytes.fromhex(commit))
+        finally:
+            core.repo_close(source)
+        replica = core.repo_open(self.repos["replica"], True)
+        try:
+            root = core.repo_import_commit_staged(replica, bundle, pin.encode("ascii"))
+        finally:
+            core.repo_close(replica)
+        row = evidence("replicate_decision", (role, decision_receipt, pin), code=0, stderr="",
+                       unchanged=before == data.read_bytes())
+        return {**row, "commit": id_evidence(root.hex()), "expectedCommit": commit}
+
     def drop_ref(self, role, pin, kind, receipt):
         # Fixture only: simulate a separate ref owner without adding a CLI command.
         receipts = {"attempt": self.attempt_receipts, "selection": self.selection_receipts,
-                    "policy": self.policy_receipts, "intent": self.intent_receipts}
+                    "policy": self.policy_receipts, "intent": self.intent_receipts, "table": self.table_receipts}
         expected = receipts[kind][receipt]
         path = self.repos[role]
         data = path / "data.mdb"
@@ -404,6 +481,11 @@ class ProcessHistory:
         if output:
             report = json.loads(output)
             row["commit"] = id_evidence(report["commit"])
+            row["tableRef"] = report.get("table_ref", "")
+            if "table_commit" in report:
+                row["tableCommit"] = id_evidence(report["table_commit"])
+            if "entries" in report:
+                row["reuseTable"] = table_evidence(report)
             if "supersession" in report:
                 row["definitionAdvisory"] = True
                 row["supersession"] = declaration_evidence(report["supersession"])
