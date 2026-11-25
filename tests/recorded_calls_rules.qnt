@@ -10,6 +10,8 @@ module recorded_calls_rules {
   type Occurrence = { id: str, commit: str, result: str, historicalRef: str }
   type Policy = { defaultMode: str, previous: str }
   type Intent = { implementation: str, defaultMode: str, v1Selection: str, v2Selection: str, previous: str }
+  type Declaration = { commit: str, basis: str, evidence: str, predecessor: str, successor: str, reason: str }
+  type Advisory = { intent: str, relation: str, declaration: Declaration }
   type Decision = { id: str, canonicalId: bool, policy: str, intent: str, defaultMode: str, override: str, route: str,
     reason: str, plan: str, planRef: str, selectionRef: str, selection: str, result: str,
     implementationOverride: str, implementationReason: str }
@@ -20,7 +22,8 @@ module recorded_calls_rules {
     requestCommit: str,
     requestImplementation: str, requestFactor: int, bundlePresent: bool, bundleUnchanged: bool, publication: Publication,
     reusePublication: ReusePublication, selection: Selection, selectedPublication: SelectedPublication,
-    occurrence: Occurrence, policy: Policy, expectedPolicy: str, intent: Intent, expectedIntent: str, decision: Decision }
+    occurrence: Occurrence, policy: Policy, expectedPolicy: str, intent: Intent, expectedIntent: str, decision: Decision,
+    expectedEvidence: str, definitionAdvisory: bool, supersession: Declaration, asKnownThen: Advisory, knowledgeView: Advisory }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def literal(arg: Argument, name: str, value: int): bool =
@@ -1017,6 +1020,40 @@ module recorded_calls_rules {
     if (read.requestImplementation != implementation) "wrong_decision_implementation"
     else decisionReadVerdict(read, req, commit, portable, priorTip, expected, occurrence)
 
+  pure def implementationIntentSetupVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = implementationIntentRequests
+    val producer = attempts[0].commit
+    val basis = attempts[2].commit
+    val left = attempts[3].commit
+    val right = attempts[4].commit
+    val aDefinition: Intent = { implementation: scaleV1, defaultMode: "reuse-by-default", v1Selection: "chosen-a",
+      v2Selection: "chosen-b", previous: basis }
+    val aPlan = attempts[8].decision.plan
+    val aRequest = attempts[9].commit
+    val aAttempt = attempts[11].commit
+    val missA: Decision = { id: "", canonicalId: true, policy: "", intent: left, defaultMode: "reuse-by-default",
+      override: "default", route: "execute-fresh", reason: "default-no-selection", plan: aPlan, planRef: "plan-a",
+      selectionRef: "chosen-a", selection: "", result: "", implementationOverride: "default",
+      implementationReason: "default-implementation" }
+    List(
+      writeVerdict(attempts[0], req[0]),
+      sumReadVerdict(selected, attempts[1], req[1], producer),
+      scaleWriteVerdict(attempts[2], req[2], ""),
+      scaleWriteVerdict(attempts[3], req[3], basis),
+      scaleWriteVerdict(attempts[4], req[4], basis),
+      intentReadVerdict(attempts[5], req[5], left, aDefinition),
+      intentReadVerdict(attempts[6], req[6], right, { ...aDefinition, implementation: scaleV2 }),
+      implementationIntentVerdict(attempts[7], req[7], producer, left, "", true),
+      intentDecisionReadVerdict(attempts[8], req[8], attempts[7].commit, aRequest, scaleV1, "-", missA, noOccurrence),
+      requestExportVerdict(attempts[9], req[9], aPlan),
+      stageVerdict(attempts[10], req[10], aRequest),
+      scaleWriteVerdict(attempts[11], req[11], aRequest),
+      exportVerdict(attempts[12], req[12], aAttempt),
+      stageVerdict(attempts[13], req[13], aAttempt),
+      selectAttemptVerdict(attempts[14], req[14], aPlan, aAttempt, true)
+    )
+  }
+
   pure def implementationIntentHistoryVerdicts(attempts: List[Attempt]): List[str] = {
     val req = implementationIntentRequests
     if (attempts.length() != req.length()) List("missing_steps")
@@ -1026,8 +1063,6 @@ module recorded_calls_rules {
       val basis = attempts[2].commit
       val left = attempts[3].commit
       val right = attempts[4].commit
-      val aDefinition: Intent = { implementation: scaleV1, defaultMode: "reuse-by-default", v1Selection: "chosen-a",
-        v2Selection: "chosen-b", previous: basis }
       val aPlan = attempts[8].decision.plan
       val aRequest = attempts[9].commit
       val aAttempt = attempts[11].commit
@@ -1053,22 +1088,7 @@ module recorded_calls_rules {
         selection: bSelection, result: bResult }
       val reuseA = { ...overrideA, intent: left, plan: attempts[39].decision.plan, implementationOverride: "default",
         implementationReason: "default-implementation" }
-      List(
-        writeVerdict(attempts[0], req[0]),
-        sumReadVerdict(selected, summed, req[1], producer),
-        scaleWriteVerdict(attempts[2], req[2], ""),
-        scaleWriteVerdict(attempts[3], req[3], basis),
-        scaleWriteVerdict(attempts[4], req[4], basis),
-        intentReadVerdict(attempts[5], req[5], left, aDefinition),
-        intentReadVerdict(attempts[6], req[6], right, { ...aDefinition, implementation: scaleV2 }),
-        implementationIntentVerdict(attempts[7], req[7], producer, left, "", true),
-        intentDecisionReadVerdict(attempts[8], req[8], attempts[7].commit, aRequest, scaleV1, "-", missA, noOccurrence),
-        requestExportVerdict(attempts[9], req[9], aPlan),
-        stageVerdict(attempts[10], req[10], aRequest),
-        scaleWriteVerdict(attempts[11], req[11], aRequest),
-        exportVerdict(attempts[12], req[12], aAttempt),
-        stageVerdict(attempts[13], req[13], aAttempt),
-        selectAttemptVerdict(attempts[14], req[14], aPlan, aAttempt, true),
+      implementationIntentSetupVerdicts(attempts).concat(List(
         selectAttemptVerdict(attempts[15], req[15], aPlan, aAttempt, true),
         implementationIntentVerdict(attempts[16], req[16], producer, right, foreign, false),
         implementationIntentVerdict(attempts[17], req[17], producer, right, "", false),
@@ -1111,7 +1131,122 @@ module recorded_calls_rules {
         absentRefVerdict(attempts[51], rejectedWriteVerdict(attempts[51], req[51], "")),
         absentRefVerdict(attempts[52], rejectedWriteVerdict(attempts[52], req[52], "")),
         versionedRequestedRead(selected, attempts[53], req[53], aResult, aRequest, summed, scaleV1)
-      )
+      ))
+    }
+  }
+
+  pure val noDeclaration: Declaration = { commit: "", basis: "", evidence: "", predecessor: "", successor: "", reason: "" }
+  pure val noAdvisory: Advisory = { intent: "", relation: "", declaration: noDeclaration }
+  pure def unannotated(intent: str): Advisory = { intent: intent, relation: "none", declaration: noDeclaration }
+
+  pure def declarationVerdict(write: Attempt, req: Request, basis: str, evidence: str, ok: bool): str =
+    if (write.expectedIntent != basis or write.expectedEvidence != evidence) "wrong_declaration_guard"
+    else if (not(ok)) rejectedWriteVerdict(write, req, "")
+    else if (write.unchanged) "declaration_not_written"
+    else writeVerdict(write, req)
+
+  pure def advisoryDefinitionVerdict(read: Attempt, req: Request, commit: str, intent: Intent,
+                                    expected: Declaration): str =
+    if (not(read.definitionAdvisory) or read.supersession != expected) "wrong_definition_declaration"
+    else intentReadVerdict(read, req, commit, intent)
+
+  pure def advisoryViewVerdict(read: Attempt, verdict: str, historical: Advisory, knowledge: Advisory): str =
+    if (verdict != "inspected") verdict
+    else if (read.asKnownThen != historical) "wrong_historical_view"
+    else if (read.knowledgeView != knowledge or read.expectedIntent != knowledge.intent) "wrong_knowledge_view"
+    else "inspected"
+
+  pure def supersessionHistoryVerdicts(attempts: List[Attempt]): List[str] = {
+    if (attempts.length() != supersessionRequests.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val basis = attempts[2].commit
+      val left = attempts[3].commit
+      val right = attempts[4].commit
+      val aDefinition: Intent = { implementation: scaleV1, defaultMode: "reuse-by-default", v1Selection: "chosen-a",
+        v2Selection: "chosen-b", previous: basis }
+      val aRequest = attempts[9].commit
+      val aAttempt = attempts[11].commit
+      val aSelection = attempts[14].commit
+      val steps = attempts.slice(implementationIntentSetupLength, attempts.length())
+      val req = advisoryRequests
+      val aResult = steps[1].commit
+      val audit = steps[3].commit
+      val assertion = steps[7].commit
+      val promoted = steps[14].commit
+      val bPlan = steps[18].decision.plan
+      val bRequest = steps[21].commit
+      val bAttempt = steps[23].commit
+      val bSelection = steps[26].commit
+      val bResult = steps[28].commit
+      val recordedA: Occurrence = { id: occurrenceA, commit: aAttempt, result: aResult, historicalRef: "" }
+      val recordedB: Occurrence = { id: occurrenceB, commit: bAttempt, result: bResult, historicalRef: "" }
+      val declaration = { commit: assertion, basis: left, evidence: audit, predecessor: scaleV1, successor: scaleV2,
+        reason: "operational-replacement" }
+      val predecessorView = { intent: assertion, relation: "predecessor", declaration: declaration }
+      val successorView = { intent: promoted, relation: "successor", declaration: declaration }
+      val thenBefore = unannotated(left)
+      val reuseA: Decision = { id: "", canonicalId: true, policy: "", intent: left, defaultMode: "reuse-by-default",
+        override: "default", route: "reuse-selected", reason: "default-selection", plan: steps[2].decision.plan,
+        planRef: "", selectionRef: "chosen-a", selection: aSelection, result: aResult, implementationOverride: "default",
+        implementationReason: "default-implementation" }
+      val exactBefore = { ...reuseA, id: steps[2].decision.id }
+      val missB = { ...reuseA, intent: promoted, route: "execute-fresh", reason: "default-no-selection", plan: bPlan,
+        planRef: "plan-b", selectionRef: "chosen-b", selection: "", result: "" }
+      val forcedB = { ...missB, override: "fresh", reason: "override-fresh", plan: steps[20].decision.plan,
+        planRef: "forced-plan", selectionRef: "" }
+      val reuseB = { ...reuseA, intent: promoted, plan: steps[29].decision.plan, selectionRef: "chosen-b",
+        selection: bSelection, result: bResult }
+      val setup = implementationIntentSetupVerdicts(attempts)
+        .replaceAt(5, advisoryDefinitionVerdict(attempts[5], implementationIntentRequests[5], left, aDefinition, noDeclaration))
+      setup.concat(List(
+        implementationIntentVerdict(steps[0], req[0], producer, left, aSelection, true),
+        versionedRequestedRead(selected, steps[1], req[1], aResult, aRequest, attempts[1], scaleV1),
+        advisoryViewVerdict(steps[2], intentDecisionReadVerdict(steps[2], req[2], steps[0].commit, aRequest, scaleV1, "-",
+          reuseA, recordedA), thenBefore, noAdvisory),
+        writeVerdict(steps[3], req[3]),
+        declarationVerdict(steps[4], req[4], basis, audit, false),
+        declarationVerdict(steps[5], req[5], left, producer, false),
+        declarationVerdict(steps[6], req[6], left, audit, false),
+        declarationVerdict(steps[7], req[7], left, audit, true),
+        advisoryDefinitionVerdict(steps[8], req[8], assertion, { ...aDefinition, previous: left }, declaration),
+        declarationVerdict(steps[9], req[9], assertion, audit, false),
+        advisoryViewVerdict(steps[10], intentDecisionReadVerdict(steps[10], req[10], steps[0].commit, aRequest, scaleV1, "-",
+          exactBefore, recordedA), thenBefore, noAdvisory),
+        advisoryViewVerdict(steps[11], intentDecisionReadVerdict(steps[11], req[11], steps[0].commit, aRequest, scaleV1, "-",
+          exactBefore, recordedA), thenBefore, predecessorView),
+        implementationIntentVerdict(steps[12], req[12], producer, assertion, aSelection, true),
+        advisoryViewVerdict(steps[13], intentDecisionReadVerdict(steps[13], req[13], steps[12].commit, aRequest, scaleV1,
+          aResult, { ...reuseA, intent: assertion, plan: steps[13].decision.plan }, recordedA),
+          predecessorView, unannotated(right)),
+        scaleWriteVerdict(steps[14], req[14], assertion),
+        advisoryDefinitionVerdict(steps[15], req[15], promoted, { ...aDefinition, previous: assertion, implementation: scaleV2 },
+          declaration),
+        implementationIntentVerdict(steps[16], req[16], producer, promoted, aSelection, false),
+        implementationIntentVerdict(steps[17], req[17], producer, promoted, "", true),
+        advisoryViewVerdict(steps[18], intentDecisionReadVerdict(steps[18], req[18], steps[17].commit, bRequest, scaleV2,
+          aResult, missB, noOccurrence), successorView, noAdvisory),
+        implementationIntentVerdict(steps[19], req[19], producer, promoted, "", true),
+        advisoryViewVerdict(steps[20], intentDecisionReadVerdict(steps[20], req[20], steps[19].commit, bRequest, scaleV2,
+          aResult, forcedB, noOccurrence), successorView, thenBefore),
+        requestExportVerdict(steps[21], req[21], bPlan),
+        stageVerdict(steps[22], req[22], bRequest),
+        scaleWriteVerdict(steps[23], req[23], bRequest),
+        exportVerdict(steps[24], req[24], bAttempt),
+        stageVerdict(steps[25], req[25], bAttempt),
+        selectAttemptVerdict(steps[26], req[26], bPlan, bAttempt, true),
+        implementationIntentVerdict(steps[27], req[27], producer, promoted, bSelection, true),
+        versionedRequestedRead(selected, steps[28], req[28], bResult, bRequest, attempts[1], scaleV2),
+        advisoryViewVerdict(steps[29], intentDecisionReadVerdict(steps[29], req[29], steps[27].commit, bRequest, scaleV2,
+          aResult, reuseB, recordedB), successorView, noAdvisory),
+        implementationIntentVerdict(steps[30], req[30], producer, left, aSelection, true),
+        advisoryViewVerdict(steps[31], intentDecisionReadVerdict(steps[31], req[31], steps[30].commit, aRequest, scaleV1,
+          bResult, { ...reuseA, plan: steps[31].decision.plan }, recordedA), thenBefore, { ...predecessorView, intent: promoted }),
+        implementationIntentVerdict(steps[32], req[32], producer, promoted, aSelection, true),
+        advisoryViewVerdict(steps[33], intentDecisionReadVerdict(steps[33], req[33], steps[32].commit, aRequest, scaleV1,
+          aResult, { ...reuseA, intent: promoted, plan: steps[33].decision.plan, implementationOverride: scaleV1,
+            implementationReason: "explicit-implementation" }, recordedA), { ...predecessorView, intent: promoted }, noAdvisory)
+      ))
     }
   }
 
@@ -1130,6 +1265,7 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 11) adoptionHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 12) policyHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 13) implementationIntentHistoryVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 14) supersessionHistoryVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -1201,8 +1337,13 @@ module recorded_calls_rules {
       "rejected", "recorded", "inspected", "inspected", "recorded", "inspected", "released", "released", "released",
       "released", "released", "released", "released", "collected", "inspected", "inspected", "inspected", "rejected",
       "rejected", "inspected")
+    val supersessions = implementationIntents.slice(0, implementationIntentSetupLength).concat(List(
+      "recorded", "inspected", "inspected", "recorded", "rejected", "rejected", "rejected", "recorded",
+      "inspected", "rejected", "inspected", "inspected", "recorded", "inspected", "recorded", "inspected",
+      "rejected", "recorded", "inspected", "recorded", "inspected", "exported", "staged", "recorded", "exported",
+      "staged", "selected", "recorded", "inspected", "inspected", "recorded", "inspected", "recorded", "inspected"))
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
-      reuse, reusePublication, versioned, selections, occurrences, adoptions, policies, implementationIntents)
+      reuse, reusePublication, versioned, selections, occurrences, adoptions, policies, implementationIntents, supersessions)
     if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
@@ -1227,7 +1368,17 @@ module recorded_calls_rules {
       val aCall = intents[20].calls[1]
       val bCall = intents[37].calls[1]
       val intentDecisions = Set(8, 19, 25, 36, 39)
+      val advisoryHistory = rows[16].attempts
+      val advisory = advisoryHistory.slice(implementationIntentSetupLength, advisoryHistory.length())
+      val advisoryDecisions = Set(2, 13, 18, 20, 29, 31, 33)
       rows.indices().forall(i => rows[i].scenario == i) and
+        advisoryDecisions.map(i => advisory[i].commit).size() == advisoryDecisions.size() and
+        advisoryDecisions.map(i => advisory[i].decision.id).size() == advisoryDecisions.size() and
+        Set(advisoryHistory[2].commit, advisoryHistory[3].commit, advisoryHistory[4].commit,
+          advisory[7].commit, advisory[14].commit).size() == 5 and
+        advisoryHistory[0].commit != advisory[3].commit and
+        advisoryHistory[9].commit != advisory[21].commit and advisoryHistory[14].commit != advisory[26].commit and
+        sameRootNotSameCall(advisory[1].calls[1], advisory[28].calls[1]) and
         intentDecisions.map(i => intents[i].commit).size() == 5 and
         intentDecisions.map(i => intents[i].decision.id).size() == 5 and
         Set(intents[2].commit, intents[3].commit, intents[4].commit).size() == 3 and
@@ -1294,6 +1445,8 @@ module recorded_calls_rules {
     selectedPublication: { mode: "", planRef: "", plan: "", selectionRef: "", selection: "", result: "" },
     occurrence: noOccurrence, policy: { defaultMode: "", previous: "" }, expectedPolicy: "",
     intent: { implementation: "", defaultMode: "", v1Selection: "", v2Selection: "", previous: "" }, expectedIntent: "",
+    expectedEvidence: "", definitionAdvisory: false, supersession: noDeclaration, asKnownThen: noAdvisory,
+    knowledgeView: noAdvisory,
     decision: { id: "", canonicalId: false, policy: "", intent: "", defaultMode: "", override: "", route: "",
       reason: "", plan: "", planRef: "", selectionRef: "", selection: "", result: "", implementationOverride: "",
       implementationReason: "" } }
@@ -1367,7 +1520,20 @@ module recorded_calls_rules {
     requestImplementation: scaleV1, decision: savedIntentDecision }
   pure def checkIntentDecision(read: Attempt): str = intentDecisionReadVerdict(read, implementationIntentRequests[19],
     "decision", "request", scaleV1, "-", savedIntentDecision, savedOccurrence)
+  pure val savedDeclaration: Declaration = { commit: "annotation", basis: "right", evidence: "audit",
+    predecessor: scaleV1, successor: scaleV2, reason: "operational-replacement" }
+  pure val knownAdvisory: Advisory = { intent: "promoted", relation: "predecessor", declaration: savedDeclaration }
+  pure val advisoryRead: Attempt = { ...intentDecisionRead, asKnownThen: unannotated("right"),
+    expectedIntent: "promoted", knowledgeView: knownAdvisory }
+  pure def checkAdvisory(read: Attempt): str =
+    advisoryViewVerdict(read, checkIntentDecision(read), unannotated("right"), knownAdvisory)
   pure val controlsPass = all {
+    checkAdvisory(advisoryRead) == "inspected",
+    checkAdvisory({ ...advisoryRead, asKnownThen: knownAdvisory }) == "wrong_historical_view",
+    checkAdvisory({ ...advisoryRead, knowledgeView: noAdvisory }) == "wrong_knowledge_view",
+    checkAdvisory({ ...advisoryRead, expectedIntent: "annotation" }) == "wrong_knowledge_view",
+    checkAdvisory({ ...advisoryRead, knowledgeView: { ...knownAdvisory,
+      declaration: { ...savedDeclaration, evidence: "wrong-audit" } } }) == "wrong_knowledge_view",
     checkIntentDecision(intentDecisionRead) == "inspected",
     checkIntentDecision({ ...intentDecisionRead, requestImplementation: scaleV2 }) == "wrong_decision_implementation",
     checkIntentDecision({ ...intentDecisionRead, decision: { ...savedIntentDecision,

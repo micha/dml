@@ -588,6 +588,49 @@ commands for fresh work, and select its result explicitly if wanted. Neither
 command dispatches work or changes a selection, and neither changes the IDs or
 layouts of portable requests and results.
 
+#### Record advisory implementation supersession
+
+Continue from [the pinned intent example](#choose-an-implementation-from-a-pinned-intent-definition).
+Record an operational replacement, using the earlier recorded attempt as
+example evidence. Both scale implementations still multiply the same way;
+this example does not claim a defect.
+
+```sh
+noted=$(calls declare-scale-supersession ./origin intent-v1 "$intent_v1" noted \
+  example.scale@1 example.scale@2 operational-replacement worker-a "$first_attempt")
+calls inspect ./origin noted  # v1 is still the default
+
+# The old decision knew no declaration. This supplies a separate knowledge view.
+calls inspect ./origin decision-v1 --knowledge-commit "$noted"
+
+# Promote v2 explicitly on the branch carrying the declaration.
+promoted=$(calls define-scale-intent ./origin promoted example.scale@2 \
+  --basis-ref noted --basis-commit "$noted")
+calls request-intent-scale ./origin producer "$producer" promoted "$promoted" next-v2 decision-promoted 3
+calls inspect ./origin decision-promoted
+```
+
+The declaration is an intent version with ordered parents `(exact basis,
+exact evidence)`. The two input refs must match their supplied IDs, the IDs
+must differ, and the output ref must be new. All three refs must differ from
+each other, `main`, and both selection slots. The endpoints must be distinct supported versions; the
+reason is `correctness-fix` or `operational-replacement`. Evidence is an ordinary
+commit with a nonempty tree. Its link retains the evidence, but does not certify
+its relevance or the recorded assessment. A branch inherits its declaration
+and cannot add a second one; a sibling from an undeclared basis can record its
+own. Declaring does not move existing refs, promote a default, execute work,
+or affect which results are eligible for reuse. You can still explicitly select v1 under
+`promoted` and reuse a matching result from the v1 slot.
+
+Decision inspection reports `as_known_then` from the exact intent parent, not
+from a current ref or a claim that the requester consulted the declaration.
+`--knowledge-commit` adds a separate `knowledge_view` for an exact intent
+version with the same initial definition, including a compatible sibling.
+Each view relates the actual request implementation to the declaration as
+`predecessor`, `successor`, or `none`. `none` means no declaration at that
+snapshot, not that the implementation has no defects. Malformed declarations
+and unrelated knowledge are errors, not absence.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).

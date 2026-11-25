@@ -42,6 +42,19 @@ def call_evidence(call):
     }
 
 
+def declaration_evidence(declaration):
+    if declaration is None:
+        return {"commit": "", "basis": "", "evidence": "", "predecessor": "", "successor": "", "reason": ""}
+    return {"commit": id_evidence(declaration["commit"]), "basis": id_evidence(declaration["basis_commit"]),
+            "evidence": id_evidence(declaration["evidence_commit"]), "predecessor": declaration["predecessor"],
+            "successor": declaration["successor"], "reason": declaration["reason"]}
+
+
+def advisory_evidence(view):
+    return {"intent": id_evidence(view["intent_commit"]), "relation": view["relation"],
+            "declaration": declaration_evidence(view["declaration"])}
+
+
 def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True):
     command = op.replace("_", "-")
     missing_ref = re.fullmatch(
@@ -61,7 +74,10 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "occurrence": {"id": "", "commit": "", "result": "", "historicalRef": ""},
             "policy": {"defaultMode": "", "previous": ""}, "expectedPolicy": "",
             "intent": {"implementation": "", "defaultMode": "", "v1Selection": "", "v2Selection": "", "previous": ""},
-            "expectedIntent": "",
+            "expectedIntent": "", "expectedEvidence": "", "definitionAdvisory": False,
+            "supersession": declaration_evidence(None),
+            "asKnownThen": {"intent": "", "relation": "", "declaration": declaration_evidence(None)},
+            "knowledgeView": {"intent": "", "relation": "", "declaration": declaration_evidence(None)},
             "decision": {"id": "", "canonicalId": False, "policy": "", "intent": "", "defaultMode": "", "override": "",
                          "route": "", "reason": "", "plan": "", "planRef": "", "selectionRef": "", "selection": "",
                          "result": "", "implementationOverride": "", "implementationReason": ""},
@@ -95,6 +111,7 @@ class ProcessHistory:
             "adopt_scale_attempt": self.adopt_scale_attempt, "drop_ref": self.drop_ref,
             "define_scale_policy": self.define_scale_policy, "request_policy_scale": self.request_policy_scale,
             "define_scale_intent": self.define_scale_intent, "request_intent_scale": self.request_intent_scale,
+            "declare_scale_supersession": self.declare_scale_supersession,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -285,6 +302,17 @@ class ProcessHistory:
             self.intent_receipts[intent_ref] = row["commit"]
         return {**row, "expectedCommit": expected}
 
+    def declare_scale_supersession(self, role, basis_ref, basis_receipt, output_ref, predecessor, successor, reason,
+                                   evidence_ref, evidence_receipt):
+        basis = self.intent_receipts[basis_receipt]
+        evidence_commit = self.sum_receipts[role, evidence_receipt]
+        args = (role, basis_ref, basis_receipt, output_ref, predecessor, successor, reason, evidence_ref, evidence_receipt)
+        operands = (basis_ref, basis, output_ref, predecessor, successor, reason, evidence_ref, evidence_commit)
+        row = self.write("declare_scale_supersession", args, operands=operands)
+        if row["commit"]:
+            self.intent_receipts[output_ref] = row["commit"]
+        return {**row, "expectedIntent": basis, "expectedEvidence": evidence_commit}
+
     def request_intent_scale(self, role, producer_ref, producer_receipt, intent_ref, intent_receipt,
                              plan_ref, decision_ref, factor, implementation, override, selection):
         producer = self.sum_receipts["source", producer_receipt]
@@ -368,11 +396,21 @@ class ProcessHistory:
         row, output = self.invoke("collect", (role,))
         return {**row, "removed": int(output) if output else -1}
 
-    def inspect(self, *args):
-        row, output = self.invoke("inspect", args)
+    def inspect(self, role, *args):
+        knowledge = self.intent_receipts[args[1]] if len(args) == 2 else ""
+        operands = (args[0], "--knowledge-commit", knowledge) if knowledge else args
+        row, output = self.invoke("inspect", (role, *args), operands=operands)
+        row["expectedIntent"] = knowledge
         if output:
             report = json.loads(output)
             row["commit"] = id_evidence(report["commit"])
+            if "supersession" in report:
+                row["definitionAdvisory"] = True
+                row["supersession"] = declaration_evidence(report["supersession"])
+            if "as_known_then" in report:
+                row["asKnownThen"] = advisory_evidence(report["as_known_then"])
+            if "knowledge_view" in report:
+                row["knowledgeView"] = advisory_evidence(report["knowledge_view"])
             if "calls" in report:
                 row["calls"] = [call_evidence(call) for call in report["calls"]]
             if "decision_id" in report:

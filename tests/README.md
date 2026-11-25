@@ -265,6 +265,13 @@ checks that pinned versions choose independently, an explicit implementation
 can still reuse, and an exact but incompatible selection cannot satisfy a
 request. It exercises atomic rejection and offline decision inspection.
 
+The [supersession history](../README.md#record-advisory-implementation-supersession)
+checks that declaring and promoting are separate, that the predecessor can
+still reuse its exact selection, and that a supplied knowledge version does
+not change the historical decision. Focused tests cover exact pins, rollback
+on occupied output, malformed declaration ancestry, and a replica with no live
+intent, plan, or evidence refs.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -541,5 +548,23 @@ With Java and Quint 0.34.0:
 ```sh
 mkdir -p build/recorded-implementation-tlc
 (cd build/recorded-implementation-tlc && quint verify ../../tests/recorded_implementation_default_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+#### Check the advisory supersession design with TLC
+
+The [supersession model](recorded_supersession_design.qnt) checks the separation
+between declaring supersession, promoting a default, and deciding reuse. It
+also checks that a separately supplied knowledge snapshot does not change what
+was available at the request's pinned intent version. See the
+[CLI example](../README.md#record-advisory-implementation-supersession) for
+the on-disk convention. The model abstracts native framing, hashing, evidence
+contents, and worker execution.
+
+With Java and Quint 0.34.0:
+
+```sh
+mkdir -p build/recorded-supersession-tlc
+(cd build/recorded-supersession-tlc && quint verify ../../tests/recorded_supersession_design.qnt \
   --backend=tlc --search-observations)
 ```
