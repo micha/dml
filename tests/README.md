@@ -371,10 +371,15 @@ write transaction after add commits and before double starts. Quint checks that
 the live call still uses the original producing attempt. The execution history
 records in-process adapter entries and object identities. Quint checks one
 outer call, add on the original arguments node, and double on the exact MAP
-made from add's returned node. An outer hit and its inspection execute neither
-adapter. An overflowing add never reaches double, keeps only the start phase,
-and leaves `main` on the earlier successful call. Replay checks these live
-observations alongside native records and read-only inspection.
+made from add's returned node. An outer hit executes no adapters. On an inner
+hit, add runs once and the outer callable invokes double's slot with the new
+MAP, but the double adapter does not run. Inspection of either hit executes no
+adapters and leaves storage unchanged. If the required double selection is
+pinned to an absent ref, the call stops at the double slot without running the
+double adapter, retains add's result, and leaves `main` unchanged. An
+overflowing add never reaches double, keeps only the start phase, and leaves
+`main` on the earlier successful call. Replay checks these live observations
+alongside native records and inspection.
 [Focused tests](test_ordinary_calls.py) cover adapter failures and inject late
 update failures after real native writes.
 

@@ -9,6 +9,10 @@ module ordinary_histories {
     List("--mode", mode, "--selected-ref", ref, "--selected", expected)
   pure def inner(mode: str, ref: str, expected: str): List[str] =
     List("--double-mode", mode, "--double-selected-ref", ref, "--double-selected", expected)
+  pure def selection(mode: str, ref: str, expected: str): List[str] = List(mode, ref, expected)
+  pure val noSelection = selection("fresh", "", "")
+  pure def invokeObserved(output: str, a: str, b: str, outer: List[str], double: List[str]): Request =
+    sourceStep("invoke_observed", List("capture-one", "@capture-one", output, a, b).concat(outer).concat(double))
   pure def inspect(repo: str, ref: str, expected: str): Request =
     { op: "inspect", args: List(repo, ref, "--expected", expected) }
   pure def graft(repo: str, kind: str, original: str, alternate: str, output: str): Request =
@@ -76,15 +80,21 @@ module ordinary_histories {
   pure val execution: List[Request] = List(
     sourceStep("defaults", List("defaults", "1")),                                              // 0
     sourceStep("capture", List("defaults", "@defaults", "capture-one")),                        // 1
-    sourceStep("invoke_observed", List("capture-one", "@capture-one", "owned", "13", "29")),     // 2
+    invokeObserved("owned", "13", "29", noSelection, noSelection),                             // 2
     inspect("source", "owned", "@owned"),                                                      // 3
-    sourceStep("invoke_observed", List("capture-one", "@capture-one", "outer-hit", "13", "29",
-      "require-selected", "owned", "@owned")),                                                   // 4
+    invokeObserved("outer-hit", "13", "29", selection("require-selected", "owned", "@owned"),
+      noSelection),                                                                             // 4
     sourceStep("inspect_observed", List("outer-hit", "@outer-hit")),                            // 5
-    sourceStep("invoke_observed", List("capture-one", "@capture-one", "add-overflow",
-      "9223372036854775807", "1")),                                                             // 6
+    invokeObserved("add-overflow", "9223372036854775807", "1", noSelection, noSelection),        // 6
     inspect("source", "add-overflow", "@add-overflow"),                                         // 7
-    inspect("source", "main", "@owned")                                                        // 8
+    inspect("source", "main", "@owned"),                                                       // 8
+    sourceStep("select_double", List("owned", "@owned", "selected")),                           // 9
+    invokeObserved("inner-hit", "29", "13", noSelection,
+      selection("require-selected", "selected", "@selected")),                                  // 10
+    sourceStep("inspect_observed", List("inner-hit", "@inner-hit")),                             // 11
+    invokeObserved("double-absent", "30", "12", noSelection,
+      selection("require-selected", "absent", "")),                                            // 12
+    inspect("source", "double-absent", "@double-absent")                                       // 13
   )
 
   var histories: List[List[Request]]

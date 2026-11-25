@@ -109,13 +109,6 @@ class OrdinaryCallsTest(unittest.TestCase):
                 self.assertEqual(self.inspect(out)["status"], expected_prefix)
                 self.assertEqual(self.inspect(b"main")["commit"], first.hex())
 
-    def test_required_absent_double_keeps_successful_add(self):
-        first = self.invoke()
-        with self.assertRaisesRegex(ValueError, "no selected double attempt"):
-            self.invoke(b"partial", double=example.Selection(example.REQUIRE, b"absent"))
-        self.assertEqual(self.inspect(b"partial")["add"]["value"], 42)
-        self.assertEqual(self.inspect(b"main")["commit"], first.hex())
-
     def test_new_outer_request_cannot_repeat_producer_occurrence(self):
         invocation = b"90000000-0000-4000-8000-000000000001"
         first = self.invoke(invocation=invocation)
