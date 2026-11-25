@@ -501,7 +501,9 @@ def main():
             {**replay_history(suite, directory / f"history-{index}", requests), "scenario": index}
             for index, requests in enumerate(histories)
         ]
-        state = evaluate(quint, args.rules, directory, observations, [args.histories])
+        # Repeated empty optional fields otherwise dominate Quint's analysis time.
+        defaults = evidence("", (), code=0, stderr="", unchanged=False)
+        state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=defaults)
         check_verdicts(histories, observations, state)
 
 

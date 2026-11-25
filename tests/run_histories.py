@@ -97,10 +97,13 @@ def replay_history(suite, directory, requests):
         return {"attempts": attempts}
 
 
-def quint_record(fields):
+def quint_record(fields, *, base=None):
     if not all(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]*", key) for key in fields):
         raise ValueError(f"Cannot encode Quint evidence record fields: {short_repr(list(fields))}")
-    return "{ " + ", ".join(f"{key}: {expression}" for key, expression in fields.items()) + " }"
+    entries = [f"{key}: {expression}" for key, expression in fields.items()]
+    if base is not None:
+        entries.insert(0, f"...{base}")
+    return "{ " + ", ".join(entries) + " }"
 
 
 def quint_literal(value):
@@ -119,9 +122,27 @@ def quint_literal(value):
     raise ValueError(f"Cannot encode Quint evidence value: {short_repr(value)}")
 
 
-def quint_evidence(observations):
+def quint_evidence(observations, *, attempt_defaults=None):
     """Declare small batches, then assemble typed rows in replay order."""
     lines = []
+    default_fields = {}
+    if attempt_defaults is not None:
+        default_fields = {key: quint_literal(value) for key, value in attempt_defaults.items()}
+        lines.append(f"  pure val evidenceDefaults = {quint_record(default_fields)}\n")
+
+    def encode_attempt(attempt):
+        if attempt_defaults is None:
+            return quint_literal(attempt)
+        if attempt.keys() != attempt_defaults.keys():
+            raise ValueError("Quint attempt fields do not match evidence defaults")
+        # Share identical fields without changing any live value. Compare the
+        # encoded expressions so bools and ints with equal Python values differ.
+        overrides = {key: expression for key, value in attempt.items()
+                     if (expression := quint_literal(value)) != default_fields[key]}
+        if not overrides:
+            return "evidenceDefaults"
+        return quint_record(overrides, base="evidenceDefaults")
+
     rows = []
     for history, row in enumerate(observations):
         attempts = row["attempts"]
@@ -129,7 +150,8 @@ def quint_evidence(observations):
         for start in range(0, len(attempts), EVIDENCE_BATCH_SIZE):
             batch = f"evidenceBatch{history}_{start}"
             batches.append(batch)
-            lines.append(f"  pure val {batch} = {quint_literal(attempts[start:start + EVIDENCE_BATCH_SIZE])}\n")
+            expressions = ", ".join(map(encode_attempt, attempts[start:start + EVIDENCE_BATCH_SIZE]))
+            lines.append(f"  pure val {batch} = List({expressions})\n")
         fields = {key: quint_literal(value) for key, value in row.items() if key != "attempts"}
         if len(batches) == 1:
             fields["attempts"] = batches[0]
@@ -143,7 +165,7 @@ def quint_evidence(observations):
     return "".join(lines)
 
 
-def evaluate(quint, rules, directory, observations, imports=()):
+def evaluate(quint, rules, directory, observations, imports=(), *, attempt_defaults=None):
     # The rule module exports a common interface; Observation is suite-specific.
     if not re.fullmatch(r"[a-z][a-z0-9_]*", rules.stem):
         raise ValueError(f"Invalid Quint rules module name: {rules.stem!r}")
@@ -153,7 +175,7 @@ def evaluate(quint, rules, directory, observations, imports=()):
             raise ValueError(f"Duplicate or reserved Quint module path: {source.name}")
         copyfile(source, destination)
     module = directory / "trace_observations.qnt"
-    evidence = quint_evidence(observations)
+    evidence = quint_evidence(observations, attempt_defaults=attempt_defaults)
     module.write_text(
         'module trace_observations {\n'
         f'  import {rules.stem}.* from "./{rules.stem}"\n'
