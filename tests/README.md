@@ -368,9 +368,13 @@ keeps the new request's add source and the old producer's original add source.
 It also checks retained prefixes after failure and read-only transferred
 inspection. A separate pinning history moves the double selection with a native
 write transaction after add commits and before double starts. Quint checks that
-the live call still uses the original producing attempt.
-[Focused tests](test_ordinary_calls.py) observe actual logical calls and inject
-late update failures after real native writes.
+the live call still uses the original producing attempt. The ownership history
+records in-process object identities and checks one outer call, add on the
+original arguments node, and double on the exact MAP made from add's returned
+node. Quint checks these handoffs alongside the persisted call history and
+inspection report.
+[Focused tests](test_ordinary_calls.py) cover adapter failures and inject late
+update failures after real native writes.
 
 The [finite ordinary call model](recorded_ordinary_design.qnt) bounds each
 path to one new outer request, two call slots, two capture versions, four MAP

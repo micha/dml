@@ -73,7 +73,14 @@ module ordinary_histories {
     inspect("source", "pinned", "@pinned")
   )
 
+  pure val ownership: List[Request] = List(
+    sourceStep("defaults", List("defaults", "1")),
+    sourceStep("capture", List("defaults", "@defaults", "capture-one")),
+    sourceStep("invoke_observed", List("capture-one", "@capture-one", "owned", "13", "29")),
+    inspect("source", "owned", "@owned")
+  )
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, pinning)
+  action init = histories' = List(story, pinning, ownership)
   action step = histories' = histories
 }

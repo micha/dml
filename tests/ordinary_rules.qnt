@@ -13,9 +13,10 @@ module ordinary_rules {
     target: str, selected: str, doubleSelected: str, mode: str, doubleMode: str, invocation: str,
     attempt: str, result: Result, trace: List[Getter] }
   type Field = { path: str, name: str, value: str }
+  type CallEvent = { op: str, handles: List[int], labels: List[str] }
   type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, head: str, main: str,
     refs: List[Ref], created: List[Native], profiles: List[str], report: List[Field],
-    unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool }
+    unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool, calls: List[CallEvent] }
   type Observation = { attempts: List[Attempt] }
 
   pure val none: Native = { id: "", role: "", dag: "", parents: List(), target: "", selected: "",
@@ -299,6 +300,44 @@ module ordinary_rules {
     else false
   }
 
+  pure def event(op: str, handles: List[int], labels: List[str]): CallEvent =
+    { op: op, handles: handles, labels: labels }
+  pure val ownedHandoff: List[CallEvent] = {
+    // Python assigns tokens by first observation, not by node value or native ID.
+    val original = 0
+    val addTarget = 1
+    val doubleTarget = 2
+    val sum = 3
+    val downstream = 4
+    val result = 5
+    List(
+      event("outer", List(original, addTarget, doubleTarget), List()),
+      event("invoke", List(addTarget, original), List()),
+      event("leaf", List(), List("ordinary-example-add-v1")),
+      event("invoke-return", List(sum), List()),
+      event("make-arguments", List(sum), List("x")),
+      event("arguments-return", List(downstream), List()),
+      event("invoke", List(doubleTarget, downstream), List()),
+      event("leaf", List(), List("ordinary-example-double-v1")),
+      event("invoke-return", List(result), List()),
+      event("outer-return", List(result), List())
+    )
+  }
+  pure def ownershipAccepted(rows: List[Attempt], i: int): bool = {
+    val a = rows[i]
+    val cap = record(rows[1], "capture")
+    val call = rows[2]
+    if (a.code != 0 or a.error != "") false
+    else if (i == 0) defaultsStep(a, "", v1) and a.main == ""
+    else if (i == 1) captureStep(a, rows[0], "")
+    else if (i == 2) addChain(a, cap, ab(13, 29), fresh, "", fresh, "")
+      and successChain(a, cap, none, false, "") and returns(a) == 2
+    else if (i == 3) terminalReport(a, call, call, call, "finished")
+      and report(a, "/add/requested", "inputs") == record(call, "outer-request").inputs.dag
+      and report(a, "/add", "return_dag") == record(call, "add-attempt").result.dag
+    else false
+  }
+
   pure def observedStep(a: Attempt, request: Request): str = {
     val read = request.op == "inspect" or request.op == "retire"
     if (a.op != request.op or a.args != request.args) "wrong_step"
@@ -321,14 +360,22 @@ module ordinary_rules {
         else if (i == 6) "wrong_pinned_double_producer"
         else "wrong_bookmark_interleaving")
     })
+    else if (rows.length() == ownership.length()) range(0, ownership.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], ownership[i])
+      val expectedCalls = if (i == 2) ownedHandoff else List()
+      out.append(if (observed != "ok") observed
+        else if (not(ownershipAccepted(rows, i))) "wrong_owned_call_history"
+        else if (rows[i].calls != expectedCalls) "wrong_owned_node_handoff"
+        else "ok")
+    })
     else List("missing_steps")
   }
   pure def verdictAccepted(result: str): bool = result == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 2 and verdicts.length() == 2
+    evidence.length() == 3 and verdicts.length() == 3
       and verdicts[0].length() == story.length() and verdicts[1].length() == pinning.length()
-      and verdicts[0].foldl(true, (ok, result) => ok and verdictAccepted(result))
-      and verdicts[1].foldl(true, (ok, result) => ok and verdictAccepted(result))
+      and verdicts[2].length() == ownership.length()
+      and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (accepted, result) => accepted and verdictAccepted(result)))
       and report(evidence[0].attempts[9], "", "status") == "hit"
       and record(evidence[0].attempts[10], "double-hit").id != ""
       and record(evidence[0].attempts[15], "add-attempt").id != ""
