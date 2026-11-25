@@ -76,6 +76,91 @@ class BindingTest(unittest.TestCase):
         self.assertEqual(output, data)
         self.assertEqual(core.datum_decode(output), (b"kept", core.DATUM_STRING))
 
+    def test_map_encoding_is_canonical_and_rejects_duplicate_keys(self):
+        low, high = bytes(16), b"\xff" * 16
+        self.assertEqual(core.datum_decode(core.datum_encode(core.DATUM_MAP, ())),
+                         (bytes(4), core.DATUM_MAP))
+        packed = core.datum_encode(core.DATUM_MAP, [(high, low), (low, high)])
+        self.assertEqual(core.datum_decode(packed), (b"\x02\x00\x00\x00" + low + high + high + low, core.DATUM_MAP))
+        self.assertEqual(packed, core.datum_encode(core.DATUM_MAP, ((low, high), (high, low))))
+        with self.assertRaises(core.Error) as duplicate:
+            core.datum_encode(core.DATUM_MAP, [(low, high), (low, low)])
+        self.assertEqual(duplicate.exception.args[0], "invalid_payload")
+        self.assertIn("map_keys_not_strictly_sorted", duplicate.exception.args[2])
+
+    def test_map_encoding_rejects_invalid_entry_shapes_and_ids(self):
+        identifier = bytes(16)
+        cases = (
+            (TypeError, iter(())),
+            (TypeError, {identifier: identifier}),
+            (TypeError, ([identifier, identifier],)),
+            (TypeError, ((identifier,),)),
+            (TypeError, ((identifier, identifier, identifier),)),
+            (TypeError, ((bytearray(identifier), identifier),)),
+            (ValueError, ((identifier[:-1], identifier),)),
+            (ValueError, ((identifier, identifier), (identifier, identifier + b"!"))),
+        )
+        for error, entries in cases:
+            with self.subTest(entries=entries), self.assertRaises(error):
+                core.datum_encode(core.DATUM_MAP, entries)
+
+    def test_map_write_rejects_a_node_id_and_rolls_back(self):
+        repo = core.repo_open(self.path, True)
+        self.addCleanup(core.repo_close, repo)
+        txn = core.txn_begin(repo, core.TXN_WRITE)
+        self.addCleanup(core.txn_abort, txn)
+        key = core.txn_put_datum(txn, core.datum_encode(core.DATUM_STRING, b"key"))
+        node = core.txn_put_object(txn, core.REC_NODE, core.object_encode(core.REC_NODE, key))
+        packed = core.datum_encode(core.DATUM_MAP, ((key, node),))
+        with self.assertRaises(core.Error) as invalid:
+            core.txn_put_datum(txn, packed)
+        self.assertEqual(invalid.exception.args[0], "invalid_kind")
+        self.assertIn("composite_ref_not_datum", invalid.exception.args[2])
+        with self.assertRaises(core.Error) as poisoned:
+            core.txn_commit(txn)
+        self.assertEqual(poisoned.exception.args[0], "invalid_state")
+        self.assert_absent(repo, key)
+
+    def test_staged_bundle_retains_nested_map_and_normalized_key(self):
+        source = core.repo_open(self.path, True)
+        self.addCleanup(core.repo_close, source)
+        writer = core.txn_begin(source, core.TXN_WRITE)
+        self.addCleanup(core.txn_abort, writer)
+
+        def put_object(kind, *operands):
+            return core.txn_put_object(writer, kind, core.object_encode(kind, *operands))
+
+        key = core.txn_put_datum(writer, core.datum_encode(core.DATUM_STRING, "café".encode()))
+        equivalent = core.txn_put_datum(writer, core.datum_encode(core.DATUM_STRING, "cafe\u0301".encode()))
+        self.assertEqual(equivalent, key)
+        value = core.txn_put_datum(writer, core.datum_encode(core.DATUM_I64, 42))
+        with self.assertRaises(core.Error) as duplicate:
+            core.datum_encode(core.DATUM_MAP, ((key, value), (equivalent, value)))
+        self.assertEqual(duplicate.exception.args[0], "invalid_payload")
+        inner_record = core.datum_encode(core.DATUM_MAP, ((key, value),))
+        inner = core.txn_put_datum(writer, inner_record)
+        outer_record = core.datum_encode(core.DATUM_MAP, ((key, inner),))
+        outer = core.txn_put_datum(writer, outer_record)
+        literal = put_object(core.REC_NODE, core.NODE_LITERAL, outer)
+        dag = put_object(core.REC_DAG, literal, b"arguments", literal)
+        tree = put_object(core.REC_TREE, b"snapshot", dag)
+        commit = put_object(core.REC_COMMIT, tree)
+        core.txn_ref_create(writer, b"main", commit)
+        core.txn_commit(writer)
+
+        bundle = core.repo_export_commit(source, commit)
+        replica = core.repo_open(self.path.with_name("replica"), True)
+        self.addCleanup(core.repo_close, replica)
+        self.assertEqual(core.repo_import_commit_staged(replica, bundle, b"staged"), commit)
+        reader = core.txn_begin(replica, core.TXN_READ)
+        self.addCleanup(core.txn_abort, reader)
+        self.assertEqual(core.txn_ref_get(reader, b"staged"), commit)
+        self.assertEqual(core.txn_lookup_node(reader, dag, b"arguments"), literal)
+        self.assertEqual(core.txn_get_datum(reader, outer), outer_record)
+        self.assertEqual(core.txn_get_datum(reader, inner), inner_record)
+        self.assertEqual(core.datum_decode(core.txn_get_datum(reader, key)), ("café".encode(), core.DATUM_STRING))
+        self.assertEqual(core.datum_decode(core.txn_get_datum(reader, value)), (b"*" + bytes(7), core.DATUM_I64))
+
     def test_bundle_binding_owns_results_and_maps_native_errors(self):
         repo = core.repo_open(self.path, True)
         self.addCleanup(core.repo_close, repo)
