@@ -1,0 +1,235 @@
+"""Focused storage and input boundaries for recorded argument maps."""
+
+from pathlib import Path
+import sys
+from tempfile import TemporaryDirectory
+import unittest
+
+from daggerml import core
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
+import recorded_argument_maps as maps
+
+from test_recorded_calls import literal, put, view
+
+
+DOUBLE = b"double@1"
+ADD = b"add@1"
+
+
+def identity(n):
+    return f"00000000-0000-4000-8000-{n:012d}".encode()
+
+
+def number(name, value):
+    return name, maps.Literal(core.DATUM_I64, value)
+
+
+def snapshot(txn, commit):
+    commit_view, tree, count = view(txn, core.REC_COMMIT, commit)
+    tree_view, _, entries = view(txn, core.REC_TREE, tree)
+    if entries != 1:
+        raise ValueError("fixture requires a single tree entry")
+    dag, name = core.object_view_entry(tree_view, 0)
+    return dag, name, tuple(core.object_view_parent(commit_view, i) for i in range(count))
+
+
+def publish(txn, ref, name, dag, *parents):
+    tree = put(txn, core.REC_TREE, name, dag)
+    commit = put(txn, core.REC_COMMIT, tree, *parents)
+    core.txn_ref_create(txn, ref, commit)
+    return commit
+
+
+class ArgumentMapsTest(unittest.TestCase):
+    def setUp(self):
+        tmp = TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name) / "repo"
+        self.serial = 0
+
+    def request(self, tag, implementation, arguments, **kwargs):
+        self.serial += 1
+        return maps.request(self.repo, b"p" + tag, b"d" + tag, implementation, identity(self.serial),
+                            arguments, **kwargs)
+
+    def execute(self, tag, implementation, *arguments):
+        self.request(tag, implementation, arguments)
+        request = bytes.fromhex(maps.inspect(self.repo, b"p" + tag)["requested"]["request"])
+        return maps.Returned(b"t" + tag, maps.work(self.repo, b"p" + tag, request, b"t" + tag, identity(self.serial)))
+
+    def table(self, first):
+        empty = maps.define_table(self.repo, b"empty", b"double")
+        return maps.update_table(self.repo, b"empty", empty, b"selected", b"insert", selected=first)
+
+    def rows(self, ref):
+        return maps.inspect(self.repo, ref)["entries"]
+
+    def data(self):
+        return (self.repo / "data.mdb").read_bytes()
+
+    def test_canonical_keys_and_insertion_order_affect_construction_not_map(self):
+        first = (number(b"a", 13), number(b"\xc3\xa9", 29))
+        second = (number(b"e\xcc\x81", 29), number(b"a", 13))
+        self.request(b"1", ADD, first)
+        self.request(b"2", ADD, second)
+        one, two = (maps.inspect(self.repo, ref)["requested"] for ref in (b"p1", b"p2"))
+        self.assertEqual(one["argument_map"], two["argument_map"])
+        self.assertNotEqual(one["construction"], two["construction"])
+        before = self.data()
+        with self.assertRaisesRegex(ValueError, "duplicate canonical argument key"):
+            self.request(b"dup", ADD, (first[1], second[0]))
+        self.assertEqual(self.data(), before)
+
+    def test_requested_map_cannot_substitute_another_well_formed_map(self):
+        self.request(b"1", DOUBLE, [number(b"x", 42)])
+        self.request(b"2", DOUBLE, [number(b"x", 43)])
+        with maps.records._write_transaction(self.repo, create=False) as txn:
+            dag, role, parents = snapshot(txn, core.txn_ref_get(txn, b"p1"))
+            other, _, _ = snapshot(txn, core.txn_ref_get(txn, b"p2"))
+            _, wrong_root, _ = view(txn, core.REC_DAG, other)
+            fields = [field for name in (b"implementation", b"invocation", b"construction")
+                      for field in (name, core.txn_lookup_node(txn, dag, name))]
+            forged = put(txn, core.REC_DAG, wrong_root, *fields)
+            publish(txn, b"forged", role, forged, *parents)
+        with self.assertRaisesRegex(ValueError, "differs from its construction"):
+            maps.inspect(self.repo, b"forged")
+
+    def test_returned_source_binds_exact_attempt_even_when_decoy_value_is_equal(self):
+        exact = self.execute(b"first", ADD, number(b"a", 13), number(b"b", 29))
+        decoy = self.execute(b"second", ADD, number(b"a", 12), number(b"b", 30))
+        self.assertEqual(maps.inspect(self.repo, exact.ref)["value"], maps.inspect(self.repo, decoy.ref)["value"])
+        before = self.data()
+        with self.assertRaisesRegex(ValueError, "returned source ref does not match"):
+            self.request(b"stale", DOUBLE, [(b"x", maps.Returned(exact.ref, decoy.attempt))])
+        self.assertEqual(self.data(), before)
+        self.request(b"correct", DOUBLE, [(b"x", exact)])
+        with maps.records._write_transaction(self.repo, create=False) as txn:
+            dag, role, parents = snapshot(txn, core.txn_ref_get(txn, b"pcorrect"))
+            _, _, (_, decoy_result) = snapshot(txn, decoy.attempt)
+            decoy_dag, _, _ = snapshot(txn, decoy_result)
+            wrong_source = put(txn, core.REC_NODE, core.NODE_SUBDAG, decoy_dag)
+            _, construction, _ = view(txn, core.REC_NODE, core.txn_lookup_node(txn, dag, b"construction"))
+            _, map_root, _ = view(txn, core.REC_DAG, construction)
+            fields = [field for name in (b"prior", b"key", b"origin")
+                      for field in (name, core.txn_lookup_node(txn, construction, name))]
+            wrong = put(txn, core.REC_DAG, map_root, b"source", wrong_source, *fields)
+            fields = [field for name in (b"implementation", b"invocation")
+                      for field in (name, core.txn_lookup_node(txn, dag, name))]
+            forged = put(txn, core.REC_DAG, map_root, b"construction", put(txn, core.REC_NODE, core.NODE_SUBDAG, wrong),
+                         *fields)
+            publish(txn, b"forged", role, forged, *parents)
+        with self.assertRaisesRegex(ValueError, "returned source does not match the selected attempt result"):
+            maps.inspect(self.repo, b"forged")
+
+    def test_equal_value_does_not_make_a_get_trace_portable_to_another_construction(self):
+        literal_attempt = self.execute(b"literal", DOUBLE, number(b"x", 42))
+        upstream = self.execute(b"upstream", ADD, number(b"a", 13), number(b"b", 29))
+        self.request(b"new", DOUBLE, [(b"x", upstream)])
+        with maps.records._write_transaction(self.repo, create=False) as txn:
+            attempt_dag, role, (_, old_result) = snapshot(txn, literal_attempt.attempt)
+            result_dag, result_role, _ = snapshot(txn, old_result)
+            request = core.txn_ref_get(txn, b"pnew")
+            graft = publish(txn, b"grafted-result", result_role, result_dag, request)
+            publish(txn, b"grafted-attempt", role, attempt_dag, request, graft)
+        with self.assertRaisesRegex(ValueError, "map_get trace does not match the producing construction"):
+            maps.inspect(self.repo, b"grafted-attempt")
+
+    def test_adoption_and_removal_preserve_other_keys_and_historical_hits(self):
+        first = self.execute(b"one", DOUBLE, number(b"x", 42))
+        second = self.execute(b"two", b"double@2", number(b"x", 42))
+        other = self.execute(b"other", DOUBLE, number(b"x", 43))
+        chosen = self.table(first)
+        both = maps.update_table(self.repo, b"selected", chosen, b"both", b"insert", selected=other)
+        before = self.data()
+        with self.assertRaisesRegex(ValueError, "different attempt"):
+            maps.update_table(self.repo, b"both", both, b"same", b"adopt", selected=first)
+        self.assertEqual(self.data(), before)
+        self.request(b"old", DOUBLE, [number(b"x", 42)], mode=maps.REQUIRE, table_ref=b"both", table_commit=both)
+        old = maps.inspect(self.repo, b"dold")
+        replaced = maps.update_table(self.repo, b"both", both, b"replaced", b"adopt", selected=second)
+        key = old["requested"]["argument_map"]
+        self.assertEqual(self.rows(b"replaced"), {**self.rows(b"both"), key: second.attempt.hex()})
+        removed = maps.update_table(self.repo, b"replaced", replaced, b"removed", b"remove", key=bytes.fromhex(key))
+        self.assertEqual(self.rows(b"removed"), {k: t for k, t in self.rows(b"both").items() if k != key})
+        self.request(b"miss", DOUBLE, [number(b"x", 42)], mode=maps.TRY, table_ref=b"removed", table_commit=removed)
+        self.assertEqual(maps.inspect(self.repo, b"dmiss")["outcome"], "pending")
+        self.assertEqual(maps.inspect(self.repo, b"dold"), old)
+
+    def test_poisoned_unrelated_entry_cannot_be_hidden_by_removal(self):
+        first = self.execute(b"one", DOUBLE, number(b"x", 42))
+        other = self.execute(b"other", DOUBLE, number(b"x", 43))
+        basis = self.table(first)
+        other_input = maps.inspect(self.repo, other.ref)["producing"]["argument_map"]
+        with maps.records._write_transaction(self.repo, create=False) as txn:
+            # A native MAP for 43 exists, but this record claims the 42 attempt produced it.
+            key = put(txn, core.REC_NODE, core.NODE_LITERAL, bytes.fromhex(other_input))
+
+            def delta(op):
+                return put(txn, core.REC_DAG, key, b"operation", literal(txn, core.DATUM_STRING, op))
+
+            poison = publish(txn, b"forged", maps.DELTA, delta(b"insert"), basis, first.attempt)
+            buried = publish(txn, b"buried", maps.DELTA, delta(b"remove"), poison)
+        before = self.data()
+        error = "does not match the table intent and argument MAP"
+        for ref, commit in ((b"forged", poison), (b"buried", buried)):
+            with self.subTest(ref=ref), self.assertRaisesRegex(ValueError, error):
+                self.request(b"hit", DOUBLE, [number(b"x", 42)], mode=maps.TRY, table_ref=ref, table_commit=commit)
+            self.assertEqual(self.data(), before)
+        self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
+        self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
+
+    def test_late_decision_ref_collision_rolls_back_fresh_work_and_reuse_main(self):
+        first = self.execute(b"one", DOUBLE, number(b"x", 42))
+        table = self.table(first)
+        before = self.data()
+        for options in ({}, {"mode": maps.TRY, "table_ref": b"selected", "table_commit": table}):
+            with self.subTest(options=options), self.assertRaisesRegex(core.Error, "ref already exists"):
+                maps.request(self.repo, b"unused", b"done", DOUBLE, identity(55), [number(b"x", 42)], **options)
+            self.assertEqual(self.data(), before)
+
+    def test_missing_type_and_overflow_do_not_publish_attempt_or_trace(self):
+        for tag, args, error in ((b"missing", [number(b"y", 42)], "map_get argument key"),
+                                 (b"typed", [(b"x", maps.Literal(core.DATUM_STRING, b"42"))], "I64 argument"),
+                                 (b"overflow", [number(b"x", 1 << 62)], "signed 64-bit integer")):
+            self.request(tag, DOUBLE, args)
+            commit = maps.inspect(self.repo, b"p" + tag)["requested"]["request"]
+            before = self.data()
+            with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, error):
+                maps.work(self.repo, b"p" + tag, bytes.fromhex(commit), b"t" + tag, identity(self.serial))
+            self.assertEqual(self.data(), before)
+
+    def test_argument_and_table_caps_apply_before_publication(self):
+        self.request(b"max", DOUBLE, [number(str(i).encode(), i) for i in range(16)])
+        before = self.data()
+        with self.assertRaisesRegex(ValueError, "up to sixteen"):
+            self.request(b"too-many", DOUBLE, [number(str(i).encode(), i) for i in range(17)])
+        self.assertEqual(self.data(), before)
+        ref, table = b"empty", maps.define_table(self.repo, b"empty", b"double")
+        for i in range(17):
+            tag = str(i).encode()
+            attempt = self.execute(tag, DOUBLE, number(b"x", i))
+            if i == 16:
+                break
+            dest = b"table-" + tag
+            table = maps.update_table(self.repo, ref, table, dest, b"insert", selected=attempt)
+            ref = dest
+        self.assertEqual(len(self.rows(ref)), 16)
+        before = self.data()
+        with self.assertRaisesRegex(ValueError, "room in the table"):
+            maps.update_table(self.repo, ref, table, b"table-overflow", b"insert", selected=attempt)
+        self.assertEqual(self.data(), before)
+
+    def test_returned_attempt_budget_reserves_room_for_new_execution(self):
+        source = number(b"x", 0)[1]
+        for i in range(64):
+            source = self.execute(str(i).encode(), DOUBLE, (b"x", source))
+        self.assertEqual(maps.inspect(self.repo, source.ref)["value"], 0)
+        before = self.data()
+        with self.assertRaisesRegex(ValueError, "too many reached argument-map attempts"):
+            self.request(b"over", DOUBLE, [(b"x", source)])
+        self.assertEqual(self.data(), before)
+
+
+if __name__ == "__main__":
+    unittest.main()
