@@ -5,13 +5,14 @@ module closure_histories {
     "c1" -> "@c1", "c2" -> "@c2", "c3" -> "@c3", "q1" -> "@q1", "q3" -> "@q3", "q5" -> "@q5", "q6" -> "@q6",
     "d1" -> "@d1", "d2" -> "@d2", "d4" -> "@d4", "d6" -> "@d6",
     "t1" -> "@t1", "t3" -> "@t3", "t5" -> "@t5", "t6" -> "@t6",
+    "subtotal-q" -> "@subtotal-q", "product-q" -> "@product-q",
     "snapshot-hit" -> "@snapshot-hit", "snapshot-fresh" -> "@snapshot-fresh", "source-graft" -> "@source-graft",
     "binding-graft" -> "@binding-graft", "key-graft" -> "@key-graft", "original-graft" -> "@original-graft")
   pure val ids = Map(
     "1" -> "12345678-abcd-4abc-8abc-123456789ab1", "2" -> "12345678-abcd-4abc-8abc-123456789ab2",
     "3" -> "12345678-abcd-4abc-8abc-123456789ab3", "4" -> "12345678-abcd-4abc-8abc-123456789ab4",
     "5" -> "12345678-abcd-4abc-8abc-123456789ab5", "6" -> "12345678-abcd-4abc-8abc-123456789ab6",
-    "7" -> "12345678-abcd-4abc-8abc-123456789ab7")
+    "7" -> "12345678-abcd-4abc-8abc-123456789ab7", "8" -> "12345678-abcd-4abc-8abc-123456789ab8")
   pure def pin(ref: str): str = pins.get(ref)
   pure def uuid(n: str): str = ids.get(n)
   pure def defaults(ref: str, version: str, scale: str, origin: str, expected: str): Request =
@@ -34,8 +35,11 @@ module closure_histories {
   pure def graft(repo: str, kind: str, fromRef: str, alternate: str, output: str): Request =
     { op: "graft", args: List(repo, kind, fromRef, alternate, output) }
 
-  // S1 is the first successful attempt ref. No later work changes it. The
-  // positive history has six own Q, four T, and eight recorded trace positions.
+  pure val maxI64Arg = "9223372036854775807"
+
+  // t1 is the first successful attempt ref. No later work changes it. The
+  // first six requests yield four attempts and eight trace positions.
+  // The two final requests are left pending by overflow.
   pure val story: List[Request] = List(
     defaults("defaults", "1", "2", "origin-a", ""),                             // 0
     capture("defaults", "@defaults", "c1"),                                      // 1
@@ -76,19 +80,23 @@ module closure_histories {
     graft("source", "selection", "t1", "c2", "poison"),                         // 33
     request("c3", "@c3", "bad-q", "bad-d", "13", "29", "7",
       selectionArgs("try-selected", "poison", "@poison")),                        // 34 validate original even on miss
-    replicate("hit", "d4", "snapshot-hit"),                                      // 35
-    replicate("miss", "t6", "snapshot-fresh"),                                   // 36
-    source("retire", List()),                                                     // 37
-    inspect("hit", "snapshot-hit"),                                               // 38
-    inspect("miss", "snapshot-fresh"),                                            // 39
-    graft("hit", "source", "snapshot-hit", "", "source-graft"),                   // 40 equal scale, wrong origin
-    inspect("hit", "source-graft"),                                               // 41
-    graft("hit", "binding", "snapshot-hit", "", "binding-graft"),                 // 42 equivalent getter, wrong binding
-    inspect("hit", "binding-graft"),                                              // 43
-    graft("hit", "key", "snapshot-hit", "", "key-graft"),                         // 44 false computational key
-    inspect("hit", "key-graft"),                                                  // 45
-    graft("hit", "original", "snapshot-hit", "", "original-graft"),               // 46 poison only the producing closure
-    inspect("hit", "original-graft")                                              // 47
+    request("c1", "@c1", "subtotal-q", "subtotal-d", maxI64Arg, "1", "7", List()),  // 35
+    work("subtotal-q", "overflow-attempt", "7"),                                  // 36 subtotal overflow
+    request("c1", "@c1", "product-q", "product-d", maxI64Arg, "0", "8", List()),    // 37
+    work("product-q", "overflow-attempt", "7"),                                   // 38 product overflow
+    replicate("hit", "d4", "snapshot-hit"),                                      // 39
+    replicate("miss", "t6", "snapshot-fresh"),                                   // 40
+    source("retire", List()),                                                     // 41
+    inspect("hit", "snapshot-hit"),                                               // 42
+    inspect("miss", "snapshot-fresh"),                                            // 43
+    graft("hit", "source", "snapshot-hit", "", "source-graft"),                   // 44 equal scale, wrong origin
+    inspect("hit", "source-graft"),                                               // 45
+    graft("hit", "binding", "snapshot-hit", "", "binding-graft"),                 // 46 equivalent getter, wrong binding
+    inspect("hit", "binding-graft"),                                              // 47
+    graft("hit", "key", "snapshot-hit", "", "key-graft"),                         // 48 false computational key
+    inspect("hit", "key-graft"),                                                  // 49
+    graft("hit", "original", "snapshot-hit", "", "original-graft"),               // 50 poison only the producing closure
+    inspect("hit", "original-graft")                                              // 51
   )
 
   var histories: List[List[Request]]

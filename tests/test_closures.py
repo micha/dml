@@ -59,16 +59,6 @@ class ClosureTest(unittest.TestCase):
             ex.work(self.path, b"pending", request, b"done", ATTEMPT)
         self.assertEqual(self.inventory(), before)
 
-    def test_subtotal_and_product_overflow_leave_no_work_records(self):
-        for label, b in (("subtotal", 1), ("product", 0)):
-            with self.subTest(label=label):
-                pending = f"pending-{label}".encode("ascii")
-                request = self.request(MAX_I64, b, pending=pending, decision=f"decision-{label}".encode("ascii"))
-                before = self.inventory()
-                with self.assertRaisesRegex(ValueError, f"scaled sum {label} is not a signed 64-bit integer"):
-                    example.work(self.path, pending, request, b"done", ATTEMPT)
-                self.assertEqual(self.inventory(), before)
-
     def test_inspection_does_not_bind_or_run_the_logical_callable(self):
         request = self.request()
         producer = example.work(self.path, b"pending", request, b"done", ATTEMPT)

@@ -340,18 +340,19 @@ mkdir -p build/recorded-composition-tlc
   --backend=tlc --search-observations)
 ```
 
-The [closure-bound dependency replay](closure_histories.qnt) checks six
-requests and four fresh attempts in the [scaled-sum example](../docs/closure-bound-dependencies.md).
+The [closure-bound dependency replay](closure_histories.qnt) checks eight
+requests and four successful fresh attempts in the [scaled-sum example](../docs/closure-bound-dependencies.md).
 It distinguishes captured source and getter version from the full-MAP reuse
 key, validates a selected attempt even on a miss, and inspects transferred
 history while rejecting capture and original-history grafts. Replay rejects a
-reuse request with the producer's invocation ID and a work request with an
-occupied attempt ref. Both failures leave native storage unchanged. After the
-collision, replay retries with the same attempt ID at a free ref and checks the
-result and getter trace.
+reuse request with the producer's invocation ID, work with an occupied attempt
+ref, and separate I64 subtotal and product overflows. Each rejection leaves
+native storage unchanged. After the collision, replay retries with the same
+attempt ID at a free ref and checks the result and getter trace. For overflow,
+replay checks the exact stored operands and the distinct CLI diagnostics.
 [Focused tests](test_closures.py) check exact I64 and argument boundaries,
-subtotal and product overflow, inspection without binding work, and rejection
-of a semantically equivalent but unpinned getter in the producing trace.
+inspection without binding work, and rejection of a semantically equivalent but
+unpinned getter in the producing trace.
 
 The [finite closure design model](recorded_closures_design.qnt) checks three
 captures, two equal-sum MAPs, one historical attempt, and at most one new
