@@ -112,7 +112,19 @@ module ordinary_histories {
     )
   }
 
+  pure val refAliases: List[Request] = List(
+    sourceStep("defaults", List("defaults", "1")),
+    sourceStep("capture", List("defaults", "@defaults", "capture-one")),
+    fromOne("first", "13", "30", List()),
+    // Both slots expect absence, so pin checks alone cannot reject the alias.
+    fromOne("retry", "13", "29", List("--double-mode", "try-selected", "--double-selected-ref", "retry")),
+    fromOne("capture-one", "13", "29", List()),
+    fromOne("main", "13", "29", List()),
+    fromOne("retry", "13", "29", List("--double-mode", "try-selected", "--double-selected-ref", "absent")),
+    inspect("source", "retry", "@retry")
+  )
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, pinning, execution, requestIdentity)
+  action init = histories' = List(story, pinning, execution, requestIdentity, refAliases)
   action step = histories' = histories
 }

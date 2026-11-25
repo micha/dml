@@ -109,15 +109,11 @@ class OrdinaryCallsTest(unittest.TestCase):
                 self.assertEqual(self.inspect(out)["status"], expected_prefix)
                 self.assertEqual(self.inspect(b"main")["commit"], first.hex())
 
-    def test_exact_i64_and_ref_aliases_rejected_before_recording(self):
+    def test_non_i64_values_rejected_before_recording(self):
         before = self.inventory()
         for value in (True, 1.5, 1 << 63, -(1 << 63) - 1):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "signed 64-bit integer"):
                 self.invoke(a=value)
-        with self.assertRaises(ValueError):
-            self.invoke(b"closure")
-        with self.assertRaises(ValueError):
-            self.invoke(b"main")
         self.assertEqual(self.inventory(), before)
 
 

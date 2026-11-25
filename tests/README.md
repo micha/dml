@@ -384,9 +384,12 @@ reuse request that repeats the producer's invocation UUID: storage stays
 unchanged, the output ref stays absent, and `main` stays on a later call.
 Retrying at the same output ref with a different UUID succeeds, moves `main`
 back to the selected producer, and reports distinct requested and producing
-provenance.
-[Focused tests](test_ordinary_calls.py) cover adapter failures and inject late
-update failures after real native writes.
+provenance. The ref-alias history rejects an output that shares the capture
+ref, `main`, or an absent double-selection ref. Each rejection leaves native
+storage unchanged. Retrying at the same output with a distinct absent selection
+records fresh add and double attempts and publishes a new result.
+[Focused tests](test_ordinary_calls.py) cover exact I64 inputs and adapter
+failures, and inject late update failures after real native writes.
 
 The [finite ordinary call model](recorded_ordinary_design.qnt) bounds each
 path to one new outer request, two call slots, two capture versions, four MAP

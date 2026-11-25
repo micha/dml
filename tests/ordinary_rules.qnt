@@ -418,6 +418,32 @@ module ordinary_rules {
     }
   }
 
+  pure def refAliasVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val cap = record(rows[1], "capture")
+    val first = rows[2]
+    val retry = rows[6]
+    if (i >= 3 and i <= 5) {
+      val expectedHead = if (i == 4) cap.id else if (i == 5) first.commit else ""
+      val rejected = a.code == 1 and a.error == "invoke: intent operation refs, selection slots, and main must be distinct"
+        and a.commit == "" and a.head == expectedHead and a.main == first.commit and a.report == List()
+        and a.unchanged and a.created == List() and a.profiles == List() and a.refs == List()
+      if (rejected) "ok" else "wrong_aliased_ref_rejection"
+    } else {
+      val accepted = a.code == 0 and a.error == "" and (
+        if (i == 0) defaultsStep(a, "", v1) and a.main == ""
+        else if (i == 1) captureStep(a, rows[0], "")
+        else if (i == 2) addChain(a, cap, ab(13, 30), fresh, "", fresh, "")
+          and successChain(a, cap, none, false, "") and returns(a) == 2
+        else if (i == 6) addChain(a, cap, ab(13, 29), fresh, "", trySelected, "")
+          and successChain(a, cap, none, false, first.commit) and returns(a) == 2
+        else if (i == 7) terminalReport(a, retry, retry, retry, "finished") and a.main == retry.commit
+        else false
+      )
+      if (accepted) "ok" else "wrong_ref_alias_history"
+    }
+  }
+
   pure def observedStep(a: Attempt, request: Request): str = {
     val inspect = request.op == "inspect" or request.op == "inspect_observed"
     val read = inspect or request.op == "retire"
@@ -449,13 +475,18 @@ module ordinary_rules {
       val observed = observedStep(rows[i], requestIdentity[i])
       out.append(if (observed != "ok") observed else requestIdentityVerdict(rows, i))
     })
+    else if (rows.length() == refAliases.length()) range(0, refAliases.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], refAliases[i])
+      out.append(if (observed != "ok") observed else refAliasVerdict(rows, i))
+    })
     else List("missing_steps")
   }
   pure def verdictAccepted(result: str): bool = result == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 4 and verdicts.length() == 4
+    evidence.length() == 5 and verdicts.length() == 5
       and verdicts[0].length() == story.length() and verdicts[1].length() == pinning.length()
       and verdicts[2].length() == execution.length() and verdicts[3].length() == requestIdentity.length()
+      and verdicts[4].length() == refAliases.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (accepted, result) => accepted and verdictAccepted(result)))
       and report(evidence[0].attempts[9], "", "status") == "hit"
       and record(evidence[0].attempts[10], "double-hit").id != ""
