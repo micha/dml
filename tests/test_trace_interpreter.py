@@ -119,15 +119,23 @@ class TraceInterpreterTest(unittest.TestCase):
             "  pure val evidence: List[Observation] = List(evidenceHistory0, evidenceHistory1)",
         ])
 
-    def test_quint_evidence_shares_defaults_without_changing_live_values(self):
-        defaults = {"value": 0, "details": {"ok": False}}
-        observations = [{"attempts": [defaults, {"value": 1, "details": {"ok": True}},
-                                      {"value": 0, "details": {"ok": 0}}]}]
+    def test_quint_columnar_evidence_keeps_defaults_and_exact_order(self):
+        defaults = {"value": 0, "details": {"ok": False}, "empty": ""}
+        observations = [
+            {"scenario": 4, "attempts": [defaults, {**defaults, "value": 1, "details": {"ok": True}}]},
+            {"scenario": 7, "attempts": [{**defaults, "details": {"ok": 0}}]},
+        ]
         lines = quint_evidence(observations, attempt_defaults=defaults).splitlines()
-        self.assertEqual(lines[:2], [
-            "  pure val evidenceDefaults = { value: 0, details: { ok: false } }",
-            "  pure val evidenceBatch0_0 = List(evidenceDefaults, { ...evidenceDefaults, value: 1, details: { ok: true } },"
-            " { ...evidenceDefaults, details: { ok: 0 } })",
+        self.assertEqual(lines, [
+            "  pure val evidenceBatch_value_0 = Map(1 -> 1)",
+            "  pure val evidenceBatch_details_0 = Map(1 -> { ok: true }, 2 -> { ok: 0 })",
+            "  pure def evidenceAt(i: int): Attempt = { value: if (evidenceBatch_value_0.keys().contains(i)) "
+            "evidenceBatch_value_0.get(i) else 0, details: if (evidenceBatch_details_0.keys().contains(i)) "
+            'evidenceBatch_details_0.get(i) else { ok: false }, empty: "" }',
+            "  pure def evidenceRange(start: int, end: int): List[Attempt] = "
+            "range(start, end).foldl(List(), (out, i) => out.append(evidenceAt(i)))",
+            "  pure val evidence: List[Observation] = List({ scenario: 4, attempts: evidenceRange(0, 2) }, "
+            "{ scenario: 7, attempts: evidenceRange(2, 3) })",
         ])
         for different in ({"value": 0}, {**defaults, "other": 0}):
             with self.subTest(different=different), self.assertRaisesRegex(ValueError, "fields do not match"):
