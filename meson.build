@@ -266,6 +266,22 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
+  test(
+    'closure-boundaries', python,
+    args: ['-B', files('tests/test_closures.py'), lmdb_inventory],
+    env: binding_env,
+    depends: public_python_core,
+  )
+  test(
+    'recorded-closures', python,
+    args: ['-B', files('tests/run_closures.py'), quint.full_path(),
+           files('examples/recorded_closures.py'), lmdb_inventory,
+           files('tests/closure_histories.qnt', 'tests/closure_rules.qnt')] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
   transfer_fault_subject = static_library(
     'transfer_fault_subject', 'src/transfer.c', 'src/object.c',
     include_directories: dml_inc,
