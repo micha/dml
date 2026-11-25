@@ -104,6 +104,43 @@ class BindingTest(unittest.TestCase):
             with self.subTest(entries=entries), self.assertRaises(error):
                 core.datum_encode(core.DATUM_MAP, entries)
 
+    def test_null_and_uri_use_native_canonical_encoding(self):
+        self.assertEqual(core.datum_decode(core.datum_encode(core.DATUM_NULL, None)), (b"", core.DATUM_NULL))
+        with self.assertRaises(TypeError):
+            core.datum_encode(core.DATUM_NULL, b"")
+        with self.assertRaises(TypeError):
+            core.datum_encode(core.DATUM_URI, "dml://source/builtin/map/get/v1")
+        canonical = b"dml://source/builtin/map/get/v1"
+        encoded = core.datum_encode(core.DATUM_URI, canonical)
+        self.assertEqual(core.datum_decode(encoded), (canonical, core.DATUM_URI))
+        for invalid in (b"relative", b"dml:\x00", b"dml:x\xff", b"dml:%zz", b"DML://SOURCE/builtin/map/get/%761"):
+            with self.subTest(uri=invalid), self.assertRaises(core.Error) as rejected:
+                core.datum_encode(core.DATUM_URI, invalid)
+            self.assertEqual(rejected.exception.args[0], "invalid_payload")
+
+    def test_datum_members_preserve_list_order_and_native_map_keys(self):
+        low, high = bytes(16), b"\xff" * 16
+        for members in ([high, low, high], (high, low, high)):
+            packed = core.datum_encode(core.DATUM_LIST, members)
+            self.assertEqual(core.datum_members(packed), (high, low, high))
+        for kind in (core.DATUM_LIST, core.DATUM_MAP):
+            self.assertEqual(core.datum_members(core.datum_encode(kind, ())), ())
+        packed = core.datum_encode(core.DATUM_MAP, ((high, low), (low, high)))
+        self.assertEqual(core.datum_members(packed), ((low, high), (high, low)))
+        with self.assertRaises(core.Error):
+            core.datum_members(packed[:-1])
+        with self.assertRaises(TypeError):
+            core.datum_members(bytearray(packed))
+        with self.assertRaisesRegex(ValueError, "require a LIST or MAP"):
+            core.datum_members(core.datum_encode(core.DATUM_NULL, None))
+
+    def test_list_encoding_rejects_non_sequences_and_bad_ids(self):
+        for items in (iter(()), {bytes(16)}, bytes(16), (bytearray(16),)):
+            with self.subTest(items=items), self.assertRaises(TypeError):
+                core.datum_encode(core.DATUM_LIST, items)
+        with self.assertRaisesRegex(ValueError, "16 bytes"):
+            core.datum_encode(core.DATUM_LIST, (bytes(16), bytes(17)))
+
     def test_map_write_rejects_a_node_id_and_rolls_back(self):
         repo = core.repo_open(self.path, True)
         self.addCleanup(core.repo_close, repo)
@@ -137,7 +174,10 @@ class BindingTest(unittest.TestCase):
         with self.assertRaises(core.Error) as duplicate:
             core.datum_encode(core.DATUM_MAP, ((key, value), (equivalent, value)))
         self.assertEqual(duplicate.exception.args[0], "invalid_payload")
-        inner_record = core.datum_encode(core.DATUM_MAP, ((key, value),))
+        uri = core.txn_put_datum(writer, core.datum_encode(core.DATUM_URI, b"dml://source/future/v99"))
+        null = core.txn_put_datum(writer, core.datum_encode(core.DATUM_NULL, None))
+        listing = core.txn_put_datum(writer, core.datum_encode(core.DATUM_LIST, (value, null, uri)))
+        inner_record = core.datum_encode(core.DATUM_MAP, ((key, listing),))
         inner = core.txn_put_datum(writer, inner_record)
         outer_record = core.datum_encode(core.DATUM_MAP, ((key, inner),))
         outer = core.txn_put_datum(writer, outer_record)
@@ -158,6 +198,9 @@ class BindingTest(unittest.TestCase):
         self.assertEqual(core.txn_lookup_node(reader, dag, b"arguments"), literal)
         self.assertEqual(core.txn_get_datum(reader, outer), outer_record)
         self.assertEqual(core.txn_get_datum(reader, inner), inner_record)
+        self.assertEqual(core.datum_members(core.txn_get_datum(reader, listing)), (value, null, uri))
+        self.assertEqual(core.datum_decode(core.txn_get_datum(reader, uri)), (b"dml://source/future/v99", core.DATUM_URI))
+        self.assertEqual(core.datum_decode(core.txn_get_datum(reader, null)), (b"", core.DATUM_NULL))
         self.assertEqual(core.datum_decode(core.txn_get_datum(reader, key)), ("café".encode(), core.DATUM_STRING))
         self.assertEqual(core.datum_decode(core.txn_get_datum(reader, value)), (b"*" + bytes(7), core.DATUM_I64))
 
