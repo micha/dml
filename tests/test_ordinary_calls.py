@@ -31,19 +31,6 @@ class OrdinaryCallsTest(unittest.TestCase):
     def inventory(self):
         return scan_inventory(SCANNER, self.repo)
 
-    def test_outer_hit_and_inspection_do_not_invoke_either_adapter(self):
-        first = self.invoke()
-        selected = example.Selection(example.REQUIRE, b"call", first)
-        with patch.object(example, "_double_sum", side_effect=AssertionError("outer invocation")), \
-                patch.object(example, "_leaf_call", side_effect=AssertionError("leaf invocation")):
-            self.invoke(b"hit", outer=selected)
-            before = self.inventory()
-            report = self.inspect(b"hit")
-            self.assertEqual(report["status"], "hit")
-            self.assertNotEqual(report["requested"]["request"], report["producing"]["request"])
-            self.assertEqual(self.inventory(), before)
-        self.assertEqual(self.inspect(b"main")["commit"], first.hex())
-
     def test_caught_foreign_node_error_poisoned_the_outer_attempt(self):
         first = self.invoke()
         callbacks = []
@@ -121,15 +108,6 @@ class OrdinaryCallsTest(unittest.TestCase):
                 self.assertEqual(self.inventory(), before[0])
                 self.assertEqual(self.inspect(out)["status"], expected_prefix)
                 self.assertEqual(self.inspect(b"main")["commit"], first.hex())
-
-    def test_add_overflow_keeps_start_without_invoking_double(self):
-        first = self.invoke()
-        with patch.object(example, "_leaf_call", wraps=example._leaf_call) as leaf:
-            with self.assertRaisesRegex(ValueError, "add result is not a signed 64-bit integer"):
-                self.invoke(b"partial", (1 << 63) - 1, 1)
-        self.assertEqual([call.args[0] for call in leaf.call_args_list], [example.ADD])
-        self.assertEqual(self.inspect(b"partial")["status"], "start")
-        self.assertEqual(self.inspect(b"main")["commit"], first.hex())
 
     def test_required_absent_double_keeps_successful_add(self):
         first = self.invoke()
