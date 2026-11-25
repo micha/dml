@@ -57,7 +57,23 @@ module ordinary_histories {
     inspect("replica", "bad-replica", "@bad-replica")                                             // 33
   )
 
+  pure val pinning: List[Request] = List(
+    sourceStep("defaults", List("defaults", "1")),
+    sourceStep("capture", List("defaults", "@defaults", "capture-one")),
+    fromOne("first", "13", "29", List()),
+    sourceStep("select_double", List("first", "@first", "selected")),
+    fromOne("alternate", "13", "30", List()),
+    sourceStep("select_double", List("alternate", "@alternate", "replacement")),
+    { op: "invoke_live", args: List("caller", "source", "capture-one", "@capture-one", "pinned",
+      "29", "13", "require-selected", "selected", "@selected") },
+    // While caller's invocation is live: after add commits, before double starts.
+    { op: "txn_begin", args: List("bookmark-editor", "edit", "source") },
+    { op: "txn_ref_update", args: List("bookmark-editor", "edit", "selected", "@replacement") },
+    { op: "txn_commit", args: List("bookmark-editor", "edit") },
+    inspect("source", "pinned", "@pinned")
+  )
+
   var histories: List[List[Request]]
-  action init = histories' = List(story)
+  action init = histories' = List(story, pinning)
   action step = histories' = histories
 }

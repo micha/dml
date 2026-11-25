@@ -366,9 +366,11 @@ The [captured ordinary call replay](ordinary_histories.qnt) exercises the real
 survive changing defaults; an outer hit skips both children; an inner hit
 keeps the new request's add source and the old producer's original add source.
 It also checks retained prefixes after failure and read-only transferred
-inspection. [Focused tests](test_ordinary_calls.py) observe actual logical
-calls, move a selection between committed phases, and inject late update
-failures after real native writes.
+inspection. A separate pinning history moves the double selection with a native
+write transaction after add commits and before double starts. Quint checks that
+the live call still uses the original producing attempt.
+[Focused tests](test_ordinary_calls.py) observe actual logical calls and inject
+late update failures after real native writes.
 
 The [finite ordinary call model](recorded_ordinary_design.qnt) bounds each
 path to one new outer request, two call slots, two capture versions, four MAP

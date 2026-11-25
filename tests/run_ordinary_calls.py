@@ -1,12 +1,16 @@
-"""Collect CLI and independent native evidence for captured ordinary calls."""
+"""Collect CLI, in-process, and independent native evidence for captured ordinary calls."""
 
 import argparse
-from contextlib import nullcontext
+from collections import deque
+from contextlib import ExitStack
+from functools import partial
+from importlib import import_module
 import json
 from pathlib import Path
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from daggerml import core
 
@@ -20,7 +24,7 @@ from run_histories import (
     evaluate,
     quint_command,
     read_histories,
-    replay_history,
+    replay_step,
 )
 from trace_support import scan_inventory
 
@@ -32,7 +36,8 @@ NO_ENV = {"dag": "", "map": "", "mapSource": "", "list": "", "listSource": "",
           "add": "", "addMap": "", "double": "", "doubleMap": ""}
 EMPTY = {"op": "", "args": [], "commit": "", "code": 0, "error": "", "head": "", "main": "",
          "refs": [], "created": [], "profiles": [], "report": [], "unchanged": True, "preserved": True,
-         "transfer": False}
+         "transfer": False, "addedObjects": False}
+EDITOR_OPS = {"txn_begin", "txn_ref_update", "txn_commit"}
 
 
 class Inventory(ClosureInventory):
@@ -155,13 +160,15 @@ class History:
             finally:
                 core.txn_abort(txn)
 
-    def evidence(self, op, args, before, after, *, commit="", head="", report=None, code=0, error="", transfer=False):
+    def evidence(self, op, args, before, after, *, commit="", head="", report=None, code=0, error="",
+                 transfer=False, remember=True):
         if commit and not IDENTITY.fullmatch(commit):
             raise ValueError(f"expected a commit ID, got {commit!r}")
-        for name, target in after.refs.items():
-            self.receipts.setdefault(name, target)
-        if op == "defaults" and head:
-            self.receipts[args[1]] = head
+        if remember:
+            for name, target in after.refs.items():
+                self.receipts.setdefault(name, target)
+            if op == "defaults" and head:
+                self.receipts[args[1]] = head
         refs = [{"name": name, "before": before.refs.get(name, ""), "after": after.refs.get(name, "")}
                 for name in sorted(before.refs.keys() | after.refs.keys())
                 if before.refs.get(name, "") != after.refs.get(name, "")]
@@ -170,13 +177,17 @@ class History:
                 "head": head, "main": after.refs.get("main", ""), "refs": refs,
                 "created": [after.commits[key] for key in sorted(after.commits.keys() - before.commits.keys())],
                 "profiles": after.added_builtin_profiles(before), "report": flat_report(report or {}),
-                "unchanged": before.rows == after.rows, "preserved": preserved, "transfer": transfer}
+                "unchanged": before.rows == after.rows, "preserved": preserved, "transfer": transfer,
+                "addedObjects": any(key.startswith(OBJECT_PREFIX) for key in after.rows.keys() - before.rows.keys())}
+
+    def resolve(self, arg):
+        return RECEIPT.sub(lambda match: self.receipts[match[1]], arg)
 
     def command(self, op):
         def invoke(role, *args):
             path = self.directory / role
             before = self.inventory(path)
-            argv = [RECEIPT.sub(lambda match: self.receipts[match[1]], arg) for arg in args]
+            argv = [self.resolve(arg) for arg in args]
             wrapper = ["-c", READ_ONLY] if op == "inspect" else []
             process = subprocess.run([sys.executable, "-B", *wrapper, self.script, op.replace("_", "-"), path, *argv],
                                      cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30)
@@ -188,6 +199,68 @@ class History:
                                  head=after.refs.get(ref, ""), report=report, code=process.returncode,
                                  error=process.stderr.strip())
         return invoke
+
+    def invoke_live(self, actor, role, capture, expected, output, a, b, mode, selected_ref, selected,
+                    *, interleaving, editor_rows):
+        example = import_module(self.script.stem)
+        path = self.directory / role
+        before = self.inventory(path)
+        outer = example._double_sum
+
+        def observe(arguments, get, make_arguments, invoke, add, double):
+            def observed_invoke(target, node):
+                result = invoke(target, node)
+                if target is add:
+                    # The real add has closed its batch. Double's batch has not opened yet.
+                    editor_rows.extend(self.edit_bookmark(path, output, before, interleaving))
+                return result
+
+            return outer(arguments, get, make_arguments, observed_invoke, add, double)
+
+        controls = example.Selection(mode.encode("ascii"), selected_ref.encode("ascii"),
+                                     bytes.fromhex(self.resolve(selected)))
+        commit, code, error = "", 0, ""
+        with patch.object(example, "_double_sum", observe):
+            try:
+                commit = example.invoke(path, capture.encode("ascii"), bytes.fromhex(self.resolve(expected)),
+                                        output.encode("ascii"), int(a), int(b), double=controls).hex()
+            except (ValueError, OverflowError, core.Error) as failure:
+                code, error = 1, str(failure)
+        after = self.inventory(path)
+        args = (actor, role, capture, expected, output, a, b, mode, selected_ref, selected)
+        return self.evidence("invoke_live", args, before, after, commit=commit, head=after.refs.get(output, ""),
+                             code=code, error=error)
+
+    def edit_bookmark(self, path, output, before, interleaving):
+        prefix = self.inventory(path)
+        active = None
+        with ExitStack() as resources:
+            for request in interleaving:
+                op = request["op"]
+                args = request["args"]
+                actor, handle, *operands = args
+                if op == "txn_begin" and active is None:
+                    (role,) = operands
+                    edit_path = self.directory / role
+                    repo = resources.enter_context(repository(edit_path))
+                    txn = core.txn_begin(repo, core.TXN_WRITE)
+                    resources.callback(core.txn_abort, txn)
+                    active = (actor, handle)
+                    yield self.evidence(op, args, before, prefix, head=prefix.refs.get(output, ""), remember=False)
+                elif op == "txn_ref_update" and active == (actor, handle):
+                    ref, target = operands
+                    commit = self.resolve(target)
+                    core.txn_ref_update(txn, ref.encode("ascii"), bytes.fromhex(commit))
+                    yield {**EMPTY, "op": op, "args": args, "commit": commit,
+                           "unchanged": scan_inventory(self.scanner, path) == prefix.rows}
+                elif op == "txn_commit" and active == (actor, handle) and not operands:
+                    core.txn_commit(txn)
+                    resources.close()
+                    active = None
+                    after = self.inventory(path)
+                    yield self.evidence(op, args, prefix, after, head=after.refs.get(output, ""), remember=False)
+                else:
+                    raise RuntimeError(f"invalid bookmark editor step: {request}")
 
     def graft(self, role, kind, from_ref, alternate_ref, output):
         path = self.directory / role
@@ -228,13 +301,25 @@ class History:
         return self.evidence("retire", (role,), before, self.inventory(retired), transfer=not original.exists())
 
 
-class Processes:
-    def __init__(self, script, scanner):
-        self.script = script
-        self.scanner = scanner
-
-    def history(self, directory):
-        return nullcontext(History(directory, self.script, self.scanner))
+def replay_ordinary(directory, script, scanner, requests):
+    directory.mkdir()
+    replay = History(directory, script, scanner)
+    attempts = []
+    pending = deque(enumerate(requests, 1))
+    while pending:
+        step, request = pending.popleft()
+        if request["op"] == "invoke_live":
+            # Schedule the contiguous editor steps at the live call's after-add checkpoint.
+            interleaving, editor_rows = [], []
+            while pending and pending[0][1]["op"] in EDITOR_OPS:
+                _, edit = pending.popleft()
+                interleaving.append(edit)
+            invoke = partial(replay.invoke_live, interleaving=interleaving, editor_rows=editor_rows)
+            attempts.append(replay_step({"invoke_live": invoke}, directory, step, request))
+            attempts.extend(editor_rows)
+        else:
+            attempts.append(replay_step(replay.operations, directory, step, request))
+    return {"attempts": attempts}
 
 
 def main():
@@ -244,11 +329,12 @@ def main():
         parser.add_argument(name, type=absolute_path)
     args = parser.parse_args()
     quint = quint_command(args)
+    sys.path.insert(0, str(args.script.parent))
     with TemporaryDirectory(prefix="dml-ordinary-") as tmp:
         directory = Path(tmp)
         histories = read_histories(quint, args.histories, directory / "histories.itf.json", ["init"])
-        suite = Processes(args.script, args.scanner)
-        observations = [replay_history(suite, directory / f"history-{i}", story) for i, story in enumerate(histories)]
+        observations = [replay_ordinary(directory / f"history-{i}", args.script, args.scanner, story)
+                        for i, story in enumerate(histories)]
         state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=EMPTY)
         check_verdicts(histories, observations, state)
 

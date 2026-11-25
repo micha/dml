@@ -15,7 +15,7 @@ module ordinary_rules {
   type Field = { path: str, name: str, value: str }
   type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, head: str, main: str,
     refs: List[Ref], created: List[Native], profiles: List[str], report: List[Field],
-    unchanged: bool, preserved: bool, transfer: bool }
+    unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool }
   type Observation = { attempts: List[Attempt] }
 
   pure val none: Native = { id: "", role: "", dag: "", parents: List(), target: "", selected: "",
@@ -102,7 +102,7 @@ module ordinary_rules {
     native(dq, List(add.id)) and dq.invocation != "" and dq.target == target
       and inputView(dq.inputs, List({ name: "x", value: add.result.value }))
       and source(dq.inputs, "x") == add.result.dag
-  pure def successChain(a: Attempt, cap: Native, oldDouble: Native, hit: bool, previous: str): bool = {
+  pure def finishedChain(a: Attempt, cap: Native, oldDouble: Native, hit: bool): bool = {
     val add = record(a, "add-attempt")
     val dq = record(a, "double-request")
     val number = 2 * add.result.value
@@ -117,12 +117,16 @@ module ordinary_rules {
              and leafResult(dt.result, dq, env.doubleMap, env.mapSource, number))
       and native(f, List(dt.id)) and f.result.dag == f.dag and f.result.returned == produced.dag
       and f.result.inputs == oq.inputs.dag and f.result.value == number and f.result.trace == add.trace
-      and a.commit == f.id and published(a, a.args[3], f.id, previous, f.id)
+      and a.commit == f.id
   }
-  pure def missPrefix(a: Attempt, cap: Native, expected: List[Input], innerMode: str, selected: str,
-      previous: str): bool = a.created.length() == 4 and returns(a) == 1 and a.commit == ""
+  pure def successChain(a: Attempt, cap: Native, oldDouble: Native, hit: bool, previous: str): bool =
+    finishedChain(a, cap, oldDouble, hit) and published(a, a.args[3], a.commit, previous, a.commit)
+  pure def addPrefix(a: Attempt, cap: Native, expected: List[Input], innerMode: str, selected: str,
+      previous: str, output: str): bool = a.created.length() == 4 and returns(a) == 1 and a.commit == ""
     and addChain(a, cap, expected, fresh, "", innerMode, selected)
-    and published(a, a.args[3], record(a, "add-attempt").id, previous, previous)
+    and published(a, output, record(a, "add-attempt").id, previous, previous)
+  pure def missPrefix(a: Attempt, cap: Native, expected: List[Input], innerMode: str, selected: str,
+      previous: str): bool = addPrefix(a, cap, expected, innerMode, selected, previous, a.args[3])
   pure def outerHit(a: Attempt, cap: Native, first: Attempt, previous: str): bool = {
     val q = record(a, "outer-request")
     val t = record(a, "hit")
@@ -258,23 +262,73 @@ module ordinary_rules {
     } else false
   }
 
-  pure def verdict(rows: List[Attempt], i: int): str = {
+  pure def selectedStep(a: Attempt, name: str, target: str, main: str): bool =
+    a.created == List() and not(a.addedObjects) and a.commit == target and published(a, name, target, main, main)
+  pure def bookmarkCommit(a: Attempt, add: str, main: str, old: str, replacement: str): bool =
+    a.head == add and a.main == main and a.created == List() and not(a.addedObjects)
+      and changes(a, Set(ref("selected", old, replacement)))
+  pure def pinningAccepted(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
-    val read = a.op == "inspect" or a.op == "retire"
-    if (a.op != story[i].op or a.args != story[i].args) "wrong_step"
+    val c = record(rows[1], "capture")
+    val first = rows[2]
+    val old = record(first, "double-attempt")
+    val alternate = rows[4]
+    val replacement = record(alternate, "double-attempt")
+    val call = rows[6]
+    val prefix = rows[7]
+    val add = record(prefix, "add-attempt")
+    val previous = alternate.commit
+    if (a.code != 0 or a.error != "") false
+    else if (i == 0) defaultsStep(a, "", v1) and a.main == ""
+    else if (i == 1) captureStep(a, rows[0], "")
+    else if (i == 2) addChain(a, c, ab(13, 29), fresh, "", fresh, "")
+      and successChain(a, c, none, false, "")
+    else if (i == 3) selectedStep(a, "selected", old.id, first.commit)
+    else if (i == 4) addChain(a, c, ab(13, 30), fresh, "", fresh, "")
+      and successChain(a, c, none, false, first.commit)
+      and record(a, "double-request").inputs.datum != record(first, "double-request").inputs.datum
+    else if (i == 5) selectedStep(a, "replacement", replacement.id, previous)
+    else if (i == 6) finishedChain(a, c, old, true) and a.head == a.commit and a.main == a.commit
+      and changes(a, Set(newRef("pinned", a.commit), ref("main", previous, a.commit),
+        ref("selected", old.id, replacement.id)))
+    else if (i == 7) addPrefix(a, c, ab(29, 13), requireSelected, old.id, previous, "pinned")
+      and ids(a.created).subseteq(ids(call.created)) and add.id == record(call, "add-attempt").id
+    else if (i == 8) a.commit == replacement.id and a.unchanged
+    else if (i == 9) bookmarkCommit(a, add.id, previous, old.id, replacement.id)
+    else if (i == 10 and call.code == 0) terminalReport(a, call, call, first, "finished")
+    else false
+  }
+
+  pure def observedStep(a: Attempt, request: Request): str = {
+    val read = request.op == "inspect" or request.op == "retire"
+    if (a.op != request.op or a.args != request.args) "wrong_step"
     else if (not(a.preserved)) "changed_historical_records"
     else if (read and (not(a.unchanged) or a.created != List() or a.refs != List())) "inspection_wrote_records"
     else if (a.op == "inspect" and a.commit != "" and a.commit != a.head) "wrong_inspection_pin"
-    else if (not(accepted(rows, i))) "wrong_call_boundary_or_history"
     else "ok"
   }
-  pure def historyVerdicts(row: Observation): List[str] =
-    if (row.attempts.length() != story.length()) List("missing_steps")
-    else range(0, story.length()).foldl(List(), (out, i) => out.append(verdict(row.attempts, i)))
+  pure def historyVerdicts(row: Observation): List[str] = {
+    val rows = row.attempts
+    if (rows.length() == story.length()) range(0, story.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], story[i])
+      out.append(if (observed != "ok") observed
+        else if (accepted(rows, i)) "ok" else "wrong_call_boundary_or_history")
+    })
+    else if (rows.length() == pinning.length()) range(0, pinning.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], pinning[i])
+      out.append(if (observed != "ok") observed
+        else if (pinningAccepted(rows, i)) "ok"
+        else if (i == 6) "wrong_pinned_double_producer"
+        else "wrong_bookmark_interleaving")
+    })
+    else List("missing_steps")
+  }
   pure def verdictAccepted(result: str): bool = result == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == story.length()
+    evidence.length() == 2 and verdicts.length() == 2
+      and verdicts[0].length() == story.length() and verdicts[1].length() == pinning.length()
       and verdicts[0].foldl(true, (ok, result) => ok and verdictAccepted(result))
+      and verdicts[1].foldl(true, (ok, result) => ok and verdictAccepted(result))
       and report(evidence[0].attempts[9], "", "status") == "hit"
       and record(evidence[0].attempts[10], "double-hit").id != ""
       and record(evidence[0].attempts[15], "add-attempt").id != ""
