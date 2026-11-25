@@ -78,23 +78,25 @@ def read_histories(quint, source, output, initializers):
     return histories
 
 
+def replay_step(operations, directory, step, request):
+    operation = operations.get(request["op"])
+    context = f"{directory.name}, step {step}: {short_repr(request)}"
+    if operation is None:
+        raise ValueError(f"{context}: unknown operation")
+    try:
+        attempt = operation(*request["args"])
+    except Exception as error:
+        raise ValueError(f"{context}: {error}") from error
+    if not isinstance(attempt, dict):
+        raise ValueError(f"{context}: operation must return an observation record")
+    return attempt
+
+
 def replay_history(suite, directory, requests):
     directory.mkdir()
     with suite.history(directory) as replay:
-        attempts = []
-        for step, request in enumerate(requests, 1):
-            operation = replay.operations.get(request["op"])
-            context = f"{directory.name}, step {step}: {short_repr(request)}"
-            if operation is None:
-                raise ValueError(f"{context}: unknown operation")
-            try:
-                attempt = operation(*request["args"])
-            except Exception as error:
-                raise ValueError(f"{context}: {error}") from error
-            if not isinstance(attempt, dict):
-                raise ValueError(f"{context}: operation must return an observation record")
-            attempts.append(attempt)
-        return {"attempts": attempts}
+        return {"attempts": [replay_step(replay.operations, directory, step, request)
+                             for step, request in enumerate(requests, 1)]}
 
 
 def quint_record(fields):

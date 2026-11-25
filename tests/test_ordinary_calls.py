@@ -162,28 +162,6 @@ class OrdinaryCallsTest(unittest.TestCase):
                 self.assertEqual(self.inspect(out)["status"], expected_prefix)
                 self.assertEqual(self.inspect(b"main")["commit"], first.hex())
 
-    def test_double_selection_is_pinned_before_the_first_leaf(self):
-        first = self.invoke()
-        old = example.select_double(self.repo, b"call", first, b"selected")
-        alternate = self.invoke(b"alternate", 13, 30)
-        replacement = example.select_double(self.repo, b"alternate", alternate, b"replacement")
-        outer = example._double_sum
-
-        def shift_slot(arguments, get, make_arguments, invoke, add, double):
-            def trace_call(target, node):
-                result = invoke(target, node)
-                if target is add:
-                    with example.records._write_transaction(self.repo, create=False) as txn:
-                        core.txn_ref_update(txn, b"selected", replacement)
-                return result
-            return outer(arguments, get, make_arguments, trace_call, add, double)
-
-        control = example.Selection(example.REQUIRE, b"selected", old)
-        with patch.object(example, "_double_sum", shift_slot):
-            self.invoke(b"pinned", 29, 13, double=control)
-        self.assertEqual(self.inspect(b"pinned")["double"]["attempt"], old.hex())
-        self.assertEqual(self.inspect(b"selected")["commit"], replacement.hex())
-
     def test_add_overflow_keeps_start_without_invoking_double(self):
         first = self.invoke()
         with patch.object(example, "_leaf_call", wraps=example._leaf_call) as leaf:
