@@ -9,8 +9,10 @@ module recorded_calls_rules {
   type SelectedPublication = { mode: str, planRef: str, plan: str, selectionRef: str, selection: str, result: str }
   type Occurrence = { id: str, commit: str, result: str, historicalRef: str }
   type Policy = { defaultMode: str, previous: str }
-  type Decision = { id: str, canonicalId: bool, policy: str, defaultMode: str, override: str, route: str,
-    reason: str, plan: str, planRef: str, selectionRef: str, selection: str, result: str }
+  type Intent = { implementation: str, defaultMode: str, v1Selection: str, v2Selection: str, previous: str }
+  type Decision = { id: str, canonicalId: bool, policy: str, intent: str, defaultMode: str, override: str, route: str,
+    reason: str, plan: str, planRef: str, selectionRef: str, selection: str, result: str,
+    implementationOverride: str, implementationReason: str }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
     commit: str, calls: List[Call],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
@@ -18,7 +20,7 @@ module recorded_calls_rules {
     requestCommit: str,
     requestImplementation: str, requestFactor: int, bundlePresent: bool, bundleUnchanged: bool, publication: Publication,
     reusePublication: ReusePublication, selection: Selection, selectedPublication: SelectedPublication,
-    occurrence: Occurrence, policy: Policy, expectedPolicy: str, decision: Decision }
+    occurrence: Occurrence, policy: Policy, expectedPolicy: str, intent: Intent, expectedIntent: str, decision: Decision }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def literal(arg: Argument, name: str, value: int): bool =
@@ -923,9 +925,9 @@ module recorded_calls_rules {
       val execute = attempts[17].commit
       val nextPlan = attempts[35].commit
       val firstAttempt: Occurrence = { id: occurrenceA, commit: first, result: result, historicalRef: "" }
-      val defaultReuse: Decision = { id: "", canonicalId: true, policy: reuse, defaultMode: "reuse-by-default",
+      val defaultReuse: Decision = { id: "", canonicalId: true, policy: reuse, intent: "", defaultMode: "reuse-by-default",
         override: "default", route: "reuse-selected", reason: "default-selection", plan: plan, planRef: "",
-        selectionRef: "active", selection: active, result: result }
+        selectionRef: "active", selection: active, result: result, implementationOverride: "", implementationReason: "" }
       val forcedFresh: Decision = { ...defaultReuse, override: "fresh", route: "execute-fresh",
         reason: "override-fresh", plan: nextPlan, planRef: "forced-plan", selectionRef: "", selection: "", result: "" }
       val defaultExecute: Decision = { ...forcedFresh, policy: execute, defaultMode: "execute-by-default",
@@ -1000,6 +1002,119 @@ module recorded_calls_rules {
     }
   }
 
+  pure def implementationIntentVerdict(write: Attempt, req: Request, producer: str, definition: str,
+                                       selection: str, accepted: bool): str =
+    if (write.expectedIntent != definition) "wrong_intent_guard"
+    else intentVerdict(write, req, producer, "", selection, accepted)
+
+  pure def intentReadVerdict(read: Attempt, req: Request, commit: str, expected: Intent): str =
+    if (not(matches(read, req)) or not(read.unchanged) or read.commit != commit or read.calls != List() or
+      read.intent != expected) "wrong_intent_definition"
+    else "inspected"
+
+  pure def intentDecisionReadVerdict(read: Attempt, req: Request, commit: str, portable: str, implementation: str,
+                                    priorTip: str, expected: Decision, occurrence: Occurrence): str =
+    if (read.requestImplementation != implementation) "wrong_decision_implementation"
+    else decisionReadVerdict(read, req, commit, portable, priorTip, expected, occurrence)
+
+  pure def implementationIntentHistoryVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = implementationIntentRequests
+    if (attempts.length() != req.length()) List("missing_steps")
+    else {
+      val producer = attempts[0].commit
+      val summed = attempts[1]
+      val basis = attempts[2].commit
+      val left = attempts[3].commit
+      val right = attempts[4].commit
+      val aDefinition: Intent = { implementation: scaleV1, defaultMode: "reuse-by-default", v1Selection: "chosen-a",
+        v2Selection: "chosen-b", previous: basis }
+      val aPlan = attempts[8].decision.plan
+      val aRequest = attempts[9].commit
+      val aAttempt = attempts[11].commit
+      val aSelection = attempts[14].commit
+      val foreign = attempts[15].commit
+      val aResult = attempts[20].commit
+      val bPlan = attempts[25].decision.plan
+      val bRequest = attempts[26].commit
+      val bAttempt = attempts[28].commit
+      val bSelection = attempts[32].commit
+      val bResult = attempts[37].commit
+      val recordedA: Occurrence = { id: occurrenceA, commit: aAttempt, result: aResult, historicalRef: "" }
+      val recordedB: Occurrence = { id: occurrenceB, commit: bAttempt, result: bResult, historicalRef: "" }
+      val missA: Decision = { id: "", canonicalId: true, policy: "", intent: left, defaultMode: "reuse-by-default",
+        override: "default", route: "execute-fresh", reason: "default-no-selection", plan: aPlan, planRef: "plan-a",
+        selectionRef: "chosen-a", selection: "", result: "", implementationOverride: "default",
+        implementationReason: "default-implementation" }
+      val overrideA: Decision = { ...missA, intent: right, route: "reuse-selected", reason: "default-selection",
+        planRef: "", selection: aSelection, result: aResult, implementationOverride: scaleV1,
+        implementationReason: "explicit-implementation" }
+      val missB = { ...missA, intent: right, plan: bPlan, planRef: "plan-b", selectionRef: "chosen-b" }
+      val reuseB = { ...missB, route: "reuse-selected", reason: "default-selection", planRef: "",
+        selection: bSelection, result: bResult }
+      val reuseA = { ...overrideA, intent: left, plan: attempts[39].decision.plan, implementationOverride: "default",
+        implementationReason: "default-implementation" }
+      List(
+        writeVerdict(attempts[0], req[0]),
+        sumReadVerdict(selected, summed, req[1], producer),
+        scaleWriteVerdict(attempts[2], req[2], ""),
+        scaleWriteVerdict(attempts[3], req[3], basis),
+        scaleWriteVerdict(attempts[4], req[4], basis),
+        intentReadVerdict(attempts[5], req[5], left, aDefinition),
+        intentReadVerdict(attempts[6], req[6], right, { ...aDefinition, implementation: scaleV2 }),
+        implementationIntentVerdict(attempts[7], req[7], producer, left, "", true),
+        intentDecisionReadVerdict(attempts[8], req[8], attempts[7].commit, aRequest, scaleV1, "-", missA, noOccurrence),
+        requestExportVerdict(attempts[9], req[9], aPlan),
+        stageVerdict(attempts[10], req[10], aRequest),
+        scaleWriteVerdict(attempts[11], req[11], aRequest),
+        exportVerdict(attempts[12], req[12], aAttempt),
+        stageVerdict(attempts[13], req[13], aAttempt),
+        selectAttemptVerdict(attempts[14], req[14], aPlan, aAttempt, true),
+        selectAttemptVerdict(attempts[15], req[15], aPlan, aAttempt, true),
+        implementationIntentVerdict(attempts[16], req[16], producer, right, foreign, false),
+        implementationIntentVerdict(attempts[17], req[17], producer, right, "", false),
+        implementationIntentVerdict(attempts[18], req[18], producer, right, aSelection, true),
+        intentDecisionReadVerdict(attempts[19], req[19], attempts[18].commit, aRequest, scaleV1, "-", overrideA, recordedA),
+        versionedRequestedRead(selected, attempts[20], req[20], aResult, aRequest, summed, scaleV1),
+        implementationIntentVerdict(attempts[21], req[21], producer, basis, aSelection, false),
+        implementationIntentVerdict(attempts[22], req[22], producer, right, "", false),
+        dropVerdict(attempts[23], req[23], foreign),
+        implementationIntentVerdict(attempts[24], req[24], producer, right, "", true),
+        intentDecisionReadVerdict(attempts[25], req[25], attempts[24].commit, bRequest, scaleV2, aResult, missB, noOccurrence),
+        requestExportVerdict(attempts[26], req[26], bPlan),
+        stageVerdict(attempts[27], req[27], bRequest),
+        scaleWriteVerdict(attempts[28], req[28], bRequest),
+        exportVerdict(attempts[29], req[29], bAttempt),
+        stageVerdict(attempts[30], req[30], bAttempt),
+        implementationIntentVerdict(attempts[31], req[31], producer, right, "", false),
+        selectAttemptVerdict(attempts[32], req[32], bPlan, bAttempt, true),
+        implementationIntentVerdict(attempts[33], req[33], producer, right, foreign, false),
+        implementationIntentVerdict(attempts[34], req[34], producer, right, bSelection, false),
+        implementationIntentVerdict(attempts[35], req[35], producer, right, bSelection, true),
+        intentDecisionReadVerdict(attempts[36], req[36], attempts[35].commit, bRequest, scaleV2, aResult, reuseB, recordedB),
+        versionedRequestedRead(selected, attempts[37], req[37], bResult, bRequest, summed, scaleV2),
+        implementationIntentVerdict(attempts[38], req[38], producer, left, aSelection, true),
+        intentDecisionReadVerdict(attempts[39], req[39], attempts[38].commit, aRequest, scaleV1, bResult, reuseA, recordedA),
+        dropVerdict(attempts[40], req[40], left),
+        dropVerdict(attempts[41], req[41], right),
+        dropVerdict(attempts[42], req[42], basis),
+        dropVerdict(attempts[43], req[43], aSelection),
+        dropVerdict(attempts[44], req[44], bSelection),
+        dropVerdict(attempts[45], req[45], aAttempt),
+        dropVerdict(attempts[46], req[46], bAttempt),
+        collectVerdict(attempts[47], req[47]),
+        intentDecisionReadVerdict(attempts[48], req[48], attempts[18].commit, aRequest, scaleV1, "-",
+          { ...overrideA, id: attempts[19].decision.id }, recordedA),
+        intentDecisionReadVerdict(attempts[49], req[49], attempts[35].commit, bRequest, scaleV2, aResult,
+          { ...reuseB, id: attempts[36].decision.id }, recordedB),
+        intentDecisionReadVerdict(attempts[50], req[50], attempts[24].commit, bRequest, scaleV2, aResult,
+          { ...missB, id: attempts[25].decision.id }, noOccurrence),
+        absentRefVerdict(attempts[51], rejectedWriteVerdict(attempts[51], req[51], "")),
+        absentRefVerdict(attempts[52], rejectedWriteVerdict(attempts[52], req[52], "")),
+        versionedRequestedRead(selected, attempts[53], req[53], aResult, aRequest, summed, scaleV1)
+      )
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -1014,6 +1129,7 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 10) attemptHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 11) adoptionHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 12) policyHistoryVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 13) implementationIntentHistoryVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -1078,8 +1194,15 @@ module recorded_calls_rules {
       "rejected", "rejected", "recorded", "inspected", "inspected", "recorded", "inspected", "recorded", "inspected",
       "recorded", "inspected", "exported", "recorded", "released", "released", "released", "released", "released",
       "released", "released", "released", "collected", "inspected", "inspected"))
+    val implementationIntents = List("recorded", "inspected", "recorded", "recorded", "recorded", "inspected",
+      "inspected", "recorded", "inspected", "exported", "staged", "recorded", "exported", "staged", "selected",
+      "selected", "rejected", "rejected", "recorded", "inspected", "inspected", "rejected", "rejected", "released",
+      "recorded", "inspected", "exported", "staged", "recorded", "exported", "staged", "rejected", "selected", "rejected",
+      "rejected", "recorded", "inspected", "inspected", "recorded", "inspected", "released", "released", "released",
+      "released", "released", "released", "released", "collected", "inspected", "inspected", "inspected", "rejected",
+      "rejected", "inspected")
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
-      reuse, reusePublication, versioned, selections, occurrences, adoptions, policies)
+      reuse, reusePublication, versioned, selections, occurrences, adoptions, policies, implementationIntents)
     if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
@@ -1100,7 +1223,17 @@ module recorded_calls_rules {
       val decided = rows[14].attempts
       val occurrenceIds = Set(27, 34, 37, 39, 41).map(index => decided[index].decision.id)
       val decisionCommits = Set(26, 33, 36, 38, 40).map(index => decided[index].commit)
+      val intents = rows[15].attempts
+      val aCall = intents[20].calls[1]
+      val bCall = intents[37].calls[1]
+      val intentDecisions = Set(8, 19, 25, 36, 39)
       rows.indices().forall(i => rows[i].scenario == i) and
+        intentDecisions.map(i => intents[i].commit).size() == 5 and
+        intentDecisions.map(i => intents[i].decision.id).size() == 5 and
+        Set(intents[2].commit, intents[3].commit, intents[4].commit).size() == 3 and
+        intents[9].commit != intents[26].commit and intents[11].commit != intents[28].commit and
+        intents[20].commit != intents[37].commit and intents[8].decision.plan != intents[39].decision.plan and
+        sameRootNotSameCall(aCall, bCall) and aCall.arguments == bCall.arguments and
         occurrenceIds.size() == 5 and decisionCommits.size() == 5 and
         Set(decided[15].commit, decided[16].commit, decided[17].commit).size() == 3 and
         Set(decided[12].commit, decided[13].commit, decided[14].commit).size() == 3 and
@@ -1160,8 +1293,10 @@ module recorded_calls_rules {
     selection: { resultRef: "", result: "" },
     selectedPublication: { mode: "", planRef: "", plan: "", selectionRef: "", selection: "", result: "" },
     occurrence: noOccurrence, policy: { defaultMode: "", previous: "" }, expectedPolicy: "",
-    decision: { id: "", canonicalId: false, policy: "", defaultMode: "", override: "", route: "",
-      reason: "", plan: "", planRef: "", selectionRef: "", selection: "", result: "" } }
+    intent: { implementation: "", defaultMode: "", v1Selection: "", v2Selection: "", previous: "" }, expectedIntent: "",
+    decision: { id: "", canonicalId: false, policy: "", intent: "", defaultMode: "", override: "", route: "",
+      reason: "", plan: "", planRef: "", selectionRef: "", selection: "", result: "", implementationOverride: "",
+      implementationReason: "" } }
   pure val inspected: Attempt = { ...recorded, op: "inspect", args: List("source"), calls: List(summed, scaled),
     unchanged: true }
   pure def inspectVerdict(readback: Attempt): str =
@@ -1218,14 +1353,29 @@ module recorded_calls_rules {
     previousSelection: "base", occurrence: { ...savedOccurrence, historicalRef: "returned-b" } }
   pure def checkAdoption(read: Attempt): str = choiceReadVerdict(read, adoptionRequests[27], "chosen", "request",
     { ...savedOccurrence, historicalRef: "returned-b" }, "base")
-  pure val savedDecision: Decision = { id: occurrenceC, canonicalId: true, policy: "policy",
+  pure val savedDecision: Decision = { id: occurrenceC, canonicalId: true, policy: "policy", intent: "",
     defaultMode: "reuse-by-default", override: "default", route: "reuse-selected", reason: "default-selection",
-    plan: "plan", planRef: "", selectionRef: "active", selection: "selection", result: "same-result" }
+    plan: "plan", planRef: "", selectionRef: "active", selection: "selection", result: "same-result",
+    implementationOverride: "", implementationReason: "" }
   pure val decisionRead: Attempt = { ...occurrenceRead, args: policyRequests[27].args,
     commit: "decision", expectedMain: "-", decision: savedDecision }
   pure def checkDecision(read: Attempt): str = decisionReadVerdict(read, policyRequests[27], "decision", "request",
     "-", savedDecision, savedOccurrence)
+  pure val savedIntentDecision: Decision = { ...savedDecision, policy: "", intent: "right", selectionRef: "chosen-a",
+    implementationOverride: scaleV1, implementationReason: "explicit-implementation" }
+  pure val intentDecisionRead: Attempt = { ...decisionRead, args: implementationIntentRequests[19].args,
+    requestImplementation: scaleV1, decision: savedIntentDecision }
+  pure def checkIntentDecision(read: Attempt): str = intentDecisionReadVerdict(read, implementationIntentRequests[19],
+    "decision", "request", scaleV1, "-", savedIntentDecision, savedOccurrence)
   pure val controlsPass = all {
+    checkIntentDecision(intentDecisionRead) == "inspected",
+    checkIntentDecision({ ...intentDecisionRead, requestImplementation: scaleV2 }) == "wrong_decision_implementation",
+    checkIntentDecision({ ...intentDecisionRead, decision: { ...savedIntentDecision,
+      implementationOverride: "default" } }) == "wrong_decision",
+    checkIntentDecision({ ...intentDecisionRead, decision: { ...savedIntentDecision,
+      implementationReason: "default-implementation" } }) == "wrong_decision",
+    checkIntentDecision({ ...intentDecisionRead, decision: { ...savedIntentDecision,
+      selectionRef: "chosen-b" } }) == "wrong_decision",
     checkDecision(decisionRead) == "inspected",
     checkDecision({ ...decisionRead, decision: { ...savedDecision, id: occurrenceA } }) == "wrong_decision",
     checkDecision({ ...decisionRead, decision: { ...savedDecision, policy: "other-policy" } }) == "wrong_decision",
