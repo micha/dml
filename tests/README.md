@@ -379,7 +379,12 @@ pinned to an absent ref, the call stops at the double slot without running the
 double adapter, retains add's result, and leaves `main` unchanged. An
 overflowing add never reaches double, keeps only the start phase, and leaves
 `main` on the earlier successful call. Replay checks these live observations
-alongside native records and inspection.
+alongside native records and inspection. A separate history rejects an outer
+reuse request that repeats the producer's invocation UUID: storage stays
+unchanged, the output ref stays absent, and `main` stays on a later call.
+Retrying at the same output ref with a different UUID succeeds, moves `main`
+back to the selected producer, and reports distinct requested and producing
+provenance.
 [Focused tests](test_ordinary_calls.py) cover adapter failures and inject late
 update failures after real native writes.
 

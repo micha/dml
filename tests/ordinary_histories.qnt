@@ -97,7 +97,22 @@ module ordinary_histories {
     inspect("source", "double-absent", "@double-absent")                                       // 13
   )
 
+  pure val producerInvocation = "90000000-0000-4000-8000-000000000001"
+  pure val retryInvocation = "90000000-0000-4000-8000-000000000002"
+  pure val requestIdentity: List[Request] = {
+    val reuse = outer("require-selected", "producer", "@producer")
+    List(
+      sourceStep("defaults", List("defaults", "1")),
+      sourceStep("capture", List("defaults", "@defaults", "capture-one")),
+      fromOne("producer", "13", "29", List("--invocation", producerInvocation)),
+      fromOne("later", "13", "30", List()),
+      fromOne("retry", "13", "29", reuse.concat(List("--invocation", producerInvocation))),
+      fromOne("retry", "13", "29", reuse.concat(List("--invocation", retryInvocation))),
+      inspect("source", "retry", "@retry")
+    )
+  }
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, pinning, execution)
+  action init = histories' = List(story, pinning, execution, requestIdentity)
   action step = histories' = histories
 }
