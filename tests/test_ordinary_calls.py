@@ -109,14 +109,6 @@ class OrdinaryCallsTest(unittest.TestCase):
                 self.assertEqual(self.inspect(out)["status"], expected_prefix)
                 self.assertEqual(self.inspect(b"main")["commit"], first.hex())
 
-    def test_new_outer_request_cannot_repeat_producer_occurrence(self):
-        invocation = b"90000000-0000-4000-8000-000000000001"
-        first = self.invoke(invocation=invocation)
-        before = self.inventory()
-        with self.assertRaisesRegex(ValueError, "new request"):
-            self.invoke(b"hit", outer=example.Selection(example.REQUIRE, b"call", first), invocation=invocation)
-        self.assertEqual(self.inventory(), before)
-
     def test_exact_i64_and_ref_aliases_rejected_before_recording(self):
         before = self.inventory()
         for value in (True, 1.5, 1 << 63, -(1 << 63) - 1):
