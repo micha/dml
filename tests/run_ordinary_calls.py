@@ -254,24 +254,27 @@ class History:
                                  error=process.stderr.strip())
         return invoke
 
-    def invoke_observed(self, role, capture, expected, output, a, b, *selection):
+    def invoke_observed(self, role, capture, expected, output, a, b, *controls):
         example = import_module(self.script.stem)
         path = self.directory / role
         before = self.inventory(path)
         trace = CallTrace()
-        outer = example.Selection()
-        if selection:
-            mode, ref, selected = selection
-            outer = example.Selection(mode.encode("ascii"), ref.encode("ascii"), bytes.fromhex(self.resolve(selected)))
+
+        def selection(mode, ref, selected):
+            return example.Selection(mode.encode("ascii"), ref.encode("ascii") if ref else None,
+                                     bytes.fromhex(self.resolve(selected)) if selected else None)
+
+        outer = selection(*controls[:3])
+        double = selection(*controls[3:])
         commit, code, error = "", 0, ""
         with trace.adapters(example):
             try:
                 commit = example.invoke(path, capture.encode("ascii"), bytes.fromhex(self.resolve(expected)),
-                                        output.encode("ascii"), int(a), int(b), outer=outer).hex()
+                                        output.encode("ascii"), int(a), int(b), outer=outer, double=double).hex()
             except (ValueError, OverflowError, core.Error) as failure:
                 code, error = 1, str(failure)
         after = self.inventory(path)
-        return self.evidence("invoke_observed", (role, capture, expected, output, a, b, *selection), before, after,
+        return self.evidence("invoke_observed", (role, capture, expected, output, a, b, *controls), before, after,
                              commit=commit, head=after.refs.get(output, ""), code=code, error=error,
                              calls=trace.events)
 

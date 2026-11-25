@@ -147,6 +147,16 @@ module ordinary_rules {
       and q.invocation != record(first, "outer-request").invocation
       and published(a, a.args[3], t.id, previous, first.commit)
   }
+  pure def innerHit(a: Attempt, cap: Native, first: Attempt, mode: str, selected: str, previous: str): bool = {
+    val past = record(first, "double-request")
+    val q = record(a, "double-request")
+    val oldDouble = record(first, "double-attempt")
+    addChain(a, cap, ab(29, 13), mode, selected, requireSelected, oldDouble.id)
+      and successChain(a, cap, oldDouble, true, previous) and q.id != past.id
+      and q.invocation != past.invocation and q.inputs.datum == past.inputs.datum
+      and source(q.inputs, "x") != source(past.inputs, "x")
+      and record(a, "outer-request").inputs.datum != record(first, "outer-request").inputs.datum
+  }
   pure def outerReport(a: Attempt, path: str, q: Native): bool =
     report(a, path, "request") == q.id and report(a, path, "capture") == q.parents[0]
       and report(a, path, "inputs") == q.inputs.dag and report(a, path, "argument_map") == q.inputs.datum
@@ -248,13 +258,8 @@ module ordinary_rules {
       and c2.env.map != c1.env.map and c2.env.list == c1.env.list
     else if (i == 8) outerHit(a, c1, first, previous)
     else if (i == 9) terminalReport(a, outer, first, first, "hit")
-    else if (i == 10) {
-      val q = record(a, "double-request")
-      addChain(a, c1, ab(29, 13), trySelected, first.commit, requireSelected, oldDouble.id)
-        and successChain(a, c1, oldDouble, true, previous) and q.id != pastDoubleQ.id
-        and q.invocation != pastDoubleQ.invocation and q.inputs.datum == pastDoubleQ.inputs.datum and source(q.inputs, "x") != source(pastDoubleQ.inputs, "x")
-        and record(a, "outer-request").inputs.datum != record(first, "outer-request").inputs.datum
-    } else if (i == 11) terminalReport(a, inner, inner, first, "finished")
+    else if (i == 10) innerHit(a, c1, first, trySelected, first.commit, previous)
+    else if (i == 11) terminalReport(a, inner, inner, first, "finished")
     else if (i == 12) addChain(a, c1, ab(13, 30), fresh, "", trySelected, oldDouble.id)
       and successChain(a, c1, none, false, previous) and returns(a) == 2
       and record(a, "double-request").inputs.datum != pastDoubleQ.inputs.datum
@@ -318,7 +323,7 @@ module ordinary_rules {
 
   pure def event(op: str, handles: List[int], labels: List[str]): CallEvent =
     { op: op, handles: handles, labels: labels }
-  pure val ownedHandoff: List[CallEvent] = {
+  pure val handoffs = {
     // Python assigns tokens by first observation, not by node value or native ID.
     val original = 0
     val addTarget = 1
@@ -326,25 +331,31 @@ module ordinary_rules {
     val sum = 3
     val downstream = 4
     val result = 5
-    List(
+    val addEntered = List(
       event("outer", List(original, addTarget, doubleTarget), List()),
       event("invoke", List(addTarget, original), List()),
-      event("leaf", List(), List("ordinary-example-add-v1")),
+      event("leaf", List(), List("ordinary-example-add-v1"))
+    )
+    val doubleInvoked = addEntered.concat(List(
       event("invoke-return", List(sum), List()),
       event("make-arguments", List(sum), List("x")),
       event("arguments-return", List(downstream), List()),
-      event("invoke", List(doubleTarget, downstream), List()),
-      event("leaf", List(), List("ordinary-example-double-v1")),
-      event("invoke-return", List(result), List()),
-      event("outer-return", List(result), List())
-    )
+      event("invoke", List(doubleTarget, downstream), List())
+    ))
+    val doubleReturned = List(event("invoke-return", List(result), List()), event("outer-return", List(result), List()))
+    { fresh: doubleInvoked.append(event("leaf", List(), List("ordinary-example-double-v1"))).concat(doubleReturned),
+      addOverflow: addEntered, innerHit: doubleInvoked.concat(doubleReturned), doubleAbsent: doubleInvoked }
   }
   pure def executionAccepted(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
     val cap = record(rows[1], "capture")
     val call = rows[2]
+    val inner = rows[10]
     if (i == 6) overflowStart(a, cap, call.commit)
-    else if (a.code != 0 or a.error != "") false
+    else if (i == 12) {
+      a.code == 1 and a.error == "no selected double attempt for the captured leaf and argument MAP"
+        and a.report == List() and addPrefix(a, cap, ab(30, 12), requireSelected, "", inner.commit, a.args[3])
+    } else if (a.code != 0 or a.error != "") false
     else if (i == 0) defaultsStep(a, "", v1) and a.main == ""
     else if (i == 1) captureStep(a, rows[0], "")
     else if (i == 2) addChain(a, cap, ab(13, 29), fresh, "", fresh, "")
@@ -356,18 +367,25 @@ module ordinary_rules {
     else if (i == 5) terminalReport(a, rows[4], call, call, "hit")
     else if (i == 7) startReport(a, rows[6])
     else if (i == 8) terminalReport(a, call, call, call, "finished")
+    else if (i == 9) selectedStep(a, "selected", record(call, "double-attempt").id, call.commit)
+    else if (i == 10) innerHit(a, cap, call, fresh, "", call.commit)
+    else if (i == 11) terminalReport(a, inner, inner, call, "finished")
+    else if (i == 13) prefixReport(a, rows[12]) and report(a, "/add", "value") == "42"
     else false
   }
 
   pure def executionVerdict(rows: List[Attempt], i: int): str = {
     val calls = rows[i].calls
-    // Overflow enters add but does not return a node to the outer adapter.
-    val expected = if (i == 2) ownedHandoff else if (i == 6) ownedHandoff.slice(0, 3) else List()
+    val expected = if (i == 2) handoffs.fresh else if (i == 6) handoffs.addOverflow
+      else if (i == 10) handoffs.innerHit else if (i == 12) handoffs.doubleAbsent else List()
     if (not(executionAccepted(rows, i))) "wrong_execution_history"
     else if (calls == expected) "ok"
     else if (i == 2) "wrong_owned_node_handoff"
     else if (i == 4 or i == 5) "executed_adapter_on_reuse"
     else if (i == 6) "wrong_add_overflow_execution"
+    else if (i == 10) "wrong_inner_hit_execution"
+    else if (i == 11) "executed_adapter_during_inner_hit_inspection"
+    else if (i == 12) "wrong_required_absent_double_execution"
     else "unexpected_adapter_execution"
   }
 
