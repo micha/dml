@@ -517,11 +517,57 @@ module recorded_calls_histories {
     source("inspect", List())
   ))
 
+  pure def declareSupersession(basis: str, receipt: str, output: str, evidence: str): Request =
+    source("declare_scale_supersession", List(basis, receipt, output, "example.scale@1", "example.scale@2",
+      "operational-replacement", "audit", evidence))
+
+  // Keep every definition available. A declaration does not choose v2;
+  // promotion is a separate write and uses the already declared v2 slot.
+  pure val advisoryRequests: List[Request] = List(
+    implementationIntent("left", "left", "no-a-plan", "before-decision", "default", "default", "chosen-a"),
+    source("inspect", List()),
+    source("inspect", List("before-decision")),
+    source("record_sum", List("audit", "8", "4")),
+    declareSupersession("left", "basis", "assertion", "audit"),
+    declareSupersession("left", "left", "assertion", "producer"),
+    declareSupersession("left", "left", "right", "audit"),
+    declareSupersession("left", "left", "assertion", "audit"),
+    source("inspect", List("assertion")),
+    declareSupersession("assertion", "assertion", "stacked", "audit"),
+    source("inspect", List("before-decision")),
+    source("inspect", List("before-decision", "assertion")),
+    implementationIntent("assertion", "assertion", "no-a-plan", "annotated-decision", "default", "default", "chosen-a"),
+    source("inspect", List("annotated-decision", "right")),
+    source("define_scale_intent", List("promoted", "example.scale@2", "assertion", "assertion")),
+    source("inspect", List("promoted")),
+    implementationIntent("promoted", "promoted", "plan-b", "default-b", "default", "default", "chosen-a"),
+    implementationIntent("promoted", "promoted", "plan-b", "default-b", "default", "default", "-"),
+    source("inspect", List("default-b")),
+    implementationIntent("promoted", "promoted", "forced-plan", "forced-b", "default", "fresh", "-"),
+    source("inspect", List("forced-b", "left")),
+    source("export_request", List("plan-b", "plan-b", "request-b.bundle")),
+    worker("stage_input", List("incoming-b", "request-b.bundle")),
+    worker("work_scale_attempt", List("incoming-b", "plan-b", "attempt-b", occurrenceB)),
+    worker("export_scale_attempt", List("attempt-b", "attempt-b", "b.bundle")),
+    source("stage_input", List("returned-b", "b.bundle")),
+    source("select_scale_attempt", List("plan-b", "plan-b", "returned-b", "attempt-b", "chosen-b")),
+    implementationIntent("promoted", "promoted", "no-b-plan", "reuse-b", "default", "default", "chosen-b"),
+    source("inspect", List()),
+    source("inspect", List("reuse-b")),
+    implementationIntent("left", "left", "no-a-plan", "retained-a", "default", "default", "chosen-a"),
+    source("inspect", List("retained-a", "promoted")),
+    implementationIntent("promoted", "promoted", "no-a-plan", "explicit-a", "example.scale@1", "default", "chosen-a"),
+    source("inspect", List("explicit-a"))
+  )
+  pure val implementationIntentSetupLength = 15
+  pure val supersessionRequests = implementationIntentRequests.slice(0, implementationIntentSetupLength)
+    .concat(advisoryRequests)
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
-    .append(implementationIntentRequests)
+    .append(implementationIntentRequests).append(supersessionRequests)
   action step = histories' = histories
 }

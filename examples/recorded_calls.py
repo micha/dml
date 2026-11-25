@@ -15,7 +15,8 @@ of the same request without changing the result's identity. Use
 Use `define-scale-policy` and `request-policy-scale` to record why a request
 uses an existing result or needs fresh work. Use `define-scale-intent` and
 `request-intent-scale` to choose the implementation from a pinned definition
-before applying that reuse policy.
+before applying that reuse policy. Use `declare-scale-supersession` to add
+advisory evidence to a new intent version without promoting a default.
 These layouts are not core record types or execution APIs.
 """
 
@@ -50,6 +51,8 @@ DECISION_ENTRY = b"scale-request-decision-v1"
 INTENT_ENTRY = b"scale-intent-definition-v1"
 INTENT_DECISION_ENTRY = b"scale-intent-decision-v1"
 INTENT_FIELDS = (b"default_implementation", b"policy_default", b"v1_selection_ref", b"v2_selection_ref")
+SUPERSESSION_ENTRY = b"scale-implementation-supersession-v1"
+SUPERSESSION_FIELDS = (b"predecessor", b"successor", b"reason")
 REUSE_DEFAULT = b"reuse-by-default"
 EXECUTE_DEFAULT = b"execute-by-default"
 USE_DEFAULT = b"default"
@@ -95,6 +98,22 @@ class _ScaleIntent(NamedTuple):
     policy_default: bytes
     v1_selection_ref: bytes
     v2_selection_ref: bytes
+
+
+class _Supersession(NamedTuple):
+    commit: bytes
+    basis: bytes
+    evidence: bytes
+    predecessor: bytes
+    successor: bytes
+    reason: bytes
+
+
+class _IntentVersion(NamedTuple):
+    definition: _ScaleIntent
+    previous: bytes | None
+    genesis: bytes
+    supersession: _Supersession | None
 
 
 @contextmanager
@@ -339,7 +358,7 @@ def _check_intent_refs(*refs):
     for label, ref in refs:
         _check_ref_name(ref, label)
     if len({MAIN, *(ref for _, ref in refs)}) != len(refs) + 1:
-        raise ValueError("intent, basis, producer, plan, decision, selection slots, and main refs must be distinct")
+        raise ValueError("intent operation refs, selection slots, and main must be distinct")
 
 
 def define_scale_intent(path, intent_ref, default_implementation, *, policy_default=None, v1_selection_ref=None,
@@ -360,7 +379,7 @@ def define_scale_intent(path, intent_ref, default_implementation, *, policy_defa
     _check_intent_refs(*refs)
     with _write_transaction(path, create=False) as txn:
         if basis_ref is not None:
-            basis, _ = _selected_intent(txn, basis_ref, basis_commit)
+            basis = _selected_intent(txn, basis_ref, basis_commit).definition
             _check_intent_refs(*refs, ("v1 selection", basis.v1_selection_ref), ("v2 selection", basis.v2_selection_ref))
             intent = basis._replace(default_implementation=default_implementation)
         else:
@@ -370,6 +389,47 @@ def define_scale_intent(path, intent_ref, default_implementation, *, policy_defa
         dag = _put_object(txn, core.REC_DAG, nodes[0], *bindings)
         parents = () if basis_commit is None else (basis_commit,)
         return _publish(txn, intent_ref, INTENT_ENTRY, dag, *parents)
+
+
+def _check_supersession(predecessor, successor, reason):
+    _check_scale_implementation(predecessor)
+    _check_scale_implementation(successor)
+    if predecessor == successor:
+        raise ValueError("supersession endpoints must be distinct implementations")
+    if type(reason) is not bytes or reason not in (b"correctness-fix", b"operational-replacement"):
+        raise ValueError("supersession reason must be correctness-fix or operational-replacement")
+
+
+def _check_supersession_evidence(txn, basis, evidence):
+    if basis == evidence:
+        raise ValueError("supersession basis and evidence must be distinct commits")
+    _, tree, _ = _object(txn, core.REC_COMMIT, evidence)
+    _, _, entries = _object(txn, core.REC_TREE, tree)
+    if entries == 0:
+        raise ValueError("supersession evidence must have a nonempty tree")
+
+
+def declare_scale_supersession(path, basis_ref, basis_commit, output_ref, predecessor, successor, reason,
+                                evidence_ref, evidence_commit):
+    """Create an advisory intent version without changing the definition or selection slots."""
+    _check_commit_id(basis_commit, "intent basis commit")
+    _check_commit_id(evidence_commit, "evidence commit")
+    _check_supersession(predecessor, successor, reason)
+    refs = (("intent basis", basis_ref), ("supersession output", output_ref), ("evidence", evidence_ref))
+    _check_intent_refs(*refs)
+    with _write_transaction(path, create=False) as txn:
+        basis = _selected_intent(txn, basis_ref, basis_commit)
+        intent = basis.definition
+        _check_intent_refs(*refs, ("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
+        if basis.supersession is not None:
+            raise ValueError("intent ancestry already has a supersession declaration")
+        if core.txn_ref_get(txn, evidence_ref) != evidence_commit:
+            raise ValueError("evidence ref does not point to the expected evidence commit")
+        _check_supersession_evidence(txn, basis_commit, evidence_commit)
+        nodes = [_put_literal(txn, core.DATUM_STRING, value) for value in (predecessor, successor, reason)]
+        bindings = [field for pair in zip(SUPERSESSION_FIELDS, nodes) for field in pair]
+        dag = _put_object(txn, core.REC_DAG, nodes[0], *bindings)
+        return _publish(txn, output_ref, SUPERSESSION_ENTRY, dag, basis_commit, evidence_commit)
 
 
 def _resolve_intent_implementation(intent, requested):
@@ -481,7 +541,7 @@ def request_intent_scale(path, producer_pin, producer_commit, intent_ref, intent
     _check_intent_refs(*refs)
     with _write_transaction(path, create=False) as txn:
         _selected_sum(txn, producer_pin, producer_commit)
-        intent, _ = _selected_intent(txn, intent_ref, intent_commit)
+        intent = _selected_intent(txn, intent_ref, intent_commit).definition
         _check_intent_refs(*refs, ("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
         chosen, reason = _resolve_intent_implementation(intent, implementation)
         fields = {b"implementation_override": implementation, b"implementation_reason": reason}
@@ -940,25 +1000,57 @@ def _read_string_field(txn, dag, name):
     return _read_literal(txn, core.txn_lookup_node(txn, dag, name), core.DATUM_STRING)
 
 
+def _read_intent_definition(txn, dag):
+    _, root, count = _object(txn, core.REC_DAG, dag)
+    if count != len(INTENT_FIELDS) or root != core.txn_lookup_node(txn, dag, INTENT_FIELDS[0]):
+        raise ValueError("scale intent definition has the wrong DAG layout")
+    intent = _ScaleIntent(*(_read_string_field(txn, dag, name) for name in INTENT_FIELDS))
+    _check_scale_implementation(intent.default_implementation)
+    _check_policy_default(intent.policy_default)
+    _check_intent_refs(("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
+    return intent
+
+
+def _read_supersession(txn, commit, view, parents, dag):
+    if parents != 2:
+        raise ValueError("supersession must have ordered intent basis and evidence parents")
+    _, root, count = _object(txn, core.REC_DAG, dag)
+    if count != len(SUPERSESSION_FIELDS) or root != core.txn_lookup_node(txn, dag, b"predecessor"):
+        raise ValueError("supersession declaration has the wrong DAG layout")
+    predecessor, successor, reason = (_read_string_field(txn, dag, name) for name in SUPERSESSION_FIELDS)
+    _check_supersession(predecessor, successor, reason)
+    basis, evidence = (core.object_view_parent(view, i) for i in range(2))
+    _check_supersession_evidence(txn, basis, evidence)
+    return _Supersession(commit, basis, evidence, predecessor, successor, reason)
+
+
 def _read_scale_intent(txn, commit):
-    head = None
-    while commit is not None:
+    head = commit
+    previous = None
+    definition = None
+    supersession = None
+    while True:
         view, parents, entry, dag = _snapshot(txn, commit)
-        if entry != INTENT_ENTRY or parents not in (0, 1):
-            raise ValueError("expected a scale-intent-definition-v1 commit with an optional intent parent")
-        _, root, count = _object(txn, core.REC_DAG, dag)
-        if count != len(INTENT_FIELDS) or root != core.txn_lookup_node(txn, dag, INTENT_FIELDS[0]):
-            raise ValueError("scale intent definition has the wrong DAG layout")
-        intent = _ScaleIntent(*(_read_string_field(txn, dag, name) for name in INTENT_FIELDS))
-        _check_scale_implementation(intent.default_implementation)
-        _check_policy_default(intent.policy_default)
-        _check_intent_refs(("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
-        commit = core.object_view_parent(view, 0) if parents else None
-        if head is None:
-            head = intent, commit
-        elif intent != head[0]._replace(default_implementation=intent.default_implementation):
-            raise ValueError("an intent version must preserve its reuse default and selection slots")
-    return head
+        if entry == SUPERSESSION_ENTRY:
+            if supersession is not None:
+                raise ValueError("intent ancestry already has a supersession declaration")
+            supersession = _read_supersession(txn, commit, view, parents, dag)
+        elif entry == INTENT_ENTRY and parents in (0, 1):
+            intent = _read_intent_definition(txn, dag)
+            if definition is None:
+                definition = intent
+            elif intent != definition._replace(default_implementation=intent.default_implementation):
+                raise ValueError("an intent version must preserve its reuse default and selection slots")
+            if parents == 0:
+                return _IntentVersion(definition, previous, commit, supersession)
+        else:
+            raise ValueError("expected a scale-intent-definition-v1 commit with an optional intent parent "
+                             "or a scale supersession declaration")
+        # Parent 1 on a declaration is opaque evidence, not part of the intent ancestry.
+        parent = core.object_view_parent(view, 0)
+        if commit == head:
+            previous = parent
+        commit = parent
 
 
 def _selected_intent(txn, ref, commit):
@@ -967,7 +1059,22 @@ def _selected_intent(txn, ref, commit):
     return _read_scale_intent(txn, commit)
 
 
-def _inspect_scale_decision(txn, commit, view, parents, entry, dag):
+def _supersession_report(declaration):
+    if declaration is None:
+        return None
+    return {"commit": declaration.commit.hex(), "basis_commit": declaration.basis.hex(),
+            "evidence_commit": declaration.evidence.hex(), "predecessor": declaration.predecessor.decode("ascii"),
+            "successor": declaration.successor.decode("ascii"), "reason": declaration.reason.decode("ascii")}
+
+
+def _supersession_view(intent_commit, implementation, declaration):
+    relation = "none"
+    if declaration is not None:
+        relation = "predecessor" if implementation == declaration.predecessor else "successor"
+    return {"intent_commit": intent_commit.hex(), "relation": relation, "declaration": _supersession_report(declaration)}
+
+
+def _inspect_scale_decision(txn, commit, view, parents, entry, dag, *, knowledge_commit=None):
     label = "intent" if entry == INTENT_DECISION_ENTRY else "policy"
     if parents not in (2, 3):
         raise ValueError(f"{label} decision must have ordered plan, {label}, and optional selection parents")
@@ -987,7 +1094,8 @@ def _inspect_scale_decision(txn, commit, view, parents, entry, dag):
     intent = None
     field_count = 3
     if entry == INTENT_DECISION_ENTRY:
-        intent, _ = _read_scale_intent(txn, definition)
+        historical = _read_scale_intent(txn, definition)
+        intent = historical.definition
         policy_default = intent.policy_default
         requested = read_field(b"implementation_override")
         chosen, implementation_reason = _resolve_intent_implementation(intent, requested)
@@ -995,7 +1103,13 @@ def _inspect_scale_decision(txn, commit, view, parents, entry, dag):
             raise ValueError("intent decision does not match the resolved implementation")
         details = {"intent_commit": definition.hex(), "request_implementation": chosen.decode("ascii"),
                    "implementation_override": requested.decode("ascii"),
-                   "implementation_reason": implementation_reason.decode("ascii")}
+                   "implementation_reason": implementation_reason.decode("ascii"),
+                   "as_known_then": _supersession_view(definition, chosen, historical.supersession)}
+        if knowledge_commit is not None:
+            knowledge = historical if knowledge_commit == definition else _read_scale_intent(txn, knowledge_commit)
+            if knowledge.genesis != historical.genesis:
+                raise ValueError("knowledge commit belongs to a different intent lineage")
+            details["knowledge_view"] = _supersession_view(knowledge_commit, chosen, knowledge.supersession)
         field_count += 2
     else:
         policy_default, _ = _read_scale_policy(txn, definition)
@@ -1157,9 +1271,11 @@ def _inspect_reuse_publication(txn, commit, view, parents, dag, *, selected):
     }
 
 
-def _inspect_snapshot(txn, commit, *, expected_request=None):
+def _inspect_snapshot(txn, commit, *, expected_request=None, knowledge_commit=None):
     snapshot = _snapshot(txn, commit)
     view, parents, entry, terminal = snapshot
+    if knowledge_commit is not None and entry != INTENT_DECISION_ENTRY:
+        raise ValueError("a knowledge commit requires an intent decision")
     if expected_request is not None and entry != REQUESTED_SCALE_ENTRY:
         raise ValueError("expected a requested-scale-v1 result commit")
     if entry in (REQUEST_ENTRY, PLAN_ENTRY):
@@ -1171,12 +1287,13 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
         if previous is not None:
             report["previous_policy_commit"] = previous.hex()
         return report
-    if entry == INTENT_ENTRY:
-        intent, previous = _read_scale_intent(txn, commit)
-        fields = {name.decode("ascii"): value.decode("ascii") for name, value in zip(INTENT_FIELDS, intent)}
-        return {**report, **fields, "previous_intent_commit": previous.hex() if previous is not None else None}
+    if entry in (INTENT_ENTRY, SUPERSESSION_ENTRY):
+        version = _read_scale_intent(txn, commit)
+        fields = {name.decode("ascii"): value.decode("ascii") for name, value in zip(INTENT_FIELDS, version.definition)}
+        return {**report, **fields, "previous_intent_commit": version.previous.hex() if version.previous else None,
+                "supersession": _supersession_report(version.supersession)}
     if entry in (DECISION_ENTRY, INTENT_DECISION_ENTRY):
-        return _inspect_scale_decision(txn, commit, view, parents, entry, terminal)
+        return _inspect_scale_decision(txn, commit, view, parents, entry, terminal, knowledge_commit=knowledge_commit)
     if entry == PUBLICATION_ENTRY:
         fields = _read_publication(txn, commit)
         return {**report, **{name.decode("ascii"): value.decode("ascii") for name, value in fields.items()}}
@@ -1228,10 +1345,12 @@ def _inspect_snapshot(txn, commit, *, expected_request=None):
     return {**report, "calls": [summed, scale]}
 
 
-def inspect(path, ref=MAIN):
-    """Read the committed example graph without executing or verifying arithmetic."""
+def inspect(path, ref=MAIN, *, knowledge_commit=None):
+    """Read the committed example graph, optionally with a separate intent knowledge view."""
+    if knowledge_commit is not None:
+        _check_commit_id(knowledge_commit, "knowledge commit")
     with _repository(path, create=False) as repo, _read_transaction(repo) as txn:
-        return _inspect_snapshot(txn, core.txn_ref_get(txn, ref))
+        return _inspect_snapshot(txn, core.txn_ref_get(txn, ref), knowledge_commit=knowledge_commit)
 
 
 def _parse_commit_id(text, label="producer commit"):
@@ -1320,6 +1439,11 @@ def main():
     intent.add_argument("--v2-selection", help="v2 selection slot for an initial definition")
     intent.add_argument("--basis-ref")
     intent.add_argument("--basis-commit")
+    supersession = commands.add_parser("declare-scale-supersession", help="add an advisory declaration to an intent")
+    supersession.add_argument("repo", type=Path)
+    for name in ("basis_ref", "basis_commit", "output_ref", "predecessor", "successor", "reason",
+                 "evidence_ref", "evidence_commit"):
+        supersession.add_argument(name)
     intent_request = commands.add_parser("request-intent-scale", help="resolve an implementation before reuse")
     intent_request.add_argument("repo", type=Path)
     for name in ("producer_pin", "producer_commit", "intent_ref", "intent_commit", "plan_pin", "decision_ref"):
@@ -1387,6 +1511,7 @@ def main():
     reader = commands.add_parser("inspect", help="read recorded calls from a ref (default: main)")
     reader.add_argument("repo", type=Path)
     reader.add_argument("ref", nargs="?", default="main")
+    reader.add_argument("--knowledge-commit", help="add a separate view from this exact intent version")
     args = parser.parse_args()
     try:
         if args.command == "record":
@@ -1450,6 +1575,14 @@ def main():
                 basis_commit=basis_commit,
             )
             print(definition.hex())
+        elif args.command == "declare-scale-supersession":
+            declaration = declare_scale_supersession(
+                args.repo, args.basis_ref.encode("ascii"), _parse_commit_id(args.basis_commit, "intent basis commit"),
+                args.output_ref.encode("ascii"), args.predecessor.encode("utf-8"), args.successor.encode("utf-8"),
+                args.reason.encode("utf-8"), args.evidence_ref.encode("ascii"),
+                _parse_commit_id(args.evidence_commit, "evidence commit"),
+            )
+            print(declaration.hex())
         elif args.command == "request-intent-scale":
             selection_commit = (_parse_commit_id(args.selection_commit, "selection commit")
                                 if args.selection_commit is not None else None)
@@ -1518,7 +1651,9 @@ def main():
         elif args.command == "collect":
             print(collect(args.repo))
         else:
-            print(json.dumps(inspect(args.repo, args.ref.encode("ascii"))))
+            knowledge = (_parse_commit_id(args.knowledge_commit, "knowledge commit")
+                         if args.knowledge_commit is not None else None)
+            print(json.dumps(inspect(args.repo, args.ref.encode("ascii"), knowledge_commit=knowledge)))
     except (core.Error, OSError, ValueError) as error:
         parser.exit(1, f"{args.command}: {error}\n")
 

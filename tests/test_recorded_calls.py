@@ -1588,6 +1588,181 @@ class RecordedCallsTest(unittest.TestCase):
             self.assertEqual(core.txn_ref_get(txn, b"not-selection"), producer)
             self.assert_missing_ref(txn, b"unused")
 
+    def test_supersession_requires_exact_distinct_pins_and_rolls_back_occupied_output(self):
+        producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        define = self.example["define_scale_intent"]
+        declare = self.example["declare_scale_supersession"]
+        v1, v2 = b"example.scale@1", b"example.scale@2"
+        basis = define(self.repo, b"basis", v2, policy_default=b"reuse-by-default",
+                       v1_selection_ref=b"slot-v1", v2_selection_ref=b"slot-v2")
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            empty_tree = put(txn, core.REC_TREE)
+            empty = put(txn, core.REC_COMMIT, empty_tree)
+            core.txn_ref_create(txn, b"empty", empty)
+            core.txn_ref_create(txn, b"same-basis", basis)
+            core.txn_commit(txn)
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        reason = b"correctness-fix"
+        for expected, output, successor, tag, evidence_ref, evidence, error in (
+            (producer, b"unused", v2, reason, b"producer", producer, "expected intent commit"),
+            (basis, b"unused", v2, reason, b"producer", basis, "expected evidence commit"),
+            (basis, b"unused", v2, reason, b"empty", empty, "nonempty tree"),
+            (basis, b"unused", v2, reason, b"same-basis", basis, "distinct commits"),
+            (basis, b"unused", v2, reason, b"slot-v2", producer, "must be distinct"),
+            (basis, b"slot-v1", v2, reason, b"producer", producer, "must be distinct"),
+            (basis, b"main", v2, reason, b"producer", producer, "must be distinct"),
+            (basis, b"unused", v1, reason, b"producer", producer, "distinct implementations"),
+            (basis, b"unused", b"example.scale@3", reason, b"producer", producer, "unsupported scale implementation"),
+            (basis, b"unused", v2, b"typo", b"producer", producer, "supersession reason"),
+        ):
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                declare(self.repo, b"basis", expected, output, v1, successor, tag, evidence_ref, evidence)
+            self.assertEqual(data.read_bytes(), before)
+        # Use a different occupied output so the writer reaches ref creation after building new objects.
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            declare(self.repo, b"basis", basis, b"empty", v1, v2, reason, b"producer", producer)
+        self.assertEqual(data.read_bytes(), before)
+        declared = declare(self.repo, b"basis", basis, b"noted", v1, v2, reason, b"producer", producer)
+        inspect = self.example["inspect"]
+        report = inspect(self.repo, b"noted")
+        self.assertEqual((report["default_implementation"], report["previous_intent_commit"]), (v2.decode(), basis.hex()))
+        self.assertEqual(report["supersession"]["commit"], declared.hex())
+        self.assertIsNone(inspect(self.repo, b"basis")["supersession"])
+        before = data.read_bytes()
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            declare(self.repo, b"basis", basis, b"noted", v1, v2, reason, b"producer", producer)
+        with self.assertRaisesRegex(ValueError, "already has a supersession declaration"):
+            declare(self.repo, b"noted", declared, b"unused", v2, v1, reason, b"producer", producer)
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            actual, _, parents = self.snapshot(txn, b"noted", b"scale-implementation-supersession-v1")
+            self.assertEqual((actual, parents), (declared, (basis, producer)))
+            self.assertEqual(core.txn_ref_get(txn, b"basis"), basis)
+            self.assertEqual(core.txn_ref_get(txn, b"producer"), producer)
+            for ref in (b"main", b"unused", b"slot-v1", b"slot-v2"):
+                self.assert_missing_ref(txn, ref)
+
+    def test_supersession_rejects_forged_ancestry_and_unrelated_knowledge(self):
+        evidence = self.example["record_sum"](self.repo, b"producer", 7, 5)
+        define = self.example["define_scale_intent"]
+        inspect = self.example["inspect"]
+        choose = self.example["request_intent_scale"]
+        v1, v2 = b"example.scale@1", b"example.scale@2"
+        initial = dict(policy_default=b"execute-by-default", v1_selection_ref=b"slot-v1", v2_selection_ref=b"slot-v2")
+        basis = define(self.repo, b"basis", v1, **initial)
+        unrelated = define(self.repo, b"unrelated", v2, **initial)
+        choose(self.repo, b"producer", evidence, b"basis", basis, b"pending", b"decision", 3)
+        valid = self.example["declare_scale_supersession"](
+            self.repo, b"basis", basis, b"noted", v1, v2, b"operational-replacement", b"producer", evidence,
+        )
+        promoted = define(self.repo, b"promoted", v2, basis_ref=b"noted", basis_commit=valid)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            _, dag, _ = self.snapshot(txn, b"noted", b"scale-implementation-supersession-v1")
+            predecessor = core.txn_lookup_node(txn, dag, b"predecessor")
+            successor = core.txn_lookup_node(txn, dag, b"successor")
+            reason = core.txn_lookup_node(txn, dag, b"reason")
+            bogus = literal(txn, core.DATUM_STRING, b"looks-valid")
+            wrong_kind = literal(txn, core.DATUM_I64, 7)
+
+            def declaration(root, successor_node, reason_node):
+                return put(txn, core.REC_DAG, root, b"predecessor", predecessor, b"successor", successor_node,
+                           b"reason", reason_node)
+
+            invalid = []
+            for ref, fields, parents, error in (
+                (b"bad-root", declaration(successor, successor, reason), (basis, evidence), "wrong DAG layout"),
+                (b"bad-type", declaration(predecessor, successor, wrong_kind), (basis, evidence), "wrong datum kind"),
+                (b"bad-reason", declaration(predecessor, successor, bogus), (basis, evidence), "supersession reason"),
+                (b"self-endpoint", declaration(predecessor, predecessor, reason), (basis, evidence),
+                 "distinct implementations"),
+                (b"no-evidence", dag, (basis,), "ordered intent basis and evidence"),
+                (b"swapped", dag, (evidence, basis), "optional intent parent"),
+                (b"stacked", dag, (promoted, evidence), "already has a supersession declaration"),
+            ):
+                tree = put(txn, core.REC_TREE, b"scale-implementation-supersession-v1", fields)
+                record = put(txn, core.REC_COMMIT, tree, *parents)
+                core.txn_ref_create(txn, ref, record)
+                invalid.append((ref, record, error))
+            core.txn_commit(txn)
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for ref, record, error in invalid:
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(ValueError, error):
+                    inspect(self.repo, ref)
+                with self.assertRaisesRegex(ValueError, error):
+                    inspect(self.repo, b"decision", knowledge_commit=record)
+        # Same reuse mode and slots, but a different initial snapshot.
+        with self.assertRaisesRegex(ValueError, "different intent lineage"):
+            inspect(self.repo, b"decision", knowledge_commit=unrelated)
+        with self.assertRaisesRegex(core.Error, "not_found"):
+            inspect(self.repo, b"decision", knowledge_commit=b"\0" * 16)
+        with self.assertRaisesRegex(ValueError, "knowledge commit must be a 16-byte ID"):
+            inspect(self.repo, b"decision", knowledge_commit=b"invalid")
+        with self.assertRaisesRegex(ValueError, "knowledge commit requires an intent decision"):
+            inspect(self.repo, b"pending", knowledge_commit=valid)
+        self.assertEqual(data.read_bytes(), before)
+
+    def test_supersession_views_use_transferred_pins_and_keep_historical_absence(self):
+        record_sum = self.example["record_sum"]
+        define = self.example["define_scale_intent"]
+        choose = self.example["request_intent_scale"]
+        producer = record_sum(self.repo, b"producer", 7, 5)
+        evidence = record_sum(self.repo, b"evidence", -3, 0)
+        v1, v2 = b"example.scale@1", b"example.scale@2"
+        basis = define(self.repo, b"basis", v1, policy_default=b"execute-by-default",
+                       v1_selection_ref=b"slot-v1", v2_selection_ref=b"slot-v2")
+        old = choose(self.repo, b"producer", producer, b"basis", basis, b"old-plan", b"old", 3)
+        declaration = self.expect_success("declare-scale-supersession", "basis", basis.hex(), "noted",
+                                          v1.decode(), v2.decode(), "operational-replacement",
+                                          "evidence", evidence.hex()).strip()
+        noted = bytes.fromhex(declaration)
+        promotion = define(self.repo, b"promoted", v2, basis_ref=b"noted", basis_commit=noted)
+        new = choose(self.repo, b"producer", producer, b"promoted", promotion, b"new-plan", b"new", 3)
+        # A conflicting sibling can use a declaration as opaque evidence; it is not a second intent parent.
+        sibling = self.example["declare_scale_supersession"](
+            self.repo, b"basis", basis, b"sibling", v2, v1, b"correctness-fix", b"noted", noted,
+        )
+        # The replica has neither live intent ref, either plan ref, nor an evidence pin.
+        destination = self.workspace / "replica"
+        source = core.repo_open(self.repo, False)
+        try:
+            replica = core.repo_open(destination, True)
+            try:
+                for ref, commit in ((b"old", old), (b"new", new), (b"peer-knowledge", sibling)):
+                    bundle = core.repo_export_commit(source, commit)
+                    self.assertEqual(core.repo_import_commit_staged(replica, bundle, ref), commit)
+            finally:
+                core.repo_close(replica)
+        finally:
+            core.repo_close(source)
+        self.example["collect"](destination)
+        with transaction(destination) as txn:
+            for ref in (b"main", b"evidence", b"basis", b"noted", b"promoted", b"old-plan", b"new-plan"):
+                self.assert_missing_ref(txn, ref)
+            view(txn, core.REC_COMMIT, evidence)
+        expected = {"commit": declaration, "basis_commit": basis.hex(), "evidence_commit": evidence.hex(),
+                    "predecessor": v1.decode(), "successor": v2.decode(), "reason": "operational-replacement"}
+        prior = json.loads(self.expect_success("inspect", "old", repo=destination))
+        together = json.loads(self.expect_success("inspect", "old", "--knowledge-commit", promotion.hex(),
+                                                  repo=destination))
+        self.assertEqual(prior["as_known_then"], {"intent_commit": basis.hex(), "relation": "none", "declaration": None})
+        self.assertEqual(together.pop("knowledge_view"),
+                         {"intent_commit": promotion.hex(), "relation": "predecessor", "declaration": expected})
+        self.assertEqual(together, prior)
+        newer = json.loads(self.expect_success("inspect", "new", "--knowledge-commit", basis.hex(), repo=destination))
+        self.assertEqual(newer["as_known_then"],
+                         {"intent_commit": promotion.hex(), "relation": "successor", "declaration": expected})
+        self.assertEqual(newer["knowledge_view"], {"intent_commit": basis.hex(), "relation": "none", "declaration": None})
+        sibling_read = self.example["inspect"](destination, b"new", knowledge_commit=sibling)
+        self.assertEqual(sibling_read.pop("knowledge_view"),
+                         {"intent_commit": sibling.hex(), "relation": "predecessor", "declaration": {
+                             "commit": sibling.hex(), "basis_commit": basis.hex(), "evidence_commit": declaration,
+                             "predecessor": v2.decode(), "successor": v1.decode(), "reason": "correctness-fix",
+                         }})
+        self.assertEqual(sibling_read, self.example["inspect"](destination, b"new"))
+
     def test_attempt_work_rejects_invalid_identity_stale_ref_and_overflow_atomically(self):
         producer = self.example["record_sum"](self.repo, b"producer", 7, 5)
         self.example["request_scale"](self.repo, b"producer", producer, b"plan", 1 << 62)
