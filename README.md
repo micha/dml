@@ -767,6 +767,9 @@ walkthrough](docs/internal-builtins.md#example-promote-a-getter-and-reuse-an-ord
 The [composed node calls walkthrough](docs/composed-node-calls.md#walkthrough)
 passes the recorded result of one call to the next and reuses downstream work
 without losing the distinction between the requested and original producers.
+The [closure-bound dependencies walkthrough](docs/closure-bound-dependencies.md#walkthrough)
+pins getter versions and a scale source before invocation, then reuses by
+captured value without replacing the producer's capture.
 
 #### Publish reuse with a durable record
 

@@ -340,6 +340,27 @@ mkdir -p build/recorded-composition-tlc
   --backend=tlc --search-observations)
 ```
 
+The [closure-bound dependency replay](closure_histories.qnt) checks six
+requests and four fresh attempts in the [scaled-sum example](../docs/closure-bound-dependencies.md).
+It distinguishes captured source and getter version from the full-MAP reuse
+key, checks rollback and exact selection validation on a miss, and inspects
+transferred history while rejecting capture and original-history grafts.
+[Focused tests](test_closures.py) check exact I64 and argument boundaries,
+overflow, atomicity, and rejection of a semantically equivalent but unpinned
+getter in the producing trace.
+
+The [finite closure design model](recorded_closures_design.qnt) checks three
+captures, two equal-sum MAPs, one historical attempt, and at most one new
+request and execution per path. It treats arithmetic values and IDs as
+fixtures and does not model the native encoder or process lifecycle. Run it
+with Java and Quint 0.34.0 or newer; confirm all 22 observations are reached:
+
+```sh
+mkdir -p build/recorded-closures-tlc
+(cd build/recorded-closures-tlc && quint verify ../../tests/recorded_closures_design.qnt \
+  --backend=tlc --search-observations)
+```
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
