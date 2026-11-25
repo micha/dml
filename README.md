@@ -703,6 +703,60 @@ records the name with no table parent; it says nothing about the name today.
 Portable requests and results, single-slot commands, and native record layouts
 are unchanged.
 
+#### Share selected scale results across implementations of one intent
+
+An intent-scoped table lets you explicitly declare that a selected attempt is
+reusable across implementations in that lineage. This is a policy choice, not
+proof that the implementations are equivalent. The exact key is the producer
+**commit** and signed factor. Matching output values do not make two producer
+commits interchangeable.
+
+Continue with `intent-v1`, `producer`, and the factor-3 v1 attempt selection
+`chosen` from the previous example:
+
+```sh
+intent_empty=$(calls define-scale-intent-reuse-table ./origin intent-v1 "$intent_v1" shared-empty)
+shared=$(calls update-scale-intent-reuse-table ./origin shared-empty "$intent_empty" shared insert \
+  --selection chosen --selection-commit "$chosen")
+
+calls request-intent-table-scale ./origin producer "$producer" intent-v1 "$intent_v1" unused-v2 shared-hit 3 \
+  --implementation example.scale@2 --table shared --table-commit "$shared"
+calls inspect ./origin shared-hit
+calls inspect ./origin main
+
+removed=$(calls update-scale-intent-reuse-table ./origin shared "$shared" shared-removed remove \
+  --producer-commit "$producer" --factor 3)
+calls request-intent-table-scale ./origin producer "$producer" intent-v1 "$intent_v1" next-v2 shared-miss 3 \
+  --implementation example.scale@2 --table shared-removed --table-commit "$removed"
+calls inspect ./origin shared-miss
+calls inspect ./origin shared-hit  # still explains the original v1 reuse
+```
+
+On the hit, the plan retained by the decision describes the requested v2
+work; `main` points to the original v1 result. `inspect` reports
+`request_commit` and `request_implementation` separately from
+`producing_request_commit` and `producing_implementation`. No v2 attempt ran.
+The exact intent, plan, and consulted table are retained, so inspection doesn't
+need the original refs. Advisory supersession does not block reuse; the
+historical and supplied knowledge views still describe the requested version.
+
+Updates are create-only: `insert` requires an absent key, `adopt` requires a
+present key and a different attempt, and `remove` requires a present key and
+no selection argument. Adoption can change the producing implementation.
+Removal affects only that key in the new table version. It frees a slot under
+the 16-key cap and preserves previous versions, attempts, and old decisions.
+It does not ban a result: you can deliberately insert its selection again.
+`inspect` on a table lists the current keys, selections, and producing requests.
+Requests never search other tables or automatically select newly produced results.
+
+The route and pin rules are the same as for the
+[implementation-scoped table](#keep-reusable-results-for-multiple-scale-requests), except that the
+table must be intent-scoped and match the exact intent lineage; it need not
+match the requested implementation. After removal, a reuse-by-default miss
+leaves a fresh plan and `main` unchanged; `--override reuse-selected` fails.
+Use unused output names as in the previous example. Existing single-slot and
+implementation-scoped commands still require an exact implementation match.
+
 #### Publish reuse with a durable record
 
 Continue from the [durable request handoff](#save-a-scale-request-before-sending-it).

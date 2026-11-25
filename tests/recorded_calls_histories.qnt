@@ -655,11 +655,128 @@ module recorded_calls_histories {
   pure val multiInputRequests = implementationIntentRequests.slice(0, implementationIntentSetupLength)
     .concat(tableBuildRequests).concat(tableRoutingRequests).concat(tableOfflineRequests)
 
+  pure def intentTableRequest(producer: str, intent: str, plan: str, decision: str, factor: str,
+                              table: str, receipt: str, override: str): Request =
+    source("request_intent_table_scale", List(producer, intent, intent, plan, decision, factor, table, receipt,
+      "default", override))
+
+  pure def editIntentTable(basis: str, output: str, mode: str, selection: str): Request =
+    source("update_scale_intent_reuse_table", List(basis, basis, output, mode, selection, selection))
+
+  pure def removeIntentTableKey(basis: str, output: str): Request =
+    source("update_scale_intent_reuse_table", List(basis, basis, output, "remove", "producer", "3"))
+
+  pure def produceIntentTableChoice(plan: str, decision: str, choice: str, occurrence: str, incoming: str,
+                                    attempt: str, returned: str, requestBundle: str, attemptBundle: str): List[Request] =
+    List(
+      source("inspect", List(decision)),
+      source("export_request", List(plan, plan, requestBundle)),
+      worker("stage_input", List(incoming, requestBundle)),
+      worker("work_scale_attempt", List(incoming, plan, attempt, occurrence)),
+      worker("inspect", List(attempt)),
+      worker("export_scale_attempt", List(attempt, attempt, attemptBundle)),
+      source("stage_input", List(returned, attemptBundle)),
+      source("select_scale_attempt", List(plan, plan, returned, attempt, choice))
+    )
+
+  pure val intentTableSetup = List(
+    worker("inspect", List("attempt-a")),
+    source("record_sum", List("decoy", "8", "4")),
+    source("inspect", List("decoy")),
+    source("define_scale_intent_reuse_table", List("left", "left", "empty-intent-table")),
+    source("inspect", List("empty-intent-table")),
+    editIntentTable("empty-intent-table", "intent-table-a", "insert", "chosen-a"),
+    source("define_scale_reuse_table", List("left", "left", "example.scale@1", "legacy-table"))
+  )
+  // Same scalar on a different producer, then a different signed factor on the original producer.
+  pure val intentTableDecoy = List(
+    intentTableRequest("decoy", "left", "decoy-plan", "decoy-miss", "3", "intent-table-a", "intent-table-a", "default")
+  ).concat(produceIntentTableChoice("decoy-plan", "decoy-miss", "decoy-choice", occurrenceB,
+    "incoming-decoy", "attempt-decoy", "returned-decoy", "decoy-request.bundle", "decoy-attempt.bundle"))
+    .append(editIntentTable("intent-table-a", "intent-table-ad", "insert", "decoy-choice"))
+  pure val intentTableNegative = List(
+    intentTableRequest("producer", "right", "negative-plan", "negative-miss", "-3",
+      "intent-table-ad", "intent-table-ad", "default")
+  ).concat(produceIntentTableChoice("negative-plan", "negative-miss", "negative-choice", occurrenceC,
+    "incoming-negative", "attempt-negative", "returned-negative", "negative-request.bundle", "negative-attempt.bundle"))
+  .concat(List(
+    editIntentTable("intent-table-ad", "intent-table-adn", "insert", "negative-choice"),
+    source("inspect", List("intent-table-adn"))
+  ))
+  pure val replacementOccurrence = "00000000-0000-4000-8000-000000000004"
+  pure val intentTableReplacement = List(
+    intentTableRequest("producer", "right", "replacement-plan", "forced-fresh", "3", "legacy-table", "legacy-table", "fresh")
+  ).concat(produceIntentTableChoice("replacement-plan", "forced-fresh", "chosen-b", replacementOccurrence,
+    "incoming-replacement", "attempt-replacement", "returned-replacement", "replacement-request.bundle", "replacement-attempt.bundle"))
+
+  pure def intentTableA(intent: str, plan: str, decision: str, table: str, override: str): Request =
+    intentTableRequest("producer", intent, plan, decision, "3", table, table, override)
+
+  pure val intentTableFlow = List(
+    source("define_scale_intent", List("unrelated", "example.scale@2", "reuse-by-default", "unrelated-a", "unrelated-b")),
+    intentTableA("unrelated", "unused", "bad-intent", "intent-table-adn", "default"),
+    intentTableA("left", "unused", "wrong-role", "legacy-table", "default"),
+    fromTable("producer", "unused", "wrong-legacy-role", "intent-table-adn"),
+    intentTableRequest("producer", "right", "unused", "stale-table", "3", "intent-table-adn", "intent-table-ad", "default"),
+    intentTableA("right", "unused", "cross-hit", "intent-table-adn", "default"),
+    source("inspect", List("cross-hit")),
+    source("inspect", List()),
+    source("inspect", List("unused")),
+    editIntentTable("intent-table-adn", "duplicate", "insert", "chosen-b"),
+    editIntentTable("intent-table-adn", "intent-table-adopted", "adopt", "chosen-b"),
+    source("inspect", List("intent-table-adopted")),
+    source("inspect", List("intent-table-adn")),
+    removeIntentTableKey("intent-table-adopted", "intent-table-a"),
+    removeIntentTableKey("intent-table-adopted", "intent-table-removed"),
+    source("inspect", List("intent-table-removed")),
+    removeIntentTableKey("intent-table-removed", "still-absent"),
+    intentTableA("right", "unused", "explicit-miss", "intent-table-removed", "reuse-selected"),
+    intentTableA("right", "removal-plan", "removal-miss", "intent-table-removed", "default"),
+    source("inspect", List("removal-miss")),
+    source("inspect", List("removal-plan")),
+    source("inspect", List()),
+    intentTableA("left", "unused", "adopted-hit", "intent-table-adopted", "reuse-selected"),
+    source("inspect", List("adopted-hit")),
+    source("inspect", List()),
+    intentTableRequest("decoy", "left", "unused", "retained-decoy", "3", "intent-table-removed", "intent-table-removed", "default"),
+    source("inspect", List("retained-decoy")),
+    source("inspect", List()),
+    intentTableRequest("producer", "right", "unused", "retained-negative", "-3",
+      "intent-table-removed", "intent-table-removed", "default"),
+    source("inspect", List("retained-negative")),
+    source("inspect", List()),
+    editIntentTable("intent-table-removed", "intent-table-reselected", "insert", "chosen-a"),
+    source("inspect", List("intent-table-reselected")),
+    intentTableRequest("producer", "right", "absent-intent-plan", "absent-intent-table", "3", "uncreated", "-", "default"),
+    source("inspect", List("absent-intent-table"))
+  )
+
+  pure val intentTableOffline = List(
+    source("drop_ref", List("intent-table-adn", "table", "intent-table-adn")),
+    source("drop_ref", List("intent-table-removed", "table", "intent-table-removed")),
+    source("drop_ref", List("chosen-a", "selection", "chosen-a")),
+    source("drop_ref", List("chosen-b", "selection", "chosen-b")),
+    source("drop_ref", List("returned-a", "attempt", "attempt-a")),
+    source("drop_ref", List("returned-replacement", "attempt", "attempt-replacement")),
+    source("drop_ref", List("right", "intent", "right")),
+    source("collect", List()),
+    source("inspect", List("cross-hit")),
+    source("inspect", List("removal-miss")),
+    source("replicate_decision", List("cross-hit", "offline-hit")),
+    { op: "inspect", args: List("replica", "offline-hit") },
+    source("replicate_decision", List("removal-miss", "offline-miss")),
+    { op: "inspect", args: List("replica", "offline-miss") }
+  )
+
+  pure val intentTableRequests = implementationIntentRequests.slice(0, implementationIntentSetupLength)
+    .concat(intentTableSetup).concat(intentTableDecoy).concat(intentTableNegative).concat(intentTableReplacement)
+    .concat(intentTableFlow).concat(intentTableOffline)
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
-    .append(implementationIntentRequests).append(supersessionRequests).append(multiInputRequests)
+    .append(implementationIntentRequests).append(supersessionRequests).append(multiInputRequests).append(intentTableRequests)
   action step = histories' = histories
 }

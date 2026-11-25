@@ -2395,6 +2395,178 @@ class RecordedCallsTest(unittest.TestCase):
             self.example["inspect"](self.repo, b"forged-decision")
         self.assertEqual(self.example["inspect"](self.repo, b"decision")["reason"], "default-table-hit")
 
+    def make_intent_reuse_table(self):
+        producer, intent, legacy = self.make_scale_reuse_table()
+        empty = self.example["define_scale_intent_reuse_table"](self.repo, b"intent", intent, b"intent-empty")
+        return producer, intent, legacy, empty
+
+    def change_intent_table(self, basis_ref, basis_commit, output_ref, operation, *, selection=None, **key):
+        pins = {} if selection is None else dict(zip(("selection_ref", "selection_commit"), selection))
+        return self.example["update_scale_intent_reuse_table"](
+            self.repo, basis_ref, basis_commit, output_ref, operation, **pins, **key,
+        )
+
+    @staticmethod
+    def put_intent_table_delta(txn, basis, operation, producer, factor, *selection_parents, factor_kind=core.DATUM_I64):
+        root = literal(txn, core.DATUM_STRING, operation)
+        source = literal(txn, core.DATUM_STRING, producer.hex().encode("ascii"))
+        multiplier = literal(txn, factor_kind, factor)
+        dag = put(txn, core.REC_DAG, root, b"operation", root, b"producer_commit", source, b"factor", multiplier)
+        tree = put(txn, core.REC_TREE, b"scale-intent-reuse-table-update-v1", dag)
+        return put(txn, core.REC_COMMIT, tree, basis, *selection_parents)
+
+    def test_intent_reuse_table_rejects_removed_malformed_history_and_wrong_parent_shapes(self):
+        producer, intent, legacy, empty = self.make_intent_reuse_table()
+        _, first = self.make_table_selection(producer, -3, suffix=1)
+        _, other = self.make_table_selection(producer, 3, suffix=2, implementation=b"example.scale@2")
+        one = self.change_intent_table(b"intent-empty", empty, b"one", b"insert", selection=first)
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            # A later removal cannot hide a key that did not match the producing request.
+            wrong_key = self.put_intent_table_delta(txn, one, b"insert", producer, -4, other[1])
+            extra_parent = self.put_intent_table_delta(txn, one, b"remove", producer, -3, first[1])
+            missing_parent = self.put_intent_table_delta(txn, one, b"insert", producer, 3)
+            wrong_type = self.put_intent_table_delta(txn, one, b"remove", producer, b"-3", factor_kind=core.DATUM_STRING)
+            buried = self.put_intent_table_delta(txn, wrong_key, b"remove", producer, -4)
+            wrong_role = self.put_intent_table_delta(txn, legacy, b"insert", producer, -3, first[1])
+            for ref, commit in ((b"buried", buried), (b"extra-parent", extra_parent),
+                                (b"missing-parent", missing_parent), (b"wrong-type", wrong_type),
+                                (b"wrong-role", wrong_role)):
+                core.txn_ref_create(txn, ref, commit)
+            core.txn_commit(txn)
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        for ref, commit, diagnostic in (
+            (b"buried", buried, "key does not match the selection inputs"),
+            (b"extra-parent", extra_parent, "requires its basis and a selection"),
+            (b"missing-parent", missing_parent, "requires its basis and a selection"),
+            (b"wrong-type", wrong_type, "wrong datum kind"),
+            (b"wrong-role", wrong_role, "expected an intent reuse table"),
+        ):
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(ValueError, diagnostic):
+                    self.example["inspect"](self.repo, ref)
+                with self.assertRaisesRegex(ValueError, diagnostic):
+                    self.example["request_intent_table_scale"](
+                        self.repo, b"producer", producer, b"intent", intent, b"new-plan", b"new-decision", -3,
+                        table_ref=ref, table_commit=commit, implementation=b"example.scale@2",
+                    )
+                self.assertEqual(data.read_bytes(), before)
+
+    def test_intent_reuse_table_removal_frees_a_key_without_forgetting_old_selections(self):
+        producer, _, _, empty = self.make_intent_reuse_table()
+        basis, ref = empty, b"intent-empty"
+        for factor in range(-8, 8):
+            implementation = b"example.scale@1" if factor % 2 else b"example.scale@2"
+            _, selection = self.make_table_selection(producer, factor, suffix=factor + 9, implementation=implementation)
+            output = f"intent-table-{factor}".encode("ascii")
+            basis, ref = self.change_intent_table(ref, basis, output, b"insert", selection=selection), output
+        _, extra = self.make_table_selection(producer, 8, suffix=17)
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "more than 16 requests"):
+            self.change_intent_table(ref, basis, b"full", b"insert", selection=extra)
+        self.assertEqual(data.read_bytes(), before)
+
+        inspect = self.example["inspect"]
+        original = inspect(self.repo, ref)
+        removed = self.change_intent_table(ref, basis, b"removed", b"remove", producer_commit=producer, factor=-8)
+        remaining = [row for row in original["entries"] if row["factor"] != -8]
+        self.assertEqual(len(remaining), 15)
+        self.assertEqual(inspect(self.repo, b"removed")["entries"], remaining)
+        self.change_intent_table(b"removed", removed, b"refilled", b"insert", selection=extra)
+        refilled = inspect(self.repo, b"refilled")["entries"]
+        self.assertEqual(refilled[:-1], remaining)
+        self.assertEqual((refilled[-1]["factor"], refilled[-1]["selection_commit"]), (8, extra[1].hex()))
+        self.assertEqual(inspect(self.repo, ref), original)
+
+    def test_intent_reuse_rejects_same_attempt_and_result_only_selection(self):
+        producer, _, _, empty = self.make_intent_reuse_table()
+        request, first = self.make_table_selection(producer, 3, suffix=1)
+        one = self.change_intent_table(b"intent-empty", empty, b"one", b"insert", selection=first)
+        inspect = self.example["inspect"]
+        plan = bytes.fromhex(inspect(self.repo, b"plan-1")["commit"])
+        attempt = bytes.fromhex(inspect(self.repo, b"attempt-1")["commit"])
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_create(txn, b"aliased-attempt", attempt)
+            core.txn_commit(txn)
+        alias = self.example["select_scale_attempt"](
+            self.repo, b"plan-1", plan, b"aliased-attempt", attempt, b"alias-selection",
+        )
+        self.assertNotEqual(first[1], alias)
+        result = self.example["work_scale"](self.repo, b"request-1", request, b"result")
+        result_only = self.example["select_scale_result"](
+            self.repo, b"plan-1", plan, b"result", result, b"result-only",
+        )
+        data = self.repo / "data.mdb"
+        before = data.read_bytes()
+        with self.assertRaisesRegex(ValueError, "must change the selected attempt"):
+            self.change_intent_table(b"one", one, b"no-change", b"adopt", selection=(b"alias-selection", alias))
+        with self.assertRaisesRegex(ValueError, "requires an attempt selection"):
+            self.change_intent_table(b"intent-empty", empty, b"bad", b"insert", selection=(b"result-only", result_only))
+        self.assertEqual(data.read_bytes(), before)
+
+    def test_intent_reuse_retains_the_requested_plan_and_original_producing_request(self):
+        producer, intent, _, empty = self.make_intent_reuse_table()
+        producing_request, selection = self.make_table_selection(producer, -3, suffix=1)
+        table = self.change_intent_table(b"intent-empty", empty, b"one", b"insert", selection=selection)
+        inspect = self.example["inspect"]
+        old_plan = bytes.fromhex(inspect(self.repo, b"plan-1")["commit"])
+        v2_plan = self.example["request_scale"](
+            self.repo, b"producer", producer, b"reference-v2-plan", -3, implementation=b"example.scale@2",
+        )
+        requested = inspect(self.repo, b"reference-v2-plan")["request_commit"]
+        decision = self.example["request_intent_table_scale"](
+            self.repo, b"producer", producer, b"intent", intent, b"unused", b"decision", -3,
+            table_ref=b"one", table_commit=table, implementation=b"example.scale@2",
+        )
+        report = inspect(self.repo, b"decision")
+        self.assertEqual((report["request_commit"], report["request_implementation"]), (requested, "example.scale@2"))
+        self.assertEqual((report["producing_request_commit"], report["producing_implementation"]),
+                         (producing_request.hex(), "example.scale@1"))
+        self.assertNotEqual(requested, producing_request.hex())
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            decision_view, tree, count = view(txn, core.REC_COMMIT, decision)
+            self.assertEqual(count, 3)
+            self.assertEqual(tuple(core.object_view_parent(decision_view, i) for i in range(count)),
+                             (v2_plan, intent, table))
+            result = core.txn_ref_get(txn, b"main")
+            result_view, _, count = view(txn, core.REC_COMMIT, result)
+            self.assertEqual(count, 1)
+            self.assertEqual(core.object_view_parent(result_view, 0), producing_request)
+            self.assert_missing_ref(txn, b"unused")
+            forged_plan = put(txn, core.REC_COMMIT, tree, old_plan, intent, table)
+            forged_table = put(txn, core.REC_COMMIT, tree, v2_plan, intent, empty)
+            core.txn_ref_create(txn, b"forged-plan", forged_plan)
+            core.txn_ref_create(txn, b"forged-table", forged_table)
+            core.txn_commit(txn)
+        with self.assertRaisesRegex(ValueError, "does not match the resolved implementation"):
+            inspect(self.repo, b"forged-plan")
+        with self.assertRaisesRegex(ValueError, "fields do not match the resolved policy"):
+            inspect(self.repo, b"forged-table")
+
+    def test_intent_reuse_rejects_occupied_outputs_without_publishing_the_producing_result(self):
+        producer, intent, _, empty = self.make_intent_reuse_table()
+        _, selection = self.make_table_selection(producer, 3, suffix=1)
+        one = self.change_intent_table(b"intent-empty", empty, b"one", b"insert", selection=selection)
+        self.example["record_scale"](self.repo, b"producer", producer, b"main", 4)
+        data = self.repo / "data.mdb"
+        # Use another alias for the table pin, so the decision collides after the main write, not during ref validation.
+        with transaction(self.repo, core.TXN_WRITE) as txn:
+            core.txn_ref_create(txn, b"one-live", one)
+            core.txn_commit(txn)
+        before = data.read_bytes()
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            self.example["request_intent_table_scale"](
+                self.repo, b"producer", producer, b"intent", intent, b"unused", b"one", 3,
+                table_ref=b"one-live", table_commit=one, implementation=b"example.scale@2",
+            )
+        self.assertEqual(data.read_bytes(), before)
+        with self.assertRaisesRegex(core.Error, "ref already exists"):
+            self.change_intent_table(b"one-live", one, b"one", b"remove", producer_commit=producer, factor=3)
+        self.assertEqual(data.read_bytes(), before)
+        with transaction(self.repo) as txn:
+            self.assert_missing_ref(txn, b"unused")
+
     def test_scale_rejects_unknown_sum_version_even_with_matching_pin_and_tree_entry(self):
         commit, _, _ = self.publish_sum_fixture(b"example.sum@2")
         data_path = self.repo / "data.mdb"

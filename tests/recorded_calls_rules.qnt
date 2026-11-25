@@ -17,6 +17,9 @@ module recorded_calls_rules {
     implementationOverride: str, implementationReason: str }
   type ReuseTableEntry = { request: str, selection: str, result: str, attempt: str, attemptId: str }
   type ReuseTable = { intent: str, implementation: str, previous: str, entries: List[ReuseTableEntry] }
+  type IntentReuseEntry = { producer: str, factor: int, request: str, implementation: str,
+    selection: str, result: str, attempt: str, attemptId: str }
+  type IntentReuseTable = { intent: str, genesis: str, previous: str, entries: List[IntentReuseEntry] }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
     commit: str, calls: List[Call],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
@@ -26,7 +29,8 @@ module recorded_calls_rules {
     reusePublication: ReusePublication, selection: Selection, selectedPublication: SelectedPublication,
     occurrence: Occurrence, policy: Policy, expectedPolicy: str, intent: Intent, expectedIntent: str, decision: Decision,
     expectedEvidence: str, definitionAdvisory: bool, supersession: Declaration, asKnownThen: Advisory, knowledgeView: Advisory,
-    expectedTable: str, tableRef: str, tableCommit: str, reuseTable: ReuseTable }
+    expectedTable: str, tableRef: str, tableCommit: str, reuseTable: ReuseTable,
+    reuseScope: str, producingRequest: str, producingImplementation: str, intentReuseTable: IntentReuseTable }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def literal(arg: Argument, name: str, value: int): bool =
@@ -1294,9 +1298,9 @@ module recorded_calls_rules {
       unannotated(decision.intent), noAdvisory)
 
   pure def workerTableAttemptVerdict(read: Attempt, req: Request, commit: str, portable: str,
-                                    id: str, result: str): str =
+                                    id: str, result: str, implementation: str): str =
     if (not(matches(read, req)) or not(read.unchanged) or read.commit != commit or read.requestCommit != portable or
-      read.requestImplementation != scaleV1 or read.calls != List() or result == "" or
+      read.requestImplementation != implementation or read.calls != List() or result == "" or
       read.occurrence != { id: id, commit: commit, result: result, historicalRef: "" }) "wrong_occurrence"
     else "inspected"
 
@@ -1315,7 +1319,7 @@ module recorded_calls_rules {
     val expectedRows = Set(tableEntry(aRequest, aChoice, rows[0].occurrence),
       tableEntry(bRequest, bChoice, rows[11].occurrence))
     List(
-      workerTableAttemptVerdict(rows[0], req[0], aAttempt, aRequest, occurrenceA, rows[0].occurrence.result),
+      workerTableAttemptVerdict(rows[0], req[0], aAttempt, aRequest, occurrenceA, rows[0].occurrence.result, scaleV1),
       writeVerdict(rows[1], req[1]),
       sumReadVerdict(decoy, rows[2], req[2], rows[1].commit),
       tableWriteVerdict(rows[3], req[3], left, "", "", true),
@@ -1327,7 +1331,7 @@ module recorded_calls_rules {
       requestExportVerdict(rows[8], req[8], bPlan),
       stageVerdict(rows[9], req[9], bRequest),
       scaleWriteVerdict(rows[10], req[10], bRequest),
-      workerTableAttemptVerdict(rows[11], req[11], bAttempt, bRequest, occurrenceB, rows[11].occurrence.result),
+      workerTableAttemptVerdict(rows[11], req[11], bAttempt, bRequest, occurrenceB, rows[11].occurrence.result, scaleV1),
       exportVerdict(rows[12], req[12], bAttempt),
       stageVerdict(rows[13], req[13], bAttempt),
       selectAttemptVerdict(rows[14], req[14], bPlan, bAttempt, true),
@@ -1380,7 +1384,7 @@ module recorded_calls_rules {
       tableDecisionVerdict(rows[12], req[12], rows[11].commit, aRequest, b.result, "", "", forced, noOccurrence),
       if (rows[13].commit == aRequest) requestExportVerdict(rows[13], req[13], freshPlan) else "wrong_request_commit",
       scaleWriteVerdict(rows[14], req[14], aRequest),
-      workerTableAttemptVerdict(rows[15], req[15], rows[14].commit, aRequest, occurrenceC, a.result),
+      workerTableAttemptVerdict(rows[15], req[15], rows[14].commit, aRequest, occurrenceC, a.result, scaleV1),
       exportVerdict(rows[16], req[16], c.commit),
       stageVerdict(rows[17], req[17], c.commit),
       selectAttemptVerdict(rows[18], req[18], freshPlan, c.commit, true),
@@ -1440,6 +1444,223 @@ module recorded_calls_rules {
     }
   }
 
+  pure def intentTableWriteVerdict(write: Attempt, req: Request, basis: str, selection: str,
+                                  producer: str, ok: bool): str =
+    if (write.expectedIntent != "" or write.expectedTable != basis or write.expectedSelection != selection or
+      write.expectedCommit != producer) "wrong_table_guard"
+    else if (not(ok)) rejectedWriteVerdict(write, req, producer)
+    else if (write.unchanged) "table_not_written"
+    else writeVerdict(write, req)
+
+  pure def intentTableReadVerdict(read: Attempt, req: Request, commit: str, intent: str, genesis: str,
+                                 basis: str, entries: Set[IntentReuseEntry]): str =
+    if (not(matches(read, req)) or not(read.unchanged) or read.commit != commit or read.calls != List()) "wrong_inspect"
+    else if (read.reuseScope != "intent" or read.intentReuseTable.intent != intent or
+      read.intentReuseTable.genesis != genesis or read.intentReuseTable.previous != basis) "wrong_table_scope"
+    else if (read.intentReuseTable.entries.length() != entries.size() or
+      not(entries.forall(e => read.intentReuseTable.entries.indices().exists(i => read.intentReuseTable.entries[i] == e))))
+      "wrong_table_entries"
+    else "inspected"
+
+  pure def intentTableEntry(producer: str, factor: int, request: str, implementation: str,
+                            selection: str, attempt: Occurrence): IntentReuseEntry =
+    { producer: producer, factor: factor, request: request, implementation: implementation,
+      selection: selection, result: attempt.result, attempt: attempt.commit, attemptId: attempt.id }
+
+  pure def entryOccurrence(row: IntentReuseEntry): Occurrence =
+    { id: row.attemptId, commit: row.attempt, result: row.result, historicalRef: "" }
+
+  pure val noProducingEntry = intentTableEntry("", 0, "", "", "", noOccurrence)
+
+  pure def intentTableDecisionVerdict(read: Attempt, req: Request, commit: str, portable: str, implementation: str,
+                                      prior: str, tableRef: str, table: str, decision: Decision,
+                                      producing: IntentReuseEntry): str =
+    if (read.reuseScope != "intent" or read.tableRef != tableRef or read.tableCommit != table) "wrong_decision_table"
+    else if (read.producingRequest != producing.request or read.producingImplementation != producing.implementation)
+      "wrong_producing_request"
+    else if (read.decision.plan == "" or read.decision.plan == portable) "wrong_decision_plan"
+    else advisoryViewVerdict(read,
+      intentDecisionReadVerdict(read, req, commit, portable, implementation, prior, decision, entryOccurrence(producing)),
+      unannotated(decision.intent), noAdvisory)
+
+  pure def offlineIntentDecisionVerdict(read: Attempt, req: Request, historical: Attempt): str = {
+    val producing = intentTableEntry("", 0, historical.producingRequest, historical.producingImplementation,
+      historical.decision.selection, historical.occurrence)
+    intentTableDecisionVerdict(read, req, historical.commit, historical.requestCommit, historical.requestImplementation,
+      historical.expectedMain, historical.tableRef, historical.tableCommit, historical.decision, producing)
+  }
+
+  pure def decisionTransferVerdict(row: Attempt, req: Request, commit: str): str =
+    if (matches(row, req) and row.unchanged and row.expectedCommit == commit and row.commit == commit) "staged"
+    else "wrong_decision_transfer"
+
+  pure def intentTableSetupVerdicts(setup: List[Attempt], rows: List[Attempt]): List[str] = {
+    val req = intentTableSetup
+    val left = setup[3].commit
+    val empty = rows[3].commit
+    List(
+      workerTableAttemptVerdict(rows[0], req[0], setup[11].commit, setup[9].commit, occurrenceA,
+        rows[0].occurrence.result, scaleV1),
+      writeVerdict(rows[1], req[1]),
+      sumReadVerdict(decoy, rows[2], req[2], rows[1].commit),
+      tableWriteVerdict(rows[3], req[3], left, "", "", true),
+      intentTableReadVerdict(rows[4], req[4], empty, left, setup[2].commit, "", Set()),
+      intentTableWriteVerdict(rows[5], req[5], empty, setup[14].commit, "", true),
+      tableWriteVerdict(rows[6], req[6], left, "", "", true)
+    )
+  }
+
+  pure def intentTableBuildChoice(rows: List[Attempt], req: List[Request], producer: str, intent: str,
+                                  implementation: str, tableRef: str, table: str, planRef: str, id: str): List[str] = {
+    val plan = rows[1].decision.plan
+    val portable = rows[2].commit
+    val attempt = rows[4].commit
+    val override = if (tableRef == "") "fresh" else "default"
+    val reason = if (tableRef == "") "override-fresh" else "default-table-miss"
+    // A forced fresh route gets a legacy table pin as input but does not retain it.
+    val consulted = if (tableRef == "") "" else table
+    List(
+      tableRequestVerdict(rows[0], req[0], producer, intent, table, true),
+      intentTableDecisionVerdict(rows[1], req[1], rows[0].commit, portable, implementation, "-", tableRef, consulted,
+        tableDecision(intent, plan, planRef, "", "", "default", override, reason), noProducingEntry),
+      requestExportVerdict(rows[2], req[2], plan),
+      stageVerdict(rows[3], req[3], portable),
+      scaleWriteVerdict(rows[4], req[4], portable),
+      workerTableAttemptVerdict(rows[5], req[5], attempt, portable, id, rows[5].occurrence.result, implementation),
+      exportVerdict(rows[6], req[6], attempt),
+      stageVerdict(rows[7], req[7], attempt),
+      selectAttemptVerdict(rows[8], req[8], plan, attempt, true)
+    )
+  }
+
+  type IntentReplay = { producer: Attempt, other: Attempt, left: str, right: str, genesis: str,
+    tableA: str, tableAD: str, tableADN: str, legacy: str, a: IntentReuseEntry, b: IntentReuseEntry,
+    d: IntentReuseEntry, n: IntentReuseEntry }
+
+  pure def intentTableHitVerdict(read: Attempt, req: Request, commit: str, portable: str, implementation: str,
+                                 prior: str, intent: str, tableRef: str, table: str, producing: IntentReuseEntry,
+                                 explicit: bool): str = {
+    val reason = if (explicit) "override-selected-reuse" else "default-table-hit"
+    val override = if (explicit) "reuse-selected" else "default"
+    val decision = tableDecision(intent, read.decision.plan, "", producing.selection, producing.result,
+      "default", override, reason)
+    intentTableDecisionVerdict(read, req, commit, portable, implementation, prior, tableRef, table, decision, producing)
+  }
+
+  pure def intentTableFlowVerdicts(rows: List[Attempt], r: IntentReplay): List[str] = {
+    val req = intentTableFlow
+    val original = Set(r.a, r.d, r.n)
+    val retained = Set(r.d, r.n)
+    val producer = r.producer.commit
+    val adopted = rows[10].commit
+    val removed = rows[14].commit
+    val miss = tableDecision(r.right, rows[19].decision.plan, "removal-plan", "", "", "default", "default",
+      "default-table-miss")
+    val absence = tableDecision(r.right, rows[34].decision.plan, "absent-intent-plan", "", "", "default", "default",
+      "default-no-table")
+    val negative = { ...selected, factor: ("-3", -3) }
+    List(
+      scaleWriteVerdict(rows[0], req[0], ""),
+      tableRequestVerdict(rows[1], req[1], producer, rows[0].commit, r.tableADN, false),
+      tableRequestVerdict(rows[2], req[2], producer, r.left, r.legacy, false),
+      tableRequestVerdict(rows[3], req[3], producer, r.left, r.tableADN, false),
+      tableRequestVerdict(rows[4], req[4], producer, r.right, r.tableAD, false),
+      tableRequestVerdict(rows[5], req[5], producer, r.right, r.tableADN, true),
+      intentTableHitVerdict(rows[6], req[6], rows[5].commit, r.b.request, scaleV2, "-", r.right,
+        "intent-table-adn", r.tableADN, r.a, false),
+      versionedRequestedRead(selected, rows[7], req[7], r.a.result, r.a.request, r.producer, scaleV1),
+      absentRefVerdict(rows[8], rejectedWriteVerdict(rows[8], req[8], "")),
+      intentTableWriteVerdict(rows[9], req[9], r.tableADN, r.b.selection, "", false),
+      intentTableWriteVerdict(rows[10], req[10], r.tableADN, r.b.selection, "", true),
+      intentTableReadVerdict(rows[11], req[11], adopted, r.left, r.genesis, r.tableADN, retained.union(Set(r.b))),
+      intentTableReadVerdict(rows[12], req[12], r.tableADN, r.left, r.genesis, r.tableAD, original),
+      intentTableWriteVerdict(rows[13], req[13], adopted, "", producer, false),
+      intentTableWriteVerdict(rows[14], req[14], adopted, "", producer, true),
+      intentTableReadVerdict(rows[15], req[15], removed, r.left, r.genesis, adopted, retained),
+      intentTableWriteVerdict(rows[16], req[16], removed, "", producer, false),
+      tableRequestVerdict(rows[17], req[17], producer, r.right, removed, false),
+      tableRequestVerdict(rows[18], req[18], producer, r.right, removed, true),
+      intentTableDecisionVerdict(rows[19], req[19], rows[18].commit, r.b.request, scaleV2, r.a.result,
+        "intent-table-removed", removed, miss, noProducingEntry),
+      planReadWithTip(rows[20], req[20], miss.plan, r.b.request, 3, r.producer, scaleV2, r.a.result),
+      versionedRequestedRead(selected, rows[21], req[21], r.a.result, r.a.request, r.producer, scaleV1),
+      tableRequestVerdict(rows[22], req[22], producer, r.left, adopted, true),
+      intentTableHitVerdict(rows[23], req[23], rows[22].commit, r.a.request, scaleV1, r.a.result, r.left,
+        "intent-table-adopted", adopted, r.b, true),
+      versionedRequestedRead(selected, rows[24], req[24], r.b.result, r.b.request, r.producer, scaleV2),
+      tableRequestVerdict(rows[25], req[25], r.other.commit, r.left, removed, true),
+      intentTableHitVerdict(rows[26], req[26], rows[25].commit, r.d.request, scaleV1, r.b.result, r.left,
+        "intent-table-removed", removed, r.d, false),
+      versionedRequestedRead(decoy, rows[27], req[27], r.d.result, r.d.request, r.other, scaleV1),
+      tableRequestVerdict(rows[28], req[28], producer, r.right, removed, true),
+      intentTableHitVerdict(rows[29], req[29], rows[28].commit, r.n.request, scaleV2, r.d.result, r.right,
+        "intent-table-removed", removed, r.n, false),
+      versionedRequestedRead(negative, rows[30], req[30], r.n.result, r.n.request, r.producer, scaleV2),
+      intentTableWriteVerdict(rows[31], req[31], removed, r.a.selection, "", true),
+      intentTableReadVerdict(rows[32], req[32], rows[31].commit, r.left, r.genesis, removed, original),
+      tableRequestVerdict(rows[33], req[33], producer, r.right, "", true),
+      intentTableDecisionVerdict(rows[34], req[34], rows[33].commit, r.b.request, scaleV2, r.n.result,
+        "uncreated", "", absence, noProducingEntry)
+    )
+  }
+
+  pure def intentTableOfflineVerdicts(rows: List[Attempt], flow: List[Attempt], r: IntentReplay): List[str] = {
+    val req = intentTableOffline
+    val releases = List(r.tableADN, flow[14].commit, r.a.selection, r.b.selection, r.a.attempt, r.b.attempt, r.right)
+    releases.foldl(List(), (out, expected) => {
+      val i = out.length()
+      out.append(dropVerdict(rows[i], req[i], expected))
+    }).concat(List(
+      collectVerdict(rows[7], req[7]),
+      offlineIntentDecisionVerdict(rows[8], req[8], flow[6]),
+      offlineIntentDecisionVerdict(rows[9], req[9], flow[19]),
+      decisionTransferVerdict(rows[10], req[10], flow[5].commit),
+      offlineIntentDecisionVerdict(rows[11], req[11], flow[6]),
+      decisionTransferVerdict(rows[12], req[12], flow[18].commit),
+      offlineIntentDecisionVerdict(rows[13], req[13], flow[19])
+    ))
+  }
+
+  pure val intentTableDecoyOffset = implementationIntentSetupLength + intentTableSetup.length()
+  pure val intentTableNegativeOffset = intentTableDecoyOffset + intentTableDecoy.length()
+  pure val intentTableReplacementOffset = intentTableNegativeOffset + intentTableNegative.length()
+  pure val intentTableFlowOffset = intentTableReplacementOffset + intentTableReplacement.length()
+  pure val intentTableOfflineOffset = intentTableFlowOffset + intentTableFlow.length()
+
+  pure def intentTableVerdicts(rows: List[Attempt]): List[str] = {
+    if (rows.length() != intentTableRequests.length()) List("missing_steps")
+    else {
+      val base = rows.slice(0, implementationIntentSetupLength)
+      val setup = rows.slice(implementationIntentSetupLength, intentTableDecoyOffset)
+      val d = rows.slice(intentTableDecoyOffset, intentTableNegativeOffset)
+      val n = rows.slice(intentTableNegativeOffset, intentTableReplacementOffset)
+      val b = rows.slice(intentTableReplacementOffset, intentTableFlowOffset)
+      val flow = rows.slice(intentTableFlowOffset, intentTableOfflineOffset)
+      val offline = rows.slice(intentTableOfflineOffset, rows.length())
+      val producer = base[0].commit
+      val other = setup[1].commit
+      val aEntry = intentTableEntry(producer, 3, base[9].commit, scaleV1, base[14].commit, setup[0].occurrence)
+      val dEntry = intentTableEntry(other, 3, d[2].commit, scaleV1, d[8].commit, d[5].occurrence)
+      val nEntry = intentTableEntry(producer, -3, n[2].commit, scaleV2, n[8].commit, n[5].occurrence)
+      val bEntry = intentTableEntry(producer, 3, b[2].commit, scaleV2, b[8].commit, b[5].occurrence)
+      val r: IntentReplay = { producer: base[1], other: setup[2], left: base[3].commit, right: base[4].commit,
+        genesis: base[2].commit, tableA: setup[5].commit, tableAD: d[9].commit, tableADN: n[9].commit,
+        legacy: setup[6].commit, a: aEntry, b: bEntry, d: dEntry, n: nEntry }
+      implementationIntentSetupVerdicts(base).concat(intentTableSetupVerdicts(base, setup))
+        .concat(intentTableBuildChoice(d, intentTableDecoy, other, r.left, scaleV1, "intent-table-a", r.tableA,
+          "decoy-plan", occurrenceB))
+        .append(intentTableWriteVerdict(d[9], intentTableDecoy[9], r.tableA, r.d.selection, "", true))
+        .concat(intentTableBuildChoice(n, intentTableNegative, producer, r.right, scaleV2, "intent-table-ad", r.tableAD,
+          "negative-plan", occurrenceC))
+        .append(intentTableWriteVerdict(n[9], intentTableNegative[9], r.tableAD, r.n.selection, "", true))
+        .append(intentTableReadVerdict(n[10], intentTableNegative[10], r.tableADN, r.left, r.genesis, r.tableAD,
+          Set(r.a, r.d, r.n)))
+        .concat(intentTableBuildChoice(b, intentTableReplacement, producer, r.right, scaleV2, "", r.legacy,
+          "replacement-plan", replacementOccurrence))
+        .concat(intentTableFlowVerdicts(flow, r)).concat(intentTableOfflineVerdicts(offline, flow, r))
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -1457,6 +1678,7 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 13) implementationIntentHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 14) supersessionHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 15) multiInputVerdicts(row.attempts)
+    else if (row.scenario == scenarios.length() + 16) intentTableVerdicts(row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
@@ -1545,9 +1767,21 @@ module recorded_calls_rules {
       "inspected")
     val multiInput = implementationIntents.slice(0, implementationIntentSetupLength)
       .concat(tableBuild).concat(tableRoute).concat(tableOffline)
+    val intentTableBuild = List("recorded", "inspected", "exported", "staged", "recorded", "inspected",
+      "exported", "staged", "selected")
+    val intentTable = implementationIntents.slice(0, implementationIntentSetupLength)
+      .concat(List("inspected", "recorded", "inspected", "recorded", "inspected", "recorded", "recorded"))
+      .concat(intentTableBuild).append("recorded").concat(intentTableBuild).append("recorded").append("inspected")
+      .concat(intentTableBuild).concat(List(
+        "recorded", "rejected", "rejected", "rejected", "rejected", "recorded", "inspected", "inspected", "rejected",
+        "rejected", "recorded", "inspected", "inspected", "rejected", "recorded", "inspected", "rejected", "rejected",
+        "recorded", "inspected", "inspected", "inspected", "recorded", "inspected", "inspected", "recorded",
+        "inspected", "inspected", "recorded", "inspected", "inspected", "recorded", "inspected", "recorded", "inspected",
+        "released", "released", "released", "released", "released", "released", "released", "collected",
+        "inspected", "inspected", "staged", "inspected", "staged", "inspected"))
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
       reuse, reusePublication, versioned, selections, occurrences, adoptions, policies, implementationIntents,
-      supersessions, multiInput)
+      supersessions, multiInput, intentTable)
     if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
@@ -1580,7 +1814,13 @@ module recorded_calls_rules {
       val tableDecisions = multi.slice(tableRouteOffset, tableOfflineOffset)
       val tableDecisionIds = Set(2, 5, 12, 25, 27, 30, 32).map(i => tableDecisions[i].decision.id)
         .union(Set(tableHistory[7].decision.id))
+      val intentRows = rows[18].attempts.slice(intentTableFlowOffset, intentTableOfflineOffset)
       rows.indices().forall(i => rows[i].scenario == i) and
+        intentRows[6].requestCommit != intentRows[6].producingRequest and
+        intentRows[23].requestCommit != intentRows[23].producingRequest and
+        intentRows[7].calls == intentRows[21].calls and
+        sameRootNotSameCall(intentRows[7].calls[1], intentRows[24].calls[1]) and
+        sameRootNotSameCall(intentRows[7].calls[1], intentRows[27].calls[1]) and
         tableDecisionIds.size() == 8 and
         Set(tableHistory[3].commit, tableHistory[5].commit, tableHistory[15].commit,
           tableDecisions[22].commit).size() == 4 and
@@ -1665,6 +1905,8 @@ module recorded_calls_rules {
     expectedEvidence: "", definitionAdvisory: false, supersession: noDeclaration, asKnownThen: noAdvisory,
     knowledgeView: noAdvisory, expectedTable: "", tableRef: "", tableCommit: "",
     reuseTable: { intent: "", implementation: "", previous: "", entries: List() },
+    reuseScope: "", producingRequest: "", producingImplementation: "",
+    intentReuseTable: { intent: "", genesis: "", previous: "", entries: List() },
     decision: { id: "", canonicalId: false, policy: "", intent: "", defaultMode: "", override: "", route: "",
       reason: "", plan: "", planRef: "", selectionRef: "", selection: "", result: "", implementationOverride: "",
       implementationReason: "" } }
@@ -1757,7 +1999,31 @@ module recorded_calls_rules {
   pure def checkTableDecision(read: Attempt): str =
     tableDecisionVerdict(read, tableRoutingRequests[2], "decision", "request", "-", "table-ab", "table",
       sampleTableDecision.decision, savedOccurrence)
+  pure val sampleIntentRow = intentTableEntry("producer", -3, "producing-request", scaleV1, "selection", savedOccurrence)
+  pure val sampleIntentTable = { ...sampleTableRead, args: intentTableFlow[15].args, reuseScope: "intent",
+    intentReuseTable: { intent: "intent", genesis: "genesis", previous: "basis", entries: List(sampleIntentRow) } }
+  pure def checkIntentTable(read: Attempt): str =
+    intentTableReadVerdict(read, intentTableFlow[15], "commit", "intent", "genesis", "basis", Set(sampleIntentRow))
+  pure val sampleIntentTableDecision = { ...sampleTableDecision, args: intentTableFlow[6].args, reuseScope: "intent",
+    requestImplementation: scaleV2, producingRequest: sampleIntentRow.request, producingImplementation: scaleV1,
+    occurrence: entryOccurrence(sampleIntentRow),
+    decision: { ...tableDecision("right", "plan", "", "selection", "same-result", "default", "default", "default-table-hit"),
+      id: occurrenceC } }
+  pure def checkIntentTableDecision(read: Attempt): str =
+    intentTableDecisionVerdict(read, intentTableFlow[6], "decision", "request", scaleV2, "-", "table-ab", "table",
+      sampleIntentTableDecision.decision, sampleIntentRow)
   pure val controlsPass = all {
+    checkIntentTable(sampleIntentTable) == "inspected",
+    checkIntentTable({ ...sampleIntentTable, intentReuseTable: { ...sampleIntentTable.intentReuseTable,
+      genesis: "unrelated" } }) == "wrong_table_scope",
+    checkIntentTable({ ...sampleIntentTable, intentReuseTable: { ...sampleIntentTable.intentReuseTable,
+      entries: List({ ...sampleIntentRow, factor: 3 }) } }) == "wrong_table_entries",
+    checkIntentTable({ ...sampleIntentTable, intentReuseTable: { ...sampleIntentTable.intentReuseTable,
+      entries: List({ ...sampleIntentRow, producer: "equal-valued-other-commit" }) } }) == "wrong_table_entries",
+    checkIntentTableDecision(sampleIntentTableDecision) == "inspected",
+    checkIntentTableDecision({ ...sampleIntentTableDecision, producingRequest: "request" }) == "wrong_producing_request",
+    checkIntentTableDecision({ ...sampleIntentTableDecision, producingImplementation: scaleV2 }) == "wrong_producing_request",
+    checkIntentTableDecision({ ...sampleIntentTableDecision, requestImplementation: scaleV1 }) == "wrong_decision_implementation",
     checkTable(sampleTableRead) == "inspected",
     checkTable({ ...sampleTableRead, reuseTable: { ...sampleTableRead.reuseTable,
       entries: List({ ...sampleTableRow, request: "equal-valued-foreign-key" }) } }) == "wrong_table_entries",
