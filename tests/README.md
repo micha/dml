@@ -279,6 +279,14 @@ after collection and after transfer to a replica without input refs. Focused tes
 ancestry, unrelated intent lineages, and decisions that claim a hit from a
 historical table that lacks the key.
 
+The [intent-scoped history](../README.md#share-selected-scale-results-across-implementations-of-one-intent)
+checks requested and producing identities independently, exact producer and
+signed-factor matching, cross-version adoption, and one-key removal. Replay
+checks historical inspection on a replica without the original refs. Focused
+checks exercise the live-key cap after removal, same-attempt and result-only
+rejections, rollback on occupied output, and malformed deltas that cannot be
+hidden by later removal.
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
@@ -587,5 +595,18 @@ execution. Use Java and Quint 0.34.0:
 ```sh
 mkdir -p build/recorded-multi-input-tlc
 (cd build/recorded-multi-input-tlc && quint verify ../../tests/recorded_multi_input_design.qnt \
+  --backend=tlc --search-observations)
+```
+
+The [intent-scoped model](recorded_intent_reuse_design.qnt) uses two
+implementations, three exact input keys, a two-key cap, and a history of up to
+four deltas. It checks cross-version provenance, one-key updates and rollback,
+pinned routing, and historical inspection independent of ref movement. Native
+framing, transfer, collection, and worker execution are not modeled. Use Java
+and Quint 0.34.0:
+
+```sh
+mkdir -p build/recorded-intent-reuse-tlc
+(cd build/recorded-intent-reuse-tlc && quint verify ../../tests/recorded_intent_reuse_design.qnt \
   --backend=tlc --search-observations)
 ```

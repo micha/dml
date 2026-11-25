@@ -19,6 +19,8 @@ before applying that reuse policy. Use `declare-scale-supersession` to add
 advisory evidence to a new intent version without promoting a default.
 Use `define-scale-reuse-table`, `update-scale-reuse-table`, and
 `request-table-scale` to keep selected attempts for several exact requests.
+Use `define-scale-intent-reuse-table`, `update-scale-intent-reuse-table`, and
+`request-intent-table-scale` to reuse across versions or remove a selected input.
 These layouts are not core record types or execution APIs.
 """
 
@@ -58,6 +60,10 @@ SUPERSESSION_FIELDS = (b"predecessor", b"successor", b"reason")
 TABLE_ENTRY = b"scale-reuse-table-v1"
 TABLE_UPDATE_ENTRY = b"scale-reuse-table-update-v1"
 TABLE_DECISION_ENTRY = b"scale-reuse-table-decision-v1"
+INTENT_TABLE_ENTRY = b"scale-intent-reuse-table-v1"
+INTENT_TABLE_UPDATE_ENTRY = b"scale-intent-reuse-table-update-v1"
+INTENT_TABLE_DECISION_ENTRY = b"scale-intent-reuse-table-decision-v1"
+TABLE_DECISION_ENTRIES = (TABLE_DECISION_ENTRY, INTENT_TABLE_DECISION_ENTRY)
 MAX_TABLE_ENTRIES = 16
 REUSE_DEFAULT = b"reuse-by-default"
 EXECUTE_DEFAULT = b"execute-by-default"
@@ -133,6 +139,13 @@ class _ScaleReuseTable(NamedTuple):
     implementation: bytes
     previous: bytes | None
     entries: dict[bytes, _TableRow]
+
+
+class _IntentReuseTable(NamedTuple):
+    intent_commit: bytes
+    intent: _IntentVersion
+    previous: bytes | None
+    entries: dict[tuple[bytes, int], _TableRow]
 
 
 @contextmanager
@@ -488,6 +501,63 @@ def update_scale_reuse_table(path, basis_ref, basis_commit, selection_ref, selec
         return _publish(txn, output_ref, TABLE_UPDATE_ENTRY, dag, basis_commit, selection_commit)
 
 
+def define_scale_intent_reuse_table(path, intent_ref, intent_commit, table_ref):
+    """Create an empty reuse table for the pinned intent lineage, open to both implementations."""
+    _check_commit_id(intent_commit, "intent commit")
+    refs = (("intent", intent_ref), ("table", table_ref))
+    _check_intent_refs(*refs)
+    with _write_transaction(path, create=False) as txn:
+        intent = _selected_intent(txn, intent_ref, intent_commit).definition
+        _check_intent_refs(*refs, ("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
+        root = _put_literal(txn, core.DATUM_STRING, b"intent")
+        dag = _put_object(txn, core.REC_DAG, root, b"scope", root)
+        return _publish(txn, table_ref, INTENT_TABLE_ENTRY, dag, intent_commit)
+
+
+def update_scale_intent_reuse_table(path, basis_ref, basis_commit, output_ref, operation, *,
+                                   selection_ref=None, selection_commit=None, producer_commit=None, factor=None):
+    """Insert, adopt, or remove one exact input's selected attempt in a new version."""
+    _check_commit_id(basis_commit, "table basis commit")
+    if type(operation) is not bytes or operation not in (b"insert", b"adopt", b"remove"):
+        raise ValueError("intent reuse table operation must be insert, adopt, or remove")
+    refs = (("table basis", basis_ref), ("table output", output_ref))
+    removing = operation == b"remove"
+    if removing:
+        if selection_ref is not None or selection_commit is not None:
+            raise ValueError("removal takes an exact producer commit and factor, not a selection")
+        _check_commit_id(producer_commit)
+        _check_i64(factor, "factor")
+        key = (producer_commit, factor)
+        input_refs = refs
+    else:
+        if producer_commit is not None or factor is not None:
+            raise ValueError("insert and adopt derive the inputs from the pinned selection")
+        _check_commit_id(selection_commit, "selection commit")
+        input_refs = (*refs, ("selection", selection_ref))
+    _check_intent_refs(*input_refs)
+    with _write_transaction(path, create=False) as txn:
+        if core.txn_ref_get(txn, basis_ref) != basis_commit:
+            raise ValueError("table basis ref does not point to the expected commit")
+        table = _read_scale_intent_reuse_table(txn, basis_commit)
+        intent = table.intent.definition
+        _check_intent_refs(*refs, ("v1 selection", intent.v1_selection_ref), ("v2 selection", intent.v2_selection_ref))
+        selection = None
+        parents = (basis_commit,)
+        if not removing:
+            if core.txn_ref_get(txn, selection_ref) != selection_commit:
+                raise ValueError("selection ref does not point to the expected commit")
+            selection = _read_scale_selection(txn, selection_commit)
+            key = _scale_inputs(selection.request)
+            parents += (selection_commit,)
+        _check_intent_table_update(table, operation, key, selection)
+        root = _put_literal(txn, core.DATUM_STRING, operation)
+        producer = _put_literal(txn, core.DATUM_STRING, key[0].hex().encode("ascii"))
+        multiplier = _put_literal(txn, core.DATUM_I64, key[1])
+        dag = _put_object(txn, core.REC_DAG, root, b"operation", root, b"producer_commit", producer,
+                          b"factor", multiplier)
+        return _publish(txn, output_ref, INTENT_TABLE_UPDATE_ENTRY, dag, *parents)
+
+
 def _resolve_intent_implementation(intent, requested):
     if type(requested) is bytes and requested == USE_DEFAULT:
         return intent.default_implementation, b"default-implementation"
@@ -616,7 +686,10 @@ def _consults_reuse_table(policy_default, override):
 def _table_route(policy_default, override, table, request):
     if not _consults_reuse_table(policy_default, override):
         return _policy_reason(policy_default, override, selected=False), None
-    row = table.entries.get(request) if table is not None else None
+    row = None
+    if table is not None:
+        key = _scale_inputs(request) if isinstance(table, _IntentReuseTable) else request.commit
+        row = table.entries.get(key)
     if override == REUSE_SELECTED:
         return _policy_reason(policy_default, override, selected=row is not None), row
     if row is not None:
@@ -624,16 +697,34 @@ def _table_route(policy_default, override, table, request):
     return (b"default-no-table" if table is None else b"default-table-miss"), None
 
 
-def _table_for_intent(txn, table_commit, intent, implementation):
-    table = _read_scale_reuse_table(txn, table_commit)
-    if table.intent.genesis != intent.genesis or table.implementation != implementation:
-        raise ValueError("reuse table does not match the intent lineage and selected implementation")
+def _table_for_intent(txn, table_commit, intent, implementation, entry):
+    if entry == INTENT_TABLE_DECISION_ENTRY:
+        table = _read_scale_intent_reuse_table(txn, table_commit)
+        if table.intent.genesis != intent.genesis:
+            raise ValueError("reuse table does not match the intent lineage")
+    else:
+        table = _read_scale_reuse_table(txn, table_commit)
+        if table.intent.genesis != intent.genesis or table.implementation != implementation:
+            raise ValueError("reuse table does not match the intent lineage and selected implementation")
     return table
 
 
 def request_table_scale(path, producer_pin, producer_commit, intent_ref, intent_commit, plan_pin, decision_ref,
                         factor, *, table_ref, table_commit=None, implementation=USE_DEFAULT, override=USE_DEFAULT):
-    """Apply the pinned intent's routing policy using one explicitly supplied table ref."""
+    """Apply the pinned intent's routing policy using one implementation-scoped table."""
+    return _request_table_scale(path, producer_pin, producer_commit, intent_ref, intent_commit, plan_pin, decision_ref,
+                                factor, table_ref, table_commit, implementation, override, TABLE_DECISION_ENTRY)
+
+
+def request_intent_table_scale(path, producer_pin, producer_commit, intent_ref, intent_commit, plan_pin, decision_ref,
+                               factor, *, table_ref, table_commit=None, implementation=USE_DEFAULT, override=USE_DEFAULT):
+    """Apply the pinned intent's routing policy with cross-version reuse of exact inputs."""
+    return _request_table_scale(path, producer_pin, producer_commit, intent_ref, intent_commit, plan_pin, decision_ref,
+                                factor, table_ref, table_commit, implementation, override, INTENT_TABLE_DECISION_ENTRY)
+
+
+def _request_table_scale(path, producer_pin, producer_commit, intent_ref, intent_commit, plan_pin, decision_ref,
+                         factor, table_ref, table_commit, implementation, override, entry):
     _check_commit_id(producer_commit)
     _check_commit_id(intent_commit, "intent commit")
     _check_i64(factor, "factor")
@@ -659,11 +750,11 @@ def request_table_scale(path, producer_pin, producer_commit, intent_ref, intent_
             if _optional_ref(txn, table_ref) != table_commit:
                 raise ValueError("table ref does not match the expected commit or absence")
             if table_commit is not None:
-                table = _table_for_intent(txn, table_commit, historical, chosen)
+                table = _table_for_intent(txn, table_commit, historical, chosen, entry)
                 table_parents = (table_commit,)
         expected_main = _optional_ref(txn, MAIN)
         plan = _put_scale_plan(txn, producer_commit, factor, chosen, expected_main)
-        request = _read_plan(txn, plan)[0].commit if table is not None else None
+        request = _read_plan(txn, plan)[0] if table is not None else None
         reason, row = _table_route(intent.policy_default, override, table, request)
         fields[b"reason"] = reason
         if row is None:
@@ -673,7 +764,7 @@ def request_table_scale(path, producer_pin, producer_commit, intent_ref, intent_
             if _optional_ref(txn, plan_pin) is not None:
                 raise ValueError("plan output ref is already occupied")
             _update_main(txn, row.selection.result, expected_main)
-        return _put_scale_decision(txn, decision_ref, TABLE_DECISION_ENTRY, fields, plan, intent_commit, *table_parents)
+        return _put_scale_decision(txn, decision_ref, entry, fields, plan, intent_commit, *table_parents)
 
 
 def _work_requested_scale(txn, incoming, request_commit):
@@ -1198,7 +1289,8 @@ def _supersession_view(intent_commit, implementation, declaration):
 
 
 def _inspect_scale_decision(txn, commit, view, parents, entry, dag, *, knowledge_commit=None):
-    uses_table = entry == TABLE_DECISION_ENTRY
+    uses_table = entry in TABLE_DECISION_ENTRIES
+    intent_scoped = entry == INTENT_TABLE_DECISION_ENTRY
     label = "policy" if entry == DECISION_ENTRY else "intent"
     if parents not in (2, 3):
         target = "table" if uses_table else "selection"
@@ -1246,9 +1338,11 @@ def _inspect_scale_decision(txn, commit, view, parents, entry, dag, *, knowledge
         consulted = _consults_reuse_table(policy_default, override)
         if target is not None and not consulted:
             raise ValueError("fresh-only table decision cannot retain a reuse table")
-        table = _table_for_intent(txn, target, historical, chosen) if target is not None else None
-        reason, row = _table_route(policy_default, override, table, request.commit)
+        table = _table_for_intent(txn, target, historical, chosen, entry) if target is not None else None
+        reason, row = _table_route(policy_default, override, table, request)
         reusing = row is not None
+        if intent_scoped:
+            details["reuse_scope"] = "intent"
         if table is not None:
             details["table_commit"] = target.hex()
     else:
@@ -1282,7 +1376,9 @@ def _inspect_scale_decision(txn, commit, view, parents, entry, dag, *, knowledge
         report[field.decode("ascii")] = slot.decode("ascii")
     if reusing:
         if uses_table:
-            report.update(_selection_identity(row.selection_commit, row.selection))
+            report.update(_selection_identity(*row))
+            if intent_scoped:
+                report.update(_producing_request_identity(row.selection.request))
         else:
             selection = _read_scale_selection(txn, target, expected_request=request)
             report.update(_selection_identity(target, selection))
@@ -1382,11 +1478,15 @@ def _check_table_update(table, operation, key, selection):
         raise ValueError("selection implementation does not match the reuse table")
     if selection.request.commit != key:
         raise ValueError("reuse table key does not match the selection request commit")
-    current = table.entries.get(key)
+    _check_table_insert_or_adopt(table.entries, operation, key, selection)
+
+
+def _check_table_insert_or_adopt(entries, operation, key, selection):
+    current = entries.get(key)
     if type(operation) is bytes and operation == b"insert":
         if current is not None:
             raise ValueError("reuse table already contains this request; use adopt to change its selection")
-        if len(table.entries) == MAX_TABLE_ENTRIES:
+        if len(entries) == MAX_TABLE_ENTRIES:
             raise ValueError(f"reuse table cannot contain more than {MAX_TABLE_ENTRIES} requests")
     elif type(operation) is bytes and operation == b"adopt":
         if current is None:
@@ -1435,6 +1535,87 @@ def _read_scale_reuse_table(txn, commit):
     return table
 
 
+def _scale_inputs(request):
+    return request.producer, request.factor
+
+
+def _check_intent_table_update(table, operation, key, selection):
+    if operation == b"remove":
+        if key not in table.entries:
+            raise ValueError("intent reuse table removal requires a present input entry")
+        return
+    if selection.attempt is None:
+        raise ValueError("reuse table requires an attempt selection")
+    if _scale_inputs(selection.request) != key:
+        raise ValueError("intent reuse table key does not match the selection inputs")
+    _check_table_insert_or_adopt(table.entries, operation, key, selection)
+
+
+def _read_intent_table_delta(txn, dag):
+    _, root, count = _object(txn, core.REC_DAG, dag)
+    if count != 3 or root != core.txn_lookup_node(txn, dag, b"operation"):
+        raise ValueError("intent reuse table update has the wrong DAG layout")
+    operation = _read_literal(txn, root, core.DATUM_STRING)
+    if operation not in (b"insert", b"adopt", b"remove"):
+        raise ValueError("intent reuse table operation must be insert, adopt, or remove")
+    producer = _read_string_field(txn, dag, b"producer_commit")
+    if not COMMIT_HEX.fullmatch(producer):
+        raise ValueError("intent reuse table producer key must be a lowercase hexadecimal commit ID")
+    factor = _read_i64(txn, core.txn_lookup_node(txn, dag, b"factor"))
+    return operation, (bytes.fromhex(producer.decode("ascii")), factor)
+
+
+def _read_scale_intent_reuse_table(txn, commit):
+    # A removal affects only its reconstructed snapshot. Validate every prior
+    # delta, even if the affected key is absent at the head.
+    deltas = []
+    previous = None
+    while True:
+        view, parents, entry, dag = _snapshot(txn, commit)
+        if entry == INTENT_TABLE_ENTRY and parents == 1:
+            break
+        if entry != INTENT_TABLE_UPDATE_ENTRY or parents not in (1, 2):
+            raise ValueError("expected an intent reuse table or update with its required ordered parents")
+        operation, key = _read_intent_table_delta(txn, dag)
+        if parents != (1 if operation == b"remove" else 2):
+            raise ValueError("intent reuse table update requires its basis and a selection only for insert or adopt")
+        basis = core.object_view_parent(view, 0)
+        selection_commit = core.object_view_parent(view, 1) if parents == 2 else None
+        if not deltas:
+            previous = basis
+        deltas.append((operation, key, selection_commit))
+        commit = basis
+    if _read_single_string(txn, dag, b"scope", "intent reuse table") != b"intent":
+        raise ValueError("intent reuse table must name the intent scope")
+    intent_commit = core.object_view_parent(view, 0)
+    table = _IntentReuseTable(intent_commit, _read_scale_intent(txn, intent_commit), previous, {})
+    for operation, key, selection_commit in reversed(deltas):
+        selection = _read_scale_selection(txn, selection_commit) if selection_commit is not None else None
+        _check_intent_table_update(table, operation, key, selection)
+        if operation == b"remove":
+            del table.entries[key]
+        else:
+            table.entries[key] = _TableRow(selection_commit, selection)
+    return table
+
+
+def _producing_request_identity(request):
+    return {"producing_request_commit": request.commit.hex(),
+            "producing_implementation": request.implementation.decode("ascii")}
+
+
+def _inspect_intent_reuse_table(txn, commit):
+    table = _read_scale_intent_reuse_table(txn, commit)
+    report = {"commit": commit.hex(), "reuse_scope": "intent", "intent_commit": table.intent_commit.hex(),
+              "intent_genesis": table.intent.genesis.hex(),
+              "entries": [{"producer_commit": producer.hex(), "factor": factor,
+                           **_selection_identity(*row), **_producing_request_identity(row.selection.request)}
+                          for (producer, factor), row in sorted(table.entries.items())]}
+    if table.previous is not None:
+        report["previous_table"] = table.previous.hex()
+    return report
+
+
 def _selection_identity(commit, selection):
     report = {"selection_commit": commit.hex(), "result_commit": selection.result.hex()}
     if selection.attempt is not None:
@@ -1479,7 +1660,7 @@ def _inspect_reuse_publication(txn, commit, view, parents, dag, *, selected):
 def _inspect_snapshot(txn, commit, *, expected_request=None, knowledge_commit=None):
     snapshot = _snapshot(txn, commit)
     view, parents, entry, terminal = snapshot
-    if knowledge_commit is not None and entry not in (INTENT_DECISION_ENTRY, TABLE_DECISION_ENTRY):
+    if knowledge_commit is not None and entry not in (INTENT_DECISION_ENTRY, *TABLE_DECISION_ENTRIES):
         raise ValueError("a knowledge commit requires an intent decision")
     if expected_request is not None and entry != REQUESTED_SCALE_ENTRY:
         raise ValueError("expected a requested-scale-v1 result commit")
@@ -1497,8 +1678,10 @@ def _inspect_snapshot(txn, commit, *, expected_request=None, knowledge_commit=No
         fields = {name.decode("ascii"): value.decode("ascii") for name, value in zip(INTENT_FIELDS, version.definition)}
         return {**report, **fields, "previous_intent_commit": version.previous.hex() if version.previous else None,
                 "supersession": _supersession_report(version.supersession)}
-    if entry in (DECISION_ENTRY, INTENT_DECISION_ENTRY, TABLE_DECISION_ENTRY):
+    if entry in (DECISION_ENTRY, INTENT_DECISION_ENTRY, *TABLE_DECISION_ENTRIES):
         return _inspect_scale_decision(txn, commit, view, parents, entry, terminal, knowledge_commit=knowledge_commit)
+    if entry in (INTENT_TABLE_ENTRY, INTENT_TABLE_UPDATE_ENTRY):
+        return _inspect_intent_reuse_table(txn, commit)
     if entry in (TABLE_ENTRY, TABLE_UPDATE_ENTRY):
         table = _read_scale_reuse_table(txn, commit)
         return {**report, "table_intent_commit": table.intent_commit.hex(),
@@ -1672,15 +1855,29 @@ def main():
     for name in ("basis_ref", "basis_commit", "selection_ref", "selection_commit", "output_ref"):
         table_update.add_argument(name)
     table_update.add_argument("operation", choices=("insert", "adopt"))
-    table_request = commands.add_parser("request-table-scale", help="resolve an intent request against a pinned table")
-    table_request.add_argument("repo", type=Path)
-    for name in ("producer_pin", "producer_commit", "intent_ref", "intent_commit", "plan_pin", "decision_ref"):
-        table_request.add_argument(name)
-    table_request.add_argument("factor", type=int)
-    table_request.add_argument("--table", required=True, help="explicit table ref on reuse paths")
-    table_request.add_argument("--table-commit", help="expected commit in the table ref, or omit for absence")
-    table_request.add_argument("--implementation", default="default", help="override the pinned default version")
-    table_request.add_argument("--override", choices=("default", "fresh", "reuse-selected"), default="default")
+    intent_table = commands.add_parser("define-scale-intent-reuse-table", help="scope a new table to an intent lineage")
+    intent_table.add_argument("repo", type=Path)
+    for name in ("intent_ref", "intent_commit", "table_ref"):
+        intent_table.add_argument(name)
+    intent_table_update = commands.add_parser("update-scale-intent-reuse-table", help="change one exact input entry")
+    intent_table_update.add_argument("repo", type=Path)
+    for name in ("basis_ref", "basis_commit", "output_ref"):
+        intent_table_update.add_argument(name)
+    intent_table_update.add_argument("operation", choices=("insert", "adopt", "remove"))
+    intent_table_update.add_argument("--selection", help="selection ref for insert or adopt")
+    intent_table_update.add_argument("--selection-commit", help="exact selection commit for insert or adopt")
+    intent_table_update.add_argument("--producer-commit", help="exact producer commit for removal")
+    intent_table_update.add_argument("--factor", type=int, help="signed 64-bit factor for removal")
+    for command, scope in (("request-table-scale", "implementation"), ("request-intent-table-scale", "intent")):
+        table_request = commands.add_parser(command, help=f"route using a pinned {scope}-scoped table")
+        table_request.add_argument("repo", type=Path)
+        for name in ("producer_pin", "producer_commit", "intent_ref", "intent_commit", "plan_pin", "decision_ref"):
+            table_request.add_argument(name)
+        table_request.add_argument("factor", type=int)
+        table_request.add_argument("--table", required=True, help="explicit table ref on reuse paths")
+        table_request.add_argument("--table-commit", help="expected commit in the table ref, or omit for absence")
+        table_request.add_argument("--implementation", default="default", help="override the pinned default version")
+        table_request.add_argument("--override", choices=("default", "fresh", "reuse-selected"), default="default")
     request_exporter = commands.add_parser("export-request", help="export only the portable request from a plan")
     request_exporter.add_argument("repo", type=Path)
     request_exporter.add_argument("plan_pin")
@@ -1836,9 +2033,27 @@ def main():
                 args.output_ref.encode("ascii"), args.operation.encode("ascii"),
             )
             print(updated.hex())
-        elif args.command == "request-table-scale":
+        elif args.command == "define-scale-intent-reuse-table":
+            table = define_scale_intent_reuse_table(
+                args.repo, args.intent_ref.encode("ascii"), _parse_commit_id(args.intent_commit, "intent commit"),
+                args.table_ref.encode("ascii"),
+            )
+            print(table.hex())
+        elif args.command == "update-scale-intent-reuse-table":
+            selection = (_parse_commit_id(args.selection_commit, "selection commit")
+                         if args.selection_commit is not None else None)
+            producer = _parse_commit_id(args.producer_commit) if args.producer_commit is not None else None
+            updated = update_scale_intent_reuse_table(
+                args.repo, args.basis_ref.encode("ascii"), _parse_commit_id(args.basis_commit, "table basis commit"),
+                args.output_ref.encode("ascii"), args.operation.encode("ascii"),
+                selection_ref=args.selection.encode("ascii") if args.selection is not None else None,
+                selection_commit=selection, producer_commit=producer, factor=args.factor,
+            )
+            print(updated.hex())
+        elif args.command in ("request-table-scale", "request-intent-table-scale"):
             table = _parse_commit_id(args.table_commit, "table commit") if args.table_commit is not None else None
-            decision = request_table_scale(
+            request = request_table_scale if args.command == "request-table-scale" else request_intent_table_scale
+            decision = request(
                 args.repo, args.producer_pin.encode("ascii"), _parse_commit_id(args.producer_commit),
                 args.intent_ref.encode("ascii"), _parse_commit_id(args.intent_commit, "intent commit"),
                 args.plan_pin.encode("ascii"), args.decision_ref.encode("ascii"), args.factor,

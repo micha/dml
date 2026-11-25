@@ -64,6 +64,18 @@ def table_evidence(report):
                          "attemptId": entry["attempt_id"]} for request, entry in sorted(report["entries"].items())]}
 
 
+def intent_table_evidence(report):
+    previous = report.get("previous_table")
+    return {"intent": id_evidence(report["intent_commit"]), "genesis": id_evidence(report["intent_genesis"]),
+            "previous": id_evidence(previous) if previous else "",
+            "entries": [{"producer": id_evidence(entry["producer_commit"]), "factor": entry["factor"],
+                         "request": id_evidence(entry["producing_request_commit"]),
+                         "implementation": entry["producing_implementation"],
+                         "selection": id_evidence(entry["selection_commit"]), "result": id_evidence(entry["result_commit"]),
+                         "attempt": id_evidence(entry["attempt_commit"]), "attemptId": entry["attempt_id"]}
+                        for entry in report["entries"]]}
+
+
 def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True):
     command = op.replace("_", "-")
     missing_ref = re.fullmatch(
@@ -86,6 +98,8 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "expectedIntent": "", "expectedEvidence": "", "definitionAdvisory": False,
             "expectedTable": "", "tableRef": "", "tableCommit": "",
             "reuseTable": {"intent": "", "implementation": "", "previous": "", "entries": []},
+            "reuseScope": "", "producingRequest": "", "producingImplementation": "",
+            "intentReuseTable": {"intent": "", "genesis": "", "previous": "", "entries": []},
             "supersession": declaration_evidence(None),
             "asKnownThen": {"intent": "", "relation": "", "declaration": declaration_evidence(None)},
             "knowledgeView": {"intent": "", "relation": "", "declaration": declaration_evidence(None)},
@@ -128,6 +142,9 @@ class ProcessHistory:
             "define_scale_reuse_table": self.define_scale_reuse_table,
             "update_scale_reuse_table": self.update_scale_reuse_table,
             "request_table_scale": self.request_table_scale, "replicate_decision": self.replicate_decision,
+            "define_scale_intent_reuse_table": self.define_scale_intent_reuse_table,
+            "update_scale_intent_reuse_table": self.update_scale_intent_reuse_table,
+            "request_intent_table_scale": self.request_intent_table_scale,
         }
 
     def invoke(self, op, args, *, operands=None, bundle=None):
@@ -363,8 +380,40 @@ class ProcessHistory:
             self.table_receipts[output] = row["commit"]
         return {**row, "expectedTable": basis, "expectedSelection": selection}
 
-    def request_table_scale(self, role, producer_ref, intent_ref, intent_receipt, plan_ref, decision_ref, factor,
-                            table_ref, table_receipt, implementation, override):
+    def define_scale_intent_reuse_table(self, role, intent_ref, intent_receipt, output):
+        intent = self.intent_receipts[intent_receipt]
+        args = (role, intent_ref, intent_receipt, output)
+        row = self.write("define_scale_intent_reuse_table", args, operands=(intent_ref, intent, output))
+        if row["commit"]:
+            self.table_receipts[output] = row["commit"]
+        return {**row, "expectedIntent": intent}
+
+    def update_scale_intent_reuse_table(self, role, basis_ref, basis_receipt, output, mode, *key):
+        basis = self.table_receipts[basis_receipt]
+        args = (role, basis_ref, basis_receipt, output, mode, *key)
+        operands = [basis_ref, basis, output, mode]
+        selection = producer = ""
+        if mode == "remove":
+            producer_receipt, factor = key
+            producer = self.sum_receipts[role, producer_receipt]
+            operands.extend(("--producer-commit", producer, "--factor", factor))
+        else:
+            selection_ref, selection_receipt = key
+            selection = self.selection_receipts[selection_receipt]
+            operands.extend(("--selection", selection_ref, "--selection-commit", selection))
+        row = self.write("update_scale_intent_reuse_table", args, operands=operands)
+        if row["commit"]:
+            self.table_receipts[output] = row["commit"]
+        return {**row, "expectedCommit": producer, "expectedTable": basis, "expectedSelection": selection}
+
+    def request_table_scale(self, *args):
+        return self.request_scale_from_table("request_table_scale", *args)
+
+    def request_intent_table_scale(self, *args):
+        return self.request_scale_from_table("request_intent_table_scale", *args)
+
+    def request_scale_from_table(self, op, role, producer_ref, intent_ref, intent_receipt, plan_ref, decision_ref, factor,
+                                 table_ref, table_receipt, implementation, override):
         producer = self.sum_receipts["source", producer_ref]
         intent = self.intent_receipts[intent_receipt]
         if table_receipt == "-":
@@ -382,7 +431,7 @@ class ProcessHistory:
             operands.extend(("--implementation", implementation))
         if override != "default":
             operands.extend(("--override", override))
-        row = self.write("request_table_scale", args, operands=operands)
+        row = self.write(op, args, operands=operands)
         if row["commit"]:
             self.decision_receipts[decision_ref] = row["commit"]
         return {**row, "expectedCommit": producer, "expectedIntent": intent, "expectedTable": table}
@@ -484,8 +533,15 @@ class ProcessHistory:
             row["tableRef"] = report.get("table_ref", "")
             if "table_commit" in report:
                 row["tableCommit"] = id_evidence(report["table_commit"])
+            row["reuseScope"] = report.get("reuse_scope", "")
             if "entries" in report:
-                row["reuseTable"] = table_evidence(report)
+                if row["reuseScope"] == "intent":
+                    row["intentReuseTable"] = intent_table_evidence(report)
+                else:
+                    row["reuseTable"] = table_evidence(report)
+            if "producing_request_commit" in report:
+                row["producingRequest"] = id_evidence(report["producing_request_commit"])
+            row["producingImplementation"] = report.get("producing_implementation", "")
             if "supersession" in report:
                 row["definitionAdvisory"] = True
                 row["supersession"] = declaration_evidence(report["supersession"])
