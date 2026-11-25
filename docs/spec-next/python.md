@@ -9,7 +9,9 @@ for installation.
 
 The binding targets GIL-enabled CPython 3.10 or newer in the main interpreter.
 It exposes the local operations below, not the entire C API. There are no
-implicit ref selections, transactions, retries, or publication workflows.
+implicit ref selections, transactions, retries, or publication workflows. See
+[internal built-ins](../internal-builtins.md) for a separate installed module
+that records fixed calls through this binding.
 
 ## Handles and errors
 
@@ -65,17 +67,19 @@ Arguments are positional. Functions without a listed result return `None`.
 | `txn_put_datum(txn, packed)`, `txn_put_object(txn, type, packed)` | The stored object's ID. |
 | `txn_get_datum(txn, id)`, `txn_get_object(txn, type, id)` | The packed record. |
 | `txn_lookup_node(txn, dag, name)` | Node ID from the named binding in `dag`. |
-| `datum_encode(kind, value)` | Packed datum. Inputs: `DATUM_I64` (signed 64-bit integer), `DATUM_STRING` (UTF-8 bytes), or `DATUM_MAP` (list or tuple of `(key_id, value_id)` tuples). |
+| `datum_encode(kind, value)` | Packed datum. Inputs: `DATUM_NULL` (`None`), `DATUM_I64` (signed 64-bit integer), `DATUM_STRING` (UTF-8 bytes), `DATUM_URI` (already canonical URI bytes), `DATUM_LIST` (list or tuple of datum IDs), or `DATUM_MAP` (list or tuple of `(key_id, value_id)` tuples). |
 | `datum_decode(packed)` | `(payload_bytes, kind)`; payload is canonical [packed bytes](records.md#packed-representation), not a converted Python value. |
+| `datum_members(packed)` | Tuple of copied member IDs in LIST order, or `(key_id, value_id)` pairs in native MAP key order. Other datum kinds raise `ValueError`; malformed packed bytes raise `core.Error`. |
 | `object_encode(type, ...)` | Packed object; see operand shapes below. |
 | `object_decode(packed)` | `(view, reference_id, count)`; reference and count follow [`dml_object_view`](../../include/dml/object.h). |
 | `object_view_entry(view, index)` | `(dag_id, name)` for a tree; index is zero-based. |
 | `object_view_parent(view, index)` | Parent commit ID for a commit; index is zero-based. |
 
-For `DATUM_MAP`, both IDs in a pair MUST be datum IDs represented as 16-byte
-`bytes`. The [C encoder](records.md#datum-model) sorts keys and rejects duplicate
-key IDs. `datum_encode` needs no repository; `txn_put_datum` checks that each ID
-resolves to a datum. `datum_decode` does not resolve those IDs.
+LIST members and both MAP IDs in each pair MUST be 16-byte `bytes`. The
+[C encoder](records.md#datum-model) preserves LIST order, sorts MAP keys, and
+rejects duplicate key IDs. `datum_encode`, `datum_decode`, and `datum_members`
+need no repository; `txn_put_datum` checks that each member ID resolves to a
+datum. For URI canonical-form rules, see [records](records.md#text-numbers-and-uris).
 
 `object_encode` accepts these operands after the record type:
 

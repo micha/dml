@@ -53,7 +53,7 @@ Pass `DML_QUINT_SCRIPT=` to switch an existing build back to `quint` on `PATH`.
 
 This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
-[provenance handoff, recorded calls, and argument-map integrations](tests/README.md#process-integration),
+[provenance handoff and recorded workflow integrations](tests/README.md#process-integration),
 and focused interpreter, Python binding, integrity, boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
 Quint request. Ref replay uses public `daggerml.core`; the other core replay
@@ -83,8 +83,10 @@ python -m pip install .
 python -c 'from daggerml import core; print(core.TXN_READ)'
 ```
 
-The wheel targets the CPython ABI and platform used to build it. It contains no
-CLI, C development files, or historical `daggerml` application modules. The
+The wheel targets the CPython ABI and platform used to build it. It includes
+[`daggerml.builtin`](docs/internal-builtins.md), a fixed versioned node-call
+module. It contains no CLI, C development files, or historical `daggerml`
+application modules. The
 standalone C build does not require Python headers; pass `-Dpython_bindings=true`
 to also build and install the binding with Meson. See the
 [Python contract](docs/spec-next/python.md) for supported operations and an example.
@@ -760,6 +762,8 @@ implementation-scoped commands still require an exact implementation match.
 For reuse across different derivations of the same typed value, see the separate
 [recorded argument maps example](docs/recorded-argument-maps.md). It keeps both
 constructions and distinguishes the new request from the attempt that ran.
+For shipped built-in operations on recorded nodes, see the [versioned built-ins
+walkthrough](docs/internal-builtins.md#example-promote-a-getter-and-reuse-an-ordinary-result).
 
 #### Publish reuse with a durable record
 
