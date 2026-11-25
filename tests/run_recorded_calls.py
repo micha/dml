@@ -1,13 +1,17 @@
 """Collect observations from the recorded-calls example for Quint."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 import json
+from os import cpu_count
 from pathlib import Path
 import re
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from threading import Lock
+from time import monotonic
 
 from daggerml import core
 
@@ -110,10 +114,11 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
 
 
 class ProcessHistory:
-    def __init__(self, directory, example):
+    def __init__(self, directory, example, fixture_lock):
         self.directory = directory
         self.repos = {role: directory / role for role in ("source", "worker", "replica")}
         self.example = example
+        self.fixture_lock = fixture_lock
         self.sum_receipts = {}
         self.scale_receipts = {}
         self.plan_receipts = {}
@@ -162,7 +167,9 @@ class ProcessHistory:
         after = data.read_bytes() if data.is_file() else None
         bundle_after = bundle.read_bytes() if bundle is not None and bundle.is_file() else None
         if result.stderr:
-            print(result.stderr, file=sys.stderr, end="")
+            # Keep diagnostics together when distinct histories run concurrently.
+            with self.fixture_lock:
+                print(f"{self.directory.name}: {result.stderr}", file=sys.stderr, end="")
         row = evidence(op, args, code=result.returncode, stderr=result.stderr,
                        unchanged=before is not None and before == after,
                        bundle_present=bundle_after is not None, bundle_unchanged=bundle_before == bundle_after)
@@ -442,16 +449,17 @@ class ProcessHistory:
         path = self.repos[role]
         data = path / "data.mdb"
         before = data.read_bytes()
-        source = core.repo_open(path, False)
-        try:
-            bundle = core.repo_export_commit(source, bytes.fromhex(commit))
-        finally:
-            core.repo_close(source)
-        replica = core.repo_open(self.repos["replica"], True)
-        try:
-            root = core.repo_import_commit_staged(replica, bundle, pin.encode("ascii"))
-        finally:
-            core.repo_close(replica)
+        with self.fixture_lock:
+            source = core.repo_open(path, False)
+            try:
+                bundle = core.repo_export_commit(source, bytes.fromhex(commit))
+            finally:
+                core.repo_close(source)
+            replica = core.repo_open(self.repos["replica"], True)
+            try:
+                root = core.repo_import_commit_staged(replica, bundle, pin.encode("ascii"))
+            finally:
+                core.repo_close(replica)
         row = evidence("replicate_decision", (role, decision_receipt, pin), code=0, stderr="",
                        unchanged=before == data.read_bytes())
         return {**row, "commit": id_evidence(root.hex()), "expectedCommit": commit}
@@ -464,16 +472,17 @@ class ProcessHistory:
         path = self.repos[role]
         data = path / "data.mdb"
         before = data.read_bytes()
-        repo = core.repo_open(path, False)
-        try:
-            txn = core.txn_begin(repo, core.TXN_WRITE)
+        with self.fixture_lock:
+            repo = core.repo_open(path, False)
             try:
-                core.txn_ref_delete_expected(txn, pin.encode("ascii"), bytes.fromhex(expected))
-                core.txn_commit(txn)
+                txn = core.txn_begin(repo, core.TXN_WRITE)
+                try:
+                    core.txn_ref_delete_expected(txn, pin.encode("ascii"), bytes.fromhex(expected))
+                    core.txn_commit(txn)
+                finally:
+                    core.txn_abort(txn)
             finally:
-                core.txn_abort(txn)
-        finally:
-            core.repo_close(repo)
+                core.repo_close(repo)
         row = evidence("drop_ref", (role, pin, kind, receipt), code=0, stderr="",
                        unchanged=before == data.read_bytes())
         return {**row, "expectedCommit": expected}
@@ -619,9 +628,22 @@ class ProcessHistory:
 class Processes:
     def __init__(self, example):
         self.example = example
+        # Fixture calls use the in-process binding, unlike regular CLI steps.
+        self.fixture_lock = Lock()
 
     def history(self, directory):
-        return nullcontext(ProcessHistory(directory, self.example))
+        return nullcontext(ProcessHistory(directory, self.example, self.fixture_lock))
+
+
+def observe_histories(suite, directory, histories):
+    def observe(index):
+        return {**replay_history(suite, directory / f"history-{index}", histories[index]), "scenario": index}
+
+    # Each history serially drives its own repositories and starts a subprocess
+    # per CLI step. Start longer histories first, then restore the spec's order.
+    order = sorted(range(len(histories)), key=lambda index: len(histories[index]), reverse=True)
+    with ThreadPoolExecutor(max_workers=min(4, cpu_count() or 1)) as executor:
+        return sorted(executor.map(observe, order), key=lambda observation: observation["scenario"])
 
 
 def main():
@@ -633,15 +655,17 @@ def main():
     quint = quint_command(args)
     with TemporaryDirectory(prefix="dml-recorded-calls-") as tmp:
         directory = Path(tmp)
+        started = monotonic()
         histories = read_histories(quint, args.histories, directory / "histories.itf.json", ["init"])
-        suite = Processes(args.example)
-        observations = [
-            {**replay_history(suite, directory / f"history-{index}", requests), "scenario": index}
-            for index, requests in enumerate(histories)
-        ]
+        loaded = monotonic()
+        print(f"Loaded {len(histories)} recorded-call histories in {loaded - started:.2f}s", flush=True)
+        observations = observe_histories(Processes(args.example), directory, histories)
+        replayed = monotonic()
+        print(f"Collected recorded-call observations in {replayed - loaded:.2f}s", flush=True)
         # Repeated empty optional fields otherwise dominate Quint's analysis time.
         defaults = evidence("", (), code=0, stderr="", unchanged=False)
         state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=defaults)
+        print(f"Evaluated recorded-call observations in {monotonic() - replayed:.2f}s", flush=True)
         check_verdicts(histories, observations, state)
 
 
