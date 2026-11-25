@@ -764,6 +764,9 @@ For reuse across different derivations of the same typed value, see the separate
 constructions and distinguishes the new request from the attempt that ran.
 For shipped built-in operations on recorded nodes, see the [versioned built-ins
 walkthrough](docs/internal-builtins.md#example-promote-a-getter-and-reuse-an-ordinary-result).
+The [composed node calls walkthrough](docs/composed-node-calls.md#walkthrough)
+passes the recorded result of one call to the next and reuses downstream work
+without losing the distinction between the requested and original producers.
 
 #### Publish reuse with a durable record
 
