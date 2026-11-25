@@ -321,13 +321,17 @@ that all observations were reached; a checker exit alone is not coverage.
 
 The [composed node calls replay](composition_histories.qnt) validates a
 [recorded add-to-double workflow](../docs/composed-node-calls.md) with eight
-requests and six fresh attempts. It checks that repeated and swapped adds
+requests and six published attempts. It checks that repeated and swapped adds
 converge on the same downstream MAP value, that reused work retains its original
-producer and trace, and that changed inputs cause fresh work. The replay checks
+producer and trace, and that changed inputs cause fresh work. Work with an occupied attempt ref
+reports the exact collision and leaves the full native inventory unchanged,
+both before `main` exists and after it points to a previous result. Each retry
+uses the same request and attempt ID at a free ref, publishes the result and
+both getter calls, and creates or updates `main`. The replay also checks
 read-only inspection of a transferred hit and rejects inconsistent producer
 pins and input source edges. [Focused tests](test_composition.py) check I64
-overflow, a late attempt ref collision, an equal-value getter-key graft, and
-a hit that would recreate the producing request.
+overflow, an equal-value getter-key graft, and a hit that would recreate the
+producing request.
 
 The [finite composition model](recorded_composition_design.qnt) covers producer
 pins, atomic decisions, rollback, and requested versus producing history. It

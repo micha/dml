@@ -25,58 +25,60 @@ module composition_histories {
     source("request_double", command.concat(selected).concat(invocation(n)))
   }
 
-  // Author eight requests and execute six attempts. Controls that author
+  // Author eight requests and publish six successful attempts. Controls that author
   // malformed ancestry copy native rows; they do not execute either callable.
   pure val story: List[Request] = List(
     source("define", List("config")),                                             // 0
     add("q1", "13", "29", "1"),                                                  // 1
-    work("q1", "t1", "1"),                                                       // 2
-    inspect("source", "t1", "@t1"),                                               // 3
-    compose("t1", "@t1", "c2"),                                                   // 4
-    double("c2", "q2", "d2", "try-selected", "t2", "", "2"),                     // 5
-    inspect("source", "d2", "@d2"),                                               // 6
-    work("q2", "t2", "2"),                                                       // 7
-    inspect("source", "t2", "@t2"),                                               // 8
-    add("q3", "13", "29", "3"),                                                  // 9
-    work("q3", "t3", "3"),                                                       // 10
-    inspect("source", "t3", "@t3"),                                               // 11
-    compose("t3", "@t1", "stale-c"),                                              // 12
-    compose("t3", "@t3", "c2"),                                                   // 13 occupied composition pin
-    compose("t3", "@t3", "c4"),                                                   // 14
-    double("c4", "unused4", "d2", "require-selected", "t2", "@t2", "4"),           // 15 occupied decision pin
-    double("c4", "q2", "occupied-hit", "require-selected", "t2", "@t2", "4"),       // 16 occupied hit pending pin
-    double("c4", "unused4", "d4", "require-selected", "t2", "@t2", "4"),           // 17
-    inspect("source", "d4", "@d4"),                                                      // 18
-    add("q5", "29", "13", "5"),                                                  // 19
-    work("q5", "t4", "4"),                                                       // 20
-    inspect("source", "t4", "@t4"),                                               // 21
-    compose("t4", "@t4", "c6"),                                                   // 22
-    double("c6", "unused6", "d6", "require-selected", "t2", "@t2", "6"),           // 23
-    inspect("source", "d6", "@d6"),                                                      // 24
-    add("q7", "13", "30", "7"),                                                  // 25
-    work("q7", "t5", "5"),                                                       // 26
-    inspect("source", "t5", "@t5"),                                               // 27
-    compose("t5", "@t5", "c8"),                                                   // 28
-    double("c8", "bad-pending", "bad-mode", "require-selected", "t2", "@t2", "8"), // 29 valid differing MAP
-    double("c8", "bad-pending", "bad-pin", "try-selected", "t2", "@t3", "8"),      // 30 stale selected pin
-    double("c8", "bad-pending", "bad-func", "try-selected", "t1", "@t1", "8"),     // 31 wrong func on mismatch
-    double("c8", "q8", "d8", "try-selected", "t2", "@t2", "8"),                   // 32 valid miss
-    inspect("source", "d8", "@d8"),                                               // 33
-    work("q8", "t6", "6"),                                                       // 34
-    inspect("source", "t6", "@t6"),                                               // 35
-    source("graft_selection", List("t2", "t3", "poison")),                         // 36
-    double("c8", "bad-pending", "bad-chain", "try-selected", "poison", "@poison", "9"), // 37
-    { op: "replicate", args: List("repeat", "d4", "snapshot-repeat") },            // 38
-    { op: "replicate", args: List("swapped", "d6", "snapshot-swapped") },          // 39
-    { op: "retire", args: List("source") },                                       // 40
-    inspect("repeat", "snapshot-repeat", "@snapshot-repeat"),                      // 41
-    inspect("swapped", "snapshot-swapped", "@snapshot-swapped"),                    // 42
-    { op: "graft_input", args: List("swapped", "snapshot-swapped", "source-graft") }, // 43
-    inspect("swapped", "source-graft", "@source-graft"),                            // 44
-    { op: "graft_parent", args: List("repeat", "snapshot-repeat", "parent-graft") }, // 45
-    inspect("repeat", "parent-graft", "@parent-graft"),                            // 46
-    { op: "graft_history", args: List("repeat", "snapshot-repeat", "history-graft") }, // 47
-    inspect("repeat", "history-graft", "@history-graft")                          // 48
+    work("q1", "config", "1"),                                                   // 2 collision before main exists
+    work("q1", "t1", "1"),                                                       // 3 retry the same request and attempt ID
+    inspect("source", "t1", "@t1"),                                               // 4
+    compose("t1", "@t1", "c2"),                                                   // 5
+    double("c2", "q2", "d2", "try-selected", "t2", "", "2"),                     // 6
+    inspect("source", "d2", "@d2"),                                               // 7
+    work("q2", "t2", "2"),                                                       // 8
+    inspect("source", "t2", "@t2"),                                               // 9
+    add("q3", "13", "29", "3"),                                                  // 10
+    work("q3", "t3", "3"),                                                       // 11
+    inspect("source", "t3", "@t3"),                                               // 12
+    compose("t3", "@t1", "stale-c"),                                              // 13
+    compose("t3", "@t3", "c2"),                                                   // 14 occupied composition pin
+    compose("t3", "@t3", "c4"),                                                   // 15
+    double("c4", "unused4", "d2", "require-selected", "t2", "@t2", "4"),           // 16 occupied decision pin
+    double("c4", "q2", "occupied-hit", "require-selected", "t2", "@t2", "4"),       // 17 occupied hit pending pin
+    double("c4", "unused4", "d4", "require-selected", "t2", "@t2", "4"),           // 18
+    inspect("source", "d4", "@d4"),                                               // 19
+    add("q5", "29", "13", "5"),                                                  // 20
+    work("q5", "t4", "4"),                                                       // 21
+    inspect("source", "t4", "@t4"),                                               // 22
+    compose("t4", "@t4", "c6"),                                                   // 23
+    double("c6", "unused6", "d6", "require-selected", "t2", "@t2", "6"),           // 24
+    inspect("source", "d6", "@d6"),                                               // 25
+    add("q7", "13", "30", "7"),                                                  // 26
+    work("q7", "config", "5"),                                                   // 27 collision with a prior main
+    work("q7", "t5", "5"),                                                       // 28 retry the same request and attempt ID
+    inspect("source", "t5", "@t5"),                                               // 29
+    compose("t5", "@t5", "c8"),                                                   // 30
+    double("c8", "bad-pending", "bad-mode", "require-selected", "t2", "@t2", "8"), // 31 valid differing MAP
+    double("c8", "bad-pending", "bad-pin", "try-selected", "t2", "@t3", "8"),      // 32 stale selected pin
+    double("c8", "bad-pending", "bad-func", "try-selected", "t1", "@t1", "8"),     // 33 wrong func on mismatch
+    double("c8", "q8", "d8", "try-selected", "t2", "@t2", "8"),                   // 34 valid miss
+    inspect("source", "d8", "@d8"),                                               // 35
+    work("q8", "t6", "6"),                                                       // 36
+    inspect("source", "t6", "@t6"),                                               // 37
+    source("graft_selection", List("t2", "t3", "poison")),                         // 38
+    double("c8", "bad-pending", "bad-chain", "try-selected", "poison", "@poison", "9"), // 39
+    { op: "replicate", args: List("repeat", "d4", "snapshot-repeat") },            // 40
+    { op: "replicate", args: List("swapped", "d6", "snapshot-swapped") },          // 41
+    { op: "retire", args: List("source") },                                       // 42
+    inspect("repeat", "snapshot-repeat", "@snapshot-repeat"),                      // 43
+    inspect("swapped", "snapshot-swapped", "@snapshot-swapped"),                    // 44
+    { op: "graft_input", args: List("swapped", "snapshot-swapped", "source-graft") }, // 45
+    inspect("swapped", "source-graft", "@source-graft"),                            // 46
+    { op: "graft_parent", args: List("repeat", "snapshot-repeat", "parent-graft") }, // 47
+    inspect("repeat", "parent-graft", "@parent-graft"),                            // 48
+    { op: "graft_history", args: List("repeat", "snapshot-repeat", "history-graft") }, // 49
+    inspect("repeat", "history-graft", "@history-graft")                          // 50
   )
   var histories: List[List[Request]]
   action init = histories' = List(story)
