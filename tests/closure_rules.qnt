@@ -70,19 +70,24 @@ module closure_rules {
     and c.listBinding == old.listBinding and c.scale == old.scale
     and c.scaleOrigin != old.scaleOrigin and c.scaleSource != old.scaleSource
 
-  pure def qSpine(q: Native, c: str): bool = native(q, List(c)) and q.pin == c and q.func == intent
-    and q.inputs != "" and q.map != "" and q.args == List({ name: "a", value: 13 }, { name: "b", value: 29 })
+  pure def inputPair(a: int, b: int): List[Input] = List({ name: "a", value: a }, { name: "b", value: b })
+  pure val standardInputs = inputPair(13, 29)
+  pure val maxI64 = 9223372036854775807
+
+  pure def qSpine(q: Native, c: str, inputs: List[Input]): bool = native(q, List(c)) and q.pin == c and q.func == intent
+    and q.inputs != "" and q.map != "" and q.args == inputs
     and q.sources.length() == 2 and sourceDag(q.sources, "a") != "" and sourceDag(q.sources, "b") != ""
   pure def dSpine(d: Native, q: str, mode: str, selected: str, hit: bool): bool =
     native(d, if (selected == "") List(q) else List(q, selected)) and d.pin == q and d.selected == selected
       and d.mode == mode and d.outcome == (if (hit) "reuse" else "pending")
-  pure def decisionRow(a: Attempt, c: Attempt, mode: str, selected: str, hit: bool, previous: str, oldR: str): bool = {
+  pure def decisionRow(a: Attempt, c: Attempt, inputs: List[Input], mode: str, selected: str,
+      hit: bool, previous: str, oldR: str): bool = {
     val q = record(a, "request")
     val d = record(a, "decision")
     val delta = List(newRef(a.args[4], d.id))
     val refs = if (not(hit)) delta.append(newRef(a.args[3], q.id))
       else if (previous == oldR) delta else delta.append(refDelta("main", previous, oldR))
-    a.created.length() == 2 and qSpine(q, c.commit) and dSpine(d, q.id, mode, selected, hit)
+    a.created.length() == 2 and qSpine(q, c.commit, inputs) and dSpine(d, q.id, mode, selected, hit)
       and d.id == a.commit and a.refs == refs and a.main == (if (hit) oldR else previous)
       and (not(hit) or a.profiles == List())
   }
@@ -140,7 +145,7 @@ module closure_rules {
     native(c, List(alternate.defaults)) and c.dag == past.descriptor and c.id != past.closure
       and c.capture == { ...past, closure: c.id, defaults: alternate.defaults }
       and c.capture.environment != alternate.environment and c.keyScale == past.scale
-      and qSpine(q, c.id) and q.map == old.producing.map and q.inputs == old.producing.inputs
+      and qSpine(q, c.id, standardInputs) and q.map == old.producing.map and q.inputs == old.producing.inputs
       and native(r, List(q.id)) and r.dag == old.outer and r.trace == old.trace
       and native(t, List(q.id, r.id))
   }
@@ -160,7 +165,7 @@ module closure_rules {
       and c.id != requested.closure and c.dag != requested.descriptor and c.keyFuncs == List(mapGet, listGet)
       and (if (kind == "key") c.keyScale == 3 and c.capture.captureKey != requested.captureKey
            else c.keyScale == 2 and c.capture.environment != requested.environment)
-      and qSpine(q, c.id) and q.map == hit.requested.map and q.inputs == hit.requested.inputs
+      and qSpine(q, c.id, standardInputs) and q.map == hit.requested.map and q.inputs == hit.requested.inputs
       and dSpine(d, q.id, "require-selected", hit.attempt, true) and d.id == a.commit
       and a.refs == List(newRef(a.args[4], a.commit)) and a.profiles == List()
   }
@@ -176,10 +181,12 @@ module closure_rules {
     25 -> "work: invalid_state: ref already exists",
     28 -> "request: no selected attempt for the capture key and argument MAP",
     34 -> "request: closure environment does not match its pinned defaults",
-    41 -> "inspect: closure environment does not match its pinned defaults",
-    43 -> "inspect: closure environment does not match its pinned defaults",
-    45 -> "inspect: capture key does not match the typed scale datum",
-    47 -> "inspect: closure environment does not match its pinned defaults")
+    36 -> "work: scaled sum subtotal is not a signed 64-bit integer",
+    38 -> "work: scaled sum product is not a signed 64-bit integer",
+    45 -> "inspect: closure environment does not match its pinned defaults",
+    47 -> "inspect: closure environment does not match its pinned defaults",
+    49 -> "inspect: capture key does not match the typed scale datum",
+    51 -> "inspect: closure environment does not match its pinned defaults")
 
   pure def accepted(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
@@ -191,15 +198,16 @@ module closure_rules {
     val previous = if (i > 0) rows[i - 1].main else ""
     if (i == 0) defaultsRow(a, "", "origin-a", mapV1, 2)
     else if (i == 1) captureRow(a, rows[0])
-    else if (i == 2) decisionRow(a, rows[1], "fresh", "", false, previous, "")
+    else if (i == 2) decisionRow(a, rows[1], standardInputs, "fresh", "", false, previous, "")
     else if (i == 3) pendingRead(a, rows[2], rows[1])
     else if (i == 4) workRow(a, rows[2], rows[1], previous, 84)
     else if (i == 5) attemptRead(a, rows[4], rows[2], rows[1])
     else if (i == 6) defaultsRow(a, rows[0].commit, "origin-c", mapV2, 3) and a.main == previous
     else if (i == 8) captureRow(a, rows[6]) and capC.captureKey != capA.captureKey
-    else if (i == 9) decisionRow(a, rows[1], "require-selected", first.attempt, true, previous, first.result)
+    else if (i == 9)
+      decisionRow(a, rows[1], standardInputs, "require-selected", first.attempt, true, previous, first.result)
     else if (i == 10) hitRead(a, rows[9], rows[1], first) and a.requested.capture == a.producing.capture
-    else if (i == 11) decisionRow(a, rows[1], "fresh", "", false, previous, "")
+    else if (i == 11) decisionRow(a, rows[1], standardInputs, "fresh", "", false, previous, "")
     else if (i == 12) workRow(a, rows[11], rows[1], previous, 84) and a.profiles == List()
     else if (i == 13) attemptRead(a, rows[12], rows[11], rows[1])
       and a.producing.capture == first.producing.capture and a.producing.request != first.producing.request
@@ -207,14 +215,15 @@ module closure_rules {
     else if (i == 14) defaultsRow(a, "", "origin-b", mapV2, 2)
     else if (i == 16) captureRow(a, rows[14]) and equalKeyDifferentCapture(capB, capA)
       and capB.mapBinding == capC.mapBinding and capB.listBinding == capC.listBinding
-    else if (i == 22) decisionRow(a, rows[16], "require-selected", first.attempt, true, previous, first.result)
+    else if (i == 22)
+      decisionRow(a, rows[16], standardInputs, "require-selected", first.attempt, true, previous, first.result)
     else if (i == 23) hitRead(a, rows[22], rows[16], first)
       and equalKeyDifferentCapture(a.requested.capture, a.producing.capture)
-    else if (i == 24) decisionRow(a, rows[16], "fresh", "", false, previous, "")
+    else if (i == 24) decisionRow(a, rows[16], standardInputs, "fresh", "", false, previous, "")
     else if (i == 26) workRow(a, rows[24], rows[16], previous, 84)
     else if (i == 27) attemptRead(a, rows[26], rows[24], rows[16])
       and a.producing.map == first.producing.map and a.outer != first.outer and a.trace != first.trace
-    else if (i == 29) decisionRow(a, rows[8], "try-selected", first.attempt, false, previous, "")
+    else if (i == 29) decisionRow(a, rows[8], standardInputs, "try-selected", first.attempt, false, previous, "")
     else if (i == 30) pendingRead(a, rows[29], rows[8]) and a.requested.map == first.producing.map
       and a.requested.capture.captureKey != first.producing.capture.captureKey
     else if (i == 31) workRow(a, rows[29], rows[8], previous, 126)
@@ -224,16 +233,18 @@ module closure_rules {
     else if (i == 33) originalGraft(a, first, capB) and a.created.length() == 4
       and a.commit == record(a, "attempt").id and a.profiles == List()
       and a.refs == List(newRef("poison", a.commit))
-    else if (i == 35 or i == 36) {
-      val from = if (i == 35) hit else rows[32]
-      val counts = if (i == 35) List(2, 2, 2, 1, 1, 1) else List(2, 1, 1, 0, 1, 1)
+    else if (i == 35) decisionRow(a, rows[1], inputPair(maxI64, 1), "fresh", "", false, previous, "")
+    else if (i == 37) decisionRow(a, rows[1], inputPair(maxI64, 0), "fresh", "", false, previous, "")
+    else if (i == 39 or i == 40) {
+      val from = if (i == 39) hit else rows[32]
+      val counts = if (i == 39) List(2, 2, 2, 1, 1, 1) else List(2, 1, 1, 0, 1, 1)
       a.transfer and a.commit == from.commit and a.counts == counts and a.main == "" and a.selectedRef == ""
         and a.refs == List(newRef(a.args[2], from.commit))
-    } else if (i == 37) a.transfer and a.unchanged and a.refs == List() and a.commit == ""
-    else if (i == 38) replicaRead(a, hit)
-    else if (i == 39) replicaRead(a, rows[32])
-    else if (Set(40, 42, 44).contains(i)) requestGraft(a, hit, a.args[1])
-    else if (i == 46) {
+    } else if (i == 41) a.transfer and a.unchanged and a.refs == List() and a.commit == ""
+    else if (i == 42) replicaRead(a, hit)
+    else if (i == 43) replicaRead(a, rows[32])
+    else if (Set(44, 46, 48).contains(i)) requestGraft(a, hit, a.args[1])
+    else if (i == 50) {
       val d = record(a, "decision")
       val t = record(a, "attempt")
       originalGraft(a, first, capB) and a.created.length() == 5 and a.profiles == List()
@@ -267,7 +278,7 @@ module closure_rules {
       and verdicts[0].foldl(true, (ok, value) => ok and verdictAccepted(value))
       and evidence[0].attempts[10].outcome == "reuse" and evidence[0].attempts[23].outcome == "reuse"
       and evidence[0].attempts[30].outcome == "pending" and evidence[0].attempts[32].value == 126
-      and evidence[0].attempts[38].unchanged and evidence[0].attempts[39].unchanged
+      and evidence[0].attempts[42].unchanged and evidence[0].attempts[43].unchanged
 
   pure val original = { ...noCapture, closure: "original", descriptor: "original-c", environment: "original-e",
     captureKey: "k2", scale: 2, scaleSource: "origin-a", scaleOrigin: "a", mapBinding: "v1", mapSource: mapV1 }
