@@ -333,9 +333,18 @@ literal arguments and points to the published pending request. Adding a new
 seventeenth argument must report `request: expected up to sixteen named arguments`
 without a receipt, new refs, or any change to the full native inventory. The extra
 argument is first in the CLI list so even a partial insert would be visible.
+
+The live-table boundary uses seventeen distinct MAP keys backed by returned
+attempts. Quint checks all sixteen key-to-attempt pairs in the full table.
+Inserting the seventeenth key must report
+`update-table: insert requires an absent key and room in the table` without a
+receipt, new refs, or any change to the full native inventory. After removing
+one row, the same insert and output ref succeed against the reduced version.
+Quint checks the exact mappings in both new versions and confirms the earlier
+full version remains unchanged.
+
 The [focused tests](test_argument_maps.py) exercise forged request maps, sources
-and getter links, poisoned table history, the live-table cap, and the
-reached-attempt budget.
+and getter links, poisoned table history, and the reached-attempt budget.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request

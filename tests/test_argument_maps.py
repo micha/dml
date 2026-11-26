@@ -62,9 +62,6 @@ class ArgumentMapsTest(unittest.TestCase):
         empty = maps.define_table(self.repo, b"empty", b"double")
         return maps.update_table(self.repo, b"empty", empty, b"selected", b"insert", selected=first)
 
-    def rows(self, ref):
-        return maps.inspect(self.repo, ref)["entries"]
-
     def data(self):
         return (self.repo / "data.mdb").read_bytes()
 
@@ -140,22 +137,6 @@ class ArgumentMapsTest(unittest.TestCase):
             self.assertEqual(self.data(), before)
         self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
         self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
-
-    def test_live_table_cap_applies_before_publication(self):
-        ref, table = b"empty", maps.define_table(self.repo, b"empty", b"double")
-        for i in range(17):
-            tag = str(i).encode()
-            attempt = self.execute(tag, DOUBLE, number(b"x", i))
-            if i == 16:
-                break
-            dest = b"table-" + tag
-            table = maps.update_table(self.repo, ref, table, dest, b"insert", selected=attempt)
-            ref = dest
-        self.assertEqual(len(self.rows(ref)), 16)
-        before = self.data()
-        with self.assertRaisesRegex(ValueError, "room in the table"):
-            maps.update_table(self.repo, ref, table, b"table-overflow", b"insert", selected=attempt)
-        self.assertEqual(self.data(), before)
 
     def test_returned_attempt_budget_reserves_room_for_new_execution(self):
         source = number(b"x", 0)[1]
