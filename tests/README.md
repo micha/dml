@@ -304,6 +304,12 @@ rows before and after adoption. An attempt to re-adopt the current selection
 must fail without changing the native inventory. Removing `42` leaves a pending miss on that key; `43`
 still routes to its original producer. After both edits and `main` updates,
 inspecting the old hit must reproduce its complete pre-edit report.
+
+Pending requests then exercise `work` failures. `double@1` rejects a missing
+or STRING `x`, or a result outside the signed I64 range. `add@1` reads a valid
+`a` before encountering a missing or STRING `b`. Quint checks each diagnostic
+and the unchanged full native inventory: the pending request, its decision, and
+`main` retain their targets, with no partial attempt, result, or getter record.
 The [focused tests](test_argument_maps.py) exercise duplicate canonical keys,
 forged sources and getter links, poisoned table history, and caps.
 

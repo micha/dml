@@ -158,17 +158,6 @@ class ArgumentMapsTest(unittest.TestCase):
         self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
         self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
 
-    def test_missing_type_and_overflow_do_not_publish_attempt_or_trace(self):
-        for tag, args, error in ((b"missing", [number(b"y", 42)], "map_get argument key"),
-                                 (b"typed", [(b"x", maps.Literal(core.DATUM_STRING, b"42"))], "I64 argument"),
-                                 (b"overflow", [number(b"x", 1 << 62)], "signed 64-bit integer")):
-            self.request(tag, DOUBLE, args)
-            commit = maps.inspect(self.repo, b"p" + tag)["requested"]["request"]
-            before = self.data()
-            with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, error):
-                maps.work(self.repo, b"p" + tag, bytes.fromhex(commit), b"t" + tag, identity(self.serial))
-            self.assertEqual(self.data(), before)
-
     def test_argument_and_table_caps_apply_before_publication(self):
         self.request(b"max", DOUBLE, [number(str(i).encode(), i) for i in range(16)])
         before = self.data()
