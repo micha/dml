@@ -71,7 +71,20 @@ module argument_maps_histories {
     source("request", List("p-string-x", "d-string-x", "double@1", "--arg", "x=string:42")),
     source("work", List("p-string-x", "@p-string-x", "t-string-x"))
   )
-  pure val fullStory = story.concat(tableEdits).concat(workFailures)
+  // Spell the key bytes explicitly; only the CLI --arg values are decoded for execution.
+  pure val composed = "key-hex:c3a9=i64:29"
+  pure val decomposed = "key-hex:65cc81=i64:29"
+  pure def keyRequest(pending: str, decision: str, first: str, second: str): Request =
+    source("request", List(pending, decision, "add@1", "--arg", first, "--arg", second))
+  pure val canonicalKeys: List[Request] = List(
+    keyRequest("p-nfc", "d-nfc", "a=i64:13", composed), source("inspect", List("p-nfc")),
+    keyRequest("p-reversed", "d-reversed", decomposed, "a=i64:13"), source("inspect", List("p-reversed")),
+    keyRequest("p-nfd", "d-nfd", "a=i64:13", decomposed), source("inspect", List("p-nfd")),
+    keyRequest("p-duplicate", "d-duplicate", composed, decomposed),
+    // Stage a new singleton before the duplicate: the reversed request already stored {é: 29}.
+    keyRequest("p-conflict", "d-conflict", "key-hex:c3a9=i64:30", decomposed)
+  )
+  pure val fullStory = story.concat(tableEdits).concat(workFailures).concat(canonicalKeys)
   var histories: List[List[Request]]
   action init = histories' = List(fullStory)
   action step = histories' = histories
