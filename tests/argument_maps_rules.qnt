@@ -184,12 +184,41 @@ module argument_maps_rules {
     } else "unchecked_step"
   }
 
+  pure val missingKey = "work: map_get argument key was not found"
+  pure val wrongType = "work: expected an I64 argument"
+  pure val workErrors = List(missingKey, wrongType, "work: argument-map result is not a signed 64-bit integer",
+    missingKey, wrongType)
+
+  pure def workFailureVerdict(before: Attempt, a: Attempt, i: int): str = {
+    val wanted = workFailures[i]
+    if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
+    else if (a.op == "request") {
+      val pending = a.args[1]
+      val decision = a.args[2]
+      if (a.code != 0 or not(a.quiet) or a.commit == "" or a.unchanged) "expected_pending_request"
+      else if (ref(before, pending) != "" or ref(before, decision) != "" or ref(a, pending) == "" or
+        ref(a, pending) == a.commit or ref(a, decision) != a.commit or ref(a, "main") == "" or
+        not(sameOtherRefs(a, before, Set(pending, decision)))) "wrong_pending_refs"
+      else if (nativeCounts(a) != (before.requests + 1, before.executions, before.results, before.accesses))
+        "wrong_native_occurrence_counts"
+      else "ok"
+    } else if (a.code != 1 or not(a.diagnosed) or a.error != workErrors[i / 2] or a.commit != "")
+      "wrong_work_diagnostic"
+    else if (not(a.unchanged) or a.refs != before.refs or ref(a, a.args[3]) != "" or
+      nativeCounts(a) != nativeCounts(before))
+      "wrong_work_rollback"
+    else "ok"
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
+    val start = story.length() + tableEdits.length()
     val prior = row.attempts.slice(0, story.length())
-    val edits = row.attempts.slice(story.length(), row.attempts.length())
+    val edits = row.attempts.slice(story.length(), start)
     if (row.scenario != 0 or row.attempts.length() != fullStory.length()) List("missing_steps")
     else range(0, story.length()).foldl(List(), (out, i) => out.append(stepVerdict(prior, i)))
       .concat(range(0, tableEdits.length()).foldl(List(), (out, i) => out.append(tableEditVerdict(prior, edits, i))))
+      .concat(range(0, workFailures.length()).foldl(List(), (out, i) =>
+        out.append(workFailureVerdict(row.attempts[start + i - 1], row.attempts[start + i], i))))
   }
   pure def verdictAccepted(verdict: str): bool = verdict == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
@@ -199,7 +228,9 @@ module argument_maps_rules {
     evidence[0].attempts[19].outcome == "pending" and
     evidence[0].attempts[story.length() + 9].outcome == "reuse" and
     evidence[0].attempts[story.length() + 13].outcome == "pending" and
-    evidence[0].attempts[story.length() + 15].outcome == "reuse"
+    evidence[0].attempts[story.length() + 15].outcome == "reuse" and
+    evidence[0].attempts.slice(story.length() + tableEdits.length(), fullStory.length())
+      .select(a => a.op == "work").foldl(List(), (errors, a) => errors.append(a.error)) == workErrors
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",

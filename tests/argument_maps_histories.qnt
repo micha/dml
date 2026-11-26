@@ -57,7 +57,21 @@ module argument_maps_histories {
     source("inspect", List("d9")),
     source("inspect", List("d3"))
   )
-  pure val fullStory = story.concat(tableEdits)
+  // The first add getter succeeds before the missing key or wrong type at b.
+  pure val workFailures: List[Request] = List(
+    source("request", List("p-missing", "d-missing", "add@1", "--arg", "a=i64:13")),
+    source("work", List("p-missing", "@p-missing", "t-missing")),
+    source("request", List("p-typed", "d-typed", "add@1", "--arg", "a=i64:13", "--arg", "b=string:29")),
+    source("work", List("p-typed", "@p-typed", "t-typed")),
+    source("request", List("p-overflow", "d-overflow", "double@1", "--arg", "x=i64:4611686018427387904")),
+    source("work", List("p-overflow", "@p-overflow", "t-overflow")),
+    // Preserve the single-getter double cases as well as the failures after add read a.
+    source("request", List("p-no-x", "d-no-x", "double@1", "--arg", "y=i64:42")),
+    source("work", List("p-no-x", "@p-no-x", "t-no-x")),
+    source("request", List("p-string-x", "d-string-x", "double@1", "--arg", "x=string:42")),
+    source("work", List("p-string-x", "@p-string-x", "t-string-x"))
+  )
+  pure val fullStory = story.concat(tableEdits).concat(workFailures)
   var histories: List[List[Request]]
   action init = histories' = List(fullStory)
   action step = histories' = histories
