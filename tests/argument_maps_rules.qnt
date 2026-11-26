@@ -234,10 +234,57 @@ module argument_maps_rules {
     else "ok"
   }
 
+  pure def pinWork(before: Attempt, a: Attempt, newResults: int, newGets: int): str = {
+    val dest = a.args[3]
+    if (a.code != 0 or not(a.quiet) or a.commit == "" or a.unchanged) "expected_new_attempt"
+    else if (ref(before, dest) != "" or ref(a, dest) != a.commit or not(sameOtherRefs(a, before, Set(dest))))
+      "wrong_attempt_refs"
+    else if (nativeCounts(a) != (before.requests, before.executions + 1, before.results + newResults,
+      before.accesses + newGets)) "wrong_native_occurrence_counts"
+    else "ok"
+  }
+
+  pure def stalePin(before: Attempt, a: Attempt): str =
+    if (a.code != 1 or not(a.diagnosed) or a.error != "request: returned source ref does not match the expected commit or absence"
+      or a.commit != "") "wrong_pin_diagnostic"
+    else if (not(a.unchanged) or a.refs != before.refs or nativeCounts(a) != nativeCounts(before) or
+      ref(a, "p-pin") != "" or ref(a, "d-pin") != "") "wrong_pin_rollback"
+    else "ok"
+
+  pure def pinVerdict(original: Attempt, before: Attempt, rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val wanted = returnedPins[i]
+    if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
+    else if (i == 3 or i == 6) stalePin(before, a)
+    else if (a.op == "request") pendingRequest(before, a)
+    else if (i == 1) pinWork(before, a, 1, 2)
+    else if (i == 4) pinWork(before, a, 0, 0) // Same request and result, new attempt only.
+    else if (i == 9) pinWork(before, a, 1, 1)
+    else if (a.code != 0 or not(a.quiet) or not(a.unchanged) or a.commit == "" or a.commit != ref(before, a.args[1]))
+      "wrong_pin_inspection"
+    else if (i == 2 or i == 5) {
+      val sibling = i == 5
+      val request = if (sibling) original.producingRequest else ref(rows[0], "p-decoy")
+      if (not(workRead(a, before.commit, request, "add@1", original.value, List("a", "b"), List("", ""))) or
+        a.attempt == original.attempt or a.value != 42 or (a.result == original.result) != sibling or
+        (a.producingInput == original.producingInput) != sibling) "wrong_pin_comparator"
+      else "ok"
+    } else if (i == 8) {
+      if (a.request != a.commit or a.implementation != "double@1" or a.input == "" or a.construction == "" or
+        a.keyHex != List("707265666978", "78") or a.sources != List("", original.attempt)) "wrong_pinned_source"
+      else "ok"
+    } else if (i == 10) {
+      val pending = rows[8]
+      if (workRead(a, before.commit, pending.request, "double@1", 84, List("x"), List(original.attempt)) and
+        a.producingInput == pending.input and a.producingConstruction == pending.construction) "ok" else "wrong_pinned_getter"
+    } else "unchecked_step"
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val start = story.length() + tableEdits.length()
     val keyStart = start + workFailures.length()
-    val keyRows = row.attempts.slice(keyStart, fullStory.length())
+    val keyRows = row.attempts.slice(keyStart, pinStart)
+    val pinRows = row.attempts.slice(pinStart, fullStory.length())
     val prior = row.attempts.slice(0, story.length())
     val edits = row.attempts.slice(story.length(), start)
     if (row.scenario != 0 or row.attempts.length() != fullStory.length()) List("missing_steps")
@@ -247,6 +294,8 @@ module argument_maps_rules {
         out.append(workFailureVerdict(row.attempts[start + i - 1], row.attempts[start + i], i))))
       .concat(range(0, canonicalKeys.length()).foldl(List(), (out, i) =>
         out.append(canonicalKeyVerdict(row.attempts[keyStart + i - 1], keyRows, i))))
+      .concat(range(0, returnedPins.length()).foldl(List(), (out, i) =>
+        out.append(pinVerdict(prior[8], row.attempts[pinStart + i - 1], pinRows, i))))
   }
   pure def verdictAccepted(verdict: str): bool = verdict == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
@@ -257,10 +306,12 @@ module argument_maps_rules {
     evidence[0].attempts[story.length() + 9].outcome == "reuse" and
     evidence[0].attempts[story.length() + 13].outcome == "pending" and
     evidence[0].attempts[story.length() + 15].outcome == "reuse" and
-    evidence[0].attempts.slice(story.length() + tableEdits.length(), fullStory.length())
+    evidence[0].attempts.slice(story.length() + tableEdits.length(), pinStart - canonicalKeys.length())
       .select(a => a.op == "work").foldl(List(), (errors, a) => errors.append(a.error)) == workErrors and
-    evidence[0].attempts.slice(fullStory.length() - canonicalKeys.length(), fullStory.length())
-      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 0, 0, 0, 1, 1)
+    evidence[0].attempts.slice(pinStart - canonicalKeys.length(), pinStart)
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 0, 0, 0, 1, 1) and
+    evidence[0].attempts.slice(pinStart, fullStory.length())
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0)
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",

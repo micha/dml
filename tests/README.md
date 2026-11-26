@@ -319,6 +319,14 @@ only for the CLI arguments. Supplying both spellings together, with equal or
 conflicting values, must report `request: duplicate canonical argument key` and
 leave the full native inventory unchanged. The conflicting request starts with a
 new singleton map so a partially committed first insert would be visible.
+
+A returned argument pins an attempt, not its value or result commit. Two `add@1`
+requests (`13 + 29` and `12 + 30`) return `42`; executing the first request twice
+also yields two attempts with the same result commit. Neither alternative attempt
+can pin the original ref. Both stale pins must report the exact mismatch and roll
+back the preceding literal insert without changing the full native inventory.
+Changing only the pin to the original attempt lets the request succeed. Quint checks
+that the inspected `x` argument and the subsequent `double@1` getter name that attempt.
 The [focused tests](test_argument_maps.py) exercise forged request maps, sources
 and getter links, poisoned table history, and caps.
 
