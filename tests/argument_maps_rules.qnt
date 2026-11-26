@@ -2,11 +2,13 @@ module argument_maps_rules {
   import argument_maps_histories.* from "./argument_maps_histories"
 
   type Ref = { name: str, target: str }
+  type Entry = { key: str, attempt: str }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, error: str,
     commit: str, unchanged: bool, refs: List[Ref], requests: int, executions: int, results: int, accesses: int,
     request: str, input: str, construction: str, implementation: str, sources: List[str],
     producingRequest: str, producingInput: str, producingConstruction: str, producingImplementation: str,
-    attempt: str, result: str, value: int, gets: List[str], getSources: List[str], outcome: str, table: str }
+    attempt: str, result: str, value: int, gets: List[str], getSources: List[str], outcome: str, table: str,
+    intent: str, entries: List[Entry], reportDigest: str }
   type Observation = { scenario: int, attempts: List[Attempt] }
 
   pure def ref(a: Attempt, name: str): str = {
@@ -108,21 +110,103 @@ module argument_maps_rules {
     } else acceptedStep(rows, i)
   }
 
-  pure def historyVerdicts(row: Observation): List[str] =
-    if (row.scenario != 0 or row.attempts.length() != story.length()) List("missing_steps")
-    else range(0, story.length()).foldl(List(), (out, i) => out.append(stepVerdict(row.attempts, i)))
+  pure def tableRead(a: Attempt, commit: str, expected: Set[Entry]): str =
+    if (a.commit != commit or a.intent != "double") "wrong_table_version"
+    else if (a.entries.length() != expected.size() or a.entries.foldl(Set(), (out, e) => out.union(Set(e))) != expected)
+      "wrong_table_entries"
+    else "ok"
+
+  pure def editedHit(a: Attempt, decision: str, table: str, producer: Attempt): bool = all {
+    a.commit == decision, a.outcome == "reuse", a.table == table,
+    a.request != "", a.request != producer.producingRequest, a.implementation == "double@1",
+    a.sources == List(""), a.construction != "", a.construction != producer.producingConstruction,
+    a.input == producer.producingInput, a.producingInput == producer.producingInput,
+    a.producingConstruction == producer.producingConstruction, a.producingRequest == producer.producingRequest,
+    a.producingImplementation == producer.producingImplementation, a.attempt == producer.attempt,
+    a.result == producer.result, a.value == producer.value, a.gets == producer.gets, a.getSources == producer.getSources
+  }
+
+  pure def sameOtherRefs(a: Attempt, before: Attempt, changed: Set[str]): bool =
+    a.refs.select(r => not(changed.contains(r.name))) == before.refs.select(r => not(changed.contains(r.name)))
+
+  pure def editCounts(i: int): (int, int, int, int) = {
+    val requests = if (i < 8) 6 else if (i < 12) 7 else if (i < 14) 8 else 9
+    if (i == 0) (requests, 4, 4, 6) else (requests, 5, 5, 7)
+  }
+
+  pure def tableEditVerdict(prior: List[Attempt], edits: List[Attempt], i: int): str = {
+    val a = edits[i]
+    val before = if (i == 0) prior[21] else edits[i - 1] // Last source inspection, not the replica's.
+    val first = prior[2]
+    val other = prior[21]
+    val replacement = edits[2]
+    val key = first.producingInput
+    val survivor = { key: other.producingInput, attempt: other.attempt }
+    if (a.op != tableEdits[i].op or a.args != tableEdits[i].args) "wrong_step"
+    else if (nativeCounts(a) != editCounts(i)) "wrong_native_occurrence_counts"
+    else if (i == 5) {
+      if (a.code == 1 and a.diagnosed and a.commit == "" and a.unchanged and
+        a.error == "update-table: adopt requires a different attempt for an existing key") "ok" else "wrong_same_adoption"
+    } else if (a.code != 0 or not(a.quiet) or a.commit == "") "unexpected_command_failure"
+    else if (a.unchanged != (a.op == "inspect")) "wrong_inventory_effect"
+    else if (a.op == "update_table" or a.op == "work") {
+      val dest = a.args[3]
+      if (ref(before, dest) == "" and ref(a, dest) == a.commit and sameOtherRefs(a, before, Set(dest))) "ok"
+      else "wrong_publication_refs"
+    } else if (i == 0 or i == 12) {
+      val pending = a.args[1]
+      val decision = a.args[2]
+      if (ref(a, pending) != "" and ref(a, decision) == a.commit and sameOtherRefs(a, before, Set(pending, decision))) "ok"
+      else "wrong_pending_refs"
+    } else if (i == 8 or i == 14) {
+      val producer = if (i == 8) replacement else other
+      if (ref(a, a.args[1]) == "" and ref(a, a.args[2]) == a.commit and ref(a, "main") == producer.result and
+        sameOtherRefs(a, before, Set(a.args[2], "main"))) "ok" else "wrong_edited_hit_refs"
+    } else if (i == 2) {
+      if (workRead(a, edits[1].commit, ref(edits[0], "p6"), "double@2", 84, List("x"), List(prior[8].attempt)) and
+        a.producingInput == key and a.producingConstruction == prior[11].construction and
+        a.producingRequest != first.producingRequest and a.attempt != first.attempt and a.result != first.result)
+        "ok" else "wrong_replacement_provenance"
+    } else if (i == 4) tableRead(a, edits[3].commit, Set({ key: key, attempt: first.attempt }, survivor))
+    else if (i == 7) tableRead(a, edits[6].commit, Set({ key: key, attempt: replacement.attempt }, survivor))
+    else if (i == 9) {
+      if (editedHit(a, edits[8].commit, edits[6].commit, replacement) and a.construction == first.producingConstruction)
+        "ok" else "wrong_adopted_hit"
+    } else if (i == 11) tableRead(a, edits[10].commit, Set(survivor))
+    else if (i == 13) {
+      if (a.commit == edits[12].commit and a.outcome == "pending" and a.table == edits[10].commit and
+        a.request == ref(edits[12], "p8") and a.input == key and a.construction == first.producingConstruction and
+        a.attempt == "" and a.producingRequest == "" and a.result == "" and a.gets == List()) "ok" else "wrong_removed_miss"
+    } else if (i == 15) {
+      if (editedHit(a, edits[14].commit, edits[10].commit, other)) "ok" else "wrong_surviving_hit"
+    } else if (i == 16) {
+      if (a.reportDigest != "" and a.reportDigest == prior[11].reportDigest) "ok" else "historical_decision_changed"
+    } else "unchecked_step"
+  }
+
+  pure def historyVerdicts(row: Observation): List[str] = {
+    val prior = row.attempts.slice(0, story.length())
+    val edits = row.attempts.slice(story.length(), row.attempts.length())
+    if (row.scenario != 0 or row.attempts.length() != fullStory.length()) List("missing_steps")
+    else range(0, story.length()).foldl(List(), (out, i) => out.append(stepVerdict(prior, i)))
+      .concat(range(0, tableEdits.length()).foldl(List(), (out, i) => out.append(tableEditVerdict(prior, edits, i))))
+  }
   pure def verdictAccepted(verdict: str): bool = verdict == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == story.length() and
+    evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == fullStory.length() and
     verdicts[0].foldl(true, (ok, verdict) => ok and verdictAccepted(verdict)) and
     evidence[0].attempts[11].outcome == "reuse" and
-    evidence[0].attempts[19].outcome == "pending"
+    evidence[0].attempts[19].outcome == "pending" and
+    evidence[0].attempts[story.length() + 9].outcome == "reuse" and
+    evidence[0].attempts[story.length() + 13].outcome == "pending" and
+    evidence[0].attempts[story.length() + 15].outcome == "reuse"
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",
     construction: "from-result", implementation: "double@2", sources: List("upstream"), producingRequest: "q-old",
     producingInput: "map", producingConstruction: "from-literal", producingImplementation: "double@1",
-    attempt: "t-old", result: "r-old", value: 84, gets: List("x"), getSources: List(""), outcome: "reuse", table: "table" }
+    attempt: "t-old", result: "r-old", value: 84, gets: List("x"), getSources: List(""), outcome: "reuse", table: "table",
+    intent: "", entries: List(), reportDigest: "" }
   pure val controlsPass = hitRead(fixture, fixture, { ...fixture, attempt: "upstream" }, "d", "table") == "ok" and
     hitRead({ ...fixture, producingRequest: fixture.request }, fixture, { ...fixture, attempt: "upstream" },
       "d", "table") == "wrong_producing_request"

@@ -298,9 +298,14 @@ A late decision-ref collision must report the exact `ref already exists`
 diagnostic without changing the full native inventory. The fresh request leaves no pending
 ref; the selected hit leaves `main` absent. Retrying each with the same
 invocation ID and a free decision ref publishes the pending request or the reused result.
+The same history then adopts a `double@2` attempt for the `42` map. Its getter
+reads the returned `42`, not the literal read by `double@1`. Quint checks both
+rows before and after adoption. An attempt to re-adopt the current selection
+must fail without changing the native inventory. Removing `42` leaves a pending miss on that key; `43`
+still routes to its original producer. After both edits and `main` updates,
+inspecting the old hit must reproduce its complete pre-edit report.
 The [focused tests](test_argument_maps.py) exercise duplicate canonical keys,
-forged sources and getter links, one-key adoption/removal, poisoned table
-history, and caps.
+forged sources and getter links, poisoned table history, and caps.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
