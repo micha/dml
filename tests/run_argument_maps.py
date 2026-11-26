@@ -64,6 +64,7 @@ def report_evidence(report):
             "request": requested.get("request", ""), "input": requested.get("argument_map", ""),
             "construction": requested.get("construction", ""), "implementation": requested.get("implementation", ""),
             "sources": [arg["attempt"] for arg in requested.get("arguments", [])],
+            "keyHex": [arg["key"].encode("utf-8").hex() for arg in requested.get("arguments", [])],
             "producingRequest": producing.get("request", ""), "producingInput": producing.get("argument_map", ""),
             "producingConstruction": producing.get("construction", ""),
             "producingImplementation": producing.get("implementation", ""),
@@ -106,12 +107,24 @@ class History:
                 "error": stderr.rstrip("\n"), "commit": commit, "unchanged": before == after,
                 **report_evidence(report), **native}
 
+    def cli_args(self, args):
+        argv = []
+        for i, arg in enumerate(args):
+            if arg.startswith("map-of:"):
+                argv.append(self.argument_maps[arg.removeprefix("map-of:")])
+                continue
+            value = RECEIPT.sub(lambda match: self.receipts[match[1]], arg)
+            if i > 0 and args[i - 1] == "--arg" and value.startswith("key-hex:"):
+                key, separator, descriptor = value.removeprefix("key-hex:").partition("=")
+                value = bytes.fromhex(key).decode("utf-8") + separator + descriptor
+            argv.append(value)
+        return argv
+
     def command(self, op):
         def invoke(role, *args):
             repo = self.directory / role
             before = self.inventory(repo)
-            argv = [self.argument_maps[arg.removeprefix("map-of:")] if arg.startswith("map-of:") else
-                    RECEIPT.sub(lambda match: self.receipts[match[1]], arg) for arg in args]
+            argv = self.cli_args(args)
             process = subprocess.run([sys.executable, "-B", self.example, op.replace("_", "-"), repo, *argv],
                                      cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30)
             return self.evidence(op, (role, *args), process.stdout, process.returncode, process.stderr, before,

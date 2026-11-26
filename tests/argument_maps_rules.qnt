@@ -5,7 +5,7 @@ module argument_maps_rules {
   type Entry = { key: str, attempt: str }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, error: str,
     commit: str, unchanged: bool, refs: List[Ref], requests: int, executions: int, results: int, accesses: int,
-    request: str, input: str, construction: str, implementation: str, sources: List[str],
+    request: str, input: str, construction: str, implementation: str, sources: List[str], keyHex: List[str],
     producingRequest: str, producingInput: str, producingConstruction: str, producingImplementation: str,
     attempt: str, result: str, value: int, gets: List[str], getSources: List[str], outcome: str, table: str,
     intent: str, entries: List[Entry], reportDigest: str }
@@ -189,20 +189,23 @@ module argument_maps_rules {
   pure val workErrors = List(missingKey, wrongType, "work: argument-map result is not a signed 64-bit integer",
     missingKey, wrongType)
 
+  pure def pendingRequest(before: Attempt, a: Attempt): str = {
+    val pending = a.args[1]
+    val decision = a.args[2]
+    if (a.code != 0 or not(a.quiet) or a.commit == "" or a.unchanged) "expected_pending_request"
+    else if (ref(before, pending) != "" or ref(before, decision) != "" or ref(a, pending) == "" or
+      ref(a, pending) == a.commit or ref(a, decision) != a.commit or ref(a, "main") == "" or
+      not(sameOtherRefs(a, before, Set(pending, decision)))) "wrong_pending_refs"
+    else if (nativeCounts(a) != (before.requests + 1, before.executions, before.results, before.accesses))
+      "wrong_native_occurrence_counts"
+    else "ok"
+  }
+
   pure def workFailureVerdict(before: Attempt, a: Attempt, i: int): str = {
     val wanted = workFailures[i]
     if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
-    else if (a.op == "request") {
-      val pending = a.args[1]
-      val decision = a.args[2]
-      if (a.code != 0 or not(a.quiet) or a.commit == "" or a.unchanged) "expected_pending_request"
-      else if (ref(before, pending) != "" or ref(before, decision) != "" or ref(a, pending) == "" or
-        ref(a, pending) == a.commit or ref(a, decision) != a.commit or ref(a, "main") == "" or
-        not(sameOtherRefs(a, before, Set(pending, decision)))) "wrong_pending_refs"
-      else if (nativeCounts(a) != (before.requests + 1, before.executions, before.results, before.accesses))
-        "wrong_native_occurrence_counts"
-      else "ok"
-    } else if (a.code != 1 or not(a.diagnosed) or a.error != workErrors[i / 2] or a.commit != "")
+    else if (a.op == "request") pendingRequest(before, a)
+    else if (a.code != 1 or not(a.diagnosed) or a.error != workErrors[i / 2] or a.commit != "")
       "wrong_work_diagnostic"
     else if (not(a.unchanged) or a.refs != before.refs or ref(a, a.args[3]) != "" or
       nativeCounts(a) != nativeCounts(before))
@@ -210,8 +213,31 @@ module argument_maps_rules {
     else "ok"
   }
 
+  pure val duplicateError = "request: duplicate canonical argument key"
+  pure def canonicalKeyVerdict(before: Attempt, rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val wanted = canonicalKeys[i]
+    if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
+    else if (i >= 6) {
+      if (a.code != 1 or not(a.diagnosed) or a.error != duplicateError or a.commit != "") "wrong_duplicate_diagnostic"
+      else if (not(a.unchanged) or a.refs != before.refs or nativeCounts(a) != nativeCounts(before) or
+        ref(a, a.args[1]) != "" or ref(a, a.args[2]) != "") "wrong_duplicate_rollback"
+      else "ok"
+    } else if (a.op == "request") pendingRequest(before, a)
+    else if (a.code != 0 or not(a.quiet) or not(a.unchanged) or a.commit == "" or
+      a.commit != ref(before, a.args[1]) or a.request != a.commit or a.implementation != "add@1" or
+      a.input == "" or a.construction == "" or a.sources != List("", "") or
+      a.keyHex.foldl(Set(), (out, key) => out.union(Set(key))) != Set("61", "c3a9")) "wrong_canonical_request"
+    else if (a.input != rows[1].input) "wrong_canonical_map"
+    else if (i == 3 and a.construction == rows[1].construction) "lost_insertion_order"
+    else if (i == 5 and a.construction != rows[1].construction) "spelling_changed_construction"
+    else "ok"
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val start = story.length() + tableEdits.length()
+    val keyStart = start + workFailures.length()
+    val keyRows = row.attempts.slice(keyStart, fullStory.length())
     val prior = row.attempts.slice(0, story.length())
     val edits = row.attempts.slice(story.length(), start)
     if (row.scenario != 0 or row.attempts.length() != fullStory.length()) List("missing_steps")
@@ -219,6 +245,8 @@ module argument_maps_rules {
       .concat(range(0, tableEdits.length()).foldl(List(), (out, i) => out.append(tableEditVerdict(prior, edits, i))))
       .concat(range(0, workFailures.length()).foldl(List(), (out, i) =>
         out.append(workFailureVerdict(row.attempts[start + i - 1], row.attempts[start + i], i))))
+      .concat(range(0, canonicalKeys.length()).foldl(List(), (out, i) =>
+        out.append(canonicalKeyVerdict(row.attempts[keyStart + i - 1], keyRows, i))))
   }
   pure def verdictAccepted(verdict: str): bool = verdict == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
@@ -230,11 +258,14 @@ module argument_maps_rules {
     evidence[0].attempts[story.length() + 13].outcome == "pending" and
     evidence[0].attempts[story.length() + 15].outcome == "reuse" and
     evidence[0].attempts.slice(story.length() + tableEdits.length(), fullStory.length())
-      .select(a => a.op == "work").foldl(List(), (errors, a) => errors.append(a.error)) == workErrors
+      .select(a => a.op == "work").foldl(List(), (errors, a) => errors.append(a.error)) == workErrors and
+    evidence[0].attempts.slice(fullStory.length() - canonicalKeys.length(), fullStory.length())
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 0, 0, 0, 1, 1)
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",
-    construction: "from-result", implementation: "double@2", sources: List("upstream"), producingRequest: "q-old",
+    construction: "from-result", implementation: "double@2", sources: List("upstream"), keyHex: List("78"),
+    producingRequest: "q-old",
     producingInput: "map", producingConstruction: "from-literal", producingImplementation: "double@1",
     attempt: "t-old", result: "r-old", value: 84, gets: List("x"), getSources: List(""), outcome: "reuse", table: "table",
     intent: "", entries: List(), reportDigest: "" }

@@ -68,19 +68,6 @@ class ArgumentMapsTest(unittest.TestCase):
     def data(self):
         return (self.repo / "data.mdb").read_bytes()
 
-    def test_canonical_keys_and_insertion_order_affect_construction_not_map(self):
-        first = (number(b"a", 13), number(b"\xc3\xa9", 29))
-        second = (number(b"e\xcc\x81", 29), number(b"a", 13))
-        self.request(b"1", ADD, first)
-        self.request(b"2", ADD, second)
-        one, two = (maps.inspect(self.repo, ref)["requested"] for ref in (b"p1", b"p2"))
-        self.assertEqual(one["argument_map"], two["argument_map"])
-        self.assertNotEqual(one["construction"], two["construction"])
-        before = self.data()
-        with self.assertRaisesRegex(ValueError, "duplicate canonical argument key"):
-            self.request(b"dup", ADD, (first[1], second[0]))
-        self.assertEqual(self.data(), before)
-
     def test_requested_map_cannot_substitute_another_well_formed_map(self):
         self.request(b"1", DOUBLE, [number(b"x", 42)])
         self.request(b"2", DOUBLE, [number(b"x", 43)])

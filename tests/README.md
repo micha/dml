@@ -310,8 +310,17 @@ or STRING `x`, or a result outside the signed I64 range. `add@1` reads a valid
 `a` before encountering a missing or STRING `b`. Quint checks each diagnostic
 and the unchanged full native inventory: the pending request, its decision, and
 `main` retain their targets, with no partial attempt, result, or getter record.
-The [focused tests](test_argument_maps.py) exercise duplicate canonical keys,
-forged sources and getter links, poisoned table history, and caps.
+
+Three `add@1` requests separate key spelling from insertion order. `a=13, é=29`
+produces the same MAP ID with composed or decomposed `é`, in either tested order.
+Changing only the spelling preserves the construction ID; reversing the inserts
+changes it. The history spells UTF-8 key bytes in hex, and the runner decodes them
+only for the CLI arguments. Supplying both spellings together, with equal or
+conflicting values, must report `request: duplicate canonical argument key` and
+leave the full native inventory unchanged. The conflicting request starts with a
+new singleton map so a partially committed first insert would be visible.
+The [focused tests](test_argument_maps.py) exercise forged request maps, sources
+and getter links, poisoned table history, and caps.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
