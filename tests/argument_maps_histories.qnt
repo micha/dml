@@ -2,16 +2,22 @@ module argument_maps_histories {
   type Request = { op: str, args: List[str] }
   pure def source(op: str, args: List[str]): Request = { op: op, args: List("source").concat(args) }
   pure val selection = List("--table-ref", "selected", "--table-commit", "@selected")
+  // Each retry changes only the decision ref, not the requested invocation.
+  pure def freshAdd(decision: str): Request = source("request", List("p2", decision, "add@1",
+    "--invocation", "00000000-0000-4000-8000-000000000002", "--arg", "a=i64:13", "--arg", "b=i64:29"))
+  pure def selectedDouble(decision: str): Request = source("request", List("p3", decision, "double@2",
+    "--invocation", "00000000-0000-4000-8000-000000000003", "--arg", "x=from:t2:@t2",
+    "--mode", "try-selected").concat(selection))
   pure val story: List[Request] = List(
     source("request", List("p1", "d1", "double@1", "--arg", "x=i64:42")),
     source("work", List("p1", "@p1", "t1")),
     source("inspect", List("t1")),
     source("define_table", List("empty", "double")),
     source("update_table", List("empty", "@empty", "selected", "insert", "--selected", "t1", "@t1")),
-    source("request", List("p2", "d2", "add@1", "--arg", "a=i64:13", "--arg", "b=i64:29")),
+    freshAdd("d1"), freshAdd("d2"),
     source("work", List("p2", "@p2", "t2")),
     source("inspect", List("t2")),
-    source("request", List("p3", "d3", "double@2", "--arg", "x=from:t2:@t2", "--mode", "try-selected").concat(selection)),
+    selectedDouble("d1"), selectedDouble("d3"),
     source("inspect", List("d3")),
     source("request", List("p-type", "d-type", "double@2", "--arg", "x=string:42",
       "--mode", "require-selected").concat(selection)),

@@ -294,9 +294,13 @@ literal `42` and returned `42` reuses the original `double@1` result for a new
 separately. The runner collects CLI reports and an independent LMDB inventory;
 Quint checks request, result, attempt, and getter counts, exact ref effects,
 and both constructions on a replica containing only the transferred hit ref.
+A late decision-ref collision must report the exact `ref already exists`
+diagnostic without changing the full native inventory. The fresh request leaves no pending
+ref; the selected hit leaves `main` absent. Retrying each with the same
+invocation ID and a free decision ref publishes the pending request or the reused result.
 The [focused tests](test_argument_maps.py) exercise duplicate canonical keys,
 forged sources and getter links, one-key adoption/removal, poisoned table
-history, caps, and rollback after a late output-ref collision.
+history, and caps.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
