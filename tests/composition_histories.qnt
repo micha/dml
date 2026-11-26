@@ -3,8 +3,11 @@ module composition_histories {
   pure def source(op: str, args: List[str]): Request = { op: op, args: List("source").concat(args) }
   // A @ref token is resolved from live native receipts by the runner. The
   // ref/pin pairs here are explicit so stale-pin controls can keep their names.
-  pure val pendingPins = Map("q1" -> "@q1", "q2" -> "@q2", "q3" -> "@q3", "q5" -> "@q5", "q7" -> "@q7", "q8" -> "@q8")
-  pure val compositionPins = Map("c2" -> "@c2", "c4" -> "@c4", "c6" -> "@c6", "c8" -> "@c8")
+  pure val pendingPins = Map(
+    "q1" -> "@q1", "q2" -> "@q2", "q3" -> "@q3", "q5" -> "@q5", "q7" -> "@q7", "q8" -> "@q8",
+    "q-overflow" -> "@q-overflow", "q-max" -> "@q-max", "q-double-overflow" -> "@q-double-overflow")
+  pure val compositionPins = Map("c2" -> "@c2", "c4" -> "@c4", "c6" -> "@c6", "c8" -> "@c8",
+    "c-overflow" -> "@c-overflow")
   pure val ids = Map(
     "1" -> "12345678-abcd-4abc-8abc-123456789ab1", "2" -> "12345678-abcd-4abc-8abc-123456789ab2",
     "3" -> "12345678-abcd-4abc-8abc-123456789ab3", "4" -> "12345678-abcd-4abc-8abc-123456789ab4",
@@ -20,7 +23,8 @@ module composition_histories {
     source("work", List(pending, pendingPins.get(pending), t, "--attempt-id", ids.get(n)))
   pure def compose(t: str, pin: str, output: str): Request = source("compose", List(t, pin, output))
   pure def double(basis: str, pending: str, d: str, mode: str, selection: str, pin: str, n: str): Request = {
-    val selected = List("--selected-ref", selection).concat(if (pin == "") List() else List("--selected", pin))
+    val selected = if (selection == "") List() else
+      List("--selected-ref", selection).concat(if (pin == "") List() else List("--selected", pin))
     val command = List(basis, compositionPins.get(basis), pending, d, "--mode", mode)
     source("request_double", command.concat(selected).concat(invocation(n)))
   }
@@ -80,7 +84,21 @@ module composition_histories {
     { op: "graft_history", args: List("repeat", "snapshot-repeat", "history-graft") }, // 49
     inspect("repeat", "history-graft", "@history-graft")                          // 50
   )
+  pure val maxI64Arg = "9223372036854775807"
+  // Use a clean repository so the rejected add cannot leave or replace main.
+  pure val overflowStory: List[Request] = List(
+    source("define", List("config")),                                           // 0
+    add("q-overflow", maxI64Arg, "1", "1"),                                     // 1
+    work("q-overflow", "t-overflow", "1"),                                      // 2 add overflows before main exists
+    add("q-max", maxI64Arg, "0", "2"),                                          // 3
+    work("q-max", "t-max", "2"),                                                // 4
+    inspect("source", "t-max", "@t-max"),                                      // 5
+    compose("t-max", "@t-max", "c-overflow"),                                   // 6
+    double("c-overflow", "q-double-overflow", "d-overflow", "fresh", "", "", "3"), // 7
+    work("q-double-overflow", "t-double-overflow", "3"),                         // 8 double overflows with main at the add result
+    inspect("source", "d-overflow", "@d-overflow")                              // 9 double still pending
+  )
   var histories: List[List[Request]]
-  action init = histories' = List(story)
+  action init = histories' = List(story, overflowStory)
   action step = histories' = histories
 }

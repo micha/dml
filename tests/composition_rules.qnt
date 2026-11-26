@@ -38,6 +38,9 @@ module composition_rules {
   pure def getUpstream(a: Attempt): Upstream = { attempt: a.attempt, request: a.producing.request,
     result: a.result, outer: a.outer, map: a.producing.map }
 
+  pure def configRow(a: Attempt): bool =
+    a.created.length() == 1 and native(a, "config", List()) and record(a, "config").id == a.commit
+      and a.refs == List(createdRef("config", a.commit))
   pure def qrow(a: Attempt, parent: str, pending: str): bool =
     a.created.length() == 1 and native(a, "request", List(parent)) and record(a, "request").id == a.commit
       and a.refs == List(createdRef(pending, a.commit))
@@ -118,8 +121,7 @@ module composition_rules {
     val a = rows[i]
     val old = rows[9]
     val r = record(a, "request").id
-    if (i == 0) a.created.length() == 1 and native(a, "config", List()) and record(a, "config").id == a.commit
-      and a.refs == List(createdRef("config", a.commit))
+    if (i == 0) configRow(a)
     else if (i == 1 or i == 10 or i == 20 or i == 26) qrow(a, rows[0].commit, a.args[3])
     else if (Set(3, 8, 11, 21, 28, 36).contains(i)) {
       val q = if (i == 3 or i == 28) rows[i - 2].commit // Retry the request from before the rejection.
@@ -201,31 +203,59 @@ module composition_rules {
     } else false
   }
 
-  pure def verdict(rows: List[Attempt], i: int): str = {
+  pure def acceptedOverflow(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
-    val wanted = story[i]
+    val addResult = rows[5].result
+    if (i == 0) configRow(a) and a.main == ""
+    else if (i == 1 or i == 3) qrow(a, rows[0].commit, a.args[3]) and a.main == ""
+      and record(a, "request").inputs != ""
+    else if (i == 4) trow(a, rows[3].commit, a.args[3], "") and a.main == record(a, "result").id
+    else if (i == 5) workRead(a, rows[4], rows[3], addFunc, 9223372036854775807) and a.main == addResult
+    else if (i == 6) crow(a, rows[4].commit, a.args[3]) and a.main == addResult
+    else if (i == 7) drow(a, rows[6].commit, "",
+        List(createdRef(a.args[4], a.commit), createdRef(a.args[3], record(a, "request").id)))
+      and a.main == addResult
+    else if (i == 9) pendingRead(a, rows[7], rows[6], rows[5], "") and a.main == addResult
+    else false
+  }
+
+  pure def rejection(a: Attempt, error: str, intact: bool): str =
+    if (a.code == 1 and a.error == error and a.commit == "" and a.unchanged
+        and a.created == List() and a.refs == List() and intact) "ok" else "wrong_rejection_or_rollback"
+
+  pure def verdict(rows: List[Attempt], i: int, overflow: bool): str = {
+    val a = rows[i]
+    val wanted = if (overflow) overflowStory[i] else story[i]
     if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
     else if (not(a.preserved)) "changed_historical_records"
-    else if (rejected.keys().contains(i)) {
+    else if (overflow and (i == 2 or i == 8)) {
+      val main = if (i == 2) "" else rows[5].result
+      val counts = if (i == 2) List(1, 0, 0, 0, 0) else List(3, 1, 1, 1, 1)
+      rejection(a, "work: int too big to convert", a.main == main and rows[i - 1].main == main and a.counts == counts)
+    } else if (not(overflow) and rejected.keys().contains(i)) {
       val mainIntact = if (i == 2) a.main == "" and rows[1].main == ""
         else if (i == 27) a.main == rows[26].main and a.main == rows[9].result else true
-      if (a.code == 1 and a.error == rejected.get(i) and a.commit == "" and a.unchanged
-          and a.created == List() and a.refs == List() and mainIntact) "ok" else "wrong_rejection_or_rollback"
+      rejection(a, rejected.get(i), mainIntact)
     } else if (a.code != 0 or a.error != "" or (a.op != "retire" and a.commit == "")) "unexpected_failure"
     else if (a.unchanged != Set("inspect", "retire").contains(a.op)) "wrong_write_boundary"
-    else if (not(accepted(rows, i))) "wrong_native_or_reported_provenance"
+    else if (not(if (overflow) acceptedOverflow(rows, i) else accepted(rows, i))) "wrong_native_or_reported_provenance"
     else "ok"
   }
 
-  pure def historyVerdicts(row: Observation): List[str] =
-    if (row.attempts.length() != story.length()) List("missing_steps")
-    else range(0, story.length()).foldl(List(), (out, i) => out.append(verdict(row.attempts, i)))
+  pure def historyVerdicts(row: Observation): List[str] = {
+    val attemptCount = row.attempts.length()
+    val overflow = attemptCount == overflowStory.length()
+    if (attemptCount != story.length() and not(overflow)) List("missing_steps")
+    else range(0, attemptCount).foldl(List(), (out, i) => out.append(verdict(row.attempts, i, overflow)))
+  }
   pure def verdictAccepted(value: str): bool = value == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == story.length()
-      and verdicts[0].foldl(true, (ok, value) => ok and verdictAccepted(value))
+    evidence.length() == 2 and verdicts.length() == 2
+      and verdicts[0].length() == story.length() and verdicts[1].length() == overflowStory.length()
+      and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (pass, value) => pass and verdictAccepted(value)))
       and evidence[0].attempts[19].outcome == "reuse" and evidence[0].attempts[25].outcome == "reuse"
       and evidence[0].attempts[35].outcome == "pending" and evidence[0].attempts[44].unchanged
+      and evidence[1].attempts[9].outcome == "pending"
 
   pure val q: Q = { ...noQ, request: "old-q", func: doubleFunc, composition: "old-c", map: "same-map",
     upstream: { ...noUpstream, attempt: "old-add" } }

@@ -1,4 +1,4 @@
-"""Check fresh work failure boundaries against the native repository."""
+"""Check forged provenance against the native repository."""
 
 from pathlib import Path
 import sys
@@ -15,7 +15,6 @@ import recorded_composition as example
 
 INVOCATION = b"90000000-0000-4000-8000-000000000001"
 ATTEMPT = b"90000000-0000-4000-8000-000000000002"
-MAX_I64 = (1 << 63) - 1
 
 
 class CompositionTest(unittest.TestCase):
@@ -57,13 +56,6 @@ class CompositionTest(unittest.TestCase):
             ex.compose(self.path, b"forged", forged, b"from-forged")
         self.assertEqual(self.inventory(), before)
 
-    def test_add_overflow_does_not_publish_partial_work(self):
-        request = self.add(MAX_I64, 1)
-        before = self.inventory()
-        with self.assertRaises(OverflowError):
-            example.work(self.path, b"add", request, b"attempt", ATTEMPT)
-        self.assertEqual(self.inventory(), before)
-
     def double_request(self, a, b):
         add_request = self.add(a, b)
         producer = example.work(self.path, b"add", add_request, b"add-done", ATTEMPT)
@@ -71,13 +63,6 @@ class CompositionTest(unittest.TestCase):
         decision = example.request_double(self.path, b"from-add", composition, b"double", b"decision", INVOCATION)
         report = example.inspect(self.path, b"decision", expected=decision)
         return composition, bytes.fromhex(report["requested"]["request"])
-
-    def test_double_overflow_leaves_the_successful_add_and_pending_double_intact(self):
-        _, request = self.double_request(MAX_I64, 0)
-        before = self.inventory()
-        with self.assertRaises(OverflowError):
-            example.work(self.path, b"double", request, b"double-done", ATTEMPT)
-        self.assertEqual(self.inventory(), before)
 
     def test_reuse_cannot_masquerade_as_a_new_request_with_the_same_id(self):
         composition, request = self.double_request(13, 29)
