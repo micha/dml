@@ -257,6 +257,17 @@ with tempfile.TemporaryDirectory() as tmp:
   )
 
   test(
+    'argument-map-request-integrity', python,
+    args: ['-B', files('tests/run_argument_map_request_integrity.py'), quint.full_path(),
+           files('examples/recorded_argument_maps.py'), lmdb_inventory,
+           files('tests/argument_map_request_integrity_histories.qnt',
+                 'tests/argument_map_request_integrity_rules.qnt')] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
+  test(
     'builtins-boundaries', python,
     args: ['-B', files('tests/test_builtins.py')],
     env: binding_env,

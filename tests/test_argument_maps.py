@@ -58,20 +58,6 @@ class ArgumentMapsTest(unittest.TestCase):
         request = bytes.fromhex(maps.inspect(self.repo, b"p" + tag)["requested"]["request"])
         return maps.Returned(b"t" + tag, maps.work(self.repo, b"p" + tag, request, b"t" + tag, identity(self.serial)))
 
-    def test_requested_map_cannot_substitute_another_well_formed_map(self):
-        self.request(b"1", DOUBLE, [number(b"x", 42)])
-        self.request(b"2", DOUBLE, [number(b"x", 43)])
-        with maps.records._write_transaction(self.repo, create=False) as txn:
-            dag, role, parents = snapshot(txn, core.txn_ref_get(txn, b"p1"))
-            other, _, _ = snapshot(txn, core.txn_ref_get(txn, b"p2"))
-            _, wrong_root, _ = view(txn, core.REC_DAG, other)
-            fields = [field for name in (b"implementation", b"invocation", b"construction")
-                      for field in (name, core.txn_lookup_node(txn, dag, name))]
-            forged = put(txn, core.REC_DAG, wrong_root, *fields)
-            publish(txn, b"forged", role, forged, *parents)
-        with self.assertRaisesRegex(ValueError, "differs from its construction"):
-            maps.inspect(self.repo, b"forged")
-
     def test_forged_returned_source_link_is_rejected_even_when_decoy_value_is_equal(self):
         exact = self.execute(b"first", ADD, number(b"a", 13), number(b"b", 29))
         decoy = self.execute(b"second", ADD, number(b"a", 12), number(b"b", 30))
