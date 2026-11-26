@@ -343,8 +343,20 @@ one row, the same insert and output ref succeed against the reduced version.
 Quint checks the exact mappings in both new versions and confirms the earlier
 full version remains unchanged.
 
-The [focused tests](test_argument_maps.py) exercise forged request maps, sources
-and getter links, poisoned table history, and the reached-attempt budget.
+The [budget replay](argument_map_budget_histories.qnt) uses the same CLI
+runner in a separate suite. It reaches 63 distinct attempts through four
+disjoint groups of pinned returns. An `add@1` request pins all four group attempts and uses the
+first one twice, so work adds exactly one more reached attempt. Quint checks
+the pending source pins and the resulting getter links. A new request cannot
+use that 64-attempt result as a source. Replacing the repeated pin with a
+sibling that shares its request and result also reaches 64 distinct attempts
+and leaves no slot for new work. Both requests must report
+`request: too many reached argument-map attempts for a new invocation`, with
+no receipt, new refs, or changes to the full native inventory. Each starts with
+an unused new literal so a partial insert would be visible.
+
+The [focused tests](test_argument_maps.py) exercise a 64-deep returned-source
+chain, forged request maps, sources and getter links, and poisoned table history.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request

@@ -234,6 +234,18 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
+  # Check the larger returned-source graph separately so its observations do not
+  # share Quint's evidence evaluation deadline with the other argument-map histories.
+  test(
+    'argument-map-budget', python,
+    args: ['-B', files('tests/run_argument_maps.py'), quint.full_path(),
+           files('examples/recorded_argument_maps.py'), lmdb_inventory,
+           files('tests/argument_map_budget_histories.qnt', 'tests/argument_map_budget_rules.qnt')] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
   test(
     'builtins-boundaries', python,
     args: ['-B', files('tests/test_builtins.py')],
