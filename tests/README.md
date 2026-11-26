@@ -327,8 +327,15 @@ can pin the original ref. Both stale pins must report the exact mismatch and rol
 back the preceding literal insert without changing the full native inventory.
 Changing only the pin to the original attempt lets the request succeed. Quint checks
 that the inspected `x` argument and the subsequent `double@1` getter name that attempt.
+
+At the request-size boundary, a fresh `add@1` decision retains all sixteen named
+literal arguments and points to the published pending request. Adding a new
+seventeenth argument must report `request: expected up to sixteen named arguments`
+without a receipt, new refs, or any change to the full native inventory. The extra
+argument is first in the CLI list so even a partial insert would be visible.
 The [focused tests](test_argument_maps.py) exercise forged request maps, sources
-and getter links, poisoned table history, and caps.
+and getter links, poisoned table history, the live-table cap, and the
+reached-attempt budget.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request

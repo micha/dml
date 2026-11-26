@@ -141,12 +141,7 @@ class ArgumentMapsTest(unittest.TestCase):
         self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
         self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
 
-    def test_argument_and_table_caps_apply_before_publication(self):
-        self.request(b"max", DOUBLE, [number(str(i).encode(), i) for i in range(16)])
-        before = self.data()
-        with self.assertRaisesRegex(ValueError, "up to sixteen"):
-            self.request(b"too-many", DOUBLE, [number(str(i).encode(), i) for i in range(17)])
-        self.assertEqual(self.data(), before)
+    def test_live_table_cap_applies_before_publication(self):
         ref, table = b"empty", maps.define_table(self.repo, b"empty", b"double")
         for i in range(17):
             tag = str(i).encode()

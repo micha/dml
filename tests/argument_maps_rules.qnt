@@ -280,11 +280,32 @@ module argument_maps_rules {
     } else "unchecked_step"
   }
 
+  pure val arityKeys = List("61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f", "70")
+  pure def argumentLimitVerdict(before: Attempt, a: Attempt, i: int): str = {
+    val wanted = argumentLimit[i]
+    if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
+    else if (i == 0) pendingRequest(before, a)
+    else if (i == 1) {
+      if (a.code != 0 or not(a.quiet) or a.commit == "" or a.commit != ref(before, a.args[1]) or
+        a.outcome != "pending" or a.request != ref(before, argumentLimit[0].args[1]) or
+        a.implementation != "add@1" or a.input == "" or a.construction == "" or
+        a.keyHex != arityKeys or a.sources != arityKeys.foldl(List(), (sources, _) => sources.append("")))
+        "wrong_sixteen_argument_request"
+      else if (not(a.unchanged) or a.refs != before.refs or nativeCounts(a) != nativeCounts(before))
+        "argument_limit_inspection_wrote"
+      else "ok"
+    } else if (a.code != 1 or not(a.diagnosed) or a.error != "request: expected up to sixteen named arguments" or
+      a.commit != "") "wrong_argument_limit_diagnostic"
+    else if (not(a.unchanged) or a.refs != before.refs or nativeCounts(a) != nativeCounts(before) or
+      ref(a, a.args[1]) != "" or ref(a, a.args[2]) != "") "wrong_argument_limit_rollback"
+    else "ok"
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val start = story.length() + tableEdits.length()
     val keyStart = start + workFailures.length()
     val keyRows = row.attempts.slice(keyStart, pinStart)
-    val pinRows = row.attempts.slice(pinStart, fullStory.length())
+    val pinRows = row.attempts.slice(pinStart, arityStart)
     val prior = row.attempts.slice(0, story.length())
     val edits = row.attempts.slice(story.length(), start)
     if (row.scenario != 0 or row.attempts.length() != fullStory.length()) List("missing_steps")
@@ -296,6 +317,8 @@ module argument_maps_rules {
         out.append(canonicalKeyVerdict(row.attempts[keyStart + i - 1], keyRows, i))))
       .concat(range(0, returnedPins.length()).foldl(List(), (out, i) =>
         out.append(pinVerdict(prior[8], row.attempts[pinStart + i - 1], pinRows, i))))
+      .concat(range(0, argumentLimit.length()).foldl(List(), (out, i) =>
+        out.append(argumentLimitVerdict(row.attempts[arityStart + i - 1], row.attempts[arityStart + i], i))))
   }
   pure def verdictAccepted(verdict: str): bool = verdict == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
@@ -310,8 +333,10 @@ module argument_maps_rules {
       .select(a => a.op == "work").foldl(List(), (errors, a) => errors.append(a.error)) == workErrors and
     evidence[0].attempts.slice(pinStart - canonicalKeys.length(), pinStart)
       .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 0, 0, 0, 1, 1) and
-    evidence[0].attempts.slice(pinStart, fullStory.length())
-      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0)
+    evidence[0].attempts.slice(pinStart, arityStart)
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0) and
+    evidence[0].attempts.slice(arityStart, fullStory.length())
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 1)
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",
