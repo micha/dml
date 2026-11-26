@@ -82,14 +82,10 @@ class ArgumentMapsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "differs from its construction"):
             maps.inspect(self.repo, b"forged")
 
-    def test_returned_source_binds_exact_attempt_even_when_decoy_value_is_equal(self):
+    def test_forged_returned_source_link_is_rejected_even_when_decoy_value_is_equal(self):
         exact = self.execute(b"first", ADD, number(b"a", 13), number(b"b", 29))
         decoy = self.execute(b"second", ADD, number(b"a", 12), number(b"b", 30))
         self.assertEqual(maps.inspect(self.repo, exact.ref)["value"], maps.inspect(self.repo, decoy.ref)["value"])
-        before = self.data()
-        with self.assertRaisesRegex(ValueError, "returned source ref does not match"):
-            self.request(b"stale", DOUBLE, [(b"x", maps.Returned(exact.ref, decoy.attempt))])
-        self.assertEqual(self.data(), before)
         self.request(b"correct", DOUBLE, [(b"x", exact)])
         with maps.records._write_transaction(self.repo, create=False) as txn:
             dag, role, parents = snapshot(txn, core.txn_ref_get(txn, b"pcorrect"))

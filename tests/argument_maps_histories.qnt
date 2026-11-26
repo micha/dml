@@ -84,7 +84,20 @@ module argument_maps_histories {
     // Stage a new singleton before the duplicate: the reversed request already stored {é: 29}.
     keyRequest("p-conflict", "d-conflict", "key-hex:c3a9=i64:30", decomposed)
   )
-  pure val fullStory = story.concat(tableEdits).concat(workFailures).concat(canonicalKeys)
+  // Only the expected attempt changes on retry. A new first insert makes a prefix commit observable.
+  pure def pinnedRequest(returned: str): Request = source("request", List("p-pin", "d-pin", "double@1",
+    "--invocation", "00000000-0000-4000-8000-000000000004", "--arg", "prefix=i64:731", "--arg", returned))
+  pure val returnedPins: List[Request] = List(
+    keyRequest("p-decoy", "d-decoy", "a=i64:12", "b=i64:30"),
+    source("work", List("p-decoy", "@p-decoy", "decoy")), source("inspect", List("decoy")),
+    pinnedRequest("x=from:t2:@decoy"),
+    // A second attempt of p2 shares even the result commit with t2; it still cannot pin t2.
+    source("work", List("p2", "@p2", "sibling")), source("inspect", List("sibling")),
+    pinnedRequest("x=from:t2:@sibling"), pinnedRequest("x=from:t2:@t2"), source("inspect", List("p-pin")),
+    source("work", List("p-pin", "@p-pin", "t-pin")), source("inspect", List("t-pin"))
+  )
+  pure val pinStart = story.length() + tableEdits.length() + workFailures.length() + canonicalKeys.length()
+  pure val fullStory = story.concat(tableEdits).concat(workFailures).concat(canonicalKeys).concat(returnedPins)
   var histories: List[List[Request]]
   action init = histories' = List(fullStory)
   action step = histories' = histories
