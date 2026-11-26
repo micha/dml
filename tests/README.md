@@ -329,13 +329,17 @@ both before `main` exists and after it points to a previous result. Each retry
 uses the same request and attempt ID at a free ref, publishes the result and
 both getter calls, and creates or updates `main`. The replay also checks
 read-only inspection of a transferred hit and rejects inconsistent producer
-pins and input source edges. A separate history checks I64 overflow in add
+pins and input source edges. On the original composition, `request-double`
+rejects reuse with the invocation ID that would recreate the producing request.
+Separately, `inspect` rejects a copy of a valid transferred hit whose first
+parent was replaced with the selected attempt's producing request. Both commands
+must report the identity error and leave the full native inventory unchanged.
+A separate history checks I64 overflow in add
 (`MAX_I64 + 1`) and double (`MAX_I64 * 2`). Each work command must fail with
 `work: int too big to convert` and leave the full native inventory unchanged.
 The rejected add leaves `main` absent. The rejected double leaves `main` at the
 successful `MAX_I64 + 0` add result and leaves the double decision pending.
-[Focused tests](test_composition.py) also check an equal-value getter-key graft
-and a hit that would recreate the producing request.
+A [focused Python test](test_composition.py) checks an equal-value getter-key graft.
 
 The [finite composition model](recorded_composition_design.qnt) covers producer
 pins, atomic decisions, rollback, and requested versus producing history. It

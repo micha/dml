@@ -167,6 +167,12 @@ def graft_selection(txn, selection, alternate):
     return replace_parents(txn, selection, wrong_q, wrong_r)
 
 
+def graft_reuse_request(txn, decision):
+    _, selected = parents(txn, decision)
+    producing_request, _ = parents(txn, selected)
+    return replace_parents(txn, decision, producing_request, selected)
+
+
 def graft_history(txn, decision):
     own, historical = parents(txn, decision)
     (current,) = parents(txn, own)
@@ -213,7 +219,7 @@ class History:
         self.operations = {op: self.command(op) for op in (
             "define", "request_add", "work", "compose", "request_double", "inspect")}
         self.operations.update(replicate=self.replicate, retire=self.retire)
-        for fixture in (graft_selection, graft_parent, graft_input, graft_history):
+        for fixture in (graft_selection, graft_parent, graft_input, graft_history, graft_reuse_request):
             self.operations[fixture.__name__] = self.fixture(fixture)
 
     def inventory(self, repo):
