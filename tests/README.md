@@ -355,8 +355,18 @@ and leaves no slot for new work. Both requests must report
 no receipt, new refs, or changes to the full native inventory. Each starts with
 an unused new literal so a partial insert would be visible.
 
+The [poisoned-table replay](argument_map_poison_histories.qnt) first confirms
+that `42` is a hit against a clean table. A test-only native fixture then
+inserts the distinct `43` MAP key with the attempt for `42`, and records a
+later removal of the `43` key. Quint checks the recorded edits and their
+parents. Lookup of `42` against either version must report
+`request: selected attempt does not match the table intent and argument MAP`,
+with no receipt or change to the full logical LMDB inventory. `fresh` ignores
+both an exact and a stale pin to the poisoned history: each decision publishes
+a pending request without a table parent or a change to `main`.
+
 The [focused tests](test_argument_maps.py) exercise a 64-deep returned-source
-chain, forged request maps, sources and getter links, and poisoned table history.
+chain and reject forged request maps, sources, and getter links.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request

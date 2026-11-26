@@ -10,7 +10,7 @@ from daggerml import core
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
 import recorded_argument_maps as maps
 
-from test_recorded_calls import literal, put, view
+from test_recorded_calls import put, view
 
 
 DOUBLE = b"double@1"
@@ -57,13 +57,6 @@ class ArgumentMapsTest(unittest.TestCase):
         self.request(tag, implementation, arguments)
         request = bytes.fromhex(maps.inspect(self.repo, b"p" + tag)["requested"]["request"])
         return maps.Returned(b"t" + tag, maps.work(self.repo, b"p" + tag, request, b"t" + tag, identity(self.serial)))
-
-    def table(self, first):
-        empty = maps.define_table(self.repo, b"empty", b"double")
-        return maps.update_table(self.repo, b"empty", empty, b"selected", b"insert", selected=first)
-
-    def data(self):
-        return (self.repo / "data.mdb").read_bytes()
 
     def test_requested_map_cannot_substitute_another_well_formed_map(self):
         self.request(b"1", DOUBLE, [number(b"x", 42)])
@@ -114,29 +107,6 @@ class ArgumentMapsTest(unittest.TestCase):
             publish(txn, b"grafted-attempt", role, attempt_dag, request, graft)
         with self.assertRaisesRegex(ValueError, "map_get trace does not match the producing construction"):
             maps.inspect(self.repo, b"grafted-attempt")
-
-    def test_poisoned_unrelated_entry_cannot_be_hidden_by_removal(self):
-        first = self.execute(b"one", DOUBLE, number(b"x", 42))
-        other = self.execute(b"other", DOUBLE, number(b"x", 43))
-        basis = self.table(first)
-        other_input = maps.inspect(self.repo, other.ref)["producing"]["argument_map"]
-        with maps.records._write_transaction(self.repo, create=False) as txn:
-            # A native MAP for 43 exists, but this record claims the 42 attempt produced it.
-            key = put(txn, core.REC_NODE, core.NODE_LITERAL, bytes.fromhex(other_input))
-
-            def delta(op):
-                return put(txn, core.REC_DAG, key, b"operation", literal(txn, core.DATUM_STRING, op))
-
-            poison = publish(txn, b"forged", maps.DELTA, delta(b"insert"), basis, first.attempt)
-            buried = publish(txn, b"buried", maps.DELTA, delta(b"remove"), poison)
-        before = self.data()
-        error = "does not match the table intent and argument MAP"
-        for ref, commit in ((b"forged", poison), (b"buried", buried)):
-            with self.subTest(ref=ref), self.assertRaisesRegex(ValueError, error):
-                self.request(b"hit", DOUBLE, [number(b"x", 42)], mode=maps.TRY, table_ref=ref, table_commit=commit)
-            self.assertEqual(self.data(), before)
-        self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
-        self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
 
     def test_inspect_accepts_a_64_deep_returned_source_walk(self):
         source = number(b"x", 0)[1]
