@@ -365,8 +365,17 @@ with no receipt or change to the full logical LMDB inventory. `fresh` ignores
 both an exact and a stale pin to the poisoned history: each decision publishes
 a pending request without a table parent or a change to `main`.
 
+The [request integrity replay](argument_map_request_integrity_histories.qnt)
+inspects two valid requests for `x=42` and `x=43`. A test-only native fixture
+copies the first request, replacing only its root with the second request's
+well-formed MAP. Quint checks both MAPs and the preserved construction,
+bindings, and parents. CLI inspection must report
+`inspect: request argument MAP differs from its construction`, with no
+standard output and no changes to the full logical LMDB inventory. The
+original request still returns the same inspection report.
+
 The [focused tests](test_argument_maps.py) exercise a 64-deep returned-source
-chain and reject forged request maps, sources, and getter links.
+chain and reject forged returned sources and getter links.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
