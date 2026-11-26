@@ -16,7 +16,8 @@ module argument_maps_rules {
   pure def nativeCounts(a: Attempt): (int, int, int, int) = (a.requests, a.executions, a.results, a.accesses)
   pure val counts = List(
     (1, 0, 0, 0), (1, 1, 1, 1), (1, 1, 1, 1), (1, 1, 1, 1), (1, 1, 1, 1),
-    (2, 1, 1, 1), (2, 2, 2, 3), (2, 2, 2, 3), (3, 2, 2, 3), (3, 2, 2, 3),
+    (1, 1, 1, 1), (2, 1, 1, 1), (2, 2, 2, 3), (2, 2, 2, 3),
+    (2, 2, 2, 3), (3, 2, 2, 3), (3, 2, 2, 3),
     (3, 2, 2, 3), (3, 2, 2, 3), (3, 2, 2, 3),
     (4, 2, 2, 3), (4, 3, 3, 5), (4, 3, 3, 5), (5, 3, 3, 5), (5, 3, 3, 5),
     (5, 4, 4, 6), (5, 4, 4, 6), (3, 2, 2, 3), (3, 2, 2, 3))
@@ -40,17 +41,30 @@ module argument_maps_rules {
     else "ok"
   }
 
+  pure def decisionCollision(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val retryDecision = story[i + 1].args[2]
+    val error = "request: ('invalid_state', -30799, 'ref already exists')"
+    if (a.code != 1 or not(a.diagnosed) or a.error != error or a.commit != "")
+      "wrong_collision_diagnostic"
+    else if (not(a.unchanged) or nativeCounts(a) != counts[i] or ref(a, "d1") != rows[0].commit or ref(a, retryDecision) != ""
+      or ref(a, a.args[1]) != "" or ref(a, "main") != "") "wrong_collision_rollback"
+    else "ok"
+  }
+
   pure def acceptedStep(rows: List[Attempt], i: int): str = {
     val a = rows[i]
     if (a.code != 0 or not(a.quiet) or a.commit == "") "unexpected_command_failure"
     else if (a.op == "inspect" and not(a.unchanged)) "inspection_wrote"
     else if (a.op != "inspect" and a.unchanged) "expected_write"
-    else if (i < 8 and ref(a, "main") != "") "premature_main"
-    else if (i >= 8 and i < 20 and ref(a, "main") != rows[2].result) "wrong_main"
-    else if (Set(0, 5, 13, 16).contains(i)) {
+    else if (i < 10 and ref(a, "main") != "") "premature_main"
+    else if (i >= 10 and i < 22 and ref(a, "main") != rows[2].result) "wrong_main"
+    else if (i == 6 and a.refs.select(r => r.name != "p2" and r.name != "d2") != rows[i - 1].refs) "wrong_retry_refs"
+    else if (Set(0, 6, 15, 18).contains(i)) {
       if (ref(a, a.args[2]) == a.commit and ref(a, a.args[1]) != "") "ok" else "wrong_pending_refs"
-    } else if (i == 8) {
-      if (ref(a, "d3") == a.commit and ref(a, "p3") == "") "ok" else "wrong_hit_refs"
+    } else if (i == 10) {
+      if (ref(a, "d3") == a.commit and ref(a, "p3") == ""
+        and a.refs.select(r => r.name != "main" and r.name != "d3") == rows[i - 1].refs) "ok" else "wrong_hit_refs"
     } else if (a.op == "work") {
       if (ref(a, a.args[3]) == a.commit) "ok" else "wrong_attempt_ref"
     } else if (a.op == "define_table") {
@@ -59,24 +73,24 @@ module argument_maps_rules {
       if (ref(a, "selected") == a.commit and ref(a, "empty") == rows[3].commit) "ok" else "wrong_table_update"
     } else if (i == 2) {
       if (workRead(a, rows[1].commit, ref(rows[0], "p1"), "double@1", 84, List("x"), List(""))) "ok" else "wrong_literal_attempt"
-    } else if (i == 7) {
-      if (workRead(a, rows[6].commit, ref(rows[5], "p2"), "add@1", 42, List("a", "b"), List("", ""))) "ok" else "wrong_42_attempt"
-    } else if (i == 9) hitRead(a, rows[2], rows[7], rows[8].commit, rows[4].commit)
-    else if (i == 15) {
-      if (workRead(a, rows[14].commit, ref(rows[13], "p4"), "add@1", 43, List("a", "b"), List("", ""))) "ok" else "wrong_43_attempt"
-    } else if (i == 17) {
-      if (a.commit == rows[16].commit and a.request == ref(rows[16], "p5") and a.outcome == "pending"
-        and a.table == rows[4].commit and a.sources == List(rows[14].commit) and a.input != rows[9].input
-        and a.attempt == "" and a.producingRequest == "" and a.gets == List()) "ok" else "wrong_value_miss"
+    } else if (i == 8) {
+      if (workRead(a, rows[7].commit, ref(rows[6], "p2"), "add@1", 42, List("a", "b"), List("", ""))) "ok" else "wrong_42_attempt"
+    } else if (i == 11) hitRead(a, rows[2], rows[8], rows[10].commit, rows[4].commit)
+    else if (i == 17) {
+      if (workRead(a, rows[16].commit, ref(rows[15], "p4"), "add@1", 43, List("a", "b"), List("", ""))) "ok" else "wrong_43_attempt"
     } else if (i == 19) {
-      if (workRead(a, rows[18].commit, rows[17].request, "double@2", 86, List("x"), List(rows[14].commit))
-        and a.producingInput == rows[17].input and a.producingConstruction == rows[17].construction) "ok" else "wrong_fresh_attempt"
-    } else if (i == 20) {
-      if (a.commit == rows[8].commit and a.refs == List({ name: "snapshot", target: a.commit })) "ok" else "wrong_replica"
+      if (a.commit == rows[18].commit and a.request == ref(rows[18], "p5") and a.outcome == "pending"
+        and a.table == rows[4].commit and a.sources == List(rows[16].commit) and a.input != rows[11].input
+        and a.attempt == "" and a.producingRequest == "" and a.gets == List()) "ok" else "wrong_value_miss"
     } else if (i == 21) {
-      if (a.request != rows[9].request or a.input != rows[9].input or a.construction != rows[9].construction
-        or a.refs != rows[20].refs) "wrong_offline_provenance"
-      else hitRead(a, rows[2], rows[7], rows[20].commit, rows[4].commit)
+      if (workRead(a, rows[20].commit, rows[19].request, "double@2", 86, List("x"), List(rows[16].commit))
+        and a.producingInput == rows[19].input and a.producingConstruction == rows[19].construction) "ok" else "wrong_fresh_attempt"
+    } else if (i == 22) {
+      if (a.commit == rows[10].commit and a.refs == List({ name: "snapshot", target: a.commit })) "ok" else "wrong_replica"
+    } else if (i == 23) {
+      if (a.request != rows[11].request or a.input != rows[11].input or a.construction != rows[11].construction
+        or a.refs != rows[22].refs) "wrong_offline_provenance"
+      else hitRead(a, rows[2], rows[8], rows[22].commit, rows[4].commit)
     } else "unchecked_step"
   }
 
@@ -84,9 +98,10 @@ module argument_maps_rules {
     val a = rows[i]
     val wanted = story[i]
     if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
+    else if (i == 5 or i == 9) decisionCollision(rows, i)
     else if (nativeCounts(a) != counts[i]) "wrong_native_occurrence_counts"
-    else if (Set(10, 11, 12).contains(i)) {
-      val error = if (i == 12) "request: table ref does not match the expected commit or absence"
+    else if (Set(12, 13, 14).contains(i)) {
+      val error = if (i == 14) "request: table ref does not match the expected commit or absence"
         else "request: no selected attempt for the argument MAP"
       if (a.code == 1 and a.diagnosed and a.commit == "" and a.error == error and a.unchanged) "ok"
       else "wrong_rejection_or_rollback"
@@ -100,8 +115,8 @@ module argument_maps_rules {
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
     evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == story.length() and
     verdicts[0].foldl(true, (ok, verdict) => ok and verdictAccepted(verdict)) and
-    evidence[0].attempts[9].outcome == "reuse" and
-    evidence[0].attempts[17].outcome == "pending"
+    evidence[0].attempts[11].outcome == "reuse" and
+    evidence[0].attempts[19].outcome == "pending"
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",

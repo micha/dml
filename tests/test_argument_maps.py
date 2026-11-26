@@ -179,15 +179,6 @@ class ArgumentMapsTest(unittest.TestCase):
         self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
         self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
 
-    def test_late_decision_ref_collision_rolls_back_fresh_work_and_reuse_main(self):
-        first = self.execute(b"one", DOUBLE, number(b"x", 42))
-        table = self.table(first)
-        before = self.data()
-        for options in ({}, {"mode": maps.TRY, "table_ref": b"selected", "table_commit": table}):
-            with self.subTest(options=options), self.assertRaisesRegex(core.Error, "ref already exists"):
-                maps.request(self.repo, b"unused", b"done", DOUBLE, identity(55), [number(b"x", 42)], **options)
-            self.assertEqual(self.data(), before)
-
     def test_missing_type_and_overflow_do_not_publish_attempt_or_trace(self):
         for tag, args, error in ((b"missing", [number(b"y", 42)], "map_get argument key"),
                                  (b"typed", [(b"x", maps.Literal(core.DATUM_STRING, b"42"))], "I64 argument"),
