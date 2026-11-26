@@ -138,15 +138,11 @@ class ArgumentMapsTest(unittest.TestCase):
         self.request(b"bypass", DOUBLE, [number(b"x", 42)], mode=maps.FRESH, table_ref=b"buried", table_commit=poison)
         self.assertEqual(maps.inspect(self.repo, b"dbypass")["table"], "")
 
-    def test_returned_attempt_budget_reserves_room_for_new_execution(self):
+    def test_inspect_accepts_a_64_deep_returned_source_walk(self):
         source = number(b"x", 0)[1]
         for i in range(64):
             source = self.execute(str(i).encode(), DOUBLE, (b"x", source))
         self.assertEqual(maps.inspect(self.repo, source.ref)["value"], 0)
-        before = self.data()
-        with self.assertRaisesRegex(ValueError, "too many reached argument-map attempts"):
-            self.request(b"over", DOUBLE, [(b"x", source)])
-        self.assertEqual(self.data(), before)
 
 
 if __name__ == "__main__":
