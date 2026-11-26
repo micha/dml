@@ -301,11 +301,69 @@ module argument_maps_rules {
     else "ok"
   }
 
+  pure def capacityProducerVerdict(before: Attempt, rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    if (a.op == "request") pendingRequest(before, a)
+    else if (a.op == "work") pinWork(before, a, 1, 1)
+    else if (not(capacityInspect(before, a))) "wrong_capacity_producer_inspection"
+    else {
+      val pending = rows[i - 2]
+      val request = ref(pending, pending.args[1])
+      if (workRead(a, before.commit, request, "double@1", 2 * (1000 + i / 3), List("x"), List(""))) "ok"
+      else "wrong_capacity_producer"
+    }
+  }
+
+  pure def capacityPublish(before: Attempt, a: Attempt, dest: str): str =
+    if (a.code != 0 or not(a.quiet) or a.commit == "" or a.unchanged) "expected_table_version"
+    else if (ref(before, dest) != "" or ref(a, dest) != a.commit or not(sameOtherRefs(a, before, Set(dest))))
+      "wrong_capacity_publication_refs"
+    else if (nativeCounts(a) != nativeCounts(before)) "wrong_native_occurrence_counts"
+    else "ok"
+
+  pure def capacityInspect(before: Attempt, a: Attempt): bool =
+    a.code == 0 and a.quiet and a.commit != "" and a.commit == ref(before, a.args[1]) and
+    a.unchanged and a.refs == before.refs and nativeCounts(a) == nativeCounts(before)
+
+  pure def capacityBoundaryVerdict(before: Attempt, a: Attempt, producers: List[Attempt], i: int): str = {
+    if (i == 1) {
+      if (a.code != 1 or not(a.diagnosed) or a.error != "update-table: insert requires an absent key and room in the table" or
+        a.commit != "") "wrong_capacity_diagnostic"
+      else if (not(a.unchanged) or a.refs != before.refs or nativeCounts(a) != nativeCounts(before) or
+        ref(a, a.args[3]) != "") "wrong_capacity_rollback"
+      else "ok"
+    } else if (a.op == "update_table") capacityPublish(before, a, a.args[3])
+    else if (not(capacityInspect(before, a))) "wrong_capacity_inspection"
+    else {
+      val entries = range(0, 17).foldl(List(), (out, j) => {
+        val producer = producers[3 * j + 2]
+        out.append({ key: producer.producingInput, attempt: producer.attempt })
+      })
+      val full = entries.slice(0, 16).foldl(Set(), (out, entry) => out.union(Set(entry)))
+      val reduced = full.exclude(Set(entries[0]))
+      val expected = if (i == 3) reduced else if (i == 5) reduced.union(Set(entries[16])) else full
+      if (entries.indices().map(j => entries[j].key).size() != 17) "non_distinct_capacity_keys"
+      else tableRead(a, ref(before, a.args[1]), expected)
+    }
+  }
+
+  pure def capacityVerdict(before: Attempt, rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val wanted = tableCapacity[i]
+    val fillStart = capacityProducers.length()
+    val boundaryStart = fillStart + capacityFill.length()
+    if (a.op != wanted.op or a.args != wanted.args) "wrong_step"
+    else if (i < fillStart) capacityProducerVerdict(before, rows, i)
+    else if (i < boundaryStart) capacityPublish(before, a, if (a.op == "define_table") a.args[1] else a.args[3])
+    else capacityBoundaryVerdict(before, a, rows, i - boundaryStart)
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val start = story.length() + tableEdits.length()
     val keyStart = start + workFailures.length()
     val keyRows = row.attempts.slice(keyStart, pinStart)
     val pinRows = row.attempts.slice(pinStart, arityStart)
+    val capacityRows = row.attempts.slice(capacityStart, fullStory.length())
     val prior = row.attempts.slice(0, story.length())
     val edits = row.attempts.slice(story.length(), start)
     if (row.scenario != 0 or row.attempts.length() != fullStory.length()) List("missing_steps")
@@ -319,6 +377,8 @@ module argument_maps_rules {
         out.append(pinVerdict(prior[8], row.attempts[pinStart + i - 1], pinRows, i))))
       .concat(range(0, argumentLimit.length()).foldl(List(), (out, i) =>
         out.append(argumentLimitVerdict(row.attempts[arityStart + i - 1], row.attempts[arityStart + i], i))))
+      .concat(range(0, tableCapacity.length()).foldl(List(), (out, i) =>
+        out.append(capacityVerdict(row.attempts[capacityStart + i - 1], capacityRows, i))))
   }
   pure def verdictAccepted(verdict: str): bool = verdict == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
@@ -335,8 +395,10 @@ module argument_maps_rules {
       .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 0, 0, 0, 1, 1) and
     evidence[0].attempts.slice(pinStart, arityStart)
       .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0) and
-    evidence[0].attempts.slice(arityStart, fullStory.length())
-      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 1)
+    evidence[0].attempts.slice(arityStart, capacityStart)
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 0, 1) and
+    evidence[0].attempts.slice(fullStory.length() - capacityBoundary.length(), fullStory.length())
+      .foldl(List(), (codes, a) => codes.append(a.code)) == List(0, 1, 0, 0, 0, 0, 0)
 
   pure val fixture: Attempt = { op: "", args: List(), code: 0, quiet: true, diagnosed: false, error: "", commit: "d",
     unchanged: true, refs: List(), requests: 0, executions: 0, results: 0, accesses: 0, request: "q-new", input: "map",

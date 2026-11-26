@@ -107,10 +107,62 @@ module argument_maps_histories {
     source("request", List("p-arity-over", "d-arity-over", "add@1", "--invocation", "00000000-0000-4000-8000-000000000006",
       "--arg", "q=i64:917").concat(sixteenArgs))
   )
+  pure def capacityCase(pending, decision, requestPin, attempt, attemptPin, arg, table, tablePin) = {
+    producer: List(
+      source("request", List(pending, decision, "double@1", "--arg", arg)),
+      source("work", List(pending, requestPin, attempt)),
+      source("inspect", List(attempt))
+    ),
+    selected: List("--selected", attempt, attemptPin),
+    table: table,
+    tablePin: tablePin
+  }
+  pure val capacityCases = List(
+    capacityCase("p-cap-a", "d-cap-a", "@p-cap-a", "t-cap-a", "@t-cap-a", "x=i64:1000", "cap-a", "@cap-a"),
+    capacityCase("p-cap-b", "d-cap-b", "@p-cap-b", "t-cap-b", "@t-cap-b", "x=i64:1001", "cap-b", "@cap-b"),
+    capacityCase("p-cap-c", "d-cap-c", "@p-cap-c", "t-cap-c", "@t-cap-c", "x=i64:1002", "cap-c", "@cap-c"),
+    capacityCase("p-cap-d", "d-cap-d", "@p-cap-d", "t-cap-d", "@t-cap-d", "x=i64:1003", "cap-d", "@cap-d"),
+    capacityCase("p-cap-e", "d-cap-e", "@p-cap-e", "t-cap-e", "@t-cap-e", "x=i64:1004", "cap-e", "@cap-e"),
+    capacityCase("p-cap-f", "d-cap-f", "@p-cap-f", "t-cap-f", "@t-cap-f", "x=i64:1005", "cap-f", "@cap-f"),
+    capacityCase("p-cap-g", "d-cap-g", "@p-cap-g", "t-cap-g", "@t-cap-g", "x=i64:1006", "cap-g", "@cap-g"),
+    capacityCase("p-cap-h", "d-cap-h", "@p-cap-h", "t-cap-h", "@t-cap-h", "x=i64:1007", "cap-h", "@cap-h"),
+    capacityCase("p-cap-i", "d-cap-i", "@p-cap-i", "t-cap-i", "@t-cap-i", "x=i64:1008", "cap-i", "@cap-i"),
+    capacityCase("p-cap-j", "d-cap-j", "@p-cap-j", "t-cap-j", "@t-cap-j", "x=i64:1009", "cap-j", "@cap-j"),
+    capacityCase("p-cap-k", "d-cap-k", "@p-cap-k", "t-cap-k", "@t-cap-k", "x=i64:1010", "cap-k", "@cap-k"),
+    capacityCase("p-cap-l", "d-cap-l", "@p-cap-l", "t-cap-l", "@t-cap-l", "x=i64:1011", "cap-l", "@cap-l"),
+    capacityCase("p-cap-m", "d-cap-m", "@p-cap-m", "t-cap-m", "@t-cap-m", "x=i64:1012", "cap-m", "@cap-m"),
+    capacityCase("p-cap-n", "d-cap-n", "@p-cap-n", "t-cap-n", "@t-cap-n", "x=i64:1013", "cap-n", "@cap-n"),
+    capacityCase("p-cap-o", "d-cap-o", "@p-cap-o", "t-cap-o", "@t-cap-o", "x=i64:1014", "cap-o", "@cap-o"),
+    capacityCase("p-cap-p", "d-cap-p", "@p-cap-p", "t-cap-p", "@t-cap-p", "x=i64:1015", "cap-p", "@cap-p"),
+    capacityCase("p-cap-q", "d-cap-q", "@p-cap-q", "t-cap-q", "@t-cap-q", "x=i64:1016", "cap-over", "@cap-over")
+  )
+  pure val capacityProducers = capacityCases.foldl(List(), (steps, candidate) => steps.concat(candidate.producer))
+  pure val capacityFill = range(0, 16).foldl(List(source("define_table", List("cap-empty", "double"))), (steps, i) => {
+    val candidate = capacityCases[i]
+    val basis = if (i == 0) List("cap-empty", "@cap-empty")
+      else List(capacityCases[i - 1].table, capacityCases[i - 1].tablePin)
+    steps.append(source("update_table", basis.concat(List(candidate.table, "insert")).concat(candidate.selected)))
+  })
+  pure def capacityInsert(basis, pin) = {
+    val candidate = capacityCases[16]
+    source("update_table", List(basis, pin, candidate.table, "insert").concat(candidate.selected))
+  }
+  pure val capacityBoundary = List(
+    source("inspect", List("cap-p")),
+    capacityInsert("cap-p", "@cap-p"),
+    source("update_table", List("cap-p", "@cap-p", "cap-reduced", "remove", "--key", "map-of:t-cap-a")),
+    source("inspect", List("cap-reduced")),
+    // Retry the same insert and output ref against the version with room for it.
+    capacityInsert("cap-reduced", "@cap-reduced"),
+    source("inspect", List("cap-over")),
+    source("inspect", List("cap-p"))
+  )
+  pure val tableCapacity = capacityProducers.concat(capacityFill).concat(capacityBoundary)
   pure val pinStart = story.length() + tableEdits.length() + workFailures.length() + canonicalKeys.length()
   pure val arityStart = pinStart + returnedPins.length()
+  pure val capacityStart = arityStart + argumentLimit.length()
   pure val fullStory = story.concat(tableEdits).concat(workFailures).concat(canonicalKeys).concat(returnedPins)
-    .concat(argumentLimit)
+    .concat(argumentLimit).concat(tableCapacity)
   var histories: List[List[Request]]
   action init = histories' = List(fullStory)
   action step = histories' = histories
