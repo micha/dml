@@ -135,27 +135,6 @@ class ArgumentMapsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "map_get trace does not match the producing construction"):
             maps.inspect(self.repo, b"grafted-attempt")
 
-    def test_adoption_and_removal_preserve_other_keys_and_historical_hits(self):
-        first = self.execute(b"one", DOUBLE, number(b"x", 42))
-        second = self.execute(b"two", b"double@2", number(b"x", 42))
-        other = self.execute(b"other", DOUBLE, number(b"x", 43))
-        chosen = self.table(first)
-        both = maps.update_table(self.repo, b"selected", chosen, b"both", b"insert", selected=other)
-        before = self.data()
-        with self.assertRaisesRegex(ValueError, "different attempt"):
-            maps.update_table(self.repo, b"both", both, b"same", b"adopt", selected=first)
-        self.assertEqual(self.data(), before)
-        self.request(b"old", DOUBLE, [number(b"x", 42)], mode=maps.REQUIRE, table_ref=b"both", table_commit=both)
-        old = maps.inspect(self.repo, b"dold")
-        replaced = maps.update_table(self.repo, b"both", both, b"replaced", b"adopt", selected=second)
-        key = old["requested"]["argument_map"]
-        self.assertEqual(self.rows(b"replaced"), {**self.rows(b"both"), key: second.attempt.hex()})
-        removed = maps.update_table(self.repo, b"replaced", replaced, b"removed", b"remove", key=bytes.fromhex(key))
-        self.assertEqual(self.rows(b"removed"), {k: t for k, t in self.rows(b"both").items() if k != key})
-        self.request(b"miss", DOUBLE, [number(b"x", 42)], mode=maps.TRY, table_ref=b"removed", table_commit=removed)
-        self.assertEqual(maps.inspect(self.repo, b"dmiss")["outcome"], "pending")
-        self.assertEqual(maps.inspect(self.repo, b"dold"), old)
-
     def test_poisoned_unrelated_entry_cannot_be_hidden_by_removal(self):
         first = self.execute(b"one", DOUBLE, number(b"x", 42))
         other = self.execute(b"other", DOUBLE, number(b"x", 43))

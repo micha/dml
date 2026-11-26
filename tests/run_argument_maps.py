@@ -2,6 +2,7 @@
 
 import argparse
 from contextlib import nullcontext
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -56,7 +57,11 @@ def report_evidence(report):
     requested = report.get("requested", {})
     producing = report.get("producing", {})
     gets = report.get("map_gets", [])
-    return {"request": requested.get("request", ""), "input": requested.get("argument_map", ""),
+    # Keep the complete inspection comparable as well as exposing fields for semantic checks.
+    digest = hashlib.sha256(json.dumps(report, sort_keys=True).encode("utf-8")).hexdigest() if report else ""
+    return {"reportDigest": digest, "intent": report.get("intent", ""),
+            "entries": [{"key": key, "attempt": attempt} for key, attempt in report.get("entries", {}).items()],
+            "request": requested.get("request", ""), "input": requested.get("argument_map", ""),
             "construction": requested.get("construction", ""), "implementation": requested.get("implementation", ""),
             "sources": [arg["attempt"] for arg in requested.get("arguments", [])],
             "producingRequest": producing.get("request", ""), "producingInput": producing.get("argument_map", ""),
@@ -73,6 +78,7 @@ class History:
         self.example = example
         self.scanner = scanner
         self.receipts = {}
+        self.argument_maps = {}
         self.operations = {
             **{op: self.command(op) for op in ("request", "work", "define_table", "update_table", "inspect")},
             "replicate": self.replicate,
@@ -88,6 +94,8 @@ class History:
             raise ValueError(f"expected a commit ID in CLI output, got {commit!r}")
         native = observations(after)
         if args[0] == "source":
+            if op == "inspect" and "producing" in report:
+                self.argument_maps[args[1]] = report["producing"]["argument_map"]
             for entry in native["refs"]:
                 self.receipts.setdefault(entry["name"], entry["target"])
         command = op.replace("_", "-")
@@ -102,7 +110,8 @@ class History:
         def invoke(role, *args):
             repo = self.directory / role
             before = self.inventory(repo)
-            argv = [RECEIPT.sub(lambda match: self.receipts[match[1]], arg) for arg in args]
+            argv = [self.argument_maps[arg.removeprefix("map-of:")] if arg.startswith("map-of:") else
+                    RECEIPT.sub(lambda match: self.receipts[match[1]], arg) for arg in args]
             process = subprocess.run([sys.executable, "-B", self.example, op.replace("_", "-"), repo, *argv],
                                      cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30)
             return self.evidence(op, (role, *args), process.stdout, process.returncode, process.stderr, before,

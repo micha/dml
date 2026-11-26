@@ -35,7 +35,30 @@ module argument_maps_histories {
     { op: "replicate", args: List("replica", "d3", "snapshot") },
     { op: "inspect", args: List("replica", "snapshot") }
   )
+  // Continue in the source repo: two producers for 42 and a surviving row for 43.
+  pure val removedTable = List("--table-ref", "removed", "--table-commit", "@removed")
+  pure val tableEdits: List[Request] = List(
+    source("request", List("p6", "d6", "double@2", "--arg", "x=from:t2:@t2")),
+    source("work", List("p6", "@p6", "t6")),
+    source("inspect", List("t6")),
+    source("update_table", List("selected", "@selected", "both", "insert", "--selected", "t5", "@t5")),
+    source("inspect", List("both")),
+    source("update_table", List("both", "@both", "same", "adopt", "--selected", "t1", "@t1")),
+    source("update_table", List("both", "@both", "adopted", "adopt", "--selected", "t6", "@t6")),
+    source("inspect", List("adopted")),
+    source("request", List("p7", "d7", "double@1", "--arg", "x=i64:42", "--mode", "require-selected",
+      "--table-ref", "adopted", "--table-commit", "@adopted")),
+    source("inspect", List("d7")),
+    source("update_table", List("adopted", "@adopted", "removed", "remove", "--key", "map-of:t1")),
+    source("inspect", List("removed")),
+    source("request", List("p8", "d8", "double@1", "--arg", "x=i64:42", "--mode", "try-selected").concat(removedTable)),
+    source("inspect", List("d8")),
+    source("request", List("p9", "d9", "double@1", "--arg", "x=i64:43", "--mode", "require-selected").concat(removedTable)),
+    source("inspect", List("d9")),
+    source("inspect", List("d3"))
+  )
+  pure val fullStory = story.concat(tableEdits)
   var histories: List[List[Request]]
-  action init = histories' = List(story)
+  action init = histories' = List(fullStory)
   action step = histories' = histories
 }
