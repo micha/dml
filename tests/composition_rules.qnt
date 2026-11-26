@@ -113,9 +113,11 @@ module composition_rules {
     32 -> "request-double: selection ref does not match the expected commit or absence",
     33 -> "request-double: attempt has the wrong ordinary func",
     39 -> "request-double: composition producer does not match its pinned attempt",
-    46 -> "inspect: composition input does not use the exact producer return DAG",
-    48 -> "inspect: composition producer does not match its pinned attempt",
-    50 -> "inspect: composition producer does not match its pinned attempt")
+    42 -> "request-double: reuse needs a new invocation ID, not the producing request",
+    47 -> "inspect: composition input does not use the exact producer return DAG",
+    49 -> "inspect: composition producer does not match its pinned attempt",
+    51 -> "inspect: composition producer does not match its pinned attempt",
+    53 -> "inspect: reuse needs a new invocation ID, not the producing request")
 
   pure def accepted(rows: List[Attempt], i: int): bool = {
     val a = rows[i]
@@ -176,22 +178,22 @@ module composition_rules {
       val d = if (i == 40) rows[18].commit else rows[24].commit
       a.transfer and a.commit == d and a.counts == List(4, 3, 3, 2, 1) and a.created.length() == 14
         and a.refs == List(createdRef(a.args[2], d))
-    } else if (i == 42) a.transfer and a.commit == "" and a.unchanged and a.refs == List()
-    else if (i == 43) replicaRead(a, rows[19])
-    else if (i == 44) replicaRead(a, rows[25])
-    else if (i == 45) {
+    } else if (i == 43) a.transfer and a.commit == "" and a.unchanged and a.refs == List()
+    else if (i == 44) replicaRead(a, rows[19])
+    else if (i == 45) replicaRead(a, rows[25])
+    else if (i == 46) {
       val c = record(a, "composition")
       val base = record(rows[23], "composition")
       a.created.length() == 1 and native(a, "composition", base.parents) and c.id == a.commit and c.pin == base.pin
         and c.inputs == record(rows[5], "composition").inputs and c.inputs != base.inputs
         and a.refs == List(createdRef("source-graft", a.commit))
-    } else if (i == 47) {
+    } else if (i == 48) {
       val c = record(a, "composition")
       val base = record(rows[15], "composition")
       a.created.length() == 1 and native(a, "composition", List(rows[4].attempt)) and c.id == a.commit
         and c.dag == base.dag and c.pin == base.pin and c.inputs == base.inputs
         and a.refs == List(createdRef("parent-graft", a.commit))
-    } else if (i == 49) {
+    } else if (i == 50) {
       val poison = rows[38]
       val d = record(a, "decision")
       a.created.length() == 5 and a.profiles == List() and d.id == a.commit
@@ -200,6 +202,11 @@ module composition_rules {
         and poison.created.foldl(true, (ok, row) => ok and
           a.created.foldl(false, (found, other) => found or row == other))
         and a.refs == List(createdRef("history-graft", a.commit))
+    } else if (i == 52) {
+      val d = record(a, "decision")
+      a.created.length() == 1 and a.profiles == List() and d.id == a.commit
+        and d.dag == record(rows[18], "decision").dag and native(a, "decision", List(old.producing.request, old.attempt))
+        and a.refs == List(createdRef("same-id-graft", a.commit)) and a.main == rows[51].main
     } else false
   }
 
@@ -234,7 +241,8 @@ module composition_rules {
       rejection(a, "work: int too big to convert", a.main == main and rows[i - 1].main == main and a.counts == counts)
     } else if (not(overflow) and rejected.keys().contains(i)) {
       val mainIntact = if (i == 2) a.main == "" and rows[1].main == ""
-        else if (i == 27) a.main == rows[26].main and a.main == rows[9].result else true
+        else if (i == 27) a.main == rows[26].main and a.main == rows[9].result
+        else if (i == 42) a.main == rows[37].result and a.main != rows[9].result else true
       rejection(a, rejected.get(i), mainIntact)
     } else if (a.code != 0 or a.error != "" or (a.op != "retire" and a.commit == "")) "unexpected_failure"
     else if (a.unchanged != Set("inspect", "retire").contains(a.op)) "wrong_write_boundary"
@@ -254,7 +262,7 @@ module composition_rules {
       and verdicts[0].length() == story.length() and verdicts[1].length() == overflowStory.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (pass, value) => pass and verdictAccepted(value)))
       and evidence[0].attempts[19].outcome == "reuse" and evidence[0].attempts[25].outcome == "reuse"
-      and evidence[0].attempts[35].outcome == "pending" and evidence[0].attempts[44].unchanged
+      and evidence[0].attempts[35].outcome == "pending" and evidence[0].attempts[45].unchanged
       and evidence[1].attempts[9].outcome == "pending"
 
   pure val q: Q = { ...noQ, request: "old-q", func: doubleFunc, composition: "old-c", map: "same-map",

@@ -74,15 +74,18 @@ module composition_histories {
     double("c8", "bad-pending", "bad-chain", "try-selected", "poison", "@poison", "9"), // 39
     { op: "replicate", args: List("repeat", "d4", "snapshot-repeat") },            // 40
     { op: "replicate", args: List("swapped", "d6", "snapshot-swapped") },          // 41
-    { op: "retire", args: List("source") },                                       // 42
-    inspect("repeat", "snapshot-repeat", "@snapshot-repeat"),                      // 43
-    inspect("swapped", "snapshot-swapped", "@snapshot-swapped"),                    // 44
-    { op: "graft_input", args: List("swapped", "snapshot-swapped", "source-graft") }, // 45
-    inspect("swapped", "source-graft", "@source-graft"),                            // 46
-    { op: "graft_parent", args: List("repeat", "snapshot-repeat", "parent-graft") }, // 47
-    inspect("repeat", "parent-graft", "@parent-graft"),                            // 48
-    { op: "graft_history", args: List("repeat", "snapshot-repeat", "history-graft") }, // 49
-    inspect("repeat", "history-graft", "@history-graft")                          // 50
+    double("c2", "same-id-unused", "same-id-decision", "require-selected", "t2", "@t2", "2"), // 42 recreates q2
+    { op: "retire", args: List("source") },                                       // 43
+    inspect("repeat", "snapshot-repeat", "@snapshot-repeat"),                      // 44
+    inspect("swapped", "snapshot-swapped", "@snapshot-swapped"),                    // 45
+    { op: "graft_input", args: List("swapped", "snapshot-swapped", "source-graft") }, // 46
+    inspect("swapped", "source-graft", "@source-graft"),                            // 47
+    { op: "graft_parent", args: List("repeat", "snapshot-repeat", "parent-graft") }, // 48
+    inspect("repeat", "parent-graft", "@parent-graft"),                            // 49
+    { op: "graft_history", args: List("repeat", "snapshot-repeat", "history-graft") }, // 50
+    inspect("repeat", "history-graft", "@history-graft"),                          // 51
+    { op: "graft_reuse_request", args: List("repeat", "snapshot-repeat", "same-id-graft") }, // 52
+    inspect("repeat", "same-id-graft", "@same-id-graft")                          // 53
   )
   pure val maxI64Arg = "9223372036854775807"
   // Use a clean repository so the rejected add cannot leave or replace main.
