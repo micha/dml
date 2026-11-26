@@ -96,8 +96,21 @@ module argument_maps_histories {
     pinnedRequest("x=from:t2:@sibling"), pinnedRequest("x=from:t2:@t2"), source("inspect", List("p-pin")),
     source("work", List("p-pin", "@p-pin", "t-pin")), source("inspect", List("t-pin"))
   )
+  pure val sixteenArgs = List("a=i64:901", "b=i64:902", "c=i64:903", "d=i64:904", "e=i64:905", "f=i64:906",
+    "g=i64:907", "h=i64:908", "i=i64:909", "j=i64:910", "k=i64:911", "l=i64:912", "m=i64:913", "n=i64:914",
+    "o=i64:915", "p=i64:916").foldl(List(), (args, arg) => args.append("--arg").append(arg))
+  pure val argumentLimit: List[Request] = List(
+    source("request", List("p-arity", "d-arity", "add@1", "--invocation", "00000000-0000-4000-8000-000000000005")
+      .concat(sixteenArgs)),
+    source("inspect", List("d-arity")),
+    // Prepend a new singleton so that committing even the first insert would change the inventory.
+    source("request", List("p-arity-over", "d-arity-over", "add@1", "--invocation", "00000000-0000-4000-8000-000000000006",
+      "--arg", "q=i64:917").concat(sixteenArgs))
+  )
   pure val pinStart = story.length() + tableEdits.length() + workFailures.length() + canonicalKeys.length()
+  pure val arityStart = pinStart + returnedPins.length()
   pure val fullStory = story.concat(tableEdits).concat(workFailures).concat(canonicalKeys).concat(returnedPins)
+    .concat(argumentLimit)
   var histories: List[List[Request]]
   action init = histories' = List(fullStory)
   action step = histories' = histories
