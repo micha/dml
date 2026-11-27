@@ -281,12 +281,19 @@ checks both defaults and overrides using the real CLI. It distinguishes a
 missing selection from a moved selection, checks that fresh routes ignore a
 moved slot, and verifies that reuse reports the original attempt and leaves no
 live plan. Replay checks atomic rejection and decision readback after
-collection. Focused checks exercise record shape and malformed history.
+collection. The separate [`recorded-calls-policy` entry](recorded_calls_policy_histories.qnt)
+reads the captured prior `main` and ordered policy decision parents natively,
+checks distinct decision IDs for equal intent, and exercises malformed
+persisted policies and decisions.
 
 The [implementation default history](../README.md#choose-an-implementation-from-a-pinned-intent-definition)
 checks that pinned versions choose independently, an explicit implementation
 can still reuse, and an exact but incompatible selection cannot satisfy a
-request. It exercises atomic rejection and offline decision inspection.
+request. It exercises atomic rejection and offline decision inspection. The
+separate [`recorded-calls-intent` entry](recorded_calls_intent_histories.qnt)
+checks definition ancestry and malformed stored decisions, and distinguishes
+fresh routes that omit selection fields from explicit reuse that publishes the
+selected attempt's exact result.
 
 The [supersession history](../README.md#record-advisory-implementation-supersession)
 checks that declaring and promoting are separate, that the predecessor can

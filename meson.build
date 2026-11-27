@@ -235,10 +235,15 @@ with tempfile.TemporaryDirectory() as tmp:
 
   # These verdicts are wide. Keep the extra Quint evaluators out of parallel
   # replay (the main recorded-calls suite timed out on Windows).
-  adoption_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt',
-                           'tests/recorded_calls_adoption_validation.qnt')
-  foreach suite : ['reuse', 'selection', 'adoption']
-    extra_modules = suite == 'adoption' ? adoption_modules : []
+  adoption_fixture_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt')
+  foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent']
+    extra_modules = []
+    if suite == 'adoption' or suite == 'intent'
+      extra_modules += adoption_fixture_modules
+    endif
+    if suite == 'adoption'
+      extra_modules += files('tests/recorded_calls_adoption_validation.qnt')
+    endif
     test(
       'recorded-calls-' + suite, python,
       args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),

@@ -367,7 +367,7 @@ class ProcessHistory:
         operands = [policy_ref, default]
         if basis:
             basis_ref, receipt = basis
-            expected = self.policy_receipts[receipt]
+            expected = self.receipt_id(receipt, self.policy_receipts)
             operands.extend(("--basis-ref", basis_ref, "--basis-commit", expected))
         row = self.write("define_scale_policy", (role, policy_ref, default, *basis), operands=operands)
         if row["commit"]:
@@ -377,7 +377,7 @@ class ProcessHistory:
     def request_policy_scale(self, role, producer_ref, producer_receipt, policy_ref, policy_receipt,
                              plan_ref, decision_ref, factor, override, *selection):
         producer = self.sum_receipts["source", producer_receipt]
-        policy = self.policy_receipts[policy_receipt]
+        policy = self.receipt_id(policy_receipt, self.policy_receipts)
         args = (role, producer_ref, producer_receipt, policy_ref, policy_receipt, plan_ref, decision_ref,
                 factor, override, *selection)
         operands = [producer_ref, producer, policy_ref, policy, plan_ref, decision_ref, factor,
@@ -388,7 +388,7 @@ class ProcessHistory:
         if selection:
             operands.extend(("--selection", selection[0]))
             if len(selection) == 2:
-                expected_selection = self.selection_receipts[selection[1]]
+                expected_selection = self.receipt_id(selection[1], self.selection_receipts)
                 operands.extend(("--selection-commit", expected_selection))
         row = self.write("request_policy_scale", args, operands=operands)
         return {**row, "expectedCommit": producer, "expectedPolicy": policy, "expectedSelection": expected_selection}
@@ -398,7 +398,7 @@ class ProcessHistory:
         operands = [intent_ref, implementation]
         if len(definition) == 2:
             basis_ref, receipt = definition
-            expected = self.intent_receipts[receipt]
+            expected = self.receipt_id(receipt, self.intent_receipts)
             operands.extend(("--basis-ref", basis_ref, "--basis-commit", expected))
         else:
             reuse, v1_slot, v2_slot = definition
@@ -422,7 +422,7 @@ class ProcessHistory:
     def request_intent_scale(self, role, producer_ref, producer_receipt, intent_ref, intent_receipt,
                              plan_ref, decision_ref, factor, implementation, override, selection):
         producer = self.sum_receipts["source", producer_receipt]
-        intent = self.intent_receipts[intent_receipt]
+        intent = self.receipt_id(intent_receipt, self.intent_receipts)
         args = (role, producer_ref, producer_receipt, intent_ref, intent_receipt, plan_ref, decision_ref,
                 factor, implementation, override, selection)
         operands = [producer_ref, producer, intent_ref, intent, plan_ref, decision_ref, factor]
@@ -430,7 +430,7 @@ class ProcessHistory:
             operands.extend(("--implementation", implementation))
         if override != "default":
             operands.extend(("--override", override))
-        expected_selection = "" if selection == "-" else self.selection_receipts[selection]
+        expected_selection = "" if selection == "-" else self.receipt_id(selection, self.selection_receipts)
         if expected_selection:
             operands.extend(("--selection-commit", expected_selection))
         row = self.write("request_intent_scale", args, operands=operands)
