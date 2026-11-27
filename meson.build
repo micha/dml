@@ -269,11 +269,14 @@ with tempfile.TemporaryDirectory() as tmp:
   endforeach
 
   test(
-    'argument-map-boundaries', python,
-    args: ['-B', files('tests/test_argument_maps.py')],
+    'argument-map-trace', python,
+    args: ['-B', files('tests/run_argument_maps.py'), quint.full_path(),
+           files('examples/recorded_argument_maps.py'), lmdb_inventory,
+           files('tests/argument_map_trace_histories.qnt', 'tests/argument_map_trace_rules.qnt'), '--native'] + quint_args,
     env: binding_env,
     depends: public_python_core,
-    timeout: 90,
+    is_parallel: false,
+    timeout: replay_timeout,
   )
   test(
     'argument-maps', python,
@@ -345,12 +348,6 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
-  test(
-    'composition-boundaries', python,
-    args: ['-B', files('tests/test_composition.py'), lmdb_inventory],
-    env: binding_env,
-    depends: public_python_core,
-  )
   test(
     'recorded-composition', python,
     args: ['-B', files('tests/run_composition.py'), quint.full_path(),

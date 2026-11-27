@@ -1,5 +1,6 @@
 module closure_rules {
   import closure_histories.* from "./closure_histories"
+  import workflow_native_fixture as n from "./workflow_native_fixture"
 
   type Ref = { name: str, before: str, after: str }
   type Edge = { name: str, dag: str }
@@ -16,7 +17,8 @@ module closure_rules {
   type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, unchanged: bool,
     main: str, preserved: bool, refs: List[Ref], transfer: bool, counts: List[int], selectedRef: str,
     created: List[Native], profiles: List[str], requested: Q, producing: Q, mode: str, outcome: str,
-    selection: str, attempt: str, result: str, outer: str, value: int, trace: List[Call] }
+    selection: str, attempt: str, result: str, outer: str, value: int, trace: List[Call],
+    nativeStatus: str, nativeValue: str, nativeCount: int, nativeItems: List[str] }
   type Observation = { attempts: List[Attempt] }
 
   pure val intent = "urn:example:captured-scaled-sum"
@@ -269,13 +271,90 @@ module closure_rules {
     else "ok"
   }
 
-  pure def historyVerdicts(row: Observation): List[str] =
-    if (row.attempts.length() != story.length()) List("missing_steps")
-    else range(0, story.length()).foldl(List(), (out, i) => out.append(verdict(row.attempts, i)))
+  pure def rejectedWithoutWrite(a: Attempt, error: str, main: str, selected: str): bool =
+    a.code == 1 and a.error == error and a.commit == "" and a.unchanged and a.preserved
+      and a.created == List() and a.refs == List() and a.main == main and a.selectedRef == selected
+
+  pure def forgeryVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val expected = forgeryStory[i]
+    pure def output(op: str, alias: str): Attempt = rows[n::outputIndex(forgeryStory, op, alias)]
+    pure def value(op: str, alias: str): str = output(op, alias).nativeValue
+    if (a.op != expected.op or a.args != expected.args) "wrong_step"
+    else if (i < 9) verdict(rows, i)
+    else if (a.op == "native") {
+      if (a.nativeStatus == "ok") "ok" else "wrong_native_status"
+    } else if (i == overrideReject) {
+      val original = rows[5]
+      val fixture = value("txn_ref_get", "genuine-q") == original.producing.request
+        and value("txn_ref_get", "stored-override-q") == value("txn_put_object", "override-q")
+        and value("txn_ref_get", "stored-override-q") != original.producing.request
+        and output("object_decode", "stored-override-commit").nativeCount == 1
+        and value("object_view_parent", "stored-override-closure") == original.producing.capture.closure
+        and original.producing.capture.scale == 2
+        and value("object_decode", "stored-override-inputs") != original.producing.inputs
+        and value("object_decode", "stored-override-map") == value("txn_put_datum", "override-map")
+        and value("object_decode", "stored-override-map") != original.producing.map
+        and output("datum_decode", "stored-scale-key-bytes").nativeCount == 6
+        and value("datum_decode", "stored-scale-key-bytes") == "7363616c65"
+        and output("datum_decode", "stored-scale-value-bytes").nativeCount == 3
+        and value("datum_decode", "stored-scale-value-bytes") == "0300000000000000"
+      if (not(fixture)) "wrong_override_fixture"
+      else if (rejectedWithoutWrite(a, "work: scaled sum requires exactly the I64 arguments a and b",
+          original.result, original.attempt)) "ok" else "wrong_override_rejection"
+    } else if (i == getterReject) {
+      val original = rows[5]
+      val alternate = rows[overrideReject + 3]
+      val r = record(rows[overrideReject + 2], "result")
+      val graftedResult = value("object_view_parent", "getter-result")
+      val fixture = value("txn_ref_get", "stored-grafted-attempt") == value("txn_put_object", "grafted-attempt")
+        and value("txn_ref_get", "stored-grafted-attempt") != original.attempt
+        and value("object_view_entry", "stored-graft-dag") == value("object_view_entry", "old-t-dag")
+        and output("object_decode", "stored-graft-commit").nativeCount == 2
+        and output("object_decode", "stored-return-commit").nativeCount == 1
+        and value("object_view_parent", "getter-owner") == original.producing.request
+        and value("object_view_parent", "getter-result-owner") == original.producing.request
+        and graftedResult == value("txn_put_object", "grafted-result") and graftedResult != original.result
+        and value("object_decode", "stored-result-inputs") == original.producing.inputs
+        and original.producing.inputs == alternate.producing.inputs
+        and original.producing.capture.captureKey != alternate.producing.capture.captureKey
+        and original.producing.capture.scale == 2 and alternate.producing.capture.scale == 3
+        and value("txn_lookup_node", "stored-trace-node") == value("txn_lookup_node", "v2-trace-node")
+        and r.trace == alternate.trace and r.traceKeys == List("a", "b") and r.traceValues == List(13, 29)
+        and value("object_decode", "stored-v2-a") == r.trace[0].operation
+        and value("object_decode", "stored-v2-b") == r.trace[1].operation
+        and value("object_decode", "stored-v2-binding-a") == alternate.producing.capture.mapBinding
+        and value("object_decode", "stored-v2-binding-b") == alternate.producing.capture.mapBinding
+        and alternate.producing.capture.mapBinding != original.producing.capture.mapBinding
+        and output("datum_decode", "original-scale-result").nativeCount == 3
+        and value("datum_decode", "original-scale-result") == "5400000000000000"
+      if (not(fixture)) "wrong_getter_fixture"
+      else if (rejectedWithoutWrite(a, "request: getter trace does not match the captured binding, inputs and keys",
+          alternate.result, original.attempt)) "ok" else "wrong_getter_rejection"
+    } else if (a.code != 0 or a.error != "" or a.commit == "" or not(a.preserved)) "unexpected_failure"
+    else if (i == overrideReject + 1 or i == getterReject + 1) {
+      val previous = if (i == getterReject + 1) rows[overrideReject + 3].result else rows[5].result
+      if (not(a.unchanged) and decisionRow(a, rows[8], standardInputs, "try-selected", rows[5].attempt,
+          false, previous, "")) "ok" else "wrong_valid_miss"
+    } else if (i == overrideReject + 2) {
+      if (not(a.unchanged) and workRow(a, rows[i - 1], rows[8], rows[5].result, 126)) "ok" else "wrong_v2_work"
+    } else if (i == overrideReject + 3) {
+      if (a.unchanged and attemptRead(a, rows[i - 1], rows[i - 2], rows[8])) "ok" else "wrong_v2_report"
+    } else "unknown_forgery_step"
+  }
+
+  pure def historyVerdicts(row: Observation): List[str] = {
+    val count = row.attempts.length()
+    if (count == story.length()) range(0, count).foldl(List(), (out, i) => out.append(verdict(row.attempts, i)))
+    else if (count == forgeryStory.length())
+      range(0, count).foldl(List(), (out, i) => out.append(forgeryVerdict(row.attempts, i)))
+    else List("missing_steps")
+  }
   pure def verdictAccepted(value: str): bool = value == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 1 and verdicts.length() == 1 and verdicts[0].length() == story.length()
-      and verdicts[0].foldl(true, (ok, value) => ok and verdictAccepted(value))
+    evidence.length() == 2 and verdicts.length() == 2 and verdicts[0].length() == story.length()
+      and verdicts[1].length() == forgeryStory.length()
+      and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (pass, value) => pass and verdictAccepted(value)))
       and evidence[0].attempts[10].outcome == "reuse" and evidence[0].attempts[23].outcome == "reuse"
       and evidence[0].attempts[30].outcome == "pending" and evidence[0].attempts[32].value == 126
       and evidence[0].attempts[42].unchanged and evidence[0].attempts[43].unchanged

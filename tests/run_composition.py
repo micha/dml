@@ -1,7 +1,7 @@
 """Collect live CLI and independent native evidence for composed node calls."""
 
 import argparse
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import re
@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 
 from daggerml import core
 
+from replay_core import WORKFLOW_NATIVE_DEFAULTS, WorkflowNative
 from run_builtins import READ_ONLY
 from run_histories import (
     absolute_path,
@@ -216,13 +217,19 @@ class History:
         self.script = script
         self.scanner = scanner
         self.receipts = {}
+        self.native = WorkflowNative(core, directory)
         self.operations = {op: self.command(op) for op in (
             "define", "request_add", "work", "compose", "request_double", "inspect")}
-        self.operations.update(replicate=self.replicate, retire=self.retire)
+        self.operations.update(replicate=self.replicate, retire=self.retire, native=self.native_step)
         for fixture in (graft_selection, graft_parent, graft_input, graft_history, graft_reuse_request):
             self.operations[fixture.__name__] = self.fixture(fixture)
 
+    def native_step(self, op, *args):
+        row = self.evidence("", (), Inventory({}), Inventory({}))
+        return {**row, **self.native.run(op, *args)}
+
     def inventory(self, repo):
+        self.native.require_closed()
         if not (repo / "data.mdb").is_file():
             return Inventory({})
         rows = scan_inventory(self.scanner, repo)
@@ -249,13 +256,13 @@ class History:
                 "refs": refs, "main": after.refs.get("main", ""), "counts": after.counts(),
                 "profiles": after.added_builtin_profiles(before),
                 "created": [after.commits[identifier] for identifier in added],
-                **report_fields(report or {}, after)}
+                **report_fields(report or {}, after), **WORKFLOW_NATIVE_DEFAULTS}
 
     def command(self, op):
         def invoke(role, *args):
             repo = self.directory / role
             before = self.inventory(repo)
-            argv = [RECEIPT.sub(lambda match: self.receipts[match[1]], arg) for arg in args]
+            argv = [self.native.cli_operand(RECEIPT.sub(lambda match: self.receipts[match[1]], arg)) for arg in args]
             wrapper = ["-c", READ_ONLY] if op == "inspect" else []
             process = subprocess.run([sys.executable, "-B", *wrapper, self.script,
                                       op.replace("_", "-"), repo, *argv], cwd=self.directory,
@@ -312,8 +319,11 @@ class Processes:
         self.script = script
         self.scanner = scanner
 
+    @contextmanager
     def history(self, directory):
-        return nullcontext(History(directory, self.script, self.scanner))
+        history = History(directory, self.script, self.scanner)
+        with history.native:
+            yield history
 
 
 def main():
@@ -330,7 +340,9 @@ def main():
         observations = [replay_history(suite, directory / f"history-{i}", story)
                         for i, story in enumerate(histories)]
         defaults = History(directory, args.script, args.scanner).evidence("", (), Inventory({}), Inventory({}))
-        state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=defaults)
+        imports = [args.histories, *(args.histories.with_name(name) for name in (
+            "workflow_native_fixture.qnt", "recorded_calls_fixtures.qnt"))]
+        state = evaluate(quint, args.rules, directory, observations, imports, attempt_defaults=defaults)
         check_verdicts(histories, observations, state)
 
 
