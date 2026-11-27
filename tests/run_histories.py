@@ -121,10 +121,27 @@ def quint_literal(value):
     raise ValueError(f"Cannot encode Quint evidence value: {short_repr(value)}")
 
 
-def quint_evidence(observations, *, attempt_defaults=None):
+def quint_attempt_with_refs(attempt, atoms):
+    if not isinstance(attempt.get("refs"), list):
+        raise ValueError("Quint reference snapshots require a refs list")
+    ids = []
+    for ref in attempt["refs"]:
+        if not isinstance(ref, dict) or ref.keys() != {"name", "target"} or not all(
+                isinstance(value, str) for value in ref.values()):
+            raise ValueError("Quint reference snapshots require exact name and target strings")
+        ids.append(atoms.setdefault((ref["name"], ref["target"]), len(atoms)))
+    fields = {key: quint_literal(value) for key, value in attempt.items() if key != "refs"}
+    fields["refs"] = f"refSnapshot({quint_literal(ids)})"
+    return quint_record(fields)
+
+
+def quint_evidence(observations, *, attempt_defaults=None, intern_refs=False):
     """Declare small batches, then assemble typed rows in replay order."""
     if attempt_defaults is not None:
+        if intern_refs:
+            raise ValueError("reference snapshots are not supported in columnar evidence")
         return quint_columnar_evidence(observations, attempt_defaults)
+    atoms = {}
     lines = []
     rows = []
     for history, row in enumerate(observations):
@@ -133,7 +150,9 @@ def quint_evidence(observations, *, attempt_defaults=None):
         for start in range(0, len(attempts), EVIDENCE_BATCH_SIZE):
             batch = f"evidenceBatch{history}_{start}"
             batches.append(batch)
-            expressions = ", ".join(map(quint_literal, attempts[start:start + EVIDENCE_BATCH_SIZE]))
+            rows_in_batch = attempts[start:start + EVIDENCE_BATCH_SIZE]
+            expressions = ", ".join(quint_attempt_with_refs(attempt, atoms) if intern_refs else quint_literal(attempt)
+                                    for attempt in rows_in_batch)
             lines.append(f"  pure val {batch} = List({expressions})\n")
         fields = {key: quint_literal(value) for key, value in row.items() if key != "attempts"}
         if len(batches) == 1:
@@ -145,6 +164,11 @@ def quint_evidence(observations, *, attempt_defaults=None):
         rows.append(name)
         lines.append(f"  pure val {name}: Observation = {quint_record(fields)}\n")
     lines.append(f"  pure val evidence: List[Observation] = List({', '.join(rows)})\n")
+    if intern_refs:
+        references = [{"name": name, "target": target} for name, target in atoms]
+        lines[:0] = [f"  pure val refAtoms: List[Ref] = {quint_literal(references)}\n",
+                     "  pure def refSnapshot(ids: List[int]): List[Ref] = "
+                     "ids.foldl(List(), (out, index) => out.append(refAtoms[index]))\n"]
     return "".join(lines)
 
 
@@ -198,7 +222,7 @@ def quint_columnar_evidence(observations, attempt_defaults):
     return "".join(lines)
 
 
-def evaluate(quint, rules, directory, observations, imports=(), *, attempt_defaults=None):
+def evaluate(quint, rules, directory, observations, imports=(), *, attempt_defaults=None, intern_refs=False):
     # The rule module exports a common interface; Observation is suite-specific.
     if not re.fullmatch(r"[a-z][a-z0-9_]*", rules.stem):
         raise ValueError(f"Invalid Quint rules module name: {rules.stem!r}")
@@ -208,7 +232,7 @@ def evaluate(quint, rules, directory, observations, imports=(), *, attempt_defau
             raise ValueError(f"Duplicate or reserved Quint module path: {source.name}")
         copyfile(source, destination)
     module = directory / "trace_observations.qnt"
-    evidence = quint_evidence(observations, attempt_defaults=attempt_defaults)
+    evidence = quint_evidence(observations, attempt_defaults=attempt_defaults, intern_refs=intern_refs)
     module.write_text(
         'module trace_observations {\n'
         f'  import {rules.stem}.* from "./{rules.stem}"\n'
