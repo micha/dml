@@ -298,9 +298,14 @@ selected attempt's exact result.
 The [supersession history](../README.md#record-advisory-implementation-supersession)
 checks that declaring and promoting are separate, that the predecessor can
 still reuse its exact selection, and that a supplied knowledge version does
-not change the historical decision. Focused tests cover exact pins, rollback
-on occupied output, malformed declaration ancestry, and a replica with no live
-intent, plan, or evidence refs.
+not change the historical decision. The separate
+[`recorded-calls-supersession` entry](recorded_calls_supersession_histories.qnt)
+checks exact pins, rollback on occupied output, and historical and supplied
+views after transferring decisions and sibling knowledge to a replica without
+origin refs. The [`recorded-calls-supersession-invalid` entry](recorded_calls_supersession_invalid_histories.qnt)
+checks malformed stored declarations both directly and as knowledge, and
+rejects invalid knowledge operands without writes. The Python boundary suite
+retains the short raw knowledge-ID check.
 
 The [multi-input history](../README.md#keep-reusable-results-for-multiple-scale-requests)
 checks that exact request keys coexist and one-key adoption preserves the other

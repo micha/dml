@@ -26,7 +26,7 @@ module recorded_calls_rules {
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
     stderr: str, stdoutEmpty: bool, repoExisted: bool, repoExists: bool,
     nativeStatus: str, nativeDetail: str, nativeValue: str, nativeCount: int, nativeItems: List[str],
-    commit: str, calls: List[Call], reportFields: List[List[str]], stdoutHash: str,
+    commit: str, calls: List[Call], reportFields: List[List[str]], stdoutHash: str, historicalReportHash: str,
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
     expectedResult: str, expectedSelection: str, expectedAttempt: str, expectedMain: str, previousSelection: str,
     requestCommit: str,
@@ -1846,7 +1846,8 @@ module recorded_calls_rules {
   pure def outputId(rows: List[Attempt], op: str, alias: str): str = nativeOutput(rows, op, alias).nativeValue
   pure def nativeNodeMatches(rows: List[Attempt], target: str): bool = {
     val stored = nativeOutput(rows, "txn_get_object", target)
-    val encoded = rows.select(row => row.op == "object_encode" and row.args[2] == target).head()
+    val encoded = rows.select(row => row.op == "object_encode" and row.args.length() == 4 and
+      row.args[0] == "node" and row.args[2] == target).head()
     stored.nativeValue != "" and stored.nativeValue == encoded.nativeValue
   }
   pure def nativeLiteralMatches(rows: List[Attempt], target: str, kind: int, payload: str): bool = {
@@ -2532,7 +2533,7 @@ module recorded_calls_rules {
     quiet: true, diagnosed: false, missingRef: false, stderr: "", stdoutEmpty: false,
     repoExisted: false, repoExists: false, nativeStatus: "", nativeDetail: "", nativeValue: "", nativeCount: 0,
     nativeItems: List(),
-    commit: "commit", calls: List(), reportFields: List(), stdoutHash: "",
+    commit: "commit", calls: List(), reportFields: List(), stdoutHash: "", historicalReportHash: "",
     expectedCommit: "", producerCommit: "", unchanged: false,
     removed: -1, expectedResult: "", expectedSelection: "", expectedAttempt: "", expectedMain: "",
     previousSelection: "", requestCommit: "",

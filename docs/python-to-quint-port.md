@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–4 and packet 5's adoption and policy/intent slices are complete**; see the [evidence below](#packet-1-evidence), including [policy and intent replay](#packet-5-policy-and-intent-evidence). Resume at **packet 5, supersession and knowledge**: baseline `tests/test_recorded_calls.py:1591`, `:1646`, and `:1707`. Read only the relevant methods, histories, rules, and interpreter commands; leave typed pre-open cases (including `:1324`) for packet 10.
+- **Packets 1–5 are complete for CLI-representable cases**; see the [evidence below](#packet-1-evidence), including [supersession and knowledge replay](#packet-5-supersession-and-knowledge-evidence). Resume at **packet 6, implementation-scoped reuse tables**: baseline `tests/test_recorded_calls.py:2252`, `:2285`, `:2302`, `:2329`, `:2351`, and `:2377`. Keep the intent-scoped table slice separate. Leave typed cases, including the short raw knowledge ID from `:1646`, for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–4 and packet 5's first two slices closed 45 whole methods (7, 10, 11, 10, 3, and 4 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1766`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–5 closed 47 whole methods (7, 10, 11, 10, and 9 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -86,7 +86,7 @@ Existing Quint anchors: `recorded_calls_histories.qnt` and `recorded_calls_rules
 | 1470 | Bad intent ancestor, changed defaults/slots, aliased slots, unsupported version, wrong decision implementation/override/reason/slot/plan or foreign selection; inspect and revalidate on child define/request. |
 | 1545 | Fresh ignores slot; explicit reuse overrides execute default; late occupied output rolls back; omitted selection fields versus actual selected attempt and result. |
 | 1591 | Supersession exact/distinct pins and commits, nonempty evidence, legal refs/endpoints/reason; late occupied output and stacked declaration reject; ordered parents, main and slots unchanged. |
-| 1646 | Bad declaration root/type/reason/endpoints/count/order/stacked ancestry, direct and as knowledge; unrelated, absent, malformed, or inapplicable knowledge rejected read-only. |
+| 1646 | Bad declaration root/type/reason/endpoints/count/order/stacked ancestry, direct and as knowledge; unrelated, absent, malformed, or inapplicable knowledge rejected read-only. Direct Python short raw ID and its diagnostic remain for packet 10. |
 | 1707 | Transferred old/new decision pins and sibling knowledge, no origin refs; preserve historical absence and change only separately requested knowledge view. |
 | 1766 | Attempt UUID case/variant, aliased/invalid output, stale input ID, arithmetic overflow: packet 4. Python `str` instead of UUID bytes and raw short commit bytes: packet 10. Both must reject atomically. |
 | 1792 | Bad request ref/factor, occupied plan, export mismatch/no file, main already names request, worker overflow: no partial state. |
@@ -390,6 +390,35 @@ diagnostic failed policy 1:37 (`storage_changed`). Accepting changed intent
 fields failed intent 1:934 (`wrong_rejection`); adding an empty selection field
 to a fresh report failed intent 2:55 (`wrong_selection_fields`); skipping the
 reuse update of `main` failed intent 2:68 (`wrong_native_status`).
+
+## Packet 5 supersession and knowledge evidence
+
+The [writer and offline-view](../tests/recorded_calls_supersession_histories.qnt)
+and [malformed declaration](../tests/recorded_calls_supersession_invalid_histories.qnt)
+entries use the shared runner. Quint requests individual native export and
+staged import calls and compares their roots with the original decision and
+sibling IDs. The runner hashes the canonical report without `knowledge_view`;
+Quint compares that projection with the report read without knowledge.
+
+All three live histories passed with coverage and rule controls. The final
+`scripts/check.sh --quint` gate passed all 36 suites in the Nix shell on
+aarch64 Linux with Quint 0.33.1. Two Python methods were removed; the exact
+short raw knowledge-ID rejection remains in `test_recorded_calls.py` for
+packet 10. Step numbers are one-based within each suite.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:1591` writer guards and late rollback | `guards` (supersession 1): fixture 5–32; rejects 35–45, 49–50, 101 | `stepVerdict` required exact expected IDs, diagnosed distinct stale pins, empty evidence, equal commits, ref aliases, endpoint/reason errors, both occupied outputs and stacked ancestry. Each left bytes unchanged. The evidence-slot alias was rejected with a matching occupant and with no occupant. |
+| `:1591` declaration and unchanged refs | supersession 1: write/read 46–48, native 53–88 and 98 | `advisoryDefinitionVerdict` preserved the default and left the earlier basis unannotated. `declarationGraph` checked exact ordered basis/evidence parents, role, root, and literals. Native refs preserved pins and showed no `main` or unused output. Neither selection slot was changed by the writer. |
+| `:1646` malformed stored declarations | invalid 1: native readback 91–426; direct/knowledge rejects 429–442 | `declarationMatches`, `decisionMatches`, and `shapeMatches` verified persisted layouts. `rejection` matched exact diagnoses for root, type, reason, endpoints, count/order, and stacked ancestry, both as the inspected record and as knowledge, without writes. |
+| `:1646` knowledge operands | invalid 1: absent commit 93, rejects 443–446, valid reads 447–453, refs 456–472 | `rejection` matched unrelated genesis, missing commit, short CLI hex, and knowledge on a nondecision. The valid counterparts passed `inspectVerdict`; exact pins and repository bytes stayed unchanged. The CLI diagnostic does not replace the remaining raw-ID Python check. |
+| `:1707` transfer and offline views | `transferred` (supersession 2): transfer 25–30, collect 33, native 36–92, reads 95–99, origin check 100 | `stepVerdict` matched exact exported/imported IDs. Native reads showed no origin-only refs and retained evidence after collection. `declarationGraph` matched the sibling's declaration as opaque evidence. `decisionRead` checked predecessor, successor, and absent views, all expected keys, and the full historical report unchanged by added knowledge. |
+
+Isolated live controls failed as intended: committing staged objects with the
+same occupied-ref diagnostic failed supersession 1:45 (`storage_changed`);
+changing a decision UUID only on a knowledge read failed supersession 2:96
+(`historical_report_changed`). Skipping the declaration root check or knowledge
+genesis validation failed invalid 1:429 and 1:443 (`wrong_rejection`).
 
 ## Removal dependencies and finish line
 
