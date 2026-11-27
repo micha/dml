@@ -1,5 +1,8 @@
 module recorded_calls_rules {
   import recorded_calls_histories.* from "./recorded_calls_histories"
+  import recorded_calls_fixtures.* from "./recorded_calls_fixtures"
+  import recorded_calls_stored_histories.* from "./recorded_calls_stored_histories"
+  import recorded_calls_outbound_histories.* from "./recorded_calls_outbound_histories"
 
   type Argument = { name: str, node: str, value: int, producer: str }
   type Call = { dag: str, implementation: str, resultNode: str, resultValue: int, arguments: List[Argument] }
@@ -23,11 +26,12 @@ module recorded_calls_rules {
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
     stderr: str, stdoutEmpty: bool, repoExisted: bool, repoExists: bool,
     nativeStatus: str, nativeDetail: str, nativeValue: str, nativeCount: int, nativeItems: List[str],
-    commit: str, calls: List[Call], reportFields: List[List[str]],
+    commit: str, calls: List[Call], reportFields: List[List[str]], stdoutHash: str,
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
     expectedResult: str, expectedSelection: str, expectedAttempt: str, expectedMain: str, previousSelection: str,
     requestCommit: str,
-    requestImplementation: str, requestFactor: int, bundlePresent: bool, bundleUnchanged: bool, publication: Publication,
+    requestImplementation: str, requestFactor: int, bundlePresent: bool, bundleUnchanged: bool, bundleSize: int,
+    publication: Publication,
     reusePublication: ReusePublication, selection: Selection, selectedPublication: SelectedPublication,
     occurrence: Occurrence, policy: Policy, expectedPolicy: str, intent: Intent, expectedIntent: str, decision: Decision,
     expectedEvidence: str, definitionAdvisory: bool, supersession: Declaration, asKnownThen: Advisory, knowledgeView: Advisory,
@@ -1976,6 +1980,316 @@ module recorded_calls_rules {
     })
   }
 
+  // A persisted forgery shares the real decoy result tree, but has the selected
+  // producer as its sole parent. Equal result roots do not make the DAGs interchangeable.
+  pure def outboundForgery(rows: List[Attempt], producer: str, decoyCommit: str, other: str): bool = {
+    val forged = outputId(rows, "txn_ref_get", "persisted-forgery")
+    val forgedTree = decoded(rows, "forged-scale-commit").nativeValue
+    val otherTree = decoded(rows, "other-scale-commit").nativeValue
+    all {
+      forged == outputId(rows, "txn_put_object", "forged-result"), forged != other,
+      forgedTree != "", forgedTree == otherTree,
+      outputId(rows, "txn_ref_get", "selected-incoming") == producer,
+      outputId(rows, "txn_ref_get", "decoy-result-pin") == other,
+      decoded(rows, "forged-scale-commit").nativeCount == 1,
+      decoded(rows, "other-scale-commit").nativeCount == 1,
+      outputId(rows, "object_view_parent", "forged-scale-parent") == producer,
+      outputId(rows, "object_view_parent", "other-scale-parent") == decoyCommit,
+      decoded(rows, "wrong-input-target").nativeValue == outputId(rows, "object_view_entry", "other-sum-dag"),
+      decoded(rows, "wrong-input-target").nativeValue != outputId(rows, "object_view_entry", "selected-sum-dag"),
+      nativeNodeMatches(rows, "wrong-input-target"),
+      decoded(rows, "other-sum-root").nativeValue != "",
+      decoded(rows, "other-sum-root").nativeValue == decoded(rows, "selected-sum-root").nativeValue
+    }
+  }
+
+  pure val stageOccupiedDiagnostic = "stage-input: ('invalid_state', -30799, 'ref already exists')"
+  pure val truncatedBundleDiagnostic = "stage-input: ('invalid_bounds', 0, 'invalid bundle record length')"
+  pure val movedInputDiagnostic = "release-input: ('invalid_state', 0, 'ref target differs from the expected ID')"
+  pure val movedStagingDiagnostic = "publish-scale: ('invalid_state', 0, 'ref target differs from the expected ID')"
+
+  pure def outboundTruncated(a: Attempt, req: Request, expectedSize: int, fresh: bool): str = {
+    val cause = a.stderr == truncatedBundleDiagnostic
+    val verdict = if (fresh) cliRejectionVerdict(a, req, "", cause) else existingRejectionVerdict(a, req, "", cause)
+    if (verdict != "rejected") verdict
+    else if (fresh and a.repoExisted) "wrong_repository_presence"
+    else if (not(a.bundlePresent and a.bundleUnchanged and a.bundleSize == expectedSize)) "wrong_bundle"
+    else verdict
+  }
+
+  pure def outboundRejected(rows: List[Attempt], marks: (str) => Attempt, a: Attempt, s: TransferStep, producer: str): str = {
+    val req = s.request
+    val mark = s.mark
+    if (mark == "wrong-export-pin") {
+      val verdict = rejectedExport(a, req, producer, false)
+      if (verdict != "rejected" or a.stderr == "export-sum: producer pin does not point to the expected commit") verdict
+      else "wrong_diagnostic"
+    } else if (mark == "no-clobber") rejectedExport(a, req, marks("decoy").commit, true)
+    else if (mark == "same-occupied" or mark == "other-occupied") {
+      val verdict = stageVerdict(a, req, "")
+      if (verdict != "rejected" or a.stderr == stageOccupiedDiagnostic) verdict else "wrong_diagnostic"
+    } else if (mark == "stale-scale") existingRejectionVerdict(a, req, producer,
+      a.stderr == "record-scale: producer pin does not point to the expected commit")
+    else if (mark == "missing-result") existingRejectionVerdict(a, req, producer, a.missingRef)
+    else if (mark == "wrong-parent" or mark == "wrong-input") {
+      val diagnostic = if (mark == "wrong-parent") "release-input: result does not retain the expected producer commit"
+        else "release-input: scale input DAG does not match the producer parent"
+      if (not(outboundForgery(rows, producer, marks("decoy").commit, marks("decoy-scale").commit))) "wrong_forgery"
+      else existingRejectionVerdict(a, req, producer, a.stderr == diagnostic)
+    } else if (mark == "moved-incoming") existingRejectionVerdict(a, req, producer,
+      a.stderr == movedInputDiagnostic and outputId(rows, "txn_ref_get", "valid-result-pin") == marks("scaled").commit)
+    else if (mark == "fresh-truncated" or mark == "existing-truncated")
+      outboundTruncated(a, req, marks("truncated-copy").bundleSize, mark == "fresh-truncated")
+    else if (req.op == "publish_scale") {
+      val expectedMain = if (mark == "rollback-create") "-" else producer
+      val cause = if (mark == "alias-main") a.stderr == "publish-scale: staging ref must differ from main"
+        else if (mark == "missing-staging") a.missingRef else a.stderr == movedStagingDiagnostic
+      if (a.expectedResult != marks("scaled").commit or a.expectedMain != expectedMain) "wrong_selection"
+      else existingRejectionVerdict(a, req, producer, cause)
+    } else "unknown_rejection"
+  }
+
+  pure def outboundVerdicts(phase: int, rows: List[Attempt]): List[str] = {
+    val steps = outboundCases[phase]
+    if (rows.length() != steps.length()) List("missing_steps")
+    else {
+      val marked = range(0, steps.length()).foldl(Map(), (byMark, i) =>
+        if (steps[i].mark == "") byMark else byMark.put(steps[i].mark, rows[i]))
+      def marks(mark: str): Attempt = marked.get(mark)
+      val producer = if (phase == 0 or phase == 2) outputId(rows, "txn_put_object", "stored-sum-commit")
+        else marks("producer").commit
+      range(0, steps.length()).foldl(List(), (out, i) => {
+        val a = rows[i]
+        val s = steps[i]
+        val req = s.request
+        val mark = s.mark
+        val verdict = if (s.label == "native_not_found") rejectionNativeReadVerdict(a, req, "")
+          else if (mark == "kept-producer" or mark == "intact-pin") rejectionNativeReadVerdict(a, req, producer)
+          else if (mark == "kept-other-pin") rejectionNativeReadVerdict(a, req, marks("other-scale").commit)
+          else if (mark == "kept-decoy-pin") rejectionNativeReadVerdict(a, req, marks("decoy").commit)
+          else if (s.label == "native_ok") {
+            if (mark == "intact-closure" and (outputId(rows, "object_view_entry", "intact-sum-dag") !=
+                outputId(rows, "txn_put_object", "stored-sum-dag") or a.nativeValue == "")) "wrong_native_graph"
+            else rejectionNativeVerdict(a, req, "ok")
+          } else if (s.label == "recorded") {
+            if (req.op == "record_scale") scaleWriteVerdict(a, req, if (mark == "decoy-scale") marks("decoy").commit else producer)
+            else if (mark == "decoy" and a.commit == producer) "collapsed_producers" else writeVerdict(a, req)
+          } else if (s.label == "exported") exportVerdict(a, req, if (mark == "decoy-export") marks("decoy").commit else producer)
+          else if (s.label == "staged") stageVerdict(a, req, if (mark == "decoy-stage") marks("decoy").commit else producer)
+          else if (s.label == "released") releaseVerdict(a, req, producer)
+          else if (s.label == "collected") {
+            if (matches(a, req) and a.removed > 0) "collected" else "wrong_collection"
+          } else if (s.label == "rejected") outboundRejected(rows, marks, a, s, producer)
+          else if (s.label == "inspected") {
+            if (not(matches(a, req))) "wrong_inspect"
+            else if (not(a.unchanged)) "storage_changed"
+            else if (mark == "collected-report") {
+              if (storedLinkedReport(rows, a, marks("scaled").commit, true, -102, "9affffffffffffff") and
+                  decoded(rows, "origin-decoy-root").nativeValue == outputId(rows, "txn_put_object", "stored-sum-root") and
+                  outputId(rows, "object_view_entry", "origin-decoy-dag") != outputId(rows, "txn_put_object", "stored-sum-dag"))
+                "inspected" else "wrong_native_graph"
+            } else if (a.commit == marks("scaled").commit and a.commit != marks("other-scale").commit and
+                a.producerCommit == producer and checkCalls(selected, a.calls, scaleV1)) "inspected" else "wrong_graph"
+          } else if (s.label == "file_observed" and matches(a, req)) {
+            val fileMatches = if (req.op == "unlink_bundle") not(a.bundlePresent) and a.bundleSize == -1
+              else if (req.op == "truncate_bundle") a.bundlePresent and a.bundleUnchanged and a.unchanged and
+                a.bundleSize > 0 and a.bundleSize + 1 == marks("selected-export").bundleSize
+              else a.repoExists and (req.op == "checkpoint_file" or (req.op == "compare_file" and a.unchanged))
+            if (fileMatches) "file_observed" else "wrong_file_observation"
+          } else "unknown_transfer_step"
+        out.append(verdict)
+      })
+    }
+  }
+
+  pure val sumEntryHex = "7265636f726465642d73756d2d7631"
+  pure val scaleEntryHex = "7265636f726465642d7363616c652d7631"
+  pure val combinedEntryHex = "7265636f726465642d63616c6c732d7631"
+  pure def storedObject(rows: List[Attempt], alias: str): str = outputId(rows, "txn_put_object", alias)
+  pure def storedRef(rows: List[Attempt], alias: str): str = outputId(rows, "txn_ref_get", alias)
+  pure def treeEntry(rows: List[Attempt], tree: str, dag: str, name: str): bool =
+    decoded(rows, tree).nativeCount == 1 and nativeOutput(rows, "object_view_entry", dag).nativeItems == List(name)
+
+  // Inspection preserves stored evidence; it does not validate arithmetic.
+  // For a fresh execution the caller supplies -102; for a retained result, -98.
+  pure def storedLinkedReport(rows: List[Attempt], readback: Attempt, result: str, split: bool,
+                            value: int, payload: str): bool = {
+    val sumDag = storedObject(rows, "stored-sum-dag")
+    val sumRoot = storedObject(rows, "stored-sum-root")
+    val scaleDag = outputId(rows, "object_view_entry", "observed-scale-dag")
+    val scaleRoot = decoded(rows, "observed-scale-root").nativeValue
+    val input = outputId(rows, "txn_lookup_node", "observed-input")
+    val producer = if (split) storedObject(rows, "stored-sum-commit") else ""
+    val lineage = if (split) all {
+      outputId(rows, "object_view_parent", "observed-scale-parent") == producer,
+      decoded(rows, "observed-parent-commit").nativeCount == 0,
+      treeEntry(rows, "observed-parent-tree", "observed-parent-dag", sumEntryHex),
+      outputId(rows, "object_view_entry", "observed-parent-dag") == sumDag
+    } else true
+    if (readback.calls.length() != 2) false else {
+      val summed = readback.calls[0]
+      val scaled = readback.calls[1]
+      all {
+        readback.commit == result, storedRef(rows, "observed-scale-id") == result,
+        readback.producerCommit == producer, lineage,
+        readback.reportFields == List(if (split) List("calls", "commit", "producer_commit") else List("calls", "commit"))
+          .concat(scaleReportFields),
+        decoded(rows, "observed-scale-commit").nativeCount == (if (split) 1 else 0),
+        treeEntry(rows, "observed-scale-tree", "observed-scale-dag", if (split) scaleEntryHex else combinedEntryHex),
+        decoded(rows, "observed-scale-root").nativeCount == 3,
+        decoded(rows, "observed-sum-root").nativeCount == 3,
+        nativeNodeMatches(rows, "observed-sum-dag"), decoded(rows, "observed-sum-dag").nativeValue == sumDag,
+        decoded(rows, "observed-sum-root").nativeValue == sumRoot,
+        nativeLiteralMatches(rows, "observed-sum-value", 3, "efffffffffffffff"),
+        nativeLiteralMatches(rows, "observed-scale-value", 3, payload),
+        summed == { dag: sumDag, implementation: "example.sum@1", resultNode: sumRoot, resultValue: -17,
+          arguments: List({ name: "a", node: storedObject(rows, "stored-a"), value: 2, producer: "" },
+            { name: "b", node: storedObject(rows, "stored-b"), value: 3, producer: "" }) },
+        scaled.dag == scaleDag, scaled.implementation == scaleV1, scaled.resultNode == scaleRoot, scaled.resultValue == value,
+        scaled.arguments.length() == 2 and literal(scaled.arguments[0], "factor", 6) and
+          scaled.arguments[1] == { name: "input", node: input, value: -17, producer: sumDag }
+      }
+    }
+  }
+  pure def storedScaleIdentity(rows: List[Attempt]): bool = all {
+    outputId(rows, "object_view_entry", "observed-scale-dag") == storedObject(rows, "stored-scale-dag"),
+    decoded(rows, "observed-scale-root").nativeValue == storedObject(rows, "stored-scale-root"),
+    outputId(rows, "txn_lookup_node", "observed-input") == storedObject(rows, "stored-input")
+  }
+  pure def storedReadVerdict(rows: List[Attempt], a: Attempt, req: Request, result: str, split: bool,
+                             value: int, payload: str): str =
+    if (not(matches(a, req))) "wrong_inspect"
+    else if (not(a.unchanged)) "storage_changed"
+    else if (not(storedLinkedReport(rows, a, result, split, value, payload))) "wrong_stored_graph"
+    else "inspected"
+
+  pure def mismatchProof(rows: List[Attempt]): bool = all {
+    rows[0].commit != rows[1].commit,
+    storedRef(rows, "genuine-id") == rows[2].commit,
+    outputId(rows, "object_view_parent", "genuine-parent") == rows[0].commit,
+    outputId(rows, "object_view_entry", "selected-sum-dag") != outputId(rows, "object_view_entry", "decoy-sum-dag"),
+    decoded(rows, "selected-sum-root").nativeValue == decoded(rows, "decoy-sum-root").nativeValue,
+    nativeNodeMatches(rows, "genuine-input-dag"),
+    decoded(rows, "genuine-input-dag").nativeValue == outputId(rows, "object_view_entry", "selected-sum-dag"),
+    storedRef(rows, "persisted-mismatch") == storedObject(rows, "mismatch-id"),
+    decoded(rows, "mismatch-commit").nativeValue == decoded(rows, "genuine-commit").nativeValue,
+    decoded(rows, "mismatch-commit").nativeCount == 1,
+    outputId(rows, "object_view_parent", "mismatch-parent") == rows[1].commit
+  }
+  pure def equivalentReports(a: Attempt, b: Attempt): bool =
+    a.stdoutHash != "" and a.stdoutHash == b.stdoutHash and a.commit == b.commit and
+    a.producerCommit == b.producerCommit and a.calls == b.calls and a.reportFields == b.reportFields
+  pure def attemptFor(rows: List[Attempt], req: Request): Attempt = rows.select(a => sameRequest(a, req)).head()
+  pure def storedNativeExpected(req: Request): str =
+    if (req.op == "txn_ref_get" and Set("absent-main", "absent-main-after-wrong-factor", "absent-producer-before-publish",
+      "absent-producer", "absent-decoy", "absent-returned", "absent-incoming", "absent-result").contains(req.args[2]))
+      "native_not_found"
+    else if (req.op == "txn_get_object" and req.args[3] == "swept-decoy") "native_not_found"
+    else "native_ok"
+  pure def storedExpectedLabel(phase: int, req: Request): str = {
+    if (Set("record_sum", "record_scale").contains(req.op)) {
+      if (phase == 1) "rejected" else "recorded"
+    } else if (req.op == "inspect") {
+      if (phase == 4 or (phase == 2 and req.args == List("source", "mismatch"))) "rejected" else "inspected"
+    } else if (req.op == "export_scale" and phase == 2) "rejected"
+    else if (req.op == "publish_scale") {
+      if (phase == 2 or req.args[4] == "5") "rejected" else "published"
+    } else if (Set("export_sum", "export_scale").contains(req.op)) "exported"
+    else if (req.op == "stage_input") "staged"
+    else if (req.op == "collect") "collected"
+    else if (Set("unlink_bundle", "checkpoint_file", "compare_file").contains(req.op)) "file_observed"
+    else storedNativeExpected(req)
+  }
+  pure val storedExpected: List[List[str]] = range(0, storedEvidenceRequests.length()).foldl(List(), (out, phase) =>
+    out.append(storedEvidenceRequests[phase].foldl(List(), (labels, req) => labels.append(storedExpectedLabel(phase, req)))))
+
+  pure def storedCliVerdict(phase: int, rows: List[Attempt], a: Attempt, req: Request): str = {
+    val producer = if (phase == 2) rows[0].commit else if (phase != 3 and phase != 4)
+      storedObject(rows, "stored-sum-commit") else ""
+    val result = if (phase == 0) attemptFor(rows, source("record_scale", List("producer", producerId, "main", "6"))).commit
+      else if (phase >= 3) storedObject(rows, "stored-scale-commit") else ""
+    if (phase == 0) {
+      if (req.op == "record_scale") scaleWriteVerdict(a, req, producer)
+      else storedReadVerdict(rows, a, req, result, true, -102, "9affffffffffffff")
+    } else if (phase == 1) {
+      if (storedRef(rows, "unsupported-id") != producer or decoded(rows, "unsupported-commit").nativeCount != 0 or
+          not(treeEntry(rows, "unsupported-tree", "unsupported-dag", sumEntryHex)) or
+          not(nativeLiteralMatches(rows, "unsupported-value", 6, "6578616d706c652e73756d4032"))) "wrong_fixture"
+      else existingRejectionVerdict(a, req, producer, a.stderr == "record-scale: expected recorded implementation example.sum@1")
+    } else if (phase == 2) {
+      val forged = storedObject(rows, "mismatch-id")
+      if (req.op == "record_sum") writeVerdict(a, req)
+      else if (req.op == "record_scale") scaleWriteVerdict(a, req, producer)
+      else if (req == source("inspect", List())) {
+        if (matches(a, req) and a.unchanged and a.commit == rows[2].commit and a.producerCommit == producer and
+            checkCalls(selected, a.calls, scaleV1)) "inspected" else "wrong_valid_counterpart"
+      } else if (not(mismatchProof(rows))) "wrong_fixture"
+      else if (req.op == "export_scale" and (a.bundlePresent or not(a.bundleUnchanged))) "wrong_bundle"
+      else if (req.op == "publish_scale" and (a.expectedMain != rows[2].commit or a.expectedResult != forged)) "wrong_selection"
+      else existingRejectionVerdict(a, req,
+        if (req.op == "inspect") "" else if (req.op == "export_scale") forged else rows[1].commit,
+        Set("inspect: scale input DAG does not match the producer parent",
+          "export-scale: scale input DAG does not match the producer parent",
+          "publish-scale: scale input DAG does not match the producer parent").contains(a.stderr))
+    } else if (phase == 3 or phase == 4) {
+      val decoyDag = storedObject(rows, "equal-root-decoy")
+      val sumRoot = storedObject(rows, "stored-sum-root")
+      if (decoyDag == storedObject(rows, "stored-sum-dag") or decoded(rows, "equal-root-decoy-root").nativeValue != sumRoot)
+        "wrong_fixture"
+      else if (phase == 3) {
+        if (not(storedScaleIdentity(rows))) "wrong_stored_graph"
+        else storedReadVerdict(rows, a, req, result, false, -98, "9effffffffffffff")
+      }
+      else if (storedRef(rows, "observed-scale-id") != result or
+          outputId(rows, "txn_lookup_node", "observed-input") != sumRoot or
+          not(treeEntry(rows, "observed-scale-tree", "observed-scale-dag", combinedEntryHex)) or
+          not(nativeLiteralMatches(rows, "observed-sum-value", 3, "efffffffffffffff"))) "wrong_fixture"
+      else existingRejectionVerdict(a, req, "", a.stderr == "inspect: recorded source has the wrong node kind")
+    } else if (req.op == "record_sum") {
+      if (a.commit == producer) "collapsed_producers" else writeVerdict(a, req)
+    } else if (req.op == "export_sum") exportVerdict(a, req, producer)
+    else if (req.op == "export_scale") exportVerdict(a, req, result)
+    else if (req.op == "stage_input") stageVerdict(a, req, if (req.args[0] == "worker") producer else result)
+    else if (req.op == "inspect") {
+      val workerReport = attemptFor(rows, worker("inspect", List("result")))
+      if (not(equivalentReports(a, workerReport))) "wrong_return_report"
+      else if (not(storedScaleIdentity(rows))) "wrong_stored_graph"
+      else storedReadVerdict(rows, a, req, result, true, -98, "9effffffffffffff")
+    } else if (req.op == "publish_scale") {
+      val factorMatches = req.args[4] == "6"
+      val verdict = publishVerdict(a, req, result, producer, "-", factorMatches)
+      if (not(factorMatches) and verdict == "rejected" and
+          a.stderr != "publish-scale: recorded factor does not match the expected factor") "wrong_diagnostic" else verdict
+    } else if (req.op == "collect") {
+      if (matches(a, req) and a.removed > 0) "collected" else "wrong_collection"
+    } else if (req.op == "unlink_bundle") {
+      if (matches(a, req) and not(a.bundlePresent) and a.bundleSize == -1) "file_observed" else "bundle_still_present"
+    } else if (matches(a, req) and a.repoExists and (req.op == "checkpoint_file" or a.unchanged)) "file_observed"
+    else "wrong_repository_bytes"
+  }
+  pure def storedVerdicts(phase: int, rows: List[Attempt]): List[str] = {
+    val req = storedEvidenceRequests[phase]
+    if (rows.length() != req.length()) List("missing_steps")
+    else range(0, req.length()).foldl(List(), (out, i) => {
+      val a = rows[i]
+      val r = req[i]
+      val label = storedExpected[phase][i]
+      val verdict = if (label == "native_not_found") rejectionNativeReadVerdict(a, r, "")
+        else if (label != "native_ok") storedCliVerdict(phase, rows, a, r)
+        else if (r.op == "txn_get_object" and r.args[3] == "unrooted-return-decoy" and a.nativeValue == "") "missing_decoy"
+        else if (r.op != "txn_ref_get") rejectionNativeVerdict(a, r, "ok")
+        else if (r.args[2] == "unchanged-producer") rejectionNativeReadVerdict(a, r, storedObject(rows, "stored-sum-commit"))
+        else if (r.args[2] == "unchanged-main") rejectionNativeReadVerdict(a, r, rows[2].commit)
+        else if (r.args[2] == "unchanged-mismatch") rejectionNativeReadVerdict(a, r, storedObject(rows, "mismatch-id"))
+        else if (Set("staged-result", "retained-result").contains(r.args[2]))
+          rejectionNativeReadVerdict(a, r, storedObject(rows, "stored-scale-commit"))
+        else rejectionNativeVerdict(a, r, "ok")
+      out.append(verdict)
+    })
+  }
+
+  pure val storedEvidenceOffset = scenarios.length() + 19 + rejectionRequests.length()
+  pure val outboundOffset = storedEvidenceOffset + storedEvidenceRequests.length()
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -1996,13 +2310,17 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 16) intentTableVerdicts(row.attempts)
     else if (row.scenario >= scenarios.length() + 17 and row.scenario < scenarios.length() + 19)
       physicalVerdicts(row.scenario - scenarios.length() - 17, row.attempts)
-    else if (row.scenario >= scenarios.length() + 19)
+    else if (row.scenario >= outboundOffset and row.scenario < outboundOffset + outboundRequests.length())
+      outboundVerdicts(row.scenario - outboundOffset, row.attempts)
+    else if (row.scenario >= storedEvidenceOffset and row.scenario < outboundOffset)
+      storedVerdicts(row.scenario - storedEvidenceOffset, row.attempts)
+    else if (row.scenario >= scenarios.length() + 19 and row.scenario < storedEvidenceOffset)
       rejectionVerdicts(row.scenario - scenarios.length() - 19, row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
     Set("recorded", "inspected", "rejected", "exported", "staged", "released", "collected", "published",
-      "acknowledged", "abandoned", "reused", "selected", "adopted", "native_ok", "native_not_found").contains(verdict)
+      "acknowledged", "abandoned", "reused", "selected", "adopted", "native_ok", "native_not_found", "file_observed").contains(verdict)
 
   pure def sameRootNotSameCall(first: Call, second: Call): bool =
     first.resultNode == second.resultNode and first.dag != second.dag
@@ -2101,6 +2419,7 @@ module recorded_calls_rules {
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
       reuse, reusePublication, versioned, selections, occurrences, adoptions, policies, implementationIntents,
       supersessions, multiInput, intentTable).concat(physicalExpected).concat(rejectionExpected)
+      .concat(storedExpected).concat(outboundExpected)
     if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
@@ -2213,11 +2532,11 @@ module recorded_calls_rules {
     quiet: true, diagnosed: false, missingRef: false, stderr: "", stdoutEmpty: false,
     repoExisted: false, repoExists: false, nativeStatus: "", nativeDetail: "", nativeValue: "", nativeCount: 0,
     nativeItems: List(),
-    commit: "commit", calls: List(), reportFields: List(),
+    commit: "commit", calls: List(), reportFields: List(), stdoutHash: "",
     expectedCommit: "", producerCommit: "", unchanged: false,
     removed: -1, expectedResult: "", expectedSelection: "", expectedAttempt: "", expectedMain: "",
     previousSelection: "", requestCommit: "",
-    requestImplementation: "", requestFactor: 0, bundlePresent: false, bundleUnchanged: true,
+    requestImplementation: "", requestFactor: 0, bundlePresent: false, bundleUnchanged: true, bundleSize: -1,
     publication: { planRef: "", plan: "", stagingRef: "", result: "" },
     reusePublication: { mode: "", planRef: "", plan: "", resultRef: "", result: "" },
     selection: { resultRef: "", result: "" },

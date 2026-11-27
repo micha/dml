@@ -1,5 +1,7 @@
 module recorded_calls_histories {
-  type Request = { op: str, args: List[str] }
+  import recorded_calls_fixtures.* from "./recorded_calls_fixtures"
+  import recorded_calls_stored_histories.storedEvidenceRequests from "./recorded_calls_stored_histories"
+  import recorded_calls_outbound_histories.outboundRequests from "./recorded_calls_outbound_histories"
   type Input = (str, int)
   type Scenario = { a: Input, b: Input, factor: Input }
 
@@ -8,9 +10,6 @@ module recorded_calls_histories {
     { a: ("7", 7), b: ("5", 5), factor: ("3", 3) },
     { a: ("-2", -2), b: ("14", 14), factor: ("-2", -2) }
   )
-  pure def coreRequest(op: str, args: List[str]): Request = { op: op, args: args }
-  pure def source(op: str, args: List[str]): Request = { op: op, args: List("source").concat(args) }
-  pure def worker(op: str, args: List[str]): Request = { op: op, args: List("worker").concat(args) }
   pure def requests(s: Scenario): List[Request] = List(
     source("record", List(s.a._1, s.b._1, s.factor._1)),
     source("inspect", List())
@@ -833,18 +832,6 @@ module recorded_calls_histories {
 
   // One CoreHistory primitive per native step; its aliases carry IDs returned
   // by the native reads, rather than trusting IDs in the CLI JSON.
-  pure def openNative(mode: str): List[Request] = List(
-    coreRequest("repo_open", List("source", "existing")),
-    coreRequest("txn_begin", List("source", mode, "snapshot"))
-  )
-  pure def closeNative(end: str): List[Request] = List(
-    coreRequest(end, List("snapshot")), coreRequest("repo_close", List("source"))
-  )
-  pure def refRead(ref: str, id: str): Request = coreRequest("txn_ref_get", List("snapshot", ref, id))
-  pure def viewObject(kind: str, id: str, view: str): List[Request] = List(
-    coreRequest("txn_get_object", List("snapshot", kind, id, view)),
-    coreRequest("object_decode", List(view, view))
-  )
   type SnapshotPath = { ref: str, commitView: str, treeView: str, dag: str, parent: str }
   pure val mainPath: SnapshotPath = { ref: "main", commitView: "main-commit", treeView: "main-tree",
     dag: "main-dag", parent: "main-parent" }
@@ -855,21 +842,8 @@ module recorded_calls_histories {
   pure val decoyPath: SnapshotPath = { ref: "decoy", commitView: "decoy-commit", treeView: "decoy-tree",
     dag: "decoy-dag", parent: "" }
   pure def viewSnapshot(path: SnapshotPath, hasParent: bool): List[Request] =
-    List(refRead(path.ref, path.ref)).concat(viewObject("commit", path.ref, path.commitView))
-      .concat(viewObject("tree", path.commitView, path.treeView))
-      .append(coreRequest("object_view_entry", List(path.treeView, "0", path.dag)))
-      .concat(if (hasParent) List(coreRequest("object_view_parent", List(path.commitView, "0", path.parent))) else List())
-  pure def lookupNode(dag: str, binding: str, node: str): Request =
-    coreRequest("txn_lookup_node", List("snapshot", dag, binding, node))
-  pure def encodeNode(kind: str, target: str): Request =
-    coreRequest("object_encode", List("node", kind, target, "encoded-node"))
-  pure def viewSubdag(dag: str, input: str, producer: str): List[Request] =
-    List(lookupNode(dag, "input", input)).concat(viewObject("node", input, producer))
-      .append(encodeNode("subdag", producer))
-  pure def viewLiteral(node: str, target: str): List[Request] =
-    viewObject("node", node, target).append(encodeNode("literal", target))
-      .append(coreRequest("txn_get_datum", List("snapshot", target, target)))
-      .append(coreRequest("datum_decode", List(target)))
+    List(refRead(path.ref, path.ref)).concat(commitAt(path.ref,
+      (path.commitView, path.treeView, path.dag, if (hasParent) path.parent else "")))
 
   pure val physicalRecord: Scenario = { a: ("-23", -23), b: ("16", 16), factor: ("-3", -3) }
   // Decoded datum kind and payload (signed I64 little-endian or UTF-8).
@@ -924,6 +898,6 @@ module recorded_calls_histories {
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
     .append(implementationIntentRequests).append(supersessionRequests).append(multiInputRequests).append(intentTableRequests)
-    .concat(physicalRequests).concat(rejectionRequests)
+    .concat(physicalRequests).concat(rejectionRequests).concat(storedEvidenceRequests).concat(outboundRequests)
   action step = histories' = histories
 }
