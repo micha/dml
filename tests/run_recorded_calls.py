@@ -110,7 +110,7 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "missingRef": missing_ref, "stderr": evidence_text(stderr.rstrip("\n")), "stdoutEmpty": False,
             "repoExisted": False, "repoExists": False,
             "nativeStatus": "", "nativeDetail": "", "nativeValue": "", "nativeCount": 0, "nativeItems": [],
-            "commit": "", "calls": [], "reportFields": [], "stdoutHash": "",
+            "commit": "", "calls": [], "reportFields": [], "stdoutHash": "", "historicalReportHash": "",
             "expectedCommit": "", "producerCommit": "", "removed": -1,
             "expectedResult": "", "expectedSelection": "", "expectedAttempt": "", "expectedMain": "",
             "previousSelection": "", "requestCommit": "", "requestImplementation": "", "requestFactor": 0,
@@ -180,7 +180,8 @@ class ProcessHistory:
             "update_scale_intent_reuse_table": self.update_scale_intent_reuse_table,
             "request_intent_table_scale": self.request_intent_table_scale,
             **{op: partial(self.native_step, op) for op in (*OPERATIONS, "datum_encode", "object_encode")
-               if op == "repo_export_commit" or op not in OPERATIONS or not OPERATIONS[op].observes_failure
+               if op in ("repo_export_commit", "repo_import_commit_staged")
+               or op not in OPERATIONS or not OPERATIONS[op].observes_failure
                if hasattr(core, op)},
         }
 
@@ -410,8 +411,8 @@ class ProcessHistory:
 
     def declare_scale_supersession(self, role, basis_ref, basis_receipt, output_ref, predecessor, successor, reason,
                                    evidence_ref, evidence_receipt):
-        basis = self.intent_receipts[basis_receipt]
-        evidence_commit = self.sum_receipts[role, evidence_receipt]
+        basis = self.receipt_id(basis_receipt, self.intent_receipts)
+        evidence_commit = self.receipt_id(evidence_receipt, self.sum_receipts, role)
         args = (role, basis_ref, basis_receipt, output_ref, predecessor, successor, reason, evidence_ref, evidence_receipt)
         operands = (basis_ref, basis, output_ref, predecessor, successor, reason, evidence_ref, evidence_commit)
         row = self.write("declare_scale_supersession", args, operands=operands)
@@ -640,8 +641,13 @@ class ProcessHistory:
         return {**row, "removed": int(output) if output else -1}
 
     def inspect(self, role, *args):
-        knowledge = self.intent_receipts[args[1]] if len(args) == 2 else ""
-        operands = (args[0], "--knowledge-commit", knowledge) if knowledge else args
+        knowledge = ""
+        operands = args
+        if len(args) == 2:
+            ref, operand = args
+            knowledge = (operand.removeprefix("literal:") if operand.startswith("literal:")
+                         else self.receipt_id(operand, self.intent_receipts))
+            operands = (ref, "--knowledge-commit", knowledge)
         row, output = self.invoke("inspect", (role, *args), operands=operands)
         row["expectedIntent"] = knowledge
         if output:
@@ -665,6 +671,8 @@ class ProcessHistory:
                 row["definitionAdvisory"] = True
                 row["supersession"] = declaration_evidence(report["supersession"])
             if "as_known_then" in report:
+                historical = {key: value for key, value in report.items() if key != "knowledge_view"}
+                row["historicalReportHash"] = sha256(json.dumps(historical, sort_keys=True).encode("utf-8")).hexdigest()
                 row["asKnownThen"] = advisory_evidence(report["as_known_then"])
             if "knowledge_view" in report:
                 row["knowledgeView"] = advisory_evidence(report["knowledge_view"])

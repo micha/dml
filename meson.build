@@ -236,19 +236,22 @@ with tempfile.TemporaryDirectory() as tmp:
   # These verdicts are wide. Keep the extra Quint evaluators out of parallel
   # replay (the main recorded-calls suite timed out on Windows).
   adoption_fixture_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt')
-  foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent']
+  foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent', 'supersession', 'supersession-invalid']
     extra_modules = []
-    if suite == 'adoption' or suite == 'intent'
+    if suite in ['adoption', 'intent', 'supersession-invalid']
       extra_modules += adoption_fixture_modules
     endif
     if suite == 'adoption'
       extra_modules += files('tests/recorded_calls_adoption_validation.qnt')
+    elif suite == 'supersession-invalid'
+      extra_modules += files('tests/recorded_calls_intent_histories.qnt', 'tests/recorded_calls_intent_rules.qnt')
     endif
+    module_suffix = suite.replace('-', '_')
     test(
       'recorded-calls-' + suite, python,
       args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
-             files('examples/recorded_calls.py', 'tests/recorded_calls_' + suite + '_histories.qnt',
-                   'tests/recorded_calls_' + suite + '_rules.qnt', 'tests/recorded_calls_histories.qnt',
+             files('examples/recorded_calls.py', 'tests/recorded_calls_' + module_suffix + '_histories.qnt',
+                   'tests/recorded_calls_' + module_suffix + '_rules.qnt', 'tests/recorded_calls_histories.qnt',
                    'tests/recorded_calls_rules.qnt')] + recorded_calls_modules + extra_modules + quint_args,
       env: binding_env,
       depends: public_python_core,
