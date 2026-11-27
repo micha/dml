@@ -937,6 +937,15 @@ Run `scripts/setup-lsp.sh` in the build environment to generate an ignored
 This optional tool uses Python 3 to assemble the database, including system-header
 paths for Nix compiler wrappers. It does not compile or install anything.
 
+## Count source lines
+
+With `cloc` installed, run from the repository root to count Git-tracked source
+files, including Quint (`.qnt`):
+
+```sh
+cloc --vcs=git --read-lang-def=scripts/cloc-quint.txt
+```
+
 ## Contributing
 
 See [AGENTS.md](AGENTS.md) for code and documentation conventions and
