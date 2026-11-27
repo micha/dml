@@ -4,6 +4,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import partial
+from hashlib import sha256
 import json
 from os import cpu_count
 from pathlib import Path
@@ -16,7 +17,7 @@ from time import monotonic
 
 from daggerml import core
 
-from replay_core import CoreHistory, OPERATIONS
+from replay_core import CoreHistory, OPERATIONS, operation_for
 from run_histories import (
     absolute_path,
     add_quint_arguments,
@@ -99,7 +100,7 @@ def evidence_text(text):
     return text if re.fullmatch(r"[\x20-\x21\x23-\x5b\x5d-\x7e]*", text) else "hex:" + text.encode("utf-8").hex()
 
 
-def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True):
+def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True, bundle_size=-1):
     command = op.replace("_", "-")
     missing_ref = re.fullmatch(
         rf"{re.escape(command)}: \('not_found', -?[0-9]+, 'ref was not found'\)", stderr.rstrip("\n"),
@@ -109,7 +110,8 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "missingRef": missing_ref, "stderr": evidence_text(stderr.rstrip("\n")), "stdoutEmpty": False,
             "repoExisted": False, "repoExists": False,
             "nativeStatus": "", "nativeDetail": "", "nativeValue": "", "nativeCount": 0, "nativeItems": [],
-            "commit": "", "calls": [], "reportFields": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
+            "commit": "", "calls": [], "reportFields": [], "stdoutHash": "",
+            "expectedCommit": "", "producerCommit": "", "removed": -1,
             "expectedResult": "", "expectedSelection": "", "expectedAttempt": "", "expectedMain": "",
             "previousSelection": "", "requestCommit": "", "requestImplementation": "", "requestFactor": 0,
             "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
@@ -131,7 +133,8 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
             "decision": {"id": "", "canonicalId": False, "policy": "", "intent": "", "defaultMode": "", "override": "",
                          "route": "", "reason": "", "plan": "", "planRef": "", "selectionRef": "", "selection": "",
                          "result": "", "implementationOverride": "", "implementationReason": ""},
-            "unchanged": unchanged, "bundlePresent": bundle_present, "bundleUnchanged": bundle_unchanged}
+            "unchanged": unchanged, "bundlePresent": bundle_present, "bundleUnchanged": bundle_unchanged,
+            "bundleSize": bundle_size}
 
 
 class ProcessHistory:
@@ -141,6 +144,7 @@ class ProcessHistory:
         self.example = example
         self.fixture_lock = fixture_lock
         self.native = CoreHistory(core, None, directory)
+        self.file_checkpoints = {}
         self.sum_receipts = {}
         self.scale_receipts = {}
         self.plan_receipts = {}
@@ -155,6 +159,8 @@ class ProcessHistory:
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
             "release_input": self.release_input, "collect": self.collect,
+            "unlink_bundle": self.unlink_bundle, "truncate_bundle": self.truncate_bundle,
+            "checkpoint_file": self.checkpoint_file, "compare_file": self.compare_file,
             "export_scale": self.export_scale, "publish_scale": self.publish_scale,
             "request_scale": self.request_scale, "export_request": self.export_request,
             "work_scale": self.work_scale, "publish_requested_scale": self.publish_requested_scale,
@@ -177,10 +183,27 @@ class ProcessHistory:
                if hasattr(core, op)},
         }
 
+    def receipt_id(self, alias, receipts, role):
+        if alias.startswith("native:"):
+            return self.native.resolve("id", alias.removeprefix("native:")).hex()
+        return receipts[role, alias]
+
+    def native_operand(self, arg):
+        if arg.startswith("sum:"):
+            return self.sum_receipts["source", arg.removeprefix("sum:")]
+        if arg.startswith("scale:"):
+            _, role, ref = arg.split(":")
+            return self.scale_receipts[role, ref]
+        return arg
+
     def native_step(self, op, *args):
-        # Reuse the one-call core interpreter against the CLI's repository paths.
+        # Explicit aliases pass immutable IDs across the CLI/native boundary.
+        # Neither direction resolves a current pin to choose the expected ID.
+        inputs = operation_for(op, args).inputs
+        operands = [self.native_operand(arg) if i < len(inputs) and inputs[i] == "id" else arg
+                    for i, arg in enumerate(args)]
         with self.fixture_lock:
-            observed = self.native.run(op, *args, include_error_detail=True)
+            observed = self.native.run(op, *operands, include_error_detail=True)
         row = evidence(op, args, code=0, stderr="", unchanged=False)
         return {**row, "nativeStatus": observed["status"], "nativeDetail": evidence_text(observed["detail"]),
                 "nativeValue": observed["value"], "nativeCount": observed["count"], "nativeItems": observed["items"]}
@@ -208,7 +231,8 @@ class ProcessHistory:
                 print(f"{self.directory.name}: {result.stderr}", file=sys.stderr, end="")
         row = evidence(op, args, code=result.returncode, stderr=result.stderr,
                        unchanged=before is not None and before == after,
-                       bundle_present=bundle_after is not None, bundle_unchanged=bundle_before == bundle_after)
+                       bundle_present=bundle_after is not None, bundle_unchanged=bundle_before == bundle_after,
+                       bundle_size=-1 if bundle_after is None else len(bundle_after))
         return {**row, "stdoutEmpty": not result.stdout, "repoExisted": repo_existed,
                 "repoExists": repo.exists()}, result.stdout
 
@@ -226,8 +250,7 @@ class ProcessHistory:
         return row
 
     def select(self, op, role, pin, producer_receipt, *tail, bundle=None):
-        # Only a record_sum receipt supplies the plan, never an import receipt.
-        commit = self.sum_receipts["source", producer_receipt]
+        commit = self.receipt_id(producer_receipt, self.sum_receipts, "source")
         operands = [pin, commit, *tail]
         if bundle is not None:
             operands[-1] = bundle
@@ -251,16 +274,16 @@ class ProcessHistory:
         return self.select("release_input", *args)
 
     def export_scale(self, role, pin, result_receipt, filename):
-        commit = self.scale_receipts[role, result_receipt]
+        commit = self.receipt_id(result_receipt, self.scale_receipts, role)
         bundle = self.directory / filename
         row = self.write("export_scale", (role, pin, result_receipt, filename),
                          operands=(pin, commit, bundle), bundle=bundle)
         return {**row, "expectedCommit": commit}
 
     def publish_scale(self, role, pin, result_receipt, producer_receipt, expected_factor, main_receipt):
-        result = self.scale_receipts["worker", result_receipt]
-        producer = self.sum_receipts["source", producer_receipt]
-        main = "-" if main_receipt == "-" else self.scale_receipts["worker", main_receipt]
+        result = self.receipt_id(result_receipt, self.scale_receipts, "worker")
+        producer = self.receipt_id(producer_receipt, self.sum_receipts, "source")
+        main = "-" if main_receipt == "-" else self.receipt_id(main_receipt, self.scale_receipts, "worker")
         row = self.write("publish_scale", (role, pin, result_receipt, producer_receipt, expected_factor, main_receipt),
                          operands=(pin, result, producer, expected_factor, main))
         return {**row, "expectedResult": result, "expectedCommit": producer, "expectedMain": main}
@@ -564,6 +587,39 @@ class ProcessHistory:
         row = self.write("publish_requested_scale", args, operands=operands)
         return {**row, "expectedCommit": plan, "expectedResult": result}
 
+    def unlink_bundle(self, filename):
+        path = self.directory / filename
+        path.unlink()
+        return evidence("unlink_bundle", (filename,), code=0, stderr="", unchanged=False,
+                        bundle_present=path.exists(), bundle_size=path.stat().st_size if path.is_file() else -1)
+
+    def truncate_bundle(self, source, destination, count):
+        src = self.directory / source
+        dst = self.directory / destination
+        before = src.read_bytes()
+        suffix_length = int(count)
+        if not 0 < suffix_length < len(before):
+            raise ValueError("bundle suffix length must leave a nonempty prefix")
+        with dst.open("xb") as file:
+            file.write(before[:-suffix_length])
+        copied = dst.read_bytes()
+        # For a copied truncation, unchanged compares the retained prefix.
+        return evidence("truncate_bundle", (source, destination, count), code=0, stderr="",
+                        unchanged=copied == before[:len(copied)], bundle_present=dst.is_file(),
+                        bundle_unchanged=src.read_bytes() == before, bundle_size=len(copied))
+
+    def checkpoint_file(self, role, alias):
+        data = self.repos[role] / "data.mdb"
+        self.file_checkpoints[alias] = data.read_bytes()
+        return {**evidence("checkpoint_file", (role, alias), code=0, stderr="", unchanged=False),
+                "repoExists": data.is_file()}
+
+    def compare_file(self, role, alias):
+        data = self.repos[role] / "data.mdb"
+        exists = data.is_file()
+        unchanged = exists and data.read_bytes() == self.file_checkpoints[alias]
+        return {**evidence("compare_file", (role, alias), code=0, stderr="", unchanged=unchanged), "repoExists": exists}
+
     def collect(self, role):
         row, output = self.invoke("collect", (role,))
         return {**row, "removed": int(output) if output else -1}
@@ -574,6 +630,7 @@ class ProcessHistory:
         row, output = self.invoke("inspect", (role, *args), operands=operands)
         row["expectedIntent"] = knowledge
         if output:
+            row["stdoutHash"] = sha256(output.encode("utf-8")).hexdigest()
             report = json.loads(output)
             row["commit"] = id_evidence(report["commit"])
             row["tableRef"] = report.get("table_ref", "")
@@ -697,6 +754,7 @@ def main():
     add_quint_arguments(parser)
     for name in ("example", "histories", "rules"):
         parser.add_argument(name, type=absolute_path)
+    parser.add_argument("modules", nargs="*", type=absolute_path, help="shared Quint modules")
     args = parser.parse_args()
     quint = quint_command(args)
     with TemporaryDirectory(prefix="dml-recorded-calls-") as tmp:
@@ -710,7 +768,8 @@ def main():
         print(f"Collected recorded-call observations in {replayed - loaded:.2f}s", file=sys.stderr, flush=True)
         # Sparse columns keep the full evidence without repeating its wide type for each step.
         defaults = evidence("", (), code=0, stderr="", unchanged=False)
-        state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=defaults)
+        state = evaluate(quint, args.rules, directory, observations, [args.histories, *args.modules],
+                         attempt_defaults=defaults)
         print(f"Evaluated recorded-call observations in {monotonic() - replayed:.2f}s", file=sys.stderr, flush=True)
         check_verdicts(histories, observations, state)
 

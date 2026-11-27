@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packet 1 is complete**; see its [live evidence](#packet-1-evidence). Resume at **packet 2**: start with the stored-result and outbound transfer cases, sharing the false-arithmetic fixture in Quint. Read only the relevant methods, histories, rules, and interpreter commands. Preserve the distinction between a stored result and a fresh computation.
+- **Packets 1 and 2 are complete**; see their [graph and rollback evidence](#packet-1-evidence) and [stored-result and transfer evidence](#packet-2-evidence). Resume at **packet 3**: plan/worker/abandon first, then receipt identity and retry. Read only the relevant methods, histories, rules, and interpreter commands. Leave the typed pre-open cases for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Only the seven packet 1 methods have been closed.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. The seven packet 1 and ten packet 2 methods are closed.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -222,6 +222,42 @@ failed histories 25 and 26 step 11 (`wrong_native_status`).
 | `:2654` out of range | `rangeRejectionRequests` (24): step 1 | `freshRejectionVerdict` saw the argument-range diagnosis and no path before or after. |
 | `:2659` sum / scale overflow | `overflowRequests` (25, 26): step 1, aborted probe 2–7, readback 8–13 in each | `overflowRejectionVerdicts` saw distinct arithmetic diagnoses and initialized repositories with no `main` and no candidate datum (max / min I64). |
 | `:2682` repeat combined record | `repeatRejectionRequests` (27): first write 1, repeat 7, native `main` reads 4 and 10 | `repeatRejectionVerdicts` saw a diagnosed rejection, the same `data.mdb` bytes, and the original receipt ID in native `main` both times. |
+
+## Packet 2 evidence
+
+The [stored-result](../tests/recorded_calls_stored_histories.qnt) and
+[transfer](../tests/recorded_calls_outbound_histories.qnt) histories share native
+fixture steps for `2 + 3 → -17`. Execution produces `-102`, but inspection and
+publication preserve the intentionally stored `-98`. CLI and native steps can
+share explicit ID aliases without re-resolving a mutable pin. The workflow
+runner observes file operations and byte equality; Quint checks the outcomes.
+
+The live replay passed 37 histories and its rule controls. Ten superseded
+Python methods and two fixture helpers were removed; the focused suite
+registration and helpers used elsewhere remain. The final
+`scripts/check.sh --quint` gate passed all 28 suites in the Nix shell on
+aarch64 Linux. macOS and Windows were not run locally. The table uses the
+runner's one-based history and step numbers.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:284` stored sum / fresh scale | `storedExecutionRequests` (28): scale 28, native graph 31–60, inspect 63 | `storedLinkedReport` matched the exact parent, sub-DAG and stored sum node, and checked a native and reported scale result of `-102`. |
+| `:299` outbound lineage / collection | `outboundCollection` (34): export, stage, unlink, scale and release 41–48; decoy read 57, collect 60, readback 63–101 | `outboundVerdicts` matched exact transfer IDs and bundle removal. The unpinned decoy existed before collection and was swept; origin and staging refs were absent in the worker. `storedLinkedReport` matched the retained edges and `-102` with unchanged worker bytes on inspection; the origin's file also matched its checkpoint. |
+| `:355` transfer and release guards | `outboundGuards` (35): export 3, 6; stage 8–9; scale 10; release 19, 20, 67, 73; moved pin read 76 | `outboundRejected` distinguished stale export, no-clobber, same/different bundle occupancy, stale scaling, missing result, wrong parent, wrong input DAG and moved incoming. `outboundForgery` read the persisted correct-parent/wrong-DAG case and the distinct equal-root producer; file/selection checks preserved the original state. |
+| `:408` truncated import | `outboundTruncation` (36): truncate 29, reject 30 and 47, native absence 33–44 and 50–61, intact import/readback 64–73 | The one-byte shorter copy matched the exact source prefix. `outboundTruncated` saw `invalid_bounds` in both attempts, with initialized bytes unchanged in the second. Native reads found no pin or partial closure; the intact bundle published its intended pin and DAG. |
+| `:430` stored return and factor guard | `storedReturnRequests` (33): worker/staged reports 56/60, unlink 61–62, absent producer 71, wrong factor 76/readback 79–80, publish 83, collect 89, lineage/readback 92–131 | `publishVerdict` distinguished the wrong factor without changing bytes, creating `main`, or losing the staged result. The right factor published the exact result. The decoy was present before collection and absent after; no source or staging pin remained. `storedLinkedReport` matched the retained commit and DAG links and `-98`; report hashes and the worker byte checkpoint matched. |
+| `:490` late rollback | `outboundLateGuard` (37): ready report 10; create rejection 16 and readback 19–21; update 25 and alias 26, reads 29–30; missing staging 34 and reads 37–38 | `outboundRejected` verified the exact result and expected main operands, the late moved or missing staging diagnosis (distinct from alias rejection), and unchanged bytes. Native reads confirmed absent `main` after create and the exact prior tip after update. |
+| `:2570` unsupported stored sum version | `unsupportedSumRequests` (29): native fixture 30–41, scale 44, refs 47–48 | `storedCliVerdict` checked the valid sum tree and persisted `example.sum@2`, then the version diagnosis, unchanged bytes, original producer pin and absent `main`. |
+| `:2581` equal-root mismatched parent | `mismatchedParentRequests` (30): valid inspect 4, native fixture 7–45, reject 48–50, refs 53–54 | `mismatchProof` read distinct producer DAGs with one root and a forged commit sharing the genuine result's tree but naming the decoy parent. Inspect, export and publication each rejected the mismatch without changing bytes. Export produced no bundle. |
+| `:2633` combined stored report | `combinedStoredRequests(true)` (31): native graph 48–73, inspect 76 | `storedLinkedReport` distinguished the selected source from the equal-root decoy and matched the physical sub-DAG and both stored results (`-17`, `-98`) with unchanged bytes. |
+| `:2646` wrong node kind | `combinedStoredRequests(false)` (32): native input 48–59, inspect 62 | `storedCliVerdict` read the substituted `-17` literal in the input slot and required the wrong-node-kind rejection without writing. |
+
+Isolated negative controls also failed as intended. Recomputing the sum when
+executing scale failed 28:63 (`wrong_stored_graph`). Committing `main` before
+checking the staging guard kept the expected CLI error but failed 37:16
+(`storage_changed`), with the native absence check also failing at 37:19.
+Changing a retained prefix byte while still truncating by one byte failed 36:29
+(`wrong_file_observation`) even though the import diagnostics were unchanged.
 
 ## Removal dependencies and finish line
 

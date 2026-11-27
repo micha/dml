@@ -133,33 +133,40 @@ python3 -B tests/run_provenance_handoff.py "$(command -v quint)" \
 
 The [Python example](../README.md#record-two-composed-calls-in-python) uses the
 public binding. The [workflow runner](run_recorded_calls.py) launches separate
-record and inspect processes and observes their reports, diagnostics, repository
-presence, and changes to `data.mdb`. The [Quint histories](recorded_calls_histories.qnt)
-also request individual native reads on the same repositories. The
-[rules](recorded_calls_rules.qnt) compare the CLI reports to those independent
-reads, including the commit parents, tree entries, and producer DAG edges.
+CLI processes and observes their reports, diagnostics, repository presence, and
+changes to `data.mdb`. The [Quint histories](recorded_calls_histories.qnt) also
+request individual native reads and fixture writes on the same repositories.
+The [rules](recorded_calls_rules.qnt) compare CLI reports to independent native
+reads of commit parents, tree entries, and producer DAG edges.
 
-For split recording, the runner passes the exact commit ID printed by the sum
-process, not the current pin target. Quint checks that two equal-valued sums
+For split recording, the runner passes an explicit immutable ID, never the
+current pin target. CLI steps can name a prior receipt or use `native:<alias>`
+for a native ID. Native ID operands can use `sum:<ref>` or `scale:<role>:<ref>`
+for prior CLI receipts. Quint checks that two equal-valued sums
 remain distinct producers and that read-only reports stay the same after their
 pins move or are deleted. For failed writes, Quint distinguishes stale and
 missing pins, occupied refs, overflow, and out-of-range input. It checks file
 preservation where applicable and uses native reads to verify that candidate
 values and refs were not left behind.
 
-The remaining [focused tests](test_recorded_calls.py) include forged parent and
-input DAG combinations and deliberately non-arithmetic stored values, which
-check that composition and inspection use the stored results. Both the workflow
-and focused tests run in the opt-in Meson gate.
+The [stored-evidence histories](recorded_calls_stored_histories.qnt) build a
+producer that stores `-17` for `2 + 3`. Inspection preserves that result and a
+stored scale result of `-98`; fresh execution with factor 6 instead computes
+`-102`. The histories also exercise an unsupported implementation, a result
+whose input DAG does not match its equal-root parent, and a literal input used
+in place of a sub-DAG edge. The workflow and remaining
+[focused tests](test_recorded_calls.py) run in the opt-in Meson gate.
 
 The [one-way bundle handoff](../README.md#compose-from-a-producer-in-another-repository)
 exercises the same caller on a second repository through the public binding.
-The replay checks read-only export, bundle file preservation, create-only staging,
-rejection of a valid same-valued decoy, release guarded by the expected producer,
-and readback after release and collection. The focused tests also verify that
-both physical links survive while collection removes an unpinned decoy, that
-release rejects a result with the correct parent and the wrong input DAG, and
-that a deliberately incorrect stored sum is transferred and consumed unchanged.
+The [outbound histories](recorded_calls_outbound_histories.qnt) check no-clobber
+export, create-only staging, and release guarded by the exact parent and input
+DAG. They check that both links survive collection while an unpinned decoy is
+swept, and that transferring the stored sum does not change the value consumed.
+A separate history truncates a copy of a bundle by one byte, checks that it
+publishes neither the staging ref nor any object from its closure, and then
+imports the intact bundle. The runner only performs the requested file edits
+and reports observations; Quint checks the outcomes.
 
 The [return and publication history](../README.md#return-and-publish-a-recorded-scale)
 checks exact result export and staging, rejection of a same-valued wrong producer,
@@ -168,11 +175,11 @@ of a zero sum share an output node but record different factors. Even when the
 exact result is staged and `main` matches, publication rejects the wrong factor
 and accepts the same result with the matching expectation. Any rejection must
 leave committed bytes unchanged. Success releases the staging ref and leaves both
-calls readable after a sweep that removes the superseded result. The focused tests
-exercise rollback after a tentative main create or update, reject a staging alias
-of `main` and a mismatched input DAG, and publish a deliberately incorrect stored
-output. They read the physical lineage links after collection with no separate
-source producer pin.
+calls readable after a sweep. The stored-result return history checks that
+publication preserves the worker's `-98` and exact report, and that both physical
+links survive collection without a source producer pin. The late-guard history
+checks that moved and missing staging pins roll back `main` changes and that a
+staging alias of `main` is rejected.
 
 The [durable-request history](../README.md#save-a-scale-request-before-sending-it)
 starts separate processes for planning, dispatch, work, staging, and publication.

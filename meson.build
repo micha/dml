@@ -210,8 +210,9 @@ with tempfile.TemporaryDirectory() as tmp:
   test(
     'recorded-calls', python,
     args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
-           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_rules.qnt')]
-          + quint_args,
+           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_rules.qnt',
+                 'tests/recorded_calls_fixtures.qnt', 'tests/recorded_calls_stored_histories.qnt',
+                 'tests/recorded_calls_outbound_histories.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
