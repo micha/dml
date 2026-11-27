@@ -233,6 +233,19 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
+  foreach suite : ['reuse', 'selection']
+    test(
+      'recorded-calls-' + suite, python,
+      args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
+             files('examples/recorded_calls.py', 'tests/recorded_calls_' + suite + '_histories.qnt',
+                   'tests/recorded_calls_' + suite + '_rules.qnt', 'tests/recorded_calls_histories.qnt',
+                   'tests/recorded_calls_rules.qnt')] + recorded_calls_modules + quint_args,
+      env: binding_env,
+      depends: public_python_core,
+      timeout: replay_timeout,
+    )
+  endforeach
+
   test(
     'argument-map-boundaries', python,
     args: ['-B', files('tests/test_argument_maps.py')],

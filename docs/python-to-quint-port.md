@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–3 are complete**; see their [graph and rollback evidence](#packet-1-evidence), [stored-result and transfer evidence](#packet-2-evidence), and [plan, worker, abandon, and receipt evidence](#packet-3-evidence). Resume at **packet 4**: stage/direct reuse proof first, then result and attempt selection. Read only the relevant methods, histories, rules, and interpreter commands. Leave the typed pre-open cases for packet 10.
+- **Packets 1–4 are complete**; see their [graph and rollback](#packet-1-evidence), [stored-result and transfer](#packet-2-evidence), [plan and receipt](#packet-3-evidence), and [reuse and selection](#packet-4-evidence) evidence. Resume at **packet 5, adoption and deep-chain slice**: baseline `tests/test_recorded_calls.py:1213–1307`. Then tackle policy/intent and supersession in separate slices. Read only the relevant methods, histories, rules, and interpreter commands; leave typed pre-open cases for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -33,7 +33,7 @@ Use focused validation while working and `scripts/check.sh --quint` for the fina
 | 1. Calibrate on recorded calls | `test_recorded_calls.py` lines 108, 171, 231, 245, 2654, 2659, 2682 | Establish independent native observations, path absence, and diagnostics. If evidence plumbing is costly, prove a single end-to-end slice first. |
 | 2. Stored results, transfer, return | Lines 284–490 and 2570–2646 | Share false-arithmetic and equal-root fixtures. Split outbound handoff from return if needed. |
 | 3. Durable plans, abandon, receipts | 526, 589, 1792, 1827, 1870–2144; typed pre-open cases go to packet 10 | Plan/worker/abandon first; receipt identity and retry second. |
-| 4. Reuse, result selection, attempt selection | 631–1139 except 763, plus 1766 | Stage/direct reuse proof first; selection and attempt shape second. Route Python-only type variants to packet 10. |
+| 4. Reuse, result selection, attempt selection | 631–1139 except 763, plus CLI-representable cases of 1766 | Complete. The direct Python UUID type and raw short ID cases from 1766 stay with 763 in packet 10. |
 | 5. Adoption, policy, intent, supersession | 1213–1707 except pre-open type cases | **Three slices:** adoption/deep chain; policy/intent decision; supersession/knowledge. Not one context window. |
 | 6. Reuse tables | 2252–2547 | Separate implementation-scoped from intent-scoped tables. Capacity, identity, key, and historical validation differ. |
 | 7. Argument-map, composition, closure records | Two remaining argument-map methods, composition graft, closure override and getter-graft | Use existing workflow histories. Isolate the 64-deep run if needed for Quint evaluation time; no new driver. |
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–3 closed 28 methods (7, 10, and 11 respectively).
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–4 closed 38 whole methods (7, 10, 11, and 10 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1766`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -88,7 +88,7 @@ Existing Quint anchors: `recorded_calls_histories.qnt` and `recorded_calls_rules
 | 1591 | Supersession exact/distinct pins and commits, nonempty evidence, legal refs/endpoints/reason; late occupied output and stacked declaration reject; ordered parents, main and slots unchanged. |
 | 1646 | Bad declaration root/type/reason/endpoints/count/order/stacked ancestry, direct and as knowledge; unrelated, absent, malformed, or inapplicable knowledge rejected read-only. |
 | 1707 | Transferred old/new decision pins and sibling knowledge, no origin refs; preserve historical absence and change only separately requested knowledge view. |
-| 1766 | Attempt UUID case/variant/type, aliased/invalid output, short/stale input ID, arithmetic overflow; reject atomically. |
+| 1766 | Attempt UUID case/variant, aliased/invalid output, stale input ID, arithmetic overflow: packet 4. Python `str` instead of UUID bytes and raw short commit bytes: packet 10. Both must reject atomically. |
 | 1792 | Bad request ref/factor, occupied plan, export mismatch/no file, main already names request, worker overflow: no partial state. |
 | 1827 | Structurally valid future implementation request imports; work (not import) rejects without losing input or creating result. |
 | 1870 | Abandon only selected pin despite moved main, alias, staged result; restoration cannot authorize publish. GC removes private plan/prior main but not staged result; worker unchanged. |
@@ -297,6 +297,44 @@ plan under a hidden ref with other data available for GC still failed 5:42
 on the wrong root failed 8:50 (`wrong_receipt_graph`). Ignoring the plan name
 in the key failed 9:33, and treating `main` already at the result as success
 failed 11:29 (both `wrong_rejection`).
+
+## Packet 4 evidence
+
+[Staged and direct reuse](../tests/recorded_calls_reuse_histories.qnt) and
+[result and attempt selection](../tests/recorded_calls_selection_histories.qnt)
+run in separate Meson entries with the shared recorded-calls runner. The runner
+passes immutable native IDs into existing CLI commands and does not evaluate
+fixture validity or decide the outcome. The histories make and read persisted
+fixtures with individual native calls, then run the real public workflow.
+
+Both entries passed (six reuse histories and five selection histories, with
+coverage and controls). The final local `scripts/check.sh --quint` gate passed
+all 31 suites in the Nix shell on aarch64 Linux with Quint 0.33.1. Ten Python
+methods and three unused helpers were removed. `:763` and the two direct
+Python argument cases of `:1766` remain for packet 10. The step numbers below
+are one-based within each entry.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:631` right request parent, wrong body implementation | `implementationCase` (reuse 1): native 84–143, inspect 146, rejects 147–151, refs 154–159 | `planLayout` and `resultLayout` matched the shared exact v2 request under the valid v2 and invalid v1 bodies. All five operations diagnosed the implementation mismatch with unchanged bytes and no bundle, receipt, destination, or proof. |
+| `:663` invalid reuse inputs | `malformedCandidates` (reuse 2): native 123–237, valid inspect 240, stage 241–245, direct 246–250, requested publish 251 | `malformedCandidateLayouts` established the bad plan DAG, missing parent, wrong factor, different equal-root producer DAG, and wrong request parent. Both reuse paths rejected each for its own cause; requested publish also rejected the wrong parent. Bytes were unchanged with no destination or `main`. |
+| `:717` staging stored evidence | `stageCase` (reuse 3): inspect/stage 115–116, refs 119–123, report 126, sweep/readback 132–137, publish 140, refs/report 143–150 | `resultLayout` and `resultReport` observed the stored `-98` even though execution would overflow. Staging at the 128-byte name retained the exact plan, prior `main`, receipt, and history. After dropping history and collecting, publish consumed only plan and destination, kept the receipt, and reported the same result. |
+| `:799` direct reuse and proof-only retention | `directCase` (reuse 4): stale result/main 148/154, restored prior 169, publish 174, refs and graph 177–202, collect and readback 217–234 | `proofGraph` checked ordered plan/result parents, root and two historical strings (including the 128-byte plan name). Native reads proved `main` moved from a distinct tip to the exact stored result. Rebinding historical names and collecting preserved the original closure through the proof alone and swept the alternate. |
+| `:873` unrelated and identical proof occupancy | `occupancyCase` (reuse 5): rejects 60/119, rollback 63–66/122–125, success/report 74/104, restored guards 113–116 | `existingRejectionVerdict` required the collision diagnosis and unchanged bytes. The successful proof reported absent prior `main`; after restoring all original guards the same operation rejected the identical proof rather than treating it as a receipt. |
+| `:914` malformed stored proof | `malformedProofCase` (reuse 6): valid reads 89/117/327, native forgery 193–315, rejected reads 318–326 | `malformedProofGraph` and exact diagnoses distinguished reversed/missing parents, wrong nested result, wrong root/extra binding, invalid and aliased ref names, and wrong datum type. All reads left bytes unchanged. |
+| `:951` portable selection and proof-only retention | `transfer` (selection 1): choose 20, native 23–41, collect 53, transfer 61–64, target reads 67–75, publish 82, graph 85–111, retry/rollback 118–123, collect 133 and readback 136–147 | `singleBinding` checked the request/result parents and historical ref despite stale `main`. Native reads found the original plan and prior tip swept and absent from the target; `selectionReadVerdict` matched the imported report. A distinct new plan published without the original result pin. `proofGraph` and `proofReport` matched plan and selection after a diagnosed, unchanged collision and collection with only the proof pinned. |
+| `:1024` malformed result selection | `resultValidation` (selection 2): persisted results/choices 72–361, rejects 364–378, valid counterpart 387–389 | `candidate` and `forgedChoice` verified exact parent/body versions, ordered parents, historical name/type, and DAG root. `exactDiagnostic` distinguished the writer, reader, and publisher rejections with unchanged bytes. The matching selection inspected and published. |
+| `:1072` occurrence identity and retention | `attempts` (selection 3): collision 11, work 12–15, native 18–52, choice 55–75, collect/readbacks 87–93, publish 96, proof 102–125, proof-only read 143 | Native checks found distinct IDs for distinct UUIDs, identical IDs on repeat, and one result shared by both attempts. `singleBinding` and `proofGraph` matched ordered attempts, choice, proof, and exact literals. Collection swept the unselected attempt but not the selected history; only the proof remained pinned at the last read. |
+| `:1139` malformed nested attempt and selection | `attemptValidation` (selection 4): persisted results/attempts/choices 72–503, rejects 506–524, valid counterpart 533–535 | Native reads distinguished the wrong nested version, result parent, attempt request, arity, uppercase UUID with a hex letter, historical name, and a result in place of an attempt. `exactDiagnostic` required read-only rejection for every applicable select/inspect/publish operation. |
+| `:1766` CLI worker guards | `guard` (selection 5): rejects 16–22, native refs 25–29 | Exact diagnoses distinguished uppercase UUID, bad variant, aliases, invalid ASCII name, stale request ID, and overflow; bytes and original refs stayed unchanged with no attempt or `main`. Python `str` and raw short bytes still use the narrowed boundary test. |
+
+Isolated live controls failed as intended. Skipping the real `main` update
+failed reuse 4:177 (`wrong_native_value`), omitting the nested result check
+failed reuse 6:320 (`wrong_rejection`), and treating an identical proof as a
+receipt failed reuse 5:119 (`wrong_rejection`). Accepting an uppercase stored
+UUID failed selection 4:510 (`wrong_rejection`); changing both the selected
+proof reader and writer to agree on the wrong root failed selection 1:89
+(`wrong_native_graph`).
 
 ## Removal dependencies and finish line
 
