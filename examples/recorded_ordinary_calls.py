@@ -7,9 +7,10 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 import json
 from pathlib import Path
+from threading import current_thread
 from uuid import uuid4
 
-from daggerml import builtin, core
+from daggerml import builtin, calls, core
 
 import recorded_builtins as layout
 import recorded_calls as records
@@ -21,11 +22,19 @@ def _role(name):
 
 
 DEFAULTS, ENV, CAPTURE = map(_role, (b"defaults", b"environment", b"capture"))
+IMPLEMENTATION_DEFAULTS = _role(b"implementation-defaults")
+DEFAULT_ROLES = (DEFAULTS, IMPLEMENTATION_DEFAULTS)
 OUTER_Q, START, FINISHED, HIT = map(_role, (b"outer-request", b"start", b"finished", b"hit"))
 ADD, ADD_Q, ADD_T = map(_role, (b"add", b"add-request", b"add-attempt"))
 DOUBLE, DOUBLE_Q, DOUBLE_T, DOUBLE_HIT = map(_role, (b"double", b"double-request", b"double-attempt", b"double-hit"))
 MAP_SOURCES = {1: layout.SOURCES[b"v1"], 2: layout.SOURCES[b"v2"]}
 LIST_SOURCE = layout.SOURCES[b"list"]
+INTENTS = {
+    kind: b"urn:dml:example:ordinary:" + name
+    for kind, name in ((ENV, b"sum-then-double"), (ADD, b"add"), (DOUBLE, b"double"))
+}
+GETTER_SLOTS = (b"map-get", b"list-get")
+OUTER_SLOTS = (*GETTER_SLOTS, b"add", b"double")
 MODES = (FRESH, TRY, REQUIRE)
 MAX_HISTORY_RECORDS = 128
 MAX_HISTORY_DEPTH = 32
@@ -35,6 +44,7 @@ MAX_HISTORY_DEPTH = 32
 class Leaf:
     dag: bytes
     binding: builtin.Binding
+    closure: calls.Closure | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +54,7 @@ class Environment:
     list_binding: builtin.Binding
     add: Leaf
     double: Leaf
+    closure: calls.Closure | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +161,18 @@ def _args(args, names):
     return tuple(source.value.as_i64() for _, source in args.entries)
 
 
+def _check_outer_sources(txn, args, allow_named):
+    entries = args.entries
+    if all(type(source) is builtin.Description for _, source in entries):
+        return
+    if allow_named and all(type(source) is builtin.LiteralSource and source.name == key for key, source in entries):
+        a, b = (source for _, source in entries)
+        if a.source_dag == b.source_dag and layout._shape(txn, a.source_dag, 2) == a.source_node:
+            return
+    raise ValueError("outer input MAP requires original I64 literal sources or one exact named input DAG"
+                     if allow_named else "outer input MAP requires the original I64 literal sources")
+
+
 def _leaf_value(kind, values):
     value = values[0] + values[1] if kind == ADD else 2 * values[0]
     records._check_i64(value, "add result" if kind == ADD else "double result")
@@ -189,17 +212,30 @@ def _check_union(txn, trace, *roots):
             todo.append(node.source_dag)
 
 
+def _reuse_key(target, args):
+    if target.closure is None:
+        return (False, target.dag, args.datum)
+    return (True, target.closure.intent, args.datum)
+
+
 def _outer_matches(request):
     if request.selected is None:
         return False
     old = request.selected.start.request
-    return (old.capture.environment.dag, old.args.datum) == (request.capture.environment.dag, request.args.datum)
+    return _reuse_key(old.capture.environment, old.args) == _reuse_key(request.capture.environment, request.args)
 
 
 def _double_matches(request):
     old = request.start.request.double_selected
-    return (old is not None and old.request.target.dag == request.target.dag
-            and old.request.args.datum == request.args.datum)
+    return old is not None and _reuse_key(old.request.target, old.request.args) == _reuse_key(request.target, request.args)
+
+
+def _implementation_uri(kind, version):
+    return INTENTS[kind] + b":v" + str(version).encode("ascii")
+
+
+def _selection_key_label(target, legacy):
+    return legacy if target.closure is None else "intent"
 
 
 class Reader:
@@ -222,7 +258,8 @@ class Reader:
             self._active.add(commit)
             try:
                 handler = {
-                    DEFAULTS: self._defaults, CAPTURE: self._capture, OUTER_Q: self._outer_request,
+                    DEFAULTS: self._defaults, IMPLEMENTATION_DEFAULTS: self._defaults,
+                    CAPTURE: self._capture, OUTER_Q: self._outer_request,
                     START: self._start, HIT: self._hit, ADD_Q: self._leaf_request, DOUBLE_Q: self._leaf_request,
                     ADD_T: self._leaf_attempt, DOUBLE_T: self._leaf_attempt, DOUBLE_HIT: self._double_hit,
                     FINISHED: self._finished,
@@ -251,20 +288,43 @@ class Reader:
             raise ValueError("unsupported captured map getter")
         return binding
 
-    def _defaults(self, _commit, _role, dag, parents):
-        self._shape(dag, ENV, 5, parents, (0, 1))
-        if parents and _snapshot(self.txn, parents[0])[0] != DEFAULTS:
-            raise ValueError("defaults must descend from a defaults snapshot")
-        listed = self.builtins.binding(layout._target(self.txn, dag, b"list-get"))
-        if listed.source_uri != LIST_SOURCE:
+    def _list_binding(self, dag):
+        binding = self.builtins.binding(layout._target(self.txn, dag, b"list-get"))
+        if binding.source_uri != LIST_SOURCE:
             raise ValueError("unsupported captured list getter")
+        return binding
+
+    def _implementation_closure(self, dag, kind, names):
+        closure = calls.inspect_closure(self.txn, dag, names=names)
+        binding = self._map_binding(dag)
+        version = next(version for version, uri in MAP_SOURCES.items() if uri == binding.source_uri)
+        if (closure.intent, closure.implementation) != (INTENTS[kind], _implementation_uri(kind, version)):
+            raise ValueError("implementation closure does not match its intent or captured getter version")
+        return closure, binding, self._list_binding(dag), version
+
+    def _implementation_leaf(self, dag, kind, version):
+        closure, binding, _, actual_version = self._implementation_closure(dag, kind, GETTER_SLOTS)
+        if actual_version != version:
+            raise ValueError("outer implementation does not capture its declared leaf version")
+        return Leaf(dag, binding, closure)
+
+    def _defaults(self, _commit, role, dag, parents):
+        if len(parents) > 1 or (parents and _snapshot(self.txn, parents[0])[0] != role):
+            raise ValueError("defaults must descend from a defaults snapshot of the same profile")
+        if role == IMPLEMENTATION_DEFAULTS:
+            closure, binding, listed, version = self._implementation_closure(dag, ENV, OUTER_SLOTS)
+            dependencies = dict(closure.captures)
+            add = self._implementation_leaf(dependencies[b"add"], ADD, version)
+            double = self._implementation_leaf(dependencies[b"double"], DOUBLE, version)
+            return Environment(dag, binding, listed, add, double, closure)
+        _check_role(self.txn, dag, ENV, 5)
         add = self._leaf(layout._target(self.txn, dag, b"add"), ADD)
         double = self._leaf(layout._target(self.txn, dag, b"double"), DOUBLE)
-        return Environment(dag, self._map_binding(dag), listed, add, double)
+        return Environment(dag, self._map_binding(dag), self._list_binding(dag), add, double)
 
     def _capture(self, commit, role, dag, parents):
         self._shape(dag, role, 2, parents, (1,))
-        env = self.load(parents[0], DEFAULTS)
+        env = self.load(parents[0], *DEFAULT_ROLES)
         if layout._target(self.txn, dag, b"environment") != env.dag:
             raise ValueError("capture does not link the pinned defaults environment")
         return Capture(commit, parents[0], env)
@@ -280,8 +340,7 @@ class Reader:
         capture = self.load(parents[0], CAPTURE)
         args = self.builtins.arguments(layout._target(txn, dag, b"inputs"))
         _args(args, (b"a", b"b"))
-        if any(type(source) is not builtin.Description for _, source in args.entries):
-            raise ValueError("outer input MAP requires the original I64 literal sources")
+        _check_outer_sources(txn, args, capture.environment.closure is not None)
         modes = (_s(txn, dag, b"mode"), _s(txn, dag, b"double-mode"))
         pins = (_s(txn, dag, b"selected"), _s(txn, dag, b"double-selected"))
         if tuple(pin for pin in pins if pin) != tuple(parent.hex().encode("ascii") for parent in parents[1:]):
@@ -305,6 +364,12 @@ class Reader:
         request = self.load(parents[0], OUTER_Q)
         if not _outer_matches(request) or request.invocation == request.selected.start.request.invocation:
             raise ValueError("outer hit needs a matching attempt and a new request")
+        if request.capture.environment.closure is not None:
+            double = request.selected.double
+            add = double.requested.upstream
+            env = request.capture.environment
+            _check_union(self.txn, add.trace, add.result, double.requested.args, double.producing.result,
+                         request.args, env.binding, env.list_binding)
         return Hit(request, request.selected)
 
     def _leaf_request(self, commit, role, dag, parents):
@@ -383,24 +448,43 @@ class Reader:
         return Finish(commit, double)
 
 
-def defaults(path, ref, version, *, expected=None):
+def _put_environment(txn, version, role):
+    map_binding = builtin.put_binding(txn, MAP_SOURCES[version])
+    list_binding = builtin.put_binding(txn, LIST_SOURCE)
+    if role == IMPLEMENTATION_DEFAULTS:
+        getters = {b"map-get": map_binding, b"list-get": list_binding}
+
+        def put(kind, captures):
+            return calls.put_closure(txn, intent=INTENTS[kind], implementation=_implementation_uri(kind, version),
+                                     captures=captures)
+
+        return put(ENV, {**getters, b"add": put(ADD, getters), b"double": put(DOUBLE, getters)})
+    map_link = layout._link(txn, map_binding)
+    return _put_role(txn, ENV, {
+        b"map-get": map_link,
+        b"list-get": layout._link(txn, list_binding),
+        b"add": layout._link(txn, _put_role(txn, ADD, {b"map-get": map_link})),
+        b"double": layout._link(txn, _put_role(txn, DOUBLE, {b"map-get": map_link})),
+    })
+
+
+def defaults(path, ref, version, *, expected=None, implementation_bound=False):
     records._check_intent_refs(("defaults", ref))
     if type(version) is not int or version not in MAP_SOURCES:
         raise ValueError("getter version must be 1 or 2")
     with records._write_transaction(path, create=expected is None) as txn:
         layout._pin(txn, ref, expected, "defaults")
+        role = IMPLEMENTATION_DEFAULTS if implementation_bound else DEFAULTS
         if expected is not None:
-            Reader(txn).load(expected, DEFAULTS)
-        map_link = layout._link(txn, builtin.put_binding(txn, MAP_SOURCES[version]))
-        env = _put_role(txn, ENV, {
-            b"map-get": map_link,
-            b"list-get": layout._link(txn, builtin.put_binding(txn, LIST_SOURCE)),
-            b"add": layout._link(txn, _put_role(txn, ADD, {b"map-get": map_link})),
-            b"double": layout._link(txn, _put_role(txn, DOUBLE, {b"map-get": map_link})),
-        })
+            previous = Reader(txn).load(expected, *DEFAULT_ROLES)
+            if previous.closure is not None:
+                role = IMPLEMENTATION_DEFAULTS
+            elif implementation_bound:
+                raise ValueError("cannot change a defaults ref to another invocation profile")
+        env = _put_environment(txn, version, role)
         if expected is None:
-            return records._publish(txn, ref, DEFAULTS, env)
-        commit = records._put_snapshot(txn, DEFAULTS, env, expected)
+            return records._publish(txn, ref, role, env)
+        commit = records._put_snapshot(txn, role, env, expected)
         core.txn_ref_update(txn, ref, commit)
         return commit
 
@@ -409,7 +493,7 @@ def capture(path, defaults_ref, defaults_commit, capture_ref):
     records._check_intent_refs(("defaults", defaults_ref), ("capture", capture_ref))
     with records._write_transaction(path, create=False) as txn:
         layout._pin(txn, defaults_ref, defaults_commit, "defaults")
-        env = Reader(txn).load(defaults_commit, DEFAULTS)
+        env = Reader(txn).load(defaults_commit, *DEFAULT_ROLES)
         commit = _put(txn, CAPTURE, {b"environment": layout._link(txn, env.dag)}, defaults_commit)
         core.txn_ref_create(txn, capture_ref, commit)
         return commit
@@ -430,7 +514,19 @@ def _selection_refs(outer, double):
     return refs
 
 
-def _begin(path, capture_ref, capture_commit, output_ref, a, b, invocation, outer, double):
+def _input_dag(txn, a, b, named):
+    with builtin.Recorder(txn) as recorder:
+        values = {b"a": a, b"b": b}
+        if named:
+            fields = {name: records._put_literal(txn, core.DATUM_I64, value) for name, value in values.items()}
+            origin = layout._put_dag(txn, fields[b"a"], fields)
+            nodes = {name: recorder.source(origin, name) for name in values}
+        else:
+            nodes = {name: recorder.literal(core.DATUM_I64, value) for name, value in values.items()}
+        return recorder.dag(recorder.arguments(nodes))
+
+
+def _begin(path, capture_ref, capture_commit, output_ref, a, b, invocation, outer, double, named_inputs):
     with records._write_transaction(path, create=False) as txn:
         layout._pin(txn, capture_ref, capture_commit, "capture")
         layout._pin(txn, output_ref, None, "output")
@@ -439,23 +535,24 @@ def _begin(path, capture_ref, capture_commit, output_ref, a, b, invocation, oute
                 layout._pin(txn, control.ref, control.expected, "selection")
         if outer.mode == REQUIRE and outer.expected is None:
             raise ValueError("no selected outer attempt")
-        with builtin.Recorder(txn) as recorder:
-            args = recorder.arguments({b"a": recorder.literal(core.DATUM_I64, a),
-                                       b"b": recorder.literal(core.DATUM_I64, b)})
-            inputs = recorder.dag(args)
+        reader = Reader(txn)
+        env = reader.load(capture_commit, CAPTURE).environment
+        if named_inputs and env.closure is None:
+            raise ValueError("named inputs require an implementation-bound capture")
+        inputs = _input_dag(txn, a, b, named_inputs)
         parents = (capture_commit, *(s.expected for s in (outer, double) if s.expected is not None))
         q = _put(txn, OUTER_Q, {b"inputs": layout._link(txn, inputs), b"invocation": _string(txn, invocation),
                                b"mode": _string(txn, outer.mode), b"double-mode": _string(txn, double.mode),
                                b"selected": _pin_literal(txn, outer.expected),
                                b"double-selected": _pin_literal(txn, double.expected)}, *parents)
-        reader = Reader(txn)
         request = reader.load(q, OUTER_Q)
         if _outer_matches(request):
             head = _put(txn, HIT, {}, q)
             reader.load(head, HIT)
             layout._main(txn, request.selected.commit)
         elif outer.mode == REQUIRE:
-            raise ValueError("no selected outer attempt for the capture and argument MAP")
+            label = _selection_key_label(env, "capture")
+            raise ValueError(f"no selected outer attempt for the {label} and argument MAP")
         else:
             head = _put(txn, START, {b"attempt": _string(txn, _new_id())}, q)
             reader.load(head, START)
@@ -483,6 +580,8 @@ class _Node:
 
 def _checked(method):
     def call(session, *args):
+        if session.thread is not current_thread():
+            raise ValueError("ordinary call session belongs to another thread")
         if not session.active or session.poisoned:
             raise ValueError("ordinary call session is inactive or poisoned")
         try:
@@ -493,13 +592,43 @@ def _checked(method):
     return call
 
 
+def _builtin_call(scope, recorder, func, binding, entries):
+    native = recorder.arguments(entries)
+    with scope.bind_builtin(recorder, func, binding, native) as (target, arguments):
+        return scope.invoke(target, arguments)
+
+
+def _map_get(scope, recorder, binding, container, key):
+    entries = {b"map": container, b"key": recorder.literal(core.DATUM_STRING, key)}
+    return _builtin_call(scope, recorder, builtin.MAP_GET, binding, entries)
+
+
+class _BoundOperations:
+    """Give a leaf copied getter results; its final scalar stays in its recorder."""
+
+    def __init__(self, scope, recorder, leaf, literal):
+        self._scope = scope
+        self._recorder = recorder
+        self._bindings = dict(leaf.closure.captures)
+        self.literal = literal
+
+    def map_get(self, container: builtin.ValueNode, key: bytes) -> calls.Node:
+        return _map_get(self._scope, self._recorder, self._bindings[b"map-get"], container, key)
+
+    def list_get(self, container: builtin.ValueNode, index: int) -> calls.Node:
+        entries = {b"list": container, b"index": self._recorder.literal(core.DATUM_I64, index)}
+        return _builtin_call(self._scope, self._recorder, builtin.LIST_GET, self._bindings[b"list-get"], entries)
+
+
 class _Session:
     """Bridge copied handles to short owned recorders; only two fixed call slots."""
 
-    def __init__(self, path, ref, head, request, batch):
+    def __init__(self, path, ref, head, request, batch, scope=None):
         self.path, self.ref, self.head = path, ref, head
         self.env, self.input_dag = request.capture.environment, request.args.dag
-        self.arguments = _Node(request.args.value)
+        self.scope = scope
+        self.thread = current_thread()
+        self.arguments = self._copy(request.args.value)
         self.add, self.double = object(), object()
         self.batch = batch
         self.txn = self.outer_scope = self.recorder = self.outer_input = self.outer_ops = None
@@ -507,6 +636,9 @@ class _Session:
         self.summed = self.double_arguments = self.result = None
         self.add_result = self.double_inputs = None
         self.active, self.poisoned = True, False
+
+    def _copy(self, value):
+        return _Node(value) if self.scope is None else self.scope.copy(value)
 
     def _begin_batch(self):
         self.txn = self.batch.enter_context(records._write_transaction(self.path, create=False))
@@ -528,10 +660,14 @@ class _Session:
             self.outer_scope = self.batch.enter_context(ExitStack())
             self.recorder = self.outer_scope.enter_context(builtin.Recorder(txn))
             self.outer_input = self.recorder.load(self.input_dag)
-            self.outer_ops = self._operations(self.recorder, self.env.binding)
-        result = self.outer_ops.map_get(self.outer_input, key)
+            if self.scope is None:
+                self.outer_ops = self._operations(self.recorder, self.env.binding)
+        if self.scope is None:
+            result = self._copy(self.outer_ops.map_get(self.outer_input, key).value)
+        else:
+            result = _map_get(self.scope, self.recorder, self.env.binding.dag, self.outer_input, key)
         self.gets += 1
-        return _Node(result.value)
+        return result
 
     def _operations(self, recorder, binding):
         return recorder.operations(map_binding=binding.dag, list_binding=self.env.list_binding.dag)
@@ -544,7 +680,12 @@ class _Session:
     def _leaf(self, kind, inputs, target):
         with builtin.Recorder(self.txn) as recorder:
             args = recorder.load(inputs)
-            node = _leaf_call(kind, args, self._operations(recorder, target.binding))
+            ops = self._operations(recorder, target.binding)
+            if self.scope is None:
+                node = _leaf_call(kind, args, ops)
+            else:
+                with calls.Scope() as scope:
+                    node = _leaf_call(kind, args, _BoundOperations(scope, recorder, target, ops.literal))
             return recorder.dag(recorder.returned(node, inputs=args))
 
     def _attempt(self, role, own, output, *, trace=None):
@@ -564,7 +705,7 @@ class _Session:
         proof = Reader(txn).load(attempt, ADD_T)
         self._advance(attempt)
         self.outer_scope = self.recorder = self.outer_ops = self.outer_input = None
-        self.summed = _Node(proof.result.value)
+        self.summed = self._copy(proof.result.value)
         return self.summed
 
     @_checked
@@ -576,7 +717,7 @@ class _Session:
         with builtin.Recorder(txn) as recorder:
             node = recorder.arguments({b"x": recorder.load(self.add_result)})
             self.double_inputs = recorder.dag(node)
-            self.double_arguments = _Node(node.value)
+            self.double_arguments = self._copy(node.value)
         return self.double_arguments
 
     def _double(self):
@@ -587,13 +728,14 @@ class _Session:
         if _double_matches(request):
             phase = _put(txn, DOUBLE_HIT, {}, own, request.start.request.double_selected.commit)
         elif request.start.request.double_mode == REQUIRE:
-            raise ValueError("no selected double attempt for the captured leaf and argument MAP")
+            label = _selection_key_label(request.target, "captured leaf")
+            raise ValueError(f"no selected double attempt for the {label} and argument MAP")
         else:
             output = self._leaf(DOUBLE, self.double_inputs, self.env.double)
             phase = self._attempt(DOUBLE_T, own, output)
         proof = reader.double_decision(phase)
         self._advance(phase)
-        self.result = _Node(proof.producing.result.value)
+        self.result = self._copy(proof.producing.result.value)
         return self.result
 
     @_checked
@@ -604,6 +746,17 @@ class _Session:
                 and arguments is self.double_arguments and self.result is None):
             return self._double()
         raise ValueError("ordinary invocation requires the next captured target and an owned argument node")
+
+    def run(self):
+        if self.scope is None:
+            return _double_sum(self.arguments, self.get, self.make_arguments, self.invoke, self.add, self.double)
+        with (self.scope.bind(lambda args: self.invoke(self.add, args)) as add,
+              self.scope.bind(lambda args: self.invoke(self.double, args)) as double):
+            def execute(args):
+                return _double_sum(args, self.get, self.make_arguments, self.scope.invoke, add, double)
+
+            with self.scope.bind(execute) as outer:
+                return self.scope.invoke(outer, self.arguments)
 
     def finish(self, returned):
         if self.poisoned or self.result is None or returned is not self.result:
@@ -628,21 +781,20 @@ class _Session:
 
 
 def invoke(path, capture_ref, capture_commit, output_ref, a, b, *,
-           outer=Selection(), double=Selection(), invocation=None):
+           outer=Selection(), double=Selection(), invocation=None, named_inputs=False):
     records._check_i64(a, "a")
     records._check_i64(b, "b")
     invocation = _new_id() if invocation is None else invocation
     records._check_uuid4(invocation, "invocation")
     records._check_intent_refs(("capture", capture_ref), ("output", output_ref), *_selection_refs(outer, double))
-    head, request = _begin(path, capture_ref, capture_commit, output_ref, a, b, invocation, outer, double)
+    head, request = _begin(path, capture_ref, capture_commit, output_ref, a, b, invocation, outer, double, named_inputs)
     if _outer_matches(request):
         return head
-    with ExitStack() as batch:
-        session = _Session(path, output_ref, head, request, batch)
+    with ExitStack() as scopes, ExitStack() as batch:
+        scope = scopes.enter_context(calls.Scope()) if request.capture.environment.closure is not None else None
+        session = _Session(path, output_ref, head, request, batch, scope)
         try:
-            returned = _double_sum(session.arguments, session.get, session.make_arguments,
-                                   session.invoke, session.add, session.double)
-            return session.finish(returned)
+            return session.finish(session.run())
         finally:
             session.active = False
 
@@ -658,13 +810,19 @@ def select_double(path, finished_ref, finished, output_ref):
         return decision.commit
 
 
+def _closure_report(closure):
+    if closure is None:
+        return {}
+    return {"intent": closure.intent.decode("ascii"), "implementation": closure.implementation.decode("ascii")}
+
+
 def _outer_report(request):
     capture = request.capture
     env = capture.environment
     return {"request": request.commit.hex(), "capture": capture.commit.hex(), "defaults": capture.defaults.hex(),
             "environment": env.dag.hex(), "inputs": request.args.dag.hex(), "argument_map": request.args.datum.hex(),
             "map_source": env.binding.source_uri.decode("ascii"), "mode": request.mode.decode("ascii"),
-            "double_mode": request.double_mode.decode("ascii")}
+            "double_mode": request.double_mode.decode("ascii"), **_closure_report(env.closure)}
 
 
 def _leaf_report(decision):
@@ -674,7 +832,8 @@ def _leaf_report(decision):
                 "argument_map": request.args.datum.hex(),
                 "map_source": request.target.binding.source_uri.decode("ascii"),
                 "upstream_attempt": upstream.commit.hex() if upstream else "",
-                "upstream_return": upstream.result.dag.hex() if upstream else ""}
+                "upstream_return": upstream.result.dag.hex() if upstream else "",
+                **_closure_report(request.target.closure)}
 
     producer = decision.producing
     return {"requested": request_report(decision.requested), "producing": request_report(producer.request),
@@ -707,7 +866,7 @@ def _report(reader, commit, role):
         env = capture.environment
         return {"status": "capture", "defaults": capture.defaults.hex(), "environment": env.dag.hex(),
                 "map_source": env.binding.source_uri.decode("ascii"), "add": env.add.dag.hex(),
-                "double": env.double.dag.hex()}
+                "double": env.double.dag.hex(), **_closure_report(env.closure)}
     if role == START:
         return {"status": "start", **_start_report(reader.load(commit, START))}
     if role == ADD_T:
@@ -751,8 +910,11 @@ def _parser():
             command.add_argument(field, type=converters.get(field, str.encode))
         if name in ("defaults", "inspect"):
             command.add_argument("--expected", type=layout._commit_id)
+        if name == "defaults":
+            command.add_argument("--implementation-bound", action="store_true")
         if name == "invoke":
             command.add_argument("--invocation", type=str.encode)
+            command.add_argument("--named-inputs", action="store_true")
             for group, flag in (("outer", ""), ("double", "double-")):
                 command.add_argument(f"--{flag}mode", dest=f"{group}_mode", choices=MODES,
                                      default=FRESH, type=str.encode)

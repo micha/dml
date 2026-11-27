@@ -510,6 +510,29 @@ mkdir -p build/recorded-ordinary-tlc
   --backend=tlc --search-observations)
 ```
 
+The [implementation-bound replay](implementation_bound_histories.qnt) opts in
+through the same CLI. Quint checks exact A and B closure links and getter
+versions, B reusing A despite new input sources, B running fresh, B requesting
+double but reusing A's double, and A still running after promotion. It verifies
+actual entries into the common facade and adapters, exact pin and MAP-miss
+rejections, rejection of a grafted equal-value source, and identical read-only
+inspection of the transferred hit without its source repository.
+[Focused ownership tests](test_calls.py) check the installed facade's scope,
+thread, and native argument binding boundaries.
+
+The [finite routing model](recorded_implementation_bound_design.qnt) covers two
+implementation versions, three MAP values, two source ledgers, one retained A
+success, and one new call with two leaf positions. It assumes atomic batches
+and validated native histories, and does not model native encoding or resource
+limits. Run with Java and Quint 0.34.0 or newer and confirm all nine observations
+are reached:
+
+```sh
+mkdir -p build/implementation-bound-tlc
+(cd build/implementation-bound-tlc && quint verify ../../tests/recorded_implementation_bound_design.qnt \
+  --backend=tlc --search-observations)
+```
+
 #### Check the split-call design with TLC
 
 The [design model](committed_calls_design.qnt) has two same-valued producer
