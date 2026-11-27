@@ -3,19 +3,22 @@
 import argparse
 import json
 from pathlib import Path
+from platform import machine
 import re
 from reprlib import repr as short_repr
 from shutil import copyfile
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 
 from replay_core import Suite
 
 
 # Evaluating all live observations is heavier than loading the request histories.
-# Meson separately bounds the complete replay and verdict run.
+# Meson separately bounds the complete replay and verdict run. Intel macOS
+# workers need more time for the widest verdict inputs, even in serial CI.
 HISTORY_TIMEOUT = 60
-VERDICT_TIMEOUT = 120
+VERDICT_TIMEOUT = 210 if sys.platform == "darwin" and machine() == "x86_64" else 120
 # Large nested literals make Quint's type/effect analysis disproportionately slow.
 EVIDENCE_BATCH_SIZE = 16
 

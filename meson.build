@@ -119,8 +119,10 @@ if get_option('quint_tests')
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
   )
-  # Includes native replay in addition to the bounded Quint verdict process.
-  replay_timeout = 210
+  # Includes history loading and live replay in addition to Quint verdicts.
+  # Keep headroom above the Intel macOS verdict timeout in run_histories.py.
+  intel_macos = host_machine.system() == 'darwin' and host_machine.cpu_family() == 'x86_64'
+  replay_timeout = intel_macos ? 330 : 210
   test(
     'quint-refs', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
