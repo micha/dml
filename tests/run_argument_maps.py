@@ -170,7 +170,8 @@ def main():
         processes = Processes(args.example, args.scanner)
         evidence = [{**replay_history(processes, directory / f"history-{i}", history), "scenario": i}
                     for i, history in enumerate(histories)]
-        state = evaluate(quint, args.rules, directory, evidence, [args.histories])
+        # Full native ref snapshots overlap heavily across adjacent steps.
+        state = evaluate(quint, args.rules, directory, evidence, [args.histories], intern_refs=True)
         check_verdicts(histories, evidence, state)
 
 

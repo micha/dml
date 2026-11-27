@@ -119,6 +119,20 @@ class TraceInterpreterTest(unittest.TestCase):
             "  pure val evidence: List[Observation] = List(evidenceHistory0, evidenceHistory1)",
         ])
 
+    def test_quint_ref_snapshots_keep_targets_order_and_multiplicity(self):
+        old = {"name": "main", "target": "A"}
+        pinned = {"name": "selected", "target": "A"}
+        moved = {"name": "main", "target": "B"}
+        observations = [{"attempts": [{"refs": []}, {"refs": [old, pinned]}, {"refs": [pinned, moved, old, old]}]}]
+        lines = quint_evidence(observations, intern_refs=True).splitlines()
+        self.assertEqual(lines[0], '  pure val refAtoms: List[Ref] = List({ name: "main", target: "A" }, '
+                         '{ name: "selected", target: "A" }, { name: "main", target: "B" })')
+        self.assertEqual(lines[2], "  pure val evidenceBatch0_0 = List({ refs: refSnapshot(List()) }, "
+                         "{ refs: refSnapshot(List(0, 1)) }, { refs: refSnapshot(List(1, 2, 0, 0)) })")
+        self.assertEqual(observations[0]["attempts"][2]["refs"], [pinned, moved, old, old])
+        with self.assertRaisesRegex(ValueError, "exact name and target"):
+            quint_evidence([{"attempts": [{"refs": [{**old, "another": "field"}]}]}], intern_refs=True)
+
     def test_quint_columnar_evidence_keeps_defaults_and_exact_order(self):
         defaults = {"value": 0, "details": {"ok": False}, "empty": ""}
         observations = [
