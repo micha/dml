@@ -322,10 +322,14 @@ consulted, and checks a forged decision whose historical table lacks the key.
 The [intent-scoped history](../README.md#share-selected-scale-results-across-implementations-of-one-intent)
 checks requested and producing identities independently, exact producer and
 signed-factor matching, cross-version adoption, and one-key removal. Replay
-checks historical inspection on a replica without the original refs. Focused
-checks exercise the live-key cap after removal, same-attempt and result-only
-rejections, rollback on occupied output, and malformed deltas that cannot be
-hidden by later removal.
+checks historical inspection on a replica without the original refs. The
+[`recorded-calls-intent-table-edit` entry](recorded_calls_intent_table_edit_histories.qnt)
+checks that removal frees capacity without changing the previous table, that
+adoption must change the attempt and insertion rejects result-only selections,
+and that later removal cannot hide a malformed ancestor. The
+[`recorded-calls-intent-table-route` entry](recorded_calls_intent_table_route_histories.qnt)
+reads the exact decision and result parents, rejects swapped plan and table
+parents, and checks rollback on occupied decision and table-edit outputs.
 
 The [recorded argument maps example](../docs/recorded-argument-maps.md) uses a
 [separate Quint history](argument_maps_histories.qnt). The same typed map from

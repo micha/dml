@@ -239,7 +239,7 @@ with tempfile.TemporaryDirectory() as tmp:
   # replay (the main recorded-calls suite timed out on Windows).
   adoption_fixture_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt')
   foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent', 'supersession', 'supersession-invalid',
-                   'table-capacity', 'table-scope']
+                   'table-capacity', 'table-scope', 'intent-table-edit', 'intent-table-route']
     extra_modules = []
     if suite in ['adoption', 'intent', 'supersession-invalid']
       extra_modules += adoption_fixture_modules
@@ -248,8 +248,11 @@ with tempfile.TemporaryDirectory() as tmp:
       extra_modules += files('tests/recorded_calls_adoption_validation.qnt')
     elif suite == 'supersession-invalid'
       extra_modules += files('tests/recorded_calls_intent_histories.qnt', 'tests/recorded_calls_intent_rules.qnt')
-    elif suite in ['table-capacity', 'table-scope']
+    elif suite in ['table-capacity', 'table-scope', 'intent-table-edit', 'intent-table-route']
       extra_modules += files('tests/recorded_calls_table_fixture.qnt')
+      if suite == 'intent-table-edit'
+        extra_modules += files('tests/recorded_calls_table_capacity_histories.qnt')
+      endif
     endif
     module_suffix = suite.replace('-', '_')
     test(
