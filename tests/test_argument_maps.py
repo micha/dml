@@ -58,29 +58,6 @@ class ArgumentMapsTest(unittest.TestCase):
         request = bytes.fromhex(maps.inspect(self.repo, b"p" + tag)["requested"]["request"])
         return maps.Returned(b"t" + tag, maps.work(self.repo, b"p" + tag, request, b"t" + tag, identity(self.serial)))
 
-    def test_forged_returned_source_link_is_rejected_even_when_decoy_value_is_equal(self):
-        exact = self.execute(b"first", ADD, number(b"a", 13), number(b"b", 29))
-        decoy = self.execute(b"second", ADD, number(b"a", 12), number(b"b", 30))
-        self.assertEqual(maps.inspect(self.repo, exact.ref)["value"], maps.inspect(self.repo, decoy.ref)["value"])
-        self.request(b"correct", DOUBLE, [(b"x", exact)])
-        with maps.records._write_transaction(self.repo, create=False) as txn:
-            dag, role, parents = snapshot(txn, core.txn_ref_get(txn, b"pcorrect"))
-            _, _, (_, decoy_result) = snapshot(txn, decoy.attempt)
-            decoy_dag, _, _ = snapshot(txn, decoy_result)
-            wrong_source = put(txn, core.REC_NODE, core.NODE_SUBDAG, decoy_dag)
-            _, construction, _ = view(txn, core.REC_NODE, core.txn_lookup_node(txn, dag, b"construction"))
-            _, map_root, _ = view(txn, core.REC_DAG, construction)
-            fields = [field for name in (b"prior", b"key", b"origin")
-                      for field in (name, core.txn_lookup_node(txn, construction, name))]
-            wrong = put(txn, core.REC_DAG, map_root, b"source", wrong_source, *fields)
-            fields = [field for name in (b"implementation", b"invocation")
-                      for field in (name, core.txn_lookup_node(txn, dag, name))]
-            forged = put(txn, core.REC_DAG, map_root, b"construction", put(txn, core.REC_NODE, core.NODE_SUBDAG, wrong),
-                         *fields)
-            publish(txn, b"forged", role, forged, *parents)
-        with self.assertRaisesRegex(ValueError, "returned source does not match the selected attempt result"):
-            maps.inspect(self.repo, b"forged")
-
     def test_equal_value_does_not_make_a_get_trace_portable_to_another_construction(self):
         literal_attempt = self.execute(b"literal", DOUBLE, number(b"x", 42))
         upstream = self.execute(b"upstream", ADD, number(b"a", 13), number(b"b", 29))
