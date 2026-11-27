@@ -1,183 +1,29 @@
 # Agent Guide
 
-## Code Style Guidelines
+## Active work
 
-These guidelines reflect the current codebase conventions. If you add a
-formatter or linter, defer to its rules and update this section accordingly.
+Until the Python-to-Quint port and cleanup are complete, work only on the port.
+Start each session with the [port work order](docs/python-to-quint-port.md).
+Begin implementation when asked; do not add Python tests during the port.
 
-### General
+## Validation
 
-- Prefer small, well-scoped changes with clear intent.
-- Keep functions short and single-purpose.
-- Favor explicitness over cleverness; write for readability first.
-- Avoid global mutable state and hidden side effects.
-- Keep error messages actionable and specific.
-- Validate inputs at module boundaries.
+Follow the [validation policy](docs/validation-policy.md). The final gate is
+`scripts/check.sh --quint`; without `--quint`, the script only builds the C core.
+See the [README](README.md#build-and-validation) for setup.
 
-### Formatting
+Keep core replay to one C API call per step and application behavior in separate
+workflow specs. Replay runners report observations; Quint decides whether they
+satisfy the contract. Keep fault-injection state out of the installed library.
 
-- Use a formatter when available (e.g., Prettier, Black, gofmt, rustfmt).
-- Indent C code with 2 spaces; do not use tabs.
-- Use K&R braces: opening brace on the same line as the declaration.
-- Keep blank lines meaningful: separate include blocks and logical sections.
-- Limit line length to 100-120 characters unless the ecosystem dictates
-  otherwise.
-- Prefer early returns to reduce nesting.
+## Documentation
 
-### Imports and Modules
+Read the [documentation guidelines](docs/documentation-guidelines.md) before
+editing docs. Update the owning [as-built contract](docs/spec-next/README.md#concept-ownership)
+when implemented behavior changes, and the [LMDB diagram](docs/lmdb-entity-diagram.html)
+when its depicted storage or boundaries change.
 
-- Group imports by standard library, third-party, then local modules.
-- Sort alphabetically within each group unless the language recommends
-  otherwise.
-- Avoid circular dependencies.
-- Prefer explicit imports over wildcard/glob imports.
-- Remove unused imports promptly.
-- Keep module boundaries clear; avoid deep cross-module reach.
-- For C headers/sources, separate system includes from project includes with a
-  blank line.
+## Build outputs
 
-### Types and Interfaces
-
-- Use types/interfaces to document intent and boundary shapes.
-- Prefer narrow types over broad `any`-style types.
-- Use explicit return types for public APIs.
-- Keep type definitions close to where they are used, unless shared broadly.
-- Favor immutable data where the language supports it.
-- Use header guards with uppercase names and no trailing comments on `#endif`.
-
-### Naming Conventions
-
-- Use descriptive, domain-focused names.
-- Prefer `verbNoun` for functions and `noun` for data structures.
-- Avoid single-letter names except for trivial scopes (e.g., `i` in loops).
-- Keep abbreviations consistent and well-known.
-- Use names that reflect units (e.g., `timeoutMs`, `maxRetries`).
-
-### Error Handling
-
-- Fail fast with clear error messages when invariants are violated.
-- Wrap lower-level errors with context at module boundaries.
-- Avoid swallowing errors; log or return them explicitly.
-- If using exceptions, catch only what you can handle.
-- Include remediation hints in errors when practical.
-
-### Logging and Observability
-
-- Log at the boundary between external input and internal logic.
-- Avoid logging sensitive data.
-- Use structured logs if the stack supports it.
-- Keep log levels consistent (debug/info/warn/error).
-
-### Testing
-
-- Follow the [development validation policy](docs/validation-policy.md) for focused
-  change-validation mapping, independent risk-based review and explicit CI exceptions.
-- Follow the [Quint design-to-replay workflow](docs/validation-policy.md#design-with-tlc-validate-implementation-with-replay):
-  use TLC before implementation when exhaustive model checking adds value, then
-  use TypeScript replay to check the real implementation.
-- Add tests for new behavior or bug fixes.
-- Keep tests deterministic; avoid time-dependent flakiness.
-- Prefer unit tests for pure logic; use integration tests for boundary
-  interactions.
-- Prefer Quint for behavior that can be specified and checked against live
-  observations. Keep core replay at one C API call per step. Use a separate
-  workflow-level spec for application behavior, as in the
-  [handoff integration](tests/README.md#process-integration). Runners collect
-  evidence; Quint decides whether it matches the behavioral contract.
-- Use focused C tests for low-level scenarios such as allocation failures.
-- Prioritize contract scenarios over coverage percentages. Use coverage as a
-  diagnostic, not a target; see the validation policy for evidence selection.
-- Add meaningful boundary, error, and allocation-failure tests. Do not treat
-  skipped or failing checks as passed.
-- Do not add fault-injection state to the installed library.
-- Use Valgrind for memory checks when requested or when touching memory-critical
-  code paths.
-- Use `scripts/check.sh` as the standard validation entrypoint. Add `--quint`
-  when testing the replay suite or behavior it covers. Do not count feasibility
-  evidence as current tests.
-- Use descriptive test names that capture the behavior.
-- Keep fixtures small and local to the test when possible.
-
-### Security and Secrets
-
-- Never commit secrets, keys, or credentials.
-- Store local secrets in ignored files like `.env`.
-- Mask or omit sensitive values from logs and error messages.
-- Treat config or schema changes as security-sensitive.
-
-### Collaboration
-
-- Keep diffs focused; avoid unrelated reformatting.
-- Prefer consistent terminology across code, docs, and tests.
-- Leave TODOs with an owner or clear next step.
-
-## Commit Messages
-
-- Use a short imperative title (50-72 chars) plus a body that explains the why.
-- Use markdown for the body where appropriate.
-- Split commits when uncommitted changes include multiple, clearly differentiated tasks.
-
-## API Stability
-
-- Public API changes should be additive when possible and coordinated with
-  versioning.
-
-## Documentation Expectations
-
-- Before modifying any documentation file (for example `docs/**/*.md`), read
-  `docs/documentation-guidelines.md` in the current session.
-- Follow `docs/documentation-guidelines.md` for writing style, source-of-truth
-  ownership, and cross-reference patterns.
-- Document new modules with a short overview and usage example.
-- Keep README or docs updated when commands or configuration change.
-- Keep `docs/lmdb-entity-diagram.html` aligned with implemented storage when relevant
-  entities, keys, packed fields, relationships or boundary claims change. Follow
-  [as-built visualization maintenance](docs/documentation-guidelines.md#as-built-visualization-maintenance);
-  design proposals and future APIs are not diagram content.
-- Include links to external systems or services when relevant.
-
-## OpenCode Slash Commands
-
-- Define OpenCode slash commands as Markdown files under `.opencode/commands/`.
-- Use YAML frontmatter for metadata like `description` and `model`, then put the
-  command prompt body below the frontmatter.
-
-## Tooling and Layout
-
-Tooling and project layout guidance is being rewritten from scratch.
-Do not treat prior command examples or directory assumptions as canonical.
-
-[The optional Nix development shell](README.md#optional-nix-development-shell)
-supplies build tools. The opt-in `.#quint` shell supplies the pinned CLI for
-[Quint behavior checks](README.md#quint-behavior-checks).
-Historical Python, CLI, test, and spike workflows are at
-[`feasibility-complete`](https://github.com/micha/dml/tree/feasibility-complete).
-
-### Build outputs and experiment evidence
-
-- Treat `build/` as disposable. Use it for rebuildable outputs, caches, and
-  scratch runs. Create temporary Git worktrees outside `build/` and remove them
-  with `git worktree remove` when done.
-- Decide what evidence to keep before running an experiment. Before handing it
-  off, move the report, source revision or patch, rerun instructions, and any
-  results or diagnostic logs needed to support its conclusions out of `build/`.
-  Use the `archive/experiments` branch for completed historical studies (see
-  `git show archive/experiments:experiments/README.md`). Put large irreplaceable
-  artifacts in backed-up storage and record their location and checksum.
-- Keep routine logs, binaries, and regenerable fixtures out of the archive.
-  Review retained logs for secrets before sharing. Report historical runs as
-  evidence, not as current validation, per the
-  [validation policy](docs/validation-policy.md#report-actual-results).
-
-## Updating This File
-
-Keep this guide current whenever you add tooling or conventions. Add new
-sections rather than overloading existing ones, and prefer concrete commands
-over general advice. If you add Cursor or Copilot rules, summarize them here
-and reference their locations.
-
-## See Also
-
-- Architecture overview: `docs/architecture.md`
-- As-built spec orientation: `docs/spec-next/README.md`
-- Old draft spec overview: `docs/spec/overview.md`
+Treat `build/` as disposable and keep temporary Git worktrees outside it. Preserve
+experiment evidence separately; see `git show archive/experiments:experiments/README.md`.
