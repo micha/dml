@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1 and 2 are complete**; see their [graph and rollback evidence](#packet-1-evidence) and [stored-result and transfer evidence](#packet-2-evidence). Resume at **packet 3**: plan/worker/abandon first, then receipt identity and retry. Read only the relevant methods, histories, rules, and interpreter commands. Leave the typed pre-open cases for packet 10.
+- **Packets 1–3 are complete**; see their [graph and rollback evidence](#packet-1-evidence), [stored-result and transfer evidence](#packet-2-evidence), and [plan, worker, abandon, and receipt evidence](#packet-3-evidence). Resume at **packet 4**: stage/direct reuse proof first, then result and attempt selection. Read only the relevant methods, histories, rules, and interpreter commands. Leave the typed pre-open cases for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. The seven packet 1 and ten packet 2 methods are closed.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–3 closed 28 methods (7, 10, and 11 respectively).
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -258,6 +258,44 @@ checking the staging guard kept the expected CLI error but failed 37:16
 (`storage_changed`), with the native absence check also failing at 37:19.
 Changing a retained prefix byte while still truncating by one byte failed 36:29
 (`wrong_file_observation`) even though the import diagnostics were unchanged.
+
+## Packet 3 evidence
+
+The [plan histories](../tests/recorded_calls_plan_histories.qnt) and [receipt
+histories](../tests/recorded_calls_receipt_histories.qnt) run against the public
+binding through the workflow CLI, with independent native reads. Quint specifies
+the persisted fixtures as individual native operations. For a future request
+that the CLI planner cannot produce, the runner exposes one native bundle export
+and a separate file write; the actual CLI stages and attempts to work the bundle.
+
+Live replay passed all 48 recorded-call histories, coverage, and rule controls.
+The final `scripts/check.sh --quint` gate passed all 28 suites in the Nix shell
+on aarch64 Linux. macOS and Windows were not run locally.
+Eleven corresponding Python methods were removed. The typed pre-open checks
+remain for packet 10; `prepare_receipted_scale` still serves two packet 4 checks.
+The table gives the runner's one-based history and step numbers.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:526` prior `main`, portable request, guarded return | `durableTipCase` (38): inspect 5; collect and native 17–29; export/import 30–39; reject 46 and native 49–51; publish/collect 55–56; native and inspect 59–83 | `planReadWithTip` matched the captured tip, factor, implementation, and request. The private plan and prior tip were absent from the worker but had survived collection at the origin. `planRejection` diagnosed stale `main` without writing. `durableLineage` matched exact ordered parents and the physical producer edge; refs were consumed, private commits swept, and the final report matched the worker's. |
+| `:589` exact request with inconsistent result | `candidateCase` (39): native fixtures and readback 6–160; rejects 161–164; valid publication 165/168/171 | `candidateLayout` verified sole request parents, exact factors and links, and distinct equal-root producer DAGs. The factor, physical input, alias, and direct-operation failures had distinct diagnoses and unchanged bytes. `storedCandidateReport` matched the native, deliberately non-arithmetic `-98`. |
+| `:1792` request and worker guards | `guardCase` (40): rejected requests 2–3, 5, 9; export mismatch 7; worker overflow 11; readback 14–15 and 20–23 | `planRejection` distinguished reserved ref, range, occupancy, mismatched plan pin, request already at `main`, and worker overflow. Bytes stayed unchanged, no wrong bundle or partial pin appeared, and the exact incoming request survived. |
+| `:1827` unsupported future request | `futureRequestCase` (41): export/file/import 20–23, native 26–46, work 49, refs 52–53 | Native export and CLI import succeeded. `futureLayout` checked the persisted request tag, producer, implementation root `example.scale@3`, and factor. Only execution failed; worker bytes and incoming pin were preserved with no result. |
+| `:1870` abandon with moved main, alias, and staged result | `abandonStagedCase` (42): abandon/repeat 16–17; refs 20–24; restored-tip rejection 28, refs 31–32; collect 37 and reads 40–46 | `planVerdicts` saw only the selected pin disappear; publication still rejected the missing pin and left no receipt. Native reads confirmed that collection swept the private plan and prior tip, not the staged result. Worker bytes matched the checkpoint. |
+| `:1919` explicit collection | `abandonExplicitCase` (43): abandon 16, refs/objects 19–23, collect 26 and reads 29–31 | `planVerdicts` saw the 128-byte pin disappear with no `main`. Plan and request existed before collection and were absent after it, with the producer pinned throughout. |
+| `:1939` invalid abandon selections | `abandonGuardsCase` (44): persisted graph 9–41, rejects 44–47, refs 50–53 | `malformedLayout` verified the correct plan tag and parent count but the wrong request DAG. Replaced pin, reserved `main`, wrong commit role, and wrong DAG were diagnosed without changing bytes; native refs remained exact. |
+| `:1990` receipt graph and retry | `retryIdentity` (45): publish 9, native 12–46, retries/inspects 49–50, 65–66, 86–87; collect 74 and reads 77–83 | `exactReceiptGraph` matched the parentless one-entry commit, four literal strings, and result-ID root. `retryVerdict` and `exactReceiptReport` matched the result and receipt without writing, including with restored guards and after ref reuse and actual reclamation. |
+| `:2047` four independent key fields and a fresh key | `keyFields` (46): ready refs 26–30; mismatches 33–34, 61, 78; alternate result 35–67; recaptured plan 76–77; fresh publish/retry 79/85, reports/alias readback 86–94 | `changedKeyFields` required exactly one changed field in each read-only rejection. `alteredResultMatches` checked the same request and different stored output; publication without a receipt succeeded. A 128-byte fresh key published and retried without consuming either alias. |
+| `:2107` aliased and occupied keys | `keyGuards` (47): alias rejects 9–11, valid counterpart 12–49, persisted forgery 71–82, occupied-key/inspect rejects 85–87 | `forgedReceiptGraph` observed the same four native nodes as the genuine receipt with the plan-ID node as the wrong root. Publish and inspect diagnosed the malformed receipt; the nonreceipt and all aliases also rejected without writing. |
+| `:2144` receipt rollback | `guardRollback` (48): rejects 14/29 and native 17–20/32–35; restore/publish 43 and native/report 46–52 | The moved staging pin and `main` already at the result each produced its own diagnosis with original bytes and no `ack`. Restoring the guards published the exact result and a readable receipt and consumed both pins. |
+
+Isolated live mutations failed as intended. Skipping the requested result's
+producer-DAG check failed 39:162 (`wrong_rejection`). Retaining the abandoned
+plan under a hidden ref with other data available for GC still failed 42:42
+(`wrong_native_status`). Changing both the receipt writer and reader to agree
+on the wrong root failed 45:50 (`wrong_receipt_graph`). Ignoring the plan name
+in the key failed 46:33, and treating `main` already at the result as success
+failed 48:29 (both `wrong_rejection`).
 
 ## Removal dependencies and finish line
 

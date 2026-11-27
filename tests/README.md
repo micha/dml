@@ -141,8 +141,8 @@ reads of commit parents, tree entries, and producer DAG edges.
 
 For split recording, the runner passes an explicit immutable ID, never the
 current pin target. CLI steps can name a prior receipt or use `native:<alias>`
-for a native ID. Native ID operands can use `sum:<ref>` or `scale:<role>:<ref>`
-for prior CLI receipts. Quint checks that two equal-valued sums
+for a native ID. Native ID operands can use `sum:<ref>`, `scale:<role>:<ref>`,
+`plan:<alias>`, or `request:<alias>` for prior CLI receipts. Quint checks that two equal-valued sums
 remain distinct producers and that read-only reports stay the same after their
 pins move or are deleted. For failed writes, Quint distinguishes stale and
 missing pins, occupied refs, overflow, and out-of-range input. It checks file
@@ -167,6 +167,15 @@ A separate history truncates a copy of a bundle by one byte, checks that it
 publishes neither the staging ref nor any object from its closure, and then
 imports the intact bundle. The runner only performs the requested file edits
 and reports observations; Quint checks the outcomes.
+
+The [durable plan histories](recorded_calls_plan_histories.qnt) observe which
+commits travel to a worker, guard publication by the captured `main`, and
+read the exact result-to-request-to-producer links after collection. They
+also test worker rejection of an imported future implementation and verify
+which refs and commits are retained after abandonment. The [receipt
+histories](recorded_calls_receipt_histories.qnt) read the native receipt DAG,
+check each retry key field independently, and replay acknowledgments after
+ref reuse and collection. Rejected publication must not reserve the key.
 
 The [return and publication history](../README.md#return-and-publish-a-recorded-scale)
 checks exact result export and staging, rejection of a same-valued wrong producer,
