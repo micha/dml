@@ -12,7 +12,8 @@ jobs:
   build-core:
     name: C core (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # Intel macOS runs the full Quint gate serially below.
+    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 25 || 20 }}
     env:
       QUINT_PACKAGE: '@informalsystems/quint@0.33.1'
       DML_QUINT_SCRIPT: build/quint-tool/node_modules/@informalsystems/quint/dist/src/cli.js
