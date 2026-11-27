@@ -4,8 +4,8 @@
 
 ## Resume here
 
-- Baseline: `f595d97` on `implementation-bound-invocation`. The survey was static. No porting, deletions, or validation runs have been completed. The user authorized writing this handoff, not starting implementation in the handoff session.
-- Start with **packet 1** below when asked to begin. Read only its methods, helpers, relevant Quint definitions, and interpreter operations. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
+- Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
+- **Packet 1 is complete**; see its [live evidence](#packet-1-evidence). Resume at **packet 2**: start with the stored-result and outbound transfer cases, sharing the false-arithmetic fixture in Quint. Read only the relevant methods, histories, rules, and interpreter commands. Preserve the distinction between a stored result and a fresh computation.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -18,7 +18,7 @@ Use focused validation while working and `scripts/check.sh --quint` for the fina
 
 ## Decisions that affect the size of the port
 
-1. **Application report versus stored graph.** `tests/run_recorded_calls.py` runs `examples/recorded_calls.py`; its evidence chiefly describes CLI output and changes to `data.mdb`. It does not independently establish exact commit parents, tree entries, DAG roots, node kinds, or object collection. `tests/replay_core.py` already knows how to read those objects. Packet 1 must establish how to use the same repository and IDs across the two kinds of steps. Do not infer a physical edge from the application's own JSON.
+1. **Application report versus stored graph.** CLI output and `data.mdb` byte comparisons do not independently establish exact commit parents, tree entries, DAG roots, node kinds, or object collection. Packet 1 added [individual native reads on the workflow repository](../tests/README.md#recorded-calls) through `tests/replay_core.py`. Quint can compare the native IDs with the CLI's reported IDs. Do not infer a physical edge from the application's own JSON.
 2. **Execution versus inspection.** `checkCalls` in `tests/recorded_calls_rules.qnt` correctly expects arithmetic for execution. Inspection of a deliberately stored `2 + 3 → -17`, scale-by-6 `→ -98` must return `-17` and `-98`. Use a stored-evidence rule rather than weakening the execution rule. When executing scale against the stored `-17`, the newly computed result is `-102`.
 3. **Rejection versus cause.** `rejectedWriteVerdict` checks a diagnosed failure and unchanged state, not necessarily the expected reason. Set up the *other* guards to succeed. Distinguish no directory, an initialized empty repository, an absent ref, and a swept object. Preserve meaningful CLI exit/stdout/stderr and independent pre/post observations. An aborted transaction used to derive a candidate datum ID is a probe, not a committed write.
 4. **Persisted forgery versus fabricated observation.** A control that mutates a report tests a Quint rule. Where the Python test writes a well-formed but inconsistent record, exercise the actual reader/publisher against that record. Prove the fixture has the intended defect and include its valid counterpart. Prefer expressing construction in Quint using existing primitive writes.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. No row is signed off yet.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Only the seven packet 1 methods have been closed.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -191,6 +191,37 @@ Existing Quint anchors: `recorded_calls_histories.qnt` and `recorded_calls_rules
 | 122 | Interned ref snapshots preserve names/targets/order/duplicates, no input mutation, reject unexpected fields. |
 | 136 | Columnar defaults, nested values, false vs zero, order and history boundaries preserved; reject differing fields. |
 | 158 | Missing per-step verdict fails even if coverage and controls say true. |
+
+## Packet 1 evidence
+
+The recorded-calls workflow now runs both CLI commands and single-call native
+steps against the same paths. CLI commands use their existing receipt aliases;
+native steps carry their own read IDs and close all handles before the next CLI
+command. The runner emits facts; Quint checks the receipt, stored graph,
+diagnostics, and pre/post state. The core-only suites still scan LMDB inventory.
+
+Numbers below are the recorded-calls runner's one-based history and step numbers.
+All listed steps passed in the live workflow (27 histories; coverage and controls
+passed). The seven corresponding Python methods and the unused `number` helper
+were removed; the focused Python suite registration is still needed. The final
+`scripts/check.sh --quint` gate passed all 28 suites in the Nix shell on aarch64
+Linux; macOS and Windows were not run locally.
+
+Two isolated CLI mutations also failed as intended: substituting a literal ID
+for the reported input node failed history 20 step 60 (`wrong_native_graph`);
+committing staged data on overflow without changing the CLI diagnostic or `main`
+failed histories 25 and 26 step 11 (`wrong_native_status`).
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:108` combined record and inspect | `combinedGraphRequests` (20): record 1, native 2–59, inspect 60 | `combinedGraphMatches` matched the receipt/native `main`, no parents, one named tree entry, both exact three-binding DAG paths, literal kinds and values, physical sub-DAG input, and the full report. |
+| `:171` independently pinned equal sums and scales | `splitGraphRequests` (21): writes 1–4, sum inspect 5, native paths 6–52, scale reads 53–54 | `splitGraphMatches` checked distinct sum commits, sum DAGs and scale commits, a common native I64 root of 12, and each named snapshot's exact parent and typed input DAG edge. The scale and sum reports selected the right paths. |
+| `:171` moved/released pins | 21: move/readback 55–64, reports 65–66, release/readback 67–78, reports 79–80 | `physicalVerdicts` observed the moved pin at the decoy and both released pins absent. `physicalInspect` matched both reports to the original pair at each phase; all inspection steps left `data.mdb` unchanged. |
+| `:231` stale / missing | `pinRejectionRequests` (22): native 3–10 and 13–20, rejections 11–12 | `pinRejectionVerdicts` saw the two original pins, no missing pin or `main`, and distinguished the expected-commit mismatch from the native missing-ref diagnosis. Both failures had exit 1, empty stdout, and unchanged `data.mdb`. |
+| `:245` duplicate sum / producer-as-output / occupied main / scale overflow | `writeRejectionRequests` (23): writes 9, 24, 39, 54; native readbacks 12–15, 27–30, 42–45, 57–60 | `writeRejectionVerdicts` distinguished the ref collisions from arithmetic failure. Each write left the file and original refs unchanged, with no `overflow` ref or candidate I64 datum. Candidate IDs came from aborted probes. |
+| `:2654` out of range | `rangeRejectionRequests` (24): step 1 | `freshRejectionVerdict` saw the argument-range diagnosis and no path before or after. |
+| `:2659` sum / scale overflow | `overflowRequests` (25, 26): step 1, aborted probe 2–7, readback 8–13 in each | `overflowRejectionVerdicts` saw distinct arithmetic diagnoses and initialized repositories with no `main` and no candidate datum (max / min I64). |
+| `:2682` repeat combined record | `repeatRejectionRequests` (27): first write 1, repeat 7, native `main` reads 4 and 10 | `repeatRejectionVerdicts` saw a diagnosed rejection, the same `data.mdb` bytes, and the original receipt ID in native `main` both times. |
 
 ## Removal dependencies and finish line
 

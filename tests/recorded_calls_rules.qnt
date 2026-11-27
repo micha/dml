@@ -21,7 +21,9 @@ module recorded_calls_rules {
     selection: str, result: str, attempt: str, attemptId: str }
   type IntentReuseTable = { intent: str, genesis: str, previous: str, entries: List[IntentReuseEntry] }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
-    commit: str, calls: List[Call],
+    stderr: str, stdoutEmpty: bool, repoExisted: bool, repoExists: bool,
+    nativeStatus: str, nativeDetail: str, nativeValue: str, nativeCount: int, nativeItems: List[str],
+    commit: str, calls: List[Call], reportFields: List[List[str]],
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
     expectedResult: str, expectedSelection: str, expectedAttempt: str, expectedMain: str, previousSelection: str,
     requestCommit: str,
@@ -122,7 +124,7 @@ module recorded_calls_rules {
 
   pure def rejectedWriteVerdict(write: Attempt, request: Request, expectedCommit: str): str =
     if (not(sameRequest(write, request)) or write.expectedCommit != expectedCommit) "wrong_selection"
-    else if (write.code != 1 or not(write.diagnosed) or write.commit != "") "wrong_rejection"
+    else if (write.code != 1 or not(write.diagnosed) or not(write.stdoutEmpty) or write.commit != "") "wrong_rejection"
     else if (not(write.unchanged)) "storage_changed"
     else "rejected"
 
@@ -147,6 +149,177 @@ module recorded_calls_rules {
         scaleReadVerdict(selected, attempts[10], splitRequests[10], attempts[7].commit, firstRead),
         scaleReadVerdict(decoy, attempts[11], splitRequests[11], attempts[9].commit, secondRead)
       )
+    }
+  }
+
+  pure def rejectionNativeVerdict(a: Attempt, req: Request, status: str): str =
+    if (not(sameRequest(a, req))) "wrong_native_request"
+    else if (a.nativeStatus != status) "wrong_native_status"
+    else if (status == "not_found") "native_not_found"
+    else "native_ok"
+
+  pure val absentRefDetail = "ref was not found"
+  pure val absentDatumDetail = "immutable object was not found"
+
+  pure def rejectionNativeReadVerdict(a: Attempt, req: Request, expected: str): str = {
+    val status = if (expected == "") "not_found" else "ok"
+    val verdict = rejectionNativeVerdict(a, req, status)
+    val absentDetail = if (req.op == "txn_ref_get") absentRefDetail else absentDatumDetail
+    if (Set("native_ok", "native_not_found").contains(verdict) and a.nativeValue != expected) "wrong_native_value"
+    else if (verdict == "native_not_found" and a.nativeDetail != absentDetail) "wrong_native_detail"
+    else verdict
+  }
+
+  pure def rejectionReadVerdicts(attempts: List[Attempt], req: List[Request], values: List[str]): List[str] =
+    if (req.length() != values.length() + 4) List("wrong_read_frame")
+    else range(0, req.length()).foldl(List(), (out, i) => out.append(
+      if (i < 2 or i >= req.length() - 2) rejectionNativeVerdict(attempts[i], req[i], "ok")
+      else rejectionNativeReadVerdict(attempts[i], req[i], values[i - 2])))
+
+  pure def rejectionProbeVerdicts(attempts: List[Attempt], req: List[Request]): List[str] =
+    range(0, req.length()).foldl(List(), (out, i) => {
+      val verdict = rejectionNativeVerdict(attempts[i], req[i], "ok")
+      out.append(if (verdict == "native_ok" and Set("datum_encode", "txn_put_datum").contains(req[i].op) and
+          attempts[i].nativeValue == "") "missing_candidate"
+        else verdict)
+    })
+
+  pure def cliRejectionVerdict(a: Attempt, req: Request, commit: str, cause: bool): str =
+    if (not(sameRequest(a, req)) or a.expectedCommit != commit) "wrong_selection"
+    else if (a.code != 1 or not(a.stdoutEmpty) or not(a.diagnosed) or a.stderr == "" or a.commit != "") "wrong_rejection"
+    else if (not(cause)) "wrong_diagnostic"
+    else "rejected"
+
+  pure def existingRejectionVerdict(a: Attempt, req: Request, commit: str, cause: bool): str = {
+    val verdict = cliRejectionVerdict(a, req, commit, cause)
+    if (verdict != "rejected") verdict
+    else if (not(a.repoExisted and a.repoExists and a.unchanged)) "storage_changed"
+    else verdict
+  }
+
+  pure def freshRejectionVerdict(a: Attempt, req: Request, diagnostic: str, initializes: bool): str = {
+    val verdict = cliRejectionVerdict(a, req, "", a.stderr == diagnostic)
+    if (verdict != "rejected") verdict
+    else if (a.repoExisted or a.repoExists != initializes) "wrong_repository_presence"
+    else verdict
+  }
+
+  pure def pinRejectionVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = pinRejectionRequests
+    val first = attempts[0].commit
+    val decoy = attempts[1].commit
+    val pinEnd = 2 + rejectionPins.length()
+    val pins = List(first, decoy, "", "")
+    List(writeVerdict(attempts[0], req[0]),
+      if (first == decoy) "collapsed_producers" else writeVerdict(attempts[1], req[1]))
+      .concat(rejectionReadVerdicts(attempts.slice(2, pinEnd), rejectionPins, pins))
+      .concat(List(
+        existingRejectionVerdict(attempts[pinEnd], req[pinEnd], first,
+          attempts[pinEnd].stderr == "record-scale: producer pin does not point to the expected commit"),
+        existingRejectionVerdict(attempts[pinEnd + 1], req[pinEnd + 1], first, attempts[pinEnd + 1].missingRef)
+      )).concat(rejectionReadVerdicts(attempts.slice(pinEnd + 2, attempts.length()), rejectionPins, pins))
+  }
+
+  // -30799 is LMDB's MDB_KEYEXIST.
+  pure val refExistsDiagnostic = "record-scale: ('invalid_state', -30799, 'ref already exists')"
+  pure val writeRejectionDiagnostics = List(
+    "record-sum: ('invalid_state', -30799, 'ref already exists')",
+    refExistsDiagnostic, refExistsDiagnostic,
+    "record-scale: example.scale@1 result is not a signed 64-bit integer"
+  )
+
+  pure def writeRejectionVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = writeRejectionRequests
+    val producer = attempts[0].commit
+    val main = attempts[1].commit
+    val probeSize = rejectionProbe("0").length()
+    val span = probeSize + 1 + writeRejectionReads.length()
+    range(0, writeRejectionCases.length()).foldl(List(
+      writeVerdict(attempts[0], req[0]), scaleWriteVerdict(attempts[1], req[1], producer)
+    ), (out, i) => {
+      val start = 2 + i * span
+      val write = start + probeSize
+      val expected = if (req[write].op == "record_sum") "" else producer
+      out.concat(rejectionProbeVerdicts(attempts.slice(start, write), req.slice(start, write)))
+        .append(existingRejectionVerdict(attempts[write], req[write], expected,
+          attempts[write].stderr == writeRejectionDiagnostics[i]))
+        .concat(rejectionReadVerdicts(attempts.slice(write + 1, start + span), writeRejectionReads,
+          List(producer, main, "", "")))
+    })
+  }
+
+  pure def overflowRejectionVerdicts(attempts: List[Attempt], req: List[Request], diagnostic: str): List[str] = {
+    val readStart = 1 + rejectionProbe("0").length()
+    List(freshRejectionVerdict(attempts[0], req[0], diagnostic, true))
+      .concat(rejectionProbeVerdicts(attempts.slice(1, readStart), req.slice(1, readStart)))
+      .concat(rejectionReadVerdicts(attempts.slice(readStart, attempts.length()), overflowReads, List("", "")))
+  }
+
+  pure def repeatRejectionVerdicts(attempts: List[Attempt]): List[str] = {
+    val req = repeatRejectionRequests
+    val commit = attempts[0].commit
+    val repeat = 1 + mainReads.length()
+    List(writeVerdict(attempts[0], req[0]))
+      .concat(rejectionReadVerdicts(attempts.slice(1, repeat), mainReads, List(commit)))
+      // mkdir's diagnostic includes an OS-specific error and a temporary path.
+      .append(existingRejectionVerdict(attempts[repeat], req[repeat], "", true))
+      .concat(rejectionReadVerdicts(attempts.slice(repeat + 1, attempts.length()), mainReads, List(commit)))
+  }
+
+  pure val rangeDiagnostic = "record: a is not a signed 64-bit integer"
+  pure val sumOverflowDiagnostic = "record: example.sum@1 result is not a signed 64-bit integer"
+  pure val scaleOverflowDiagnostic = "record: example.scale@1 result is not a signed 64-bit integer"
+
+  pure def rejectionVerdicts(index: int, attempts: List[Attempt]): List[str] =
+    if (not(rejectionRequests.indices().contains(index))) List("missing_history")
+    else {
+      val req = rejectionRequests[index]
+      if (attempts.length() != req.length()) List("missing_steps")
+      else if (index == 0) pinRejectionVerdicts(attempts)
+      else if (index == 1) writeRejectionVerdicts(attempts)
+      else if (index == 2) List(freshRejectionVerdict(attempts[0], req[0], rangeDiagnostic, false))
+      else if (index == 3) overflowRejectionVerdicts(attempts, req, sumOverflowDiagnostic)
+      else if (index == 4) overflowRejectionVerdicts(attempts, req, scaleOverflowDiagnostic)
+      else repeatRejectionVerdicts(attempts)
+    }
+
+  pure val rejectionProbeExpected = List("native_ok", "native_ok", "native_ok", "native_ok", "native_ok", "native_ok")
+  pure val rejectionPinExpected = List("native_ok", "native_ok", "native_ok", "native_ok", "native_not_found",
+    "native_not_found", "native_ok", "native_ok")
+  pure val rejectionWriteExpected = rejectionProbeExpected.concat(List("rejected", "native_ok", "native_ok", "native_ok",
+    "native_ok", "native_not_found", "native_not_found", "native_ok", "native_ok"))
+  pure val rejectionOverflowExpected = List("rejected").concat(rejectionProbeExpected).concat(List("native_ok", "native_ok",
+    "native_not_found", "native_not_found", "native_ok", "native_ok"))
+  pure val rejectionMainExpected = List("native_ok", "native_ok", "native_ok", "native_ok", "native_ok")
+  pure val rejectionExpected: List[List[str]] = List(
+    List("recorded", "recorded").concat(rejectionPinExpected).concat(List("rejected", "rejected")).concat(rejectionPinExpected),
+    List("recorded", "recorded").concat(rejectionWriteExpected).concat(rejectionWriteExpected)
+      .concat(rejectionWriteExpected).concat(rejectionWriteExpected),
+    List("rejected"), rejectionOverflowExpected, rejectionOverflowExpected,
+    List("recorded").concat(rejectionMainExpected).append("rejected").concat(rejectionMainExpected)
+  )
+
+  pure def rejectionControls(template: Attempt): bool = {
+    val req = rangeRejectionRequests[0]
+    val invalid = { ...template, op: req.op, args: req.args, commit: "", expectedCommit: "", code: 1,
+      repoExisted: false, repoExists: false, stdoutEmpty: true, diagnosed: true, stderr: rangeDiagnostic }
+    val absent = { ...template, op: rejectionDatum.op, args: rejectionDatum.args,
+      nativeStatus: "not_found", nativeValue: "", nativeDetail: absentDatumDetail }
+    val mainRef = rejectionRef("main")
+    val missingRef = { ...absent, op: mainRef.op, args: mainRef.args, nativeDetail: absentRefDetail }
+    val wrongRef = { ...missingRef, nativeStatus: "ok", nativeValue: "other", nativeDetail: "" }
+    all {
+      freshRejectionVerdict(invalid, req, rangeDiagnostic, false) == "rejected",
+      freshRejectionVerdict({ ...invalid, repoExists: true }, req, rangeDiagnostic, false) == "wrong_repository_presence",
+      freshRejectionVerdict({ ...invalid, stdoutEmpty: false }, req, rangeDiagnostic, false) == "wrong_rejection",
+      freshRejectionVerdict({ ...invalid, stderr: scaleOverflowDiagnostic, repoExists: true }, req, sumOverflowDiagnostic, true)
+        == "wrong_diagnostic",
+      rejectionNativeReadVerdict(absent, rejectionDatum, "") == "native_not_found",
+      rejectionNativeReadVerdict({ ...absent, nativeStatus: "ok", nativeValue: "candidate-id" }, rejectionDatum, "")
+        == "wrong_native_status",
+      rejectionNativeReadVerdict(missingRef, mainRef, "") == "native_not_found",
+      rejectionNativeReadVerdict({ ...missingRef, nativeDetail: absentDatumDetail }, mainRef, "") == "wrong_native_detail",
+      rejectionNativeReadVerdict(wrongRef, mainRef, "original") == "wrong_native_value"
     }
   }
 
@@ -1661,6 +1834,148 @@ module recorded_calls_rules {
     }
   }
 
+  // These paths are observations from individual native calls. Compare them
+  // to the CLI's claims, never use a report to choose the records to read.
+  pure def nativeOutput(rows: List[Attempt], op: str, alias: str): Attempt =
+    rows.select(row => row.op == op and row.args[row.args.length() - 1] == alias).head()
+  pure def decoded(rows: List[Attempt], alias: str): Attempt = nativeOutput(rows, "object_decode", alias)
+  pure def outputId(rows: List[Attempt], op: str, alias: str): str = nativeOutput(rows, op, alias).nativeValue
+  pure def nativeNodeMatches(rows: List[Attempt], target: str): bool = {
+    val stored = nativeOutput(rows, "txn_get_object", target)
+    val encoded = rows.select(row => row.op == "object_encode" and row.args[2] == target).head()
+    stored.nativeValue != "" and stored.nativeValue == encoded.nativeValue
+  }
+  pure def nativeLiteralMatches(rows: List[Attempt], target: str, kind: int, payload: str): bool = {
+    val datum = nativeOutput(rows, "datum_decode", target)
+    nativeNodeMatches(rows, target) and datum.nativeCount == kind and datum.nativeValue == payload
+  }
+  pure def nativeSnapshotMatches(rows: List[Attempt], path: SnapshotPath, commit: str,
+                                  parents: int, entry: str): bool =
+    commit == outputId(rows, "txn_ref_get", path.ref) and decoded(rows, path.commitView).nativeCount == parents and
+    decoded(rows, path.treeView).nativeCount == 1 and
+    nativeOutput(rows, "object_view_entry", path.dag).nativeItems == List(entry)
+
+  // Preserve exact JSON keys at every object; the report checks below account
+  // for all values represented by those keys.
+  pure val callFields = List("arguments", "dag", "implementation", "result")
+  pure val numericFields = List("node", "value")
+  pure val scaleReportFields = List(callFields, List("a", "b"), numericFields, numericFields, numericFields,
+    callFields, List("factor", "input"), numericFields, List("call", "node", "value"), numericFields)
+
+  pure def combinedGraphMatches(rows: List[Attempt], report: Attempt): bool = {
+    if (not(checkCalls(physicalRecord, report.calls, scaleV1))) false
+    else {
+      val summed = report.calls[0]
+      val scaled = report.calls[1]
+      all {
+        nativeSnapshotMatches(rows, mainPath, report.commit, 0, "7265636f726465642d63616c6c732d7631"), // recorded-calls-v1
+        report.commit == rows[0].commit,
+        report.reportFields == List(List("calls", "commit")).concat(scaleReportFields),
+        scaled.dag == outputId(rows, "object_view_entry", "main-dag"),
+        summed.dag == decoded(rows, "sum-dag").nativeValue and nativeNodeMatches(rows, "sum-dag"),
+        decoded(rows, "scale-root").nativeCount == 3 and decoded(rows, "sum-root").nativeCount == 3,
+        summed.resultNode == decoded(rows, "sum-root").nativeValue,
+        scaled.resultNode == decoded(rows, "scale-root").nativeValue,
+        summed.arguments[0].node == outputId(rows, "txn_lookup_node", "sum-a"),
+        summed.arguments[1].node == outputId(rows, "txn_lookup_node", "sum-b"),
+        scaled.arguments[0].node == outputId(rows, "txn_lookup_node", "scale-factor"),
+        scaled.arguments[1].node == outputId(rows, "txn_lookup_node", "scale-input"),
+        combinedLiterals.foldl(true, (ok, fixture) =>
+          ok and nativeLiteralMatches(rows, fixture.target, fixture.kind, fixture.payload))
+      }
+    }
+  }
+
+  pure val physicalDecoy: Scenario = { a: ("9", 9), b: ("3", 3), factor: ("3", 3) }
+  pure val firstScaleRead = splitGraphSetup.length()
+  pure val movedScaleRead = firstScaleRead + splitGraphReads.length() + moveProducer.length()
+  pure val releasedScaleRead = movedScaleRead + splitGraphReads.length() + releaseProducers.length()
+
+  pure def splitGraphMatches(rows: List[Attempt], report: Attempt, alternate: bool): bool = {
+    val sumPath = if (alternate) decoyPath else producerPath
+    val scalePath = if (alternate) alternatePath else mainPath
+    val sourceDag = if (alternate) "alternate-source-dag" else "main-source-dag"
+    val sourceNode = if (alternate) "alternate-input" else "main-input"
+    val producer = rows[if (alternate) 1 else 0].commit
+    val consumer = rows[if (alternate) 3 else 2].commit
+    val scenario = if (alternate) physicalDecoy else selected
+    if (not(checkCalls(scenario, report.calls, scaleV1))) false
+    else {
+      val summed = report.calls[0]
+      val scaled = report.calls[1]
+      all {
+        nativeSnapshotMatches(rows, sumPath, producer, 0, "7265636f726465642d73756d2d7631"), // recorded-sum-v1
+        nativeSnapshotMatches(rows, scalePath, consumer, 1, "7265636f726465642d7363616c652d7631"), // recorded-scale-v1
+        report.commit == consumer and report.producerCommit == producer,
+        report.reportFields == List(List("calls", "commit", "producer_commit")).concat(scaleReportFields),
+        outputId(rows, "object_view_parent", scalePath.parent) == producer,
+        summed.dag == outputId(rows, "object_view_entry", sumPath.dag),
+        scaled.dag == outputId(rows, "object_view_entry", scalePath.dag),
+        summed.dag == decoded(rows, sourceDag).nativeValue and nativeNodeMatches(rows, sourceDag),
+        scaled.arguments[1].node == outputId(rows, "txn_lookup_node", sourceNode),
+        summed.resultNode == decoded(rows, "producer-root").nativeValue,
+        summed.resultNode == decoded(rows, "decoy-root").nativeValue,
+        nativeLiteralMatches(rows, "producer-value", 3, "0c00000000000000"),
+        rows[0].commit != rows[1].commit and rows[2].commit != rows[3].commit,
+        outputId(rows, "object_view_entry", producerPath.dag) != outputId(rows, "object_view_entry", decoyPath.dag)
+      }
+    }
+  }
+
+  pure def physicalLabel(req: Request): str =
+    if (req.op == "inspect") "inspected"
+    else if (Set("record", "record_sum", "record_scale").contains(req.op)) "recorded"
+    else if (req.op == "txn_ref_get" and Set("released-producer", "released-decoy").contains(req.args[2])) "native_not_found"
+    else "native_ok"
+
+  pure val physicalExpected = physicalRequests.foldl(List(), (out, reqs) =>
+    out.append(reqs.foldl(List(), (labels, req) => labels.append(physicalLabel(req)))))
+
+  pure def physicalInspect(rows: List[Attempt], index: int, split: bool): bool = {
+    val report = rows[index]
+    if (not(split)) combinedGraphMatches(rows, report)
+    else if (index == 4) {
+      sumReadVerdict(selected, report, splitGraphRequests[index], rows[0].commit) == "inspected" and
+      report.calls[0].dag == outputId(rows, "object_view_entry", producerPath.dag)
+    } else if (index < movedScaleRead) {
+      splitGraphMatches(rows, report, index == firstScaleRead + 1) and
+      (index != firstScaleRead or report.calls[0] == rows[4].calls[0])
+    } else {
+      val phase = if (index < releasedScaleRead) movedScaleRead else releasedScaleRead
+      val original = rows[firstScaleRead + index - phase]
+      report.commit == original.commit and report.producerCommit == original.producerCommit and
+      report.calls == original.calls and report.reportFields == original.reportFields
+    }
+  }
+
+  pure def physicalVerdicts(phase: int, rows: List[Attempt]): List[str] = {
+    val reqs = physicalRequests[phase]
+    val labels = physicalExpected[phase]
+    if (rows.length() != reqs.length()) List("missing_steps")
+    else if (not(reqs.indices().forall(i => sameRequest(rows[i], reqs[i])))) List("wrong_request")
+    else range(0, reqs.length()).foldl(List(), (out, i) => {
+      val attempt = rows[i]
+      val request = reqs[i]
+      val label = labels[i]
+      val verdict = if (label == "recorded") {
+        if (attempt.op == "record_scale") scaleWriteVerdict(attempt, request, rows[i - 2].commit)
+        else writeVerdict(attempt, request)
+      } else if (label == "inspected") {
+        if (not(matches(attempt, request))) "wrong_inspect"
+        else if (not(attempt.unchanged)) "storage_changed"
+        else if (not(physicalInspect(rows, i, phase == 1))) "wrong_native_graph"
+        else "inspected"
+      } else if (label == "native_not_found") {
+        if (attempt.nativeStatus == "not_found" and attempt.nativeDetail == absentRefDetail and
+          attempt.nativeValue == "") label else "pin_not_absent"
+      } else if (attempt.nativeStatus != "ok") "native_failure"
+      else if (request.op == "txn_ref_get" and request.args[2] == "moved-producer" and
+        attempt.nativeValue != rows[1].commit) "wrong_pin_target"
+      else label
+      out.append(verdict)
+    })
+  }
+
   pure def historyVerdicts(row: Observation): List[str] =
     if (row.scenario == scenarios.length()) separateVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 1) handoffVerdicts(row.attempts)
@@ -1679,11 +1994,15 @@ module recorded_calls_rules {
     else if (row.scenario == scenarios.length() + 14) supersessionHistoryVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 15) multiInputVerdicts(row.attempts)
     else if (row.scenario == scenarios.length() + 16) intentTableVerdicts(row.attempts)
+    else if (row.scenario >= scenarios.length() + 17 and row.scenario < scenarios.length() + 19)
+      physicalVerdicts(row.scenario - scenarios.length() - 17, row.attempts)
+    else if (row.scenario >= scenarios.length() + 19)
+      rejectionVerdicts(row.scenario - scenarios.length() - 19, row.attempts)
     else togetherVerdicts(row)
 
   pure def verdictAccepted(verdict: str): bool =
     Set("recorded", "inspected", "rejected", "exported", "staged", "released", "collected", "published",
-      "acknowledged", "abandoned", "reused", "selected", "adopted").contains(verdict)
+      "acknowledged", "abandoned", "reused", "selected", "adopted", "native_ok", "native_not_found").contains(verdict)
 
   pure def sameRootNotSameCall(first: Call, second: Call): bool =
     first.resultNode == second.resultNode and first.dag != second.dag
@@ -1781,7 +2100,7 @@ module recorded_calls_rules {
         "inspected", "inspected", "staged", "inspected", "staged", "inspected"))
     val expected = List(together, together, separate, handoff, roundTrip, durable, retry, abandon,
       reuse, reusePublication, versioned, selections, occurrences, adoptions, policies, implementationIntents,
-      supersessions, multiInput, intentTable)
+      supersessions, multiInput, intentTable).concat(physicalExpected).concat(rejectionExpected)
     if (rows.length() != expected.length() or verdicts != expected) false
     else {
       val split = rows[2].attempts
@@ -1891,7 +2210,10 @@ module recorded_calls_rules {
   pure val scaled: Call = { dag: "scale-call", implementation: "example.scale@1", resultNode: "literal-36",
     resultValue: 36, arguments: List(factor, input) }
   pure val recorded: Attempt = { op: "record", args: List("source", "7", "5", "3"), code: 0,
-    quiet: true, diagnosed: false, missingRef: false, commit: "commit", calls: List(),
+    quiet: true, diagnosed: false, missingRef: false, stderr: "", stdoutEmpty: false,
+    repoExisted: false, repoExists: false, nativeStatus: "", nativeDetail: "", nativeValue: "", nativeCount: 0,
+    nativeItems: List(),
+    commit: "commit", calls: List(), reportFields: List(),
     expectedCommit: "", producerCommit: "", unchanged: false,
     removed: -1, expectedResult: "", expectedSelection: "", expectedAttempt: "", expectedMain: "",
     previousSelection: "", requestCommit: "",
@@ -1922,17 +2244,17 @@ module recorded_calls_rules {
   pure val scaleWrite: Attempt = { ...recorded, op: "record_scale", args: splitRequests[7].args,
     commit: "scaled", expectedCommit: "commit" }
   pure val staleWrite: Attempt = { ...scaleWrite, args: splitRequests[4].args,
-    code: 1, quiet: false, diagnosed: true, commit: "", unchanged: true }
+    code: 1, quiet: false, diagnosed: true, stdoutEmpty: true, commit: "", unchanged: true }
   pure val staged: Attempt = { ...recorded, op: "stage_input", args: handoffRequests[12].args,
     bundlePresent: true }
   pure val rejectedExportControl: Attempt = { ...recorded, op: "export_sum", args: handoffRequests[4].args,
-    code: 1, quiet: false, diagnosed: true, commit: "", expectedCommit: "commit", unchanged: true }
+    code: 1, quiet: false, diagnosed: true, stdoutEmpty: true, commit: "", expectedCommit: "commit", unchanged: true }
   pure val released: Attempt = { ...recorded, op: "release_input", args: handoffRequests[19].args,
     expectedCommit: "commit" }
   pure val published: Attempt = { ...recorded, op: "publish_scale", args: returnRequests[17].args,
     commit: "result", expectedResult: "result", expectedCommit: "producer", expectedMain: "-" }
   pure val rejectedPublication: Attempt = { ...published, args: returnRequests[21].args, commit: "", expectedMain: "tip",
-    code: 1, quiet: false, diagnosed: true, unchanged: true }
+    code: 1, quiet: false, diagnosed: true, stdoutEmpty: true, unchanged: true }
   pure val acknowledged: Attempt = { ...published, op: "publish_requested_scale", args: retryRequests[9].args,
     expectedCommit: "plan", unchanged: true }
   pure val publication: Publication = { planRef: "plan", plan: "plan", stagingRef: "returned", result: "result" }
@@ -2013,6 +2335,7 @@ module recorded_calls_rules {
     intentTableDecisionVerdict(read, intentTableFlow[6], "decision", "request", scaleV2, "-", "table-ab", "table",
       sampleIntentTableDecision.decision, sampleIntentRow)
   pure val controlsPass = all {
+    rejectionControls(recorded),
     checkIntentTable(sampleIntentTable) == "inspected",
     checkIntentTable({ ...sampleIntentTable, intentReuseTable: { ...sampleIntentTable.intentReuseTable,
       genesis: "unrelated" } }) == "wrong_table_scope",

@@ -2,7 +2,8 @@
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
+from contextlib import contextmanager
+from functools import partial
 import json
 from os import cpu_count
 from pathlib import Path
@@ -15,6 +16,7 @@ from time import monotonic
 
 from daggerml import core
 
+from replay_core import CoreHistory, OPERATIONS
 from run_histories import (
     absolute_path,
     add_quint_arguments,
@@ -44,6 +46,18 @@ def call_evidence(call):
             for name, arg in sorted(call["arguments"].items())
         ],
     }
+
+
+def json_fields(value):
+    """Preserve JSON object field sets in a canonical depth-first order."""
+    if isinstance(value, dict):
+        keys = sorted(value)
+        yield keys
+        for key in keys:
+            yield from json_fields(value[key])
+    elif isinstance(value, list):
+        for item in value:
+            yield from json_fields(item)
 
 
 def declaration_evidence(declaration):
@@ -80,6 +94,11 @@ def intent_table_evidence(report):
                         for entry in report["entries"]]}
 
 
+def evidence_text(text):
+    # The Quint evidence writer cannot represent quotes, backslashes or non-ASCII text.
+    return text if re.fullmatch(r"[\x20-\x21\x23-\x5b\x5d-\x7e]*", text) else "hex:" + text.encode("utf-8").hex()
+
+
 def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True):
     command = op.replace("_", "-")
     missing_ref = re.fullmatch(
@@ -87,8 +106,10 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
     ) is not None
     return {"op": op, "args": list(args), "code": code, "quiet": not stderr,
             "diagnosed": stderr.startswith(f"{command}: ") and "Traceback" not in stderr,
-            "missingRef": missing_ref,
-            "commit": "", "calls": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
+            "missingRef": missing_ref, "stderr": evidence_text(stderr.rstrip("\n")), "stdoutEmpty": False,
+            "repoExisted": False, "repoExists": False,
+            "nativeStatus": "", "nativeDetail": "", "nativeValue": "", "nativeCount": 0, "nativeItems": [],
+            "commit": "", "calls": [], "reportFields": [], "expectedCommit": "", "producerCommit": "", "removed": -1,
             "expectedResult": "", "expectedSelection": "", "expectedAttempt": "", "expectedMain": "",
             "previousSelection": "", "requestCommit": "", "requestImplementation": "", "requestFactor": 0,
             "publication": {"planRef": "", "plan": "", "stagingRef": "", "result": ""},
@@ -119,6 +140,7 @@ class ProcessHistory:
         self.repos = {role: directory / role for role in ("source", "worker", "replica")}
         self.example = example
         self.fixture_lock = fixture_lock
+        self.native = CoreHistory(core, None, directory)
         self.sum_receipts = {}
         self.scale_receipts = {}
         self.plan_receipts = {}
@@ -150,12 +172,26 @@ class ProcessHistory:
             "define_scale_intent_reuse_table": self.define_scale_intent_reuse_table,
             "update_scale_intent_reuse_table": self.update_scale_intent_reuse_table,
             "request_intent_table_scale": self.request_intent_table_scale,
+            **{op: partial(self.native_step, op) for op in (*OPERATIONS, "datum_encode", "object_encode")
+               if op not in OPERATIONS or not OPERATIONS[op].observes_failure
+               if hasattr(core, op)},
         }
 
+    def native_step(self, op, *args):
+        # Reuse the one-call core interpreter against the CLI's repository paths.
+        with self.fixture_lock:
+            observed = self.native.run(op, *args, include_error_detail=True)
+        row = evidence(op, args, code=0, stderr="", unchanged=False)
+        return {**row, "nativeStatus": observed["status"], "nativeDetail": evidence_text(observed["detail"]),
+                "nativeValue": observed["value"], "nativeCount": observed["count"], "nativeItems": observed["items"]}
+
     def invoke(self, op, args, *, operands=None, bundle=None):
+        if self.native.values["repo"]:
+            raise ValueError("close native repository handles before launching the CLI")
         role, *cli_args = args
         repo = self.repos[role]
         data = repo / "data.mdb"
+        repo_existed = repo.exists()
         before = data.read_bytes() if data.is_file() else None
         bundle_before = bundle.read_bytes() if bundle is not None and bundle.is_file() else None
         command = op.replace("_", "-")
@@ -173,11 +209,12 @@ class ProcessHistory:
         row = evidence(op, args, code=result.returncode, stderr=result.stderr,
                        unchanged=before is not None and before == after,
                        bundle_present=bundle_after is not None, bundle_unchanged=bundle_before == bundle_after)
-        return row, result.stdout
+        return {**row, "stdoutEmpty": not result.stdout, "repoExisted": repo_existed,
+                "repoExists": repo.exists()}, result.stdout
 
     def write(self, op, args, **options):
         row, output = self.invoke(op, args, **options)
-        return {**row, "commit": id_evidence(output.strip()) if output else ""}
+        return {**row, "commit": id_evidence(output.strip()) if row["code"] == 0 and output else ""}
 
     def record(self, *args):
         return self.write("record", args)
@@ -560,6 +597,7 @@ class ProcessHistory:
                 row["knowledgeView"] = advisory_evidence(report["knowledge_view"])
             if "calls" in report:
                 row["calls"] = [call_evidence(call) for call in report["calls"]]
+                row["reportFields"] = list(json_fields(report))
             if "decision_id" in report:
                 decision_id = report["decision_id"]
                 canonical_id = re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
@@ -631,8 +669,16 @@ class Processes:
         # Fixture calls use the in-process binding, unlike regular CLI steps.
         self.fixture_lock = Lock()
 
+    @contextmanager
     def history(self, directory):
-        return nullcontext(ProcessHistory(directory, self.example, self.fixture_lock))
+        history = ProcessHistory(directory, self.example, self.fixture_lock)
+        try:
+            yield history
+            if history.native.values["repo"] or history.native.values["txn"]:
+                raise ValueError("history must explicitly end native transactions and close repositories")
+        finally:
+            with self.fixture_lock:
+                history.native.close()
 
 
 def observe_histories(suite, directory, histories):

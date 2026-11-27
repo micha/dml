@@ -175,7 +175,7 @@ class CoreHistory:
             self.values[output][alias] = result
         return value, count, items
 
-    def run(self, op, *args):
+    def run(self, op, *args, include_error_detail=False):
         spec = operation_for(op, args)
         has_alias = spec.output in ("txn", "packed", "id", "view", "bundle", "entry")
         if len(args) != len(spec.inputs) + has_alias:
@@ -195,19 +195,19 @@ class CoreHistory:
 
         native_args = [self.resolve(kind, arg) for kind, arg in zip(spec.inputs, args)]
 
-        status, value, count, items = "ok", "", 0, []
+        status, detail, value, count, items = "ok", "", "", 0, []
         try:
             result = getattr(self.core, op)(*native_args)
         except self.core.Error as error:
             if (len(error.args) != 3 or not isinstance(error.args[0], str)
                     or not isinstance(error.args[1], int) or not isinstance(error.args[2], str)):
                 raise
-            status = error.args[0]
+            status, _, detail = error.args
         else:
             if spec.observes_failure:
                 status, result = result
             value, count, items = self.observe_output(spec.output, out, status, result)
-            if op == "repo_open":
+            if op == "repo_open" and self.scanner is not None:
                 self.before.setdefault(primary, {})
             elif op == "txn_begin":
                 self.txn_repos[out] = primary
@@ -221,8 +221,11 @@ class CoreHistory:
             after = scan_inventory(self.scanner, self.path(repo))
             (changes if repo == primary else other_changes).extend(inventory_diff(before, after))
             self.before[repo] = after
-        return dict(op=op, args=list(args), status=status, value=value, count=count, items=items,
-                    changes=changes, otherChanges=other_changes)
+        observed = dict(op=op, args=list(args), status=status, value=value, count=count, items=items,
+                        changes=changes, otherChanges=other_changes)
+        if include_error_detail:
+            observed["detail"] = detail
+        return observed
 
     def close(self):
         # Safety net for invalid histories, not a modeled transition.
