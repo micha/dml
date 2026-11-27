@@ -143,7 +143,7 @@ class ProcessHistory:
         self.repos = {role: directory / role for role in ("source", "worker", "replica")}
         self.example = example
         self.fixture_lock = fixture_lock
-        self.native = CoreHistory(core, None, directory)
+        self.native = CoreHistory(core, None, directory, status_results=False)
         self.file_checkpoints = {}
         self.sum_receipts = {}
         self.scale_receipts = {}
@@ -160,6 +160,7 @@ class ProcessHistory:
             "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
             "release_input": self.release_input, "collect": self.collect,
             "unlink_bundle": self.unlink_bundle, "truncate_bundle": self.truncate_bundle,
+            "write_bundle": self.write_bundle,
             "checkpoint_file": self.checkpoint_file, "compare_file": self.compare_file,
             "export_scale": self.export_scale, "publish_scale": self.publish_scale,
             "request_scale": self.request_scale, "export_request": self.export_request,
@@ -179,14 +180,14 @@ class ProcessHistory:
             "update_scale_intent_reuse_table": self.update_scale_intent_reuse_table,
             "request_intent_table_scale": self.request_intent_table_scale,
             **{op: partial(self.native_step, op) for op in (*OPERATIONS, "datum_encode", "object_encode")
-               if op not in OPERATIONS or not OPERATIONS[op].observes_failure
+               if op == "repo_export_commit" or op not in OPERATIONS or not OPERATIONS[op].observes_failure
                if hasattr(core, op)},
         }
 
-    def receipt_id(self, alias, receipts, role):
+    def receipt_id(self, alias, receipts, role=None):
         if alias.startswith("native:"):
             return self.native.resolve("id", alias.removeprefix("native:")).hex()
-        return receipts[role, alias]
+        return receipts[alias if role is None else (role, alias)]
 
     def native_operand(self, arg):
         if arg.startswith("sum:"):
@@ -194,6 +195,10 @@ class ProcessHistory:
         if arg.startswith("scale:"):
             _, role, ref = arg.split(":")
             return self.scale_receipts[role, ref]
+        if arg.startswith("plan:"):
+            return self.plan_receipts[arg.removeprefix("plan:")]
+        if arg.startswith("request:"):
+            return self.request_receipts[arg.removeprefix("request:")]
         return arg
 
     def native_step(self, op, *args):
@@ -205,8 +210,11 @@ class ProcessHistory:
         with self.fixture_lock:
             observed = self.native.run(op, *operands, include_error_detail=True)
         row = evidence(op, args, code=0, stderr="", unchanged=False)
+        items = observed["items"]
+        if op == "datum_decode" and observed["status"] == "ok" and observed["count"] == core.DATUM_STRING:
+            items = [evidence_text(bytes.fromhex(observed["value"]).decode("utf-8"))]
         return {**row, "nativeStatus": observed["status"], "nativeDetail": evidence_text(observed["detail"]),
-                "nativeValue": observed["value"], "nativeCount": observed["count"], "nativeItems": observed["items"]}
+                "nativeValue": observed["value"], "nativeCount": observed["count"], "nativeItems": items}
 
     def invoke(self, op, args, *, operands=None, bundle=None):
         if self.native.values["repo"]:
@@ -300,7 +308,7 @@ class ProcessHistory:
         return row
 
     def abandon_scale_request(self, role, pin, plan_receipt):
-        plan = self.plan_receipts[plan_receipt]
+        plan = self.receipt_id(plan_receipt, self.plan_receipts)
         row = self.write("abandon_scale_request", (role, pin, plan_receipt), operands=(pin, plan))
         return {**row, "expectedCommit": plan}
 
@@ -314,7 +322,7 @@ class ProcessHistory:
         return {**row, "expectedCommit": plan}
 
     def work_scale(self, role, pin, request_receipt, result_ref):
-        request = self.request_receipts[request_receipt]
+        request = self.receipt_id(request_receipt, self.request_receipts)
         row = self.write("work_scale", (role, pin, request_receipt, result_ref),
                          operands=(pin, request, result_ref))
         if row["commit"]:
@@ -577,8 +585,8 @@ class ProcessHistory:
         return {**row, "expectedCommit": plan, "expectedSelection": selection}
 
     def publish_requested_scale(self, role, pin, plan_receipt, returned, result_receipt, receipt_ref=None):
-        plan = self.plan_receipts[plan_receipt]
-        result = self.scale_receipts["worker", result_receipt]
+        plan = self.receipt_id(plan_receipt, self.plan_receipts)
+        result = self.receipt_id(result_receipt, self.scale_receipts, "worker")
         args = (role, pin, plan_receipt, returned, result_receipt)
         operands = (pin, plan, returned, result)
         if receipt_ref is not None:
@@ -592,6 +600,15 @@ class ProcessHistory:
         path.unlink()
         return evidence("unlink_bundle", (filename,), code=0, stderr="", unchanged=False,
                         bundle_present=path.exists(), bundle_size=path.stat().st_size if path.is_file() else -1)
+
+    def write_bundle(self, alias, filename):
+        data = self.native.resolve("bundle", alias)
+        path = self.directory / filename
+        with path.open("xb") as file:
+            file.write(data)
+        written = path.read_bytes()
+        return evidence("write_bundle", (alias, filename), code=0, stderr="", unchanged=written == data,
+                        bundle_present=path.is_file(), bundle_size=len(written))
 
     def truncate_bundle(self, source, destination, count):
         src = self.directory / source
@@ -632,6 +649,7 @@ class ProcessHistory:
         if output:
             row["stdoutHash"] = sha256(output.encode("utf-8")).hexdigest()
             report = json.loads(output)
+            row["reportFields"] = list(json_fields(report))
             row["commit"] = id_evidence(report["commit"])
             row["tableRef"] = report.get("table_ref", "")
             if "table_commit" in report:
@@ -654,7 +672,6 @@ class ProcessHistory:
                 row["knowledgeView"] = advisory_evidence(report["knowledge_view"])
             if "calls" in report:
                 row["calls"] = [call_evidence(call) for call in report["calls"]]
-                row["reportFields"] = list(json_fields(report))
             if "decision_id" in report:
                 decision_id = report["decision_id"]
                 canonical_id = re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",

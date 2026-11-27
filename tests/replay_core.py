@@ -103,8 +103,9 @@ def bundle_items(data):
 
 
 class CoreHistory:
-    def __init__(self, core, scanner, directory):
+    def __init__(self, core, scanner, directory, *, status_results=True):
         self.core = core
+        self.status_results = status_results
         self.scanner = scanner
         self.directory = directory
         self.values = {kind: {} for kind in ("repo", "txn", "packed", "id", "view", "bundle")}
@@ -204,7 +205,7 @@ class CoreHistory:
                 raise
             status, _, detail = error.args
         else:
-            if spec.observes_failure:
+            if spec.observes_failure and self.status_results:
                 status, result = result
             value, count, items = self.observe_output(spec.output, out, status, result)
             if op == "repo_open" and self.scanner is not None:

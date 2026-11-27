@@ -2,6 +2,8 @@ module recorded_calls_histories {
   import recorded_calls_fixtures.* from "./recorded_calls_fixtures"
   import recorded_calls_stored_histories.storedEvidenceRequests from "./recorded_calls_stored_histories"
   import recorded_calls_outbound_histories.outboundRequests from "./recorded_calls_outbound_histories"
+  import recorded_calls_plan_histories.planRequests from "./recorded_calls_plan_histories"
+  import recorded_calls_receipt_histories.receiptRequests from "./recorded_calls_receipt_histories"
   type Input = (str, int)
   type Scenario = { a: Input, b: Input, factor: Input }
 
@@ -899,5 +901,6 @@ module recorded_calls_histories {
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
     .append(implementationIntentRequests).append(supersessionRequests).append(multiInputRequests).append(intentTableRequests)
     .concat(physicalRequests).concat(rejectionRequests).concat(storedEvidenceRequests).concat(outboundRequests)
+    .concat(planRequests).concat(receiptRequests)
   action step = histories' = histories
 }
