@@ -142,8 +142,8 @@ reads of commit parents, tree entries, and producer DAG edges.
 For split recording, the runner passes an explicit immutable ID, never the
 current pin target. CLI steps can name a prior receipt or use `native:<alias>`
 for a native ID. Native ID operands can use `sum:<ref>`, `scale:<role>:<ref>`,
-`plan:<alias>`, or `request:<alias>` for prior CLI receipts. Quint checks that two equal-valued sums
-remain distinct producers and that read-only reports stay the same after their
+or `plan:<alias>` for prior CLI receipts. Quint checks that two equal-valued
+sums remain distinct producers and that read-only reports stay the same after their
 pins move or are deleted. For failed writes, Quint distinguishes stale and
 missing pins, occupied refs, overflow, and out-of-range input. It checks file
 preservation where applicable and uses native reads to verify that candidate
@@ -168,14 +168,9 @@ publishes neither the staging ref nor any object from its closure, and then
 imports the intact bundle. The runner only performs the requested file edits
 and reports observations; Quint checks the outcomes.
 
-The [durable plan histories](recorded_calls_plan_histories.qnt) observe which
-commits travel to a worker, guard publication by the captured `main`, and
-read the exact result-to-request-to-producer links after collection. They
-also test worker rejection of an imported future implementation and verify
-which refs and commits are retained after abandonment. The [receipt
-histories](recorded_calls_receipt_histories.qnt) read the native receipt DAG,
-check each retry key field independently, and replay acknowledgments after
-ref reuse and collection. Rejected publication must not reserve the key.
+The opt-in Meson gate runs [durable plans](recorded_calls_plan_histories.qnt)
+and [receipt histories](recorded_calls_receipt_histories.qnt) under a separate
+`recorded-calls-durable` entry, using the same replay runner.
 
 The [return and publication history](../README.md#return-and-publish-a-recorded-scale)
 checks exact result export and staging, rejection of a same-valued wrong producer,
@@ -194,29 +189,29 @@ The [durable-request history](../README.md#save-a-scale-request-before-sending-i
 starts separate processes for planning, dispatch, work, staging, and publication.
 It checks two requests with the same zero-valued sum and different factors, and
 rejects a wrong request, stale plan, stale staging selection, and stale `main`
-without changing committed bytes. The focused tests update an existing `main`,
-verify its previous tip is not exported when unrelated to the request, and
-resume publication without the bundles or producer pin. They also reject a
-forged factor or input edge under the right request parent, and directly check
-that the published worker result, request, producer commit, and sub-DAG edge
-survive collection.
+without changing committed bytes. `recorded-calls-durable` verifies that the
+captured tip is not exported when unrelated to the request and resumes
+publication without the bundles or producer pin. It rejects a future
+implementation at work time, and a forged factor or input edge under the
+right request parent. Native reads check exact lineage after collection.
 
 The [publication retry history](../README.md#retry-publication-if-its-acknowledgment-was-lost)
 checks first publication, a matching retry, rejection under a missing or occupied
 key, and a retry after a second publication and collection. The retry must return
-the first result ID without changing committed bytes or the newer tip. The focused
-tests also check atomic rollback of a tentative receipt, reused pin names, a retry
-with all first-publication guards satisfied again, and physical reclamation of the
-old commits despite the retained receipt.
+the first result ID without changing committed bytes or the newer tip.
+`recorded-calls-durable` reads the native receipt DAG, checks each key field
+independently, and verifies rollback of tentative receipts. It retries with
+all original guards satisfied, then after ref reuse and actual reclamation
+of the old commits.
 
 The [abandonment history](../README.md#abandon-a-scale-request-without-publishing)
 checks that a late staged result cannot publish after abandonment, no receipt or
 `main` appears, and a stale ID cannot delete a replacement plan under the same
 name. Removing the replacement leaves the exact staged result intact. The
 publication retry history covers the opposite order: a consumed plan cannot be
-abandoned, and the publication receipt still acknowledges success. Focused
-checks cover a moved `main`, invalid and non-plan selections, exact ref
-preservation, and explicit collection.
+abandoned, and the publication receipt still acknowledges success.
+`recorded-calls-durable` checks abandonment with a moved `main`, invalid and
+non-plan selections, exact ref preservation, and explicit collection.
 
 The [reuse history](../README.md#reuse-an-explicitly-selected-local-scale-result)
 retains one worker result locally and publishes that same commit through two

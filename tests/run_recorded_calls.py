@@ -197,8 +197,6 @@ class ProcessHistory:
             return self.scale_receipts[role, ref]
         if arg.startswith("plan:"):
             return self.plan_receipts[arg.removeprefix("plan:")]
-        if arg.startswith("request:"):
-            return self.request_receipts[arg.removeprefix("request:")]
         return arg
 
     def native_step(self, op, *args):
