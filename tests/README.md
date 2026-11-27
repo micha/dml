@@ -270,8 +270,11 @@ branches, and explicitly reselects the original attempt on a descendant.
 Replay checks exact version matching even when two versions select the same
 attempt, rejects an occupied ref without writes, and reads reuse records for
 the different choices after the attempt pins are removed and collection runs.
-Focused tests check ordered parents, rollback, malformed predecessor chains,
-and retention when only the adopted version is pinned.
+The separate [`recorded-calls-adoption` entry](recorded_calls_adoption_histories.qnt)
+checks adoption after abandoning the plan, native parent order, and retention
+through the adopted version after collection. It runs adopt, inspect, and
+publish against malformed stored chains and inspects a valid chain of 1,025
+alternating adoption links.
 
 The [intent policy history](../README.md#set-a-reuse-default-for-the-scale-intent)
 checks both defaults and overrides using the real CLI. It distinguishes a

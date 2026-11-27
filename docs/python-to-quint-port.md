@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–4 are complete**; see their [graph and rollback](#packet-1-evidence), [stored-result and transfer](#packet-2-evidence), [plan and receipt](#packet-3-evidence), and [reuse and selection](#packet-4-evidence) evidence. Resume at **packet 5, adoption and deep-chain slice**: baseline `tests/test_recorded_calls.py:1213–1307`. Then tackle policy/intent and supersession in separate slices. Read only the relevant methods, histories, rules, and interpreter commands; leave typed pre-open cases for packet 10.
+- **Packets 1–4 and packet 5's adoption slice are complete**; see the [evidence below](#packet-1-evidence), including [adoption and deep-chain replay](#packet-5-adoption-evidence). Resume at **packet 5, policy and intent decisions**: baseline `tests/test_recorded_calls.py:1345–1545`. Tackle supersession separately. Read only the relevant methods, histories, rules, and interpreter commands; leave typed pre-open cases (including `:1324`) for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–4 closed 38 whole methods (7, 10, 11, and 10 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1766`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–4 and packet 5's adoption slice closed 41 whole methods (7, 10, 11, 10, and 3 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1766`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -335,6 +335,33 @@ receipt failed reuse 5:119 (`wrong_rejection`). Accepting an uppercase stored
 UUID failed selection 4:510 (`wrong_rejection`); changing both the selected
 proof reader and writer to agree on the wrong root failed selection 1:89
 (`wrong_native_graph`).
+
+## Packet 5 adoption evidence
+
+The [adoption suite](../tests/recorded_calls_adoption_histories.qnt) uses the
+shared workflow runner. It passes native basis IDs into the real adoption
+command so Quint can exercise persisted forgeries. Every link of the deep
+chain is requested in Quint as an encode and a put; Python only dispatches
+those calls and collects observations.
+
+All three live histories passed with coverage and synthetic controls. The
+final local `scripts/check.sh --quint` gate passed all 32 suites in the Nix
+shell on aarch64 Linux with Quint 0.33.1. The three superseded Python methods
+were removed; their shared fixture and the `:1324` typed pre-open test remain.
+The step numbers below are one-based within `recorded-calls-adoption`.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:1213` adoption without a plan and late output collisions | `retention` (1): abandon 14, missing plan 17, reject/adopt/reject 20–22, native 25–53 | `retentionVerdicts` required the occupied-ref diagnosis and unchanged bytes for both an unrelated occupant and the identical adopted version. The successful write left the other pins exact and `plan` and `main` absent. `adoptionGraph` matched the ordered selection/attempt parents and the sole `attempt_ref` literal as the DAG root. |
+| `:1213` retention after collection | 1: release 58–61, collect 64, native 67–79, inspect 82 | Collection swept the abandoned plan, but the old choice, both attempts and their request remained after their pins were gone. `adoptionReport` matched the exact predecessor and adopted attempt without writing. |
+| `:1249` malformed versions and ancestry | `malformedChain` (2): native 24–483, writer-only guards 484–485, adopt/inspect/publish triples 486–503, refs 506–523, valid counterparts 526–553 | Native graph checks established the ordered layouts, including the alternate request with the same computed scalar. Exact diagnostics distinguished legacy basis, foreign attempt, one or swapped parents, legacy root, repeated attempt, foreign request and buried bad name. Every rejection left bytes unchanged and ready pins intact. The valid chain inspected, accepted another adoption and published the exact result. |
+| `:1307` iterative deep read | `deep` (3): build 33–2082, tip and predecessor 2088–2107, inspect 2110 | `deepVerdicts` checked success and 1,025 distinct link IDs, and read both ordered parents of each of the last two links natively. `adoptionReport` matched the exact tip, previous selection and final attempt without writing. |
+
+Isolated live controls failed as intended. Reversing the adoption writer's
+parents failed 1:53 (`wrong_adoption_graph`). Skipping the historical-name
+check on non-head links failed the malformed history at step 501
+(`wrong_rejection`). Imposing a 1,000-link limit failed the deep history at
+step 2110 (`wrong_inspect`).
 
 ## Removal dependencies and finish line
 

@@ -354,7 +354,7 @@ class ProcessHistory:
         return {**row, "expectedCommit": plan, "expectedAttempt": attempt}
 
     def adopt_scale_attempt(self, role, basis_ref, basis_receipt, attempt_ref, attempt_receipt, selection_ref):
-        basis = self.selection_receipts[basis_receipt]
+        basis = self.receipt_id(basis_receipt, self.selection_receipts)
         attempt = self.attempt_receipts[attempt_receipt]
         args = (role, basis_ref, basis_receipt, attempt_ref, attempt_receipt, selection_ref)
         row = self.write("adopt_scale_attempt", args, operands=(basis_ref, basis, attempt_ref, attempt, selection_ref))
