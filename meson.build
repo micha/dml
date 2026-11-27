@@ -233,6 +233,8 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
+  # These verdicts are wide. Do not make the existing replay suites compete
+  # with two more Quint evaluators (the main recorded-calls suite timed out on Windows).
   foreach suite : ['reuse', 'selection']
     test(
       'recorded-calls-' + suite, python,
@@ -242,6 +244,7 @@ with tempfile.TemporaryDirectory() as tmp:
                    'tests/recorded_calls_rules.qnt')] + recorded_calls_modules + quint_args,
       env: binding_env,
       depends: public_python_core,
+      is_parallel: false,
       timeout: replay_timeout,
     )
   endforeach
