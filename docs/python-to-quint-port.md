@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–7 are complete for their assigned cases**; see [packet 7 evidence](#packet-7-evidence) and the earlier evidence below. Resume at **packet 8, built-in stored records and values**. Leave closure no-bind for packet 9 and typed cases, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`, for packet 10.
+- **Packets 1–8 are complete for their assigned cases**; see [packet 8 evidence](#packet-8-evidence) and the earlier evidence below. Resume at **packet 9, live scopes and callbacks**, including the remaining built-in handles, recorder scope and closure no-bind cases. Leave typed cases, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`, for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -38,7 +38,7 @@ Use focused validation while working and `scripts/check.sh --quint` for the fina
 | 6. Reuse tables | 2252–2547 | Separate implementation-scoped from intent-scoped tables. Capacity, identity, key, and historical validation differ. |
 | 7. Argument-map, composition, closure records | Two remaining argument-map methods, composition graft, closure override and getter-graft | Use existing workflow histories. Isolate the 64-deep run if needed for Quint evaluation time; no new driver. |
 | 8. Built-in stored records and values | Fixed operations, exact edges, bad profiles, canonical keys/NaN, limits and rollback | Keep persisted graphs and transactions separate from live handle identity. |
-| 9. Live scopes and callbacks | `test_calls.py`, recorder ownership, ordinary callback cases, closure no-bind | Agree on handle/event evidence. Treat failures after a ref update separately from a stale ref rejected before the update. |
+| 9. Live scopes and callbacks | `test_calls.py`, `test_builtins.py` live handle and scope cases, ordinary callback cases, closure no-bind | Agree on handle/event evidence. Treat failures after a ref update separately from a stale ref rejected before the update. |
 | 10. Public Python boundary | Binding, typed ordinary/closure arguments, recorded-call pre-open matrices | First typed values, encoding and diagnostics; separately ownership, destruction and thread affinity. |
 | 11. Interpreter conformance and cleanup | Interpreter's nine methods, old registrations, fixtures, drivers, docs, final validation | Preserve an independent failure oracle. Do not delete a dependency used by a remaining Quint suite. |
 
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–7 closed 63 whole methods (7, 10, 11, 10, 9, 11, and 5 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–8 closed 73 whole methods (7, 10, 11, 10, 9, 11, 5, and 10 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766` and the stored-record portion of `test_builtins.py:73`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -510,6 +510,45 @@ Accepting a named key in place of a literal failed recorded-composition 3:139
 (`wrong_rejection_or_rollback`). Ignoring the extra scale argument or the
 producer's getter binding failed recorded-closures 2:111 and 2:200
 (`wrong_override_rejection`, `wrong_getter_rejection`).
+
+## Packet 8 evidence
+
+The separate [built-in primitives replay](../tests/builtin_primitive_histories.qnt)
+uses the public Python module to execute requested Recorder, NodeOperations, and
+Inspector methods. Quint constructs malformed records with single-call native
+steps and checks both reported and physical edges. The recorder dispatcher
+reports exact exception types, copied values and actual handler entries; it does
+not select cases or decide verdicts. All 23 histories and their rule controls
+passed with Quint 0.33.1, including against a fresh installed wheel outside the
+checkout. The same installed wheel passed the public binding tests and ref
+replay. The local `scripts/check.sh --quint` gate passed all 40 suites in the
+Nix shell on aarch64 Linux; macOS and Windows were not run locally. Ten Python
+methods were removed. The scope registration remains for `:234`, `:248`, and
+for the opaque, immutable handle, copied-value lifetime and inactive-recorder
+cases from `:73`.
+
+The table gives one-based history and step numbers for `builtin-primitives`.
+
+| Baseline `tests/test_builtins.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:73` five handlers, exact graph and offline inspection | 1: observed getters 40 and 42, read 59–70, native edges 71–151, comparison 154 | `graphStep` observed only the requested version enter each getter. Both insertions used distinct named sources selecting the same native list literal; both getter versions returned equal bytes. Offline inspection reported the original input, value 42, exact ordered calls and their argument DAGs and sources without entering the recorder or attempting native writes. Independent packed-node comparisons matched each required sub-DAG edge; committed inventory was unchanged. |
+| `:131` unknown and wrong binding | 2–3: inspect 9, call 17, poisoned exit 18, comparison 21 | `profileStep` matched each stored URI and exact binding before requiring the unsupported func/source pairing error. Both attempts rolled back. |
+| `:141` malformed binding | 4: inspect 45–52, comparison 55 | The native valid profile matched the public author's ID and read as v1. `malformedBinding` matched each persisted variant to an ID different from the canonical binding. `profileExpected` required root, field kind (adapter, interpreter, timeout, source), role, or binding count errors. Reads did not change storage. |
+| `:158` shape and index | 6:10; 7–10:11; 11–14:13 | `valueVerdicts` distinguished exact argument names, missing key in both versions, non-MAP and non-STRING inputs, and negative, end, bool and float indices. Each case reached its guard and poisoned only its own scope. |
+| `:186` NFC duplicates | 15:11–12; 16:16–23 | One decomposed argument read back with the composed key; both spellings together rejected. In the separate insert case both spellings gave the same key DAG and selected the existing I64 `3` before insertion rejected the duplicate. |
+| `:199` caught conversion | 17:12–24, 26–30, 32–35 | The arguments, operation, commit and exact ref were readable in the writer. Conversion raised TypeError; trace and clean scope exit diagnosed poison and native commit found no live transaction. Inventory was unchanged and all four staged records/ref read `not_found` in a fresh reader. |
+| `:217` late outer error | 18:31–41, 43–49 | The seven distinct DAGs were present before a real RuntimeError crossed the recorder context. `returnPath` matched the staged trace and I64 `743`. Commit found no live transaction, the inventory was unchanged, and all seven fresh reads reported absence. |
+| `:262` native ID injected through logical literal | 19:14–19, 21–23 | The logical API rejected a real LIST member ID and poisoned the recorder. The earlier staged scalar record disappeared, while the committed member still read as I64 `321`. |
+| `:274` NaN | 20:9, 13–15, 24–25, 27 | The live getters and return preserved the F64 payload; `exactNan` matched the offline return to the original native datum ID and canonical payload. The native record bytes and inventory matched after inspection. |
+| `:290` three independent limits | 21:9–24, 30, 53–56; 22:9–11, 19–22; 23:9–143 | `repeatedTrace` required 16 occurrences of one exact operation ID and the writer rejected the seventeenth. The argument profile contained exactly 16 ordered canonical entries and rejected a seventeenth. `distinctDags` matched 64 distinct profiles and an identical repeated ID at capacity; the next distinct record rejected and rolled back. |
+| `:322` four persisted lies | 5:57–68, comparison 71 | `persistedLie` matched each successfully read valid counterpart and the exact changed native value node in each forged DAG. `profileExpected` distinguished source, argument MAP, fixed semantics, and returned-value rejections. No read changed the committed inventory. |
+
+Isolated live controls failed as intended: wrong equal-valued handler routing
+(1:42), a report with wrong nested arguments but intact storage (1:62), and
+skipping a persisted source check (5:59). Values controls caught bool coercion
+(13:13), skipping rollback on an escaping exception (18:40), allowing the
+seventeenth call position (21:53), and a false reported NaN payload retaining the
+original ID (20:24).
 
 ## Removal dependencies and finish line
 

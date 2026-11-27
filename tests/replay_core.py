@@ -13,7 +13,7 @@ from trace_support import Replay, inventory_diff, scan_inventory
 
 
 RECORD_TYPES = {"node": 3, "dag": 4, "tree": 5, "commit": 6}
-DATUM_KINDS = {"i64": 3, "string": 6, "map": 10}
+DATUM_KINDS = {"null": 1, "i64": 3, "string": 6, "uri": 7, "list": 8, "map": 10}
 NODE_KINDS = {"literal": 1, "subdag": 2}
 TXN_MODES = {"read": 1, "write": 2}
 BUNDLE_HEADER = struct.Struct("<4sI16sI")
@@ -78,7 +78,10 @@ def operation_for(op, args):
             if len(args) < 2 or len(args) % 2:
                 raise ValueError("map encoding needs key/value ID pairs and an output alias")
             return Operation(("datum_kind",) + ("id",) * (len(args) - 2), "packed")
-        return Operation(("datum_kind", "int" if args[0] == "i64" else "text"), "packed")
+        if args[0] == "list":
+            return Operation(("datum_kind",) + ("id",) * (len(args) - 2), "packed")
+        scalar = {"null": "null", "i64": "int", "string": "text", "uri": "text"}
+        return Operation(("datum_kind", scalar[args[0]]), "packed")
     return OPERATIONS[op]
 
 
@@ -150,6 +153,8 @@ class CoreHistory:
             return arg.encode("utf-8")
         if kind == "int":
             return int(arg)
+        if kind == "null" and arg == "none":
+            return None
         raise ValueError(f"unsupported argument kind {kind}")
 
     def observe_output(self, output, alias, status, result):
@@ -201,6 +206,8 @@ class CoreHistory:
         native_args = [self.resolve(kind, arg) for kind, arg in zip(spec.inputs, args)]
         if op == "datum_encode" and args[0] == "map":
             native_args = [native_args[0], list(zip(native_args[1::2], native_args[2::2], strict=True))]
+        elif op == "datum_encode" and args[0] == "list":
+            native_args = [native_args[0], native_args[1:]]
 
         status, detail, value, count, items = "ok", "", "", 0, []
         try:

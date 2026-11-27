@@ -349,6 +349,18 @@ with tempfile.TemporaryDirectory() as tmp:
   )
 
   test(
+    'builtin-primitives', python,
+    args: ['-B', files('tests/run_builtin_primitives.py'), quint.full_path(), lmdb_inventory,
+           files('tests/builtin_primitive_histories.qnt', 'tests/builtin_primitive_rules.qnt',
+                 'tests/builtin_primitive_fixture.qnt', 'tests/builtin_primitive_evidence.qnt',
+                 'tests/builtins_profile_histories.qnt', 'tests/builtins_profile_rules.qnt',
+                 'tests/builtins_values_histories.qnt', 'tests/builtins_values_rules.qnt')] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
+  test(
     'recorded-composition', python,
     args: ['-B', files('tests/run_composition.py'), quint.full_path(),
            files('examples/recorded_composition.py'), lmdb_inventory,
