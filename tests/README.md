@@ -440,8 +440,17 @@ argument node with different operation IDs, equal MAPs reuse only the original
 ordinary result, and a changed MAP runs a new attempt. Quint checks native
 commit counts, full-inventory rollback on late ref collisions, and distinct
 requested and producing edges. A read-only CLI verifies the transferred hit
-closure and rejects two equal-value trace grafts. [Focused runtime tests](test_builtins.py)
-check handler routing, type and lifetime boundaries, and poisoned-scope rollback.
+closure and rejects two equal-value trace grafts.
+
+The separate [built-in primitives replay](builtin_primitive_histories.qnt)
+requests Recorder, NodeOperations and Inspector calls on the public Python
+binding. It checks version-specific handler entry, exact stored and reported
+edges, and independent profile forgeries written by single-call native steps.
+Other histories check typed argument rejection, canonical keys and NaN bytes,
+transaction rollback, and distinct profile IDs versus repeated call positions.
+The remaining [focused runtime tests](test_builtins.py) cover live handle
+and recorder scope behavior.
+
 The [finite design model](recorded_builtins_design.qnt) checks routing and exact
 source/trace association separately from native encoding and arithmetic:
 
