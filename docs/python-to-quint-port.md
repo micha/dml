@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–6 are complete for CLI-representable cases**; see the [evidence below](#packet-1-evidence), including [intent-scoped reuse tables](#packet-6-intent-scoped-table-evidence). Resume at **packet 7, argument-map, composition, and closure records**. Leave typed cases, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`, for packet 10.
+- **Packets 1–7 are complete for their assigned cases**; see [packet 7 evidence](#packet-7-evidence) and the earlier evidence below. Resume at **packet 8, built-in stored records and values**. Leave closure no-bind for packet 9 and typed cases, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`, for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–6 closed 58 whole methods (7, 10, 11, 10, 9, and 11 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–7 closed 63 whole methods (7, 10, 11, 10, 9, 11, and 5 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -480,8 +480,39 @@ live table pin instead of the stored parent failed route 1:80–81
 `main` or the failed removal's objects failed route 2:48 and 2:60
 (`storage_changed`).
 
+## Packet 7 evidence
+
+The [argument-map trace](../tests/argument_map_trace_histories.qnt),
+[composition](../tests/composition_histories.qnt), and
+[closure](../tests/closure_histories.qnt) suites execute the actual workflow
+CLI. Quint specifies fixture writes and independent readback. The shared
+workflow adapter dispatches individual native calls, with MAP encoding taking
+explicit key/value datum IDs. No native handles are kept open across CLI
+operations. All four new histories passed with coverage and rule controls.
+Five Python methods and the argument-map and composition boundary registrations
+were removed; the closure I64 type and no-bind tests remain. The final local
+`scripts/check.sh --quint` gate passed all 39 suites in the Nix shell on aarch64
+Linux with Quint 0.33.1. macOS and Windows were not run locally. The table uses
+one-based history and step numbers within each Meson entry.
+
+| Baseline | Live history / steps | Rule and observed result |
+|---|---|---|
+| `tests/test_argument_maps.py:61` getter from the wrong construction | `graft` (argument-map-trace 1): valid reads 3, 6, 9; native 10–60; reject 61; valid readbacks 62–63 | `validPair` matched equal MAPs and scalar results of 84 from distinct literal and returned constructions. `graftLayout` read the same attempt/result trees with correctly ordered new parents but a getter still linked to the old construction. Inspection diagnosed that mismatch and left the inventory unchanged. |
+| `tests/test_argument_maps.py:74` 64-deep linear walk | `deep` (argument-map-trace 2): build 1–128, native 129–707, inspect 708 | `linkMatches` and `requestEdge` matched a parentless base and each exact predecessor, with 64 distinct attempts. `deepVerdict` matched the native tip's attempt, owner, result, preceding source, and value 0, without writing. |
+| `tests/test_composition.py:33` named in place of literal key | `namedKeyStory` (recorded-composition 3): original report 5; native 6–138; reject 139, retry 140 | `namedKeyVerdict` read the same STRING `a` node via a named source, the stored return of 42, and the exact result and attempt owners. Compose diagnosed the wrong getter path and left the inventory unchanged; the genuine attempt composed at the same free ref. |
+| `tests/test_closures.py:48` stored scale override | `forgeryStory` (recorded-closures 2): valid work/report 5–6; native 10–110; reject 111 | `forgeryVerdict` read the added I64 `scale=3` and distinct MAP on the original scale-2 closure. Work required exactly `a` and `b`, leaving the existing main, selection, and full inventory unchanged. |
+| `tests/test_closures.py:70` wrong getter version on a scale miss | `forgeryStory` (recorded-closures 2): genuine miss and v2 trace 112–114; native 115–199; reject 200, genuine miss 201 | `forgeryVerdict` matched the producing scale-2 request, 84 return, and both exact v2 getter bindings from the genuine scale-3 trace. The equivalent getter did not satisfy the pinned v1 binding. The rejection left storage unchanged; the original valid attempt yielded a pending miss at the same output refs. |
+
+Isolated live controls that ignored the getter construction or lowered the
+reader's reached-attempt limit to 63 failed argument-map-trace 1:61
+(`wrong_getter_diagnostic`) and 2:708 (`wrong_64_deep_tip`), respectively.
+Accepting a named key in place of a literal failed recorded-composition 3:139
+(`wrong_rejection_or_rollback`). Ignoring the extra scale argument or the
+producer's getter binding failed recorded-closures 2:111 and 2:200
+(`wrong_override_rejection`, `wrong_getter_rejection`).
+
 ## Removal dependencies and finish line
 
-Three existing replay files (`tests/run_argument_map_poison.py`, `tests/run_argument_map_request_integrity.py`, `tests/run_argument_map_returned_source.py`) import fixture functions from `tests/test_recorded_calls.py`. `tests/test_argument_maps.py` and `tests/test_calls.py` also import from it. Do not strand those imports. Review remaining drivers for duplicate orchestration and behavioral judgments; keep necessary evidence collection distinct from tests. Do not start an unrelated harness rewrite.
+Three existing replay files (`tests/run_argument_map_poison.py`, `tests/run_argument_map_request_integrity.py`, `tests/run_argument_map_returned_source.py`) import fixture functions from `tests/test_recorded_calls.py`. `tests/test_calls.py` also imports from it. Do not strand those imports. Review remaining drivers for duplicate orchestration and behavioral judgments; keep necessary evidence collection distinct from tests. Do not start an unrelated harness rewrite.
 
 Complete means: all ledger obligations accounted for against live behavior or an explicit user decision; no residual Python tests or obsolete registrations; no stranded fixtures; validation and installed-consumer instructions reflect the resulting suites; final results and any exceptions reported under the validation policy. Until then, this remains the only workstream.

@@ -427,8 +427,11 @@ inspection must report `inspect: returned source does not match the selected att
 with no standard output and no changes to the full logical LMDB inventory.
 The original request still returns the same inspection report.
 
-The [focused tests](test_argument_maps.py) exercise a 64-deep returned-source
-chain and reject a getter link from a different construction.
+The [trace replay](argument_map_trace_histories.qnt) follows a linear 64-deep
+returned-source chain, reading the ordered native parents at every link before
+inspecting the tip. It also copies a getter trace to a request with the same
+MAP but a different construction, then requires `inspect` to reject the
+stored mismatch without changing the native inventory.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
@@ -471,7 +474,10 @@ A separate history checks I64 overflow in add
 `work: int too big to convert` and leave the full native inventory unchanged.
 The rejected add leaves `main` absent. The rejected double leaves `main` at the
 successful `MAX_I64 + 0` add result and leaves the double decision pending.
-A [focused Python test](test_composition.py) checks an equal-value getter-key graft.
+A separate history replaces the first getter's literal key with a named
+source of the same STRING value. Quint checks the stored source and return
+value, requires `compose` to reject the wrong path without changing the native
+inventory, and retries with the genuine attempt at the same output ref.
 
 The [finite composition model](recorded_composition_design.qnt) covers producer
 pins, atomic decisions, rollback, and requested versus producing history. It
@@ -494,9 +500,12 @@ ref, and separate I64 subtotal and product overflows. Each rejection leaves
 native storage unchanged. After the collision, replay retries with the same
 attempt ID at a free ref and checks the result and getter trace. For overflow,
 replay checks the exact stored operands and the distinct CLI diagnostics.
-[Focused tests](test_closures.py) check exact I64 and argument boundaries,
-inspection without binding work, and rejection of a semantically equivalent but
-unpinned getter in the producing trace.
+A separate history checks two stored records: invocation arguments that
+try to override the captured scale, and a producing trace that uses equivalent
+but unpinned getters. The trace mismatch must reject even on a capture-key
+miss; the genuine selection gives a pending request at the same output refs.
+[Focused Python tests](test_closures.py) retain exact I64 type checks and
+inspection without binding work.
 
 The [finite closure design model](recorded_closures_design.qnt) checks three
 captures, two equal-sum MAPs, one historical attempt, and at most one new

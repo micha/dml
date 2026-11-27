@@ -1,4 +1,5 @@
 module closure_histories {
+  import workflow_native_fixture as n from "./workflow_native_fixture"
   type Request = { op: str, args: List[str] }
   pure def source(op: str, args: List[str]): Request = { op: op, args: List("source").concat(args) }
   pure val pins = Map(
@@ -99,7 +100,97 @@ module closure_histories {
     inspect("hit", "original-graft")                                              // 51
   )
 
+  pure val overrideBuild = n::open("write")
+    .append(n::readRef("q1", "genuine-q"))
+    .concat(n::snapshot("genuine-q", "genuine-q-commit", "genuine-q-dag"))
+    .append(n::parent("genuine-q-commit", "0", "captured-closure"))
+    .concat(n::target("genuine-q-dag", "inputs", "genuine-inputs"))
+    .concat(n::target("genuine-inputs", "source-00", "source-a"))
+    .concat(n::target("genuine-inputs", "source-01", "source-b"))
+    .concat(n::target("genuine-inputs", "key-00", "arg-a-datum"))
+    .concat(n::target("genuine-inputs", "key-01", "arg-b-datum"))
+    .concat(n::target("source-a", "value", "literal-a-datum"))
+    .concat(n::target("source-b", "value", "literal-b-datum"))
+    .concat(n::literal("i64", "3", "scale-value"))
+    .append(n::lookup("source-a", "role", "literal-role"))
+    .concat(n::putObject("dag", List("scale-value", "value", "scale-value", "role", "literal-role"), "scale-source"))
+    .concat(n::target("scale-source", "value", "scale-value-datum"))
+    .concat(n::link("scale-source", "scale-link"))
+    .concat(n::literal("string", "scale", "scale-key"))
+    .append(n::step("datum_encode", List("map", "arg-a-datum", "literal-a-datum", "arg-b-datum", "literal-b-datum",
+      "literal-datum", "scale-value-datum", "override-map")))
+    .append(n::step("txn_put_datum", List("snapshot", "override-map", "override-map")))
+    .concat(n::putObject("node", List("literal", "override-map"), "override-map-node"))
+    .concat(List("role", "key-00", "source-00", "key-01", "source-01").foldl(List(), (out, name) =>
+      out.append(n::lookup("genuine-inputs", name, name))))
+    .concat(n::putObject("dag", List("override-map-node", "value", "override-map-node", "role", "role",
+      "key-00", "key-00", "source-00", "source-00", "key-01", "key-01", "source-01", "source-01",
+      "key-02", "scale-key", "source-02", "scale-link"), "override-inputs"))
+    .concat(n::link("override-inputs", "override-inputs-link"))
+    .concat(n::patchDag("genuine-q-dag", "func", List("func", "invocation", "closure", "inputs"),
+      "inputs", "override-inputs-link", "override-q-dag"))
+    .concat(n::publish("closure-example-request-v1", "override-q-dag", List("captured-closure"), "override-q"))
+    .append(n::pin("override-q", "override-q")).concat(n::close("txn_commit"))
+
+  pure val overrideRead = n::open("read")
+    .append(n::readRef("override-q", "stored-override-q"))
+    .concat(n::snapshot("stored-override-q", "stored-override-commit", "stored-override-dag"))
+    .append(n::parent("stored-override-commit", "0", "stored-override-closure"))
+    .concat(n::target("stored-override-dag", "inputs", "stored-override-inputs"))
+    .concat(n::target("stored-override-inputs", "value", "stored-override-map"))
+    .concat(n::target("stored-override-inputs", "key-02", "stored-scale-key"))
+    .concat(n::readDatum("stored-scale-key", "stored-scale-key-bytes"))
+    .concat(n::target("stored-override-inputs", "source-02", "stored-scale-source"))
+    .concat(n::target("stored-scale-source", "value", "stored-scale-value"))
+    .concat(n::readDatum("stored-scale-value", "stored-scale-value-bytes"))
+    .concat(n::close("txn_abort"))
+
+  // Copy the valid v2 trace into the v1 return. The request / closure, inputs,
+  // returned literal and attempt identity still come from the original v1 run.
+  pure val getterBuild = n::open("write")
+    .append(n::readRef("t1", "old-t"))
+    .append(n::readRef("t6", "alternate-t"))
+    .concat(n::snapshot("old-t", "old-t-commit", "old-t-dag"))
+    .append(n::parent("old-t-commit", "1", "old-r"))
+    .concat(n::snapshot("old-r", "old-r-commit", "old-r-dag"))
+    .concat(n::snapshot("alternate-t", "alternate-t-commit", "alternate-t-dag"))
+    .append(n::parent("alternate-t-commit", "1", "alternate-r"))
+    .concat(n::snapshot("alternate-r", "alternate-r-commit", "alternate-r-dag"))
+    .append(n::lookup("alternate-r-dag", "trace", "v2-trace-node"))
+    .concat(n::patchDag("old-r-dag", "value", List("role", "value", "returned", "trace", "inputs"),
+      "trace", "v2-trace-node", "grafted-return"))
+    .concat(n::publish("closure-example-result-v1", "grafted-return", List("genuine-q"), "grafted-result"))
+    .concat(n::publish("closure-example-attempt-v1", "old-t-dag", List("genuine-q", "grafted-result"), "grafted-attempt"))
+    .append(n::pin("getter-poison", "grafted-attempt")).concat(n::close("txn_commit"))
+
+  pure val getterRead = n::open("read")
+    .append(n::readRef("getter-poison", "stored-grafted-attempt"))
+    .concat(n::snapshot("stored-grafted-attempt", "stored-graft-commit", "stored-graft-dag"))
+    .append(n::parent("stored-graft-commit", "0", "getter-owner"))
+    .append(n::parent("stored-graft-commit", "1", "getter-result"))
+    .concat(n::snapshot("getter-result", "stored-return-commit", "stored-return-dag"))
+    .append(n::parent("stored-return-commit", "0", "getter-result-owner"))
+    .concat(n::target("stored-return-dag", "value", "stored-result-value"))
+    .concat(n::readDatum("stored-result-value", "original-scale-result"))
+    .concat(n::target("stored-return-dag", "inputs", "stored-result-inputs"))
+    .concat(n::targetVia("stored-return-dag", "trace", "stored-trace-node", "getter-trace"))
+    .concat(n::target("getter-trace", "call-00", "stored-v2-a"))
+    .concat(n::target("getter-trace", "call-01", "stored-v2-b"))
+    .concat(n::target("stored-v2-a", "binding", "stored-v2-binding-a"))
+    .concat(n::target("stored-v2-b", "binding", "stored-v2-binding-b"))
+    .concat(n::close("txn_abort"))
+
+  pure val overrideReject = 9 + overrideBuild.length() + overrideRead.length()
+  pure val getterReject = overrideReject + 4 + getterBuild.length() + getterRead.length()
+  pure val forgeryStory = story.slice(0, 9).concat(overrideBuild).concat(overrideRead)
+    .append(source("work", List("override-q", "native:stored-override-q", "bad-attempt", "--attempt-id", uuid("2"))))
+    .append(story[29]).append(story[31]).append(story[32])
+    .concat(getterBuild).concat(getterRead)
+    .append(request("c3", "@c3", "miss-q", "miss-d", "13", "29", "2",
+      selectionArgs("try-selected", "getter-poison", "native:stored-grafted-attempt")))
+    .append(request("c3", "@c3", "miss-q", "miss-d", "13", "29", "2", selectionArgs("try-selected", "t1", "@t1")))
+
   var histories: List[List[Request]]
-  action init = histories' = List(story)
+  action init = histories' = List(story, forgeryStory)
   action step = histories' = histories
 }

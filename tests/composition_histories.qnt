@@ -1,4 +1,5 @@
 module composition_histories {
+  import workflow_native_fixture as n from "./workflow_native_fixture"
   type Request = { op: str, args: List[str] }
   pure def source(op: str, args: List[str]): Request = { op: op, args: List("source").concat(args) }
   // A @ref token is resolved from live native receipts by the runner. The
@@ -101,7 +102,66 @@ module composition_histories {
     work("q-double-overflow", "t-double-overflow", "3"),                         // 8 double overflows with main at the add result
     inspect("source", "d-overflow", "@d-overflow")                              // 9 double still pending
   )
+  pure val namedKeyBuild = n::open("write")
+    .append(n::readRef("t1", "original-attempt"))
+    .concat(n::snapshot("original-attempt", "old-attempt-commit", "old-attempt-dag"))
+    .append(n::parent("old-attempt-commit", "0", "own-q"))
+    .append(n::parent("old-attempt-commit", "1", "original-result"))
+    .concat(n::snapshot("original-result", "old-return-commit", "old-return-dag"))
+    .concat(n::target("old-return-dag", "trace", "old-trace"))
+    .concat(n::target("old-trace", "call-00", "old-call"))
+    .concat(n::target("old-call", "arguments", "old-getter-args"))
+    .concat(n::target("old-getter-args", "source-00", "old-key"))
+    .append(n::lookup("old-key", "value", "key-value"))
+    .concat(n::literal("string", "key", "key-name"))
+    .concat(n::literal("string", "builtin-literal-source-v1", "source-role"))
+    .concat(n::putObject("dag", List("key-value", "key", "key-value"), "named-dag"))
+    .concat(n::link("named-dag", "named-link"))
+    .concat(n::putObject("dag", List("key-value", "role", "source-role", "name", "key-name", "source", "named-link",
+      "value", "key-value"), "named-key"))
+    .concat(n::link("named-key", "named-key-link"))
+    .concat(n::patchDag("old-getter-args", "value", List("role", "value", "key-00", "key-01", "source-00", "source-01"),
+      "source-00", "named-key-link", "new-getter-args"))
+    .concat(n::link("new-getter-args", "new-getter-args-link"))
+    .concat(n::patchDag("old-call", "value", List("role", "value", "func", "binding", "arguments"),
+      "arguments", "new-getter-args-link", "new-call"))
+    .concat(n::link("new-call", "new-call-link"))
+    .concat(n::patchDag("old-trace", "role", List("role", "call-00", "call-01"),
+      "call-00", "new-call-link", "new-trace"))
+    .concat(n::link("new-trace", "new-trace-link"))
+    .concat(n::patchDag("old-return-dag", "value", List("role", "value", "trace", "returned", "inputs"),
+      "trace", "new-trace-link", "new-return"))
+    .concat(n::publish("composition-example-result-v1", "new-return", List("own-q"), "new-result"))
+    .concat(n::publish("composition-example-attempt-v1", "old-attempt-dag", List("own-q", "new-result"), "new-attempt"))
+    .append(n::pin("forged-attempt", "new-attempt")).concat(n::close("txn_commit"))
+
+  pure val namedKeyRead = n::open("read")
+    .append(n::readRef("forged-attempt", "stored-attempt"))
+    .concat(n::snapshot("stored-attempt", "actual-attempt-commit", "actual-attempt-dag"))
+    .append(n::parent("actual-attempt-commit", "0", "stored-owner"))
+    .append(n::parent("actual-attempt-commit", "1", "stored-result"))
+    .concat(n::snapshot("stored-result", "actual-return-commit", "actual-return-dag"))
+    .append(n::parent("actual-return-commit", "0", "stored-result-owner"))
+    .concat(n::target("actual-return-dag", "value", "stored-value"))
+    .concat(n::readDatum("stored-value", "sum-bytes"))
+    .concat(n::target("actual-return-dag", "trace", "stored-trace"))
+    .concat(n::target("stored-trace", "call-00", "stored-call"))
+    .concat(n::target("stored-call", "arguments", "stored-args"))
+    .concat(n::target("stored-args", "source-00", "stored-key"))
+    .concat(n::targetVia("stored-key", "value", "stored-key-value-node", "stored-key-value"))
+    .concat(n::readDatum("stored-key-value", "key-bytes"))
+    .concat(n::targetVia("stored-key", "role", "stored-key-role-node", "stored-key-role"))
+    .concat(n::readDatum("stored-key-role", "key-role-bytes"))
+    .concat(n::target("stored-key", "source", "stored-named-dag"))
+    .append(n::lookup("stored-named-dag", "key", "stored-named-value"))
+    .concat(n::close("txn_abort"))
+
+  pure val namedKeyReject = 5 + namedKeyBuild.length() + namedKeyRead.length()
+  pure val namedKeyStory = story.slice(0, 5).concat(namedKeyBuild).concat(namedKeyRead)
+    .append(compose("forged-attempt", "native:stored-attempt", "from-forged"))
+    .append(compose("t1", "@t1", "from-forged"))
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, overflowStory)
+  action init = histories' = List(story, overflowStory, namedKeyStory)
   action step = histories' = histories
 }

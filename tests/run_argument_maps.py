@@ -1,7 +1,7 @@
 """Observe the recorded argument-map CLI and independent native inventory for Quint."""
 
 import argparse
-from contextlib import nullcontext
+from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 
 from daggerml import core
 
+from replay_core import WORKFLOW_NATIVE_DEFAULTS, WorkflowNative
 from run_histories import (
     absolute_path,
     add_quint_arguments,
@@ -148,18 +149,59 @@ class History:
         return self.evidence("replicate", (role, receipt, pin), imported.hex(), 0, "", before, self.inventory(repo))
 
 
+NATIVE_ATTEMPT_DEFAULTS = {
+    "op": "", "args": [], "code": 0, "quiet": True, "diagnosed": False, "error": "", "commit": "",
+    "unchanged": False, "addedRefs": [], "removedRefs": [], "requests": 0, "executions": 0,
+    "results": 0, "accesses": 0, **report_evidence({}), **WORKFLOW_NATIVE_DEFAULTS,
+}
+
+
+class NativeHistory(History):
+    def __init__(self, directory, example, scanner):
+        super().__init__(directory, example, scanner)
+        self.native = WorkflowNative(core, directory)
+        self.operations["native"] = self.native_step
+
+    def native_step(self, op, *args):
+        return {**NATIVE_ATTEMPT_DEFAULTS, **self.native.run(op, *args)}
+
+    def inventory(self, repo):
+        self.native.require_closed()
+        return super().inventory(repo)
+
+    def evidence(self, op, args, output, code, stderr, before, after):
+        row = super().evidence(op, args, output, code, stderr, before, after)
+        del row["refs"]
+
+        def ref_changes(old, new):
+            return [{"name": bytes.fromhex(key[len(REF_PREFIX):]).decode("ascii"), "target": new[key]}
+                    for key in sorted(new) if key.startswith(REF_PREFIX) and new[key] != old.get(key)]
+
+        # Keep ref deltas rather than copying every old pin at every link of a long walk.
+        return {**row, "addedRefs": ref_changes(before, after), "removedRefs": ref_changes(after, before),
+                **WORKFLOW_NATIVE_DEFAULTS}
+
+
 class Processes:
-    def __init__(self, example, scanner):
+    def __init__(self, example, scanner, native):
         self.example = example
         self.scanner = scanner
+        self.native = native
 
+    @contextmanager
     def history(self, directory):
-        return nullcontext(History(directory, self.example, self.scanner))
+        if self.native:
+            history = NativeHistory(directory, self.example, self.scanner)
+            with history.native:
+                yield history
+        else:
+            yield History(directory, self.example, self.scanner)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     add_quint_arguments(parser)
+    parser.add_argument("--native", action="store_true", help="enable single-call native steps and ref deltas")
     for name in ("example", "scanner", "histories", "rules"):
         parser.add_argument(name, type=absolute_path)
     args = parser.parse_args()
@@ -167,11 +209,12 @@ def main():
     with TemporaryDirectory(prefix="dml-argument-maps-") as tmp:
         directory = Path(tmp)
         histories = read_histories(quint, args.histories, directory / "histories.itf.json", ["init"])
-        processes = Processes(args.example, args.scanner)
+        processes = Processes(args.example, args.scanner, args.native)
         evidence = [{**replay_history(processes, directory / f"history-{i}", history), "scenario": i}
                     for i, history in enumerate(histories)]
         # Full native ref snapshots overlap heavily across adjacent steps.
-        state = evaluate(quint, args.rules, directory, evidence, [args.histories], intern_refs=True)
+        state = evaluate(quint, args.rules, directory, evidence, [args.histories],
+                         intern_refs=not args.native, attempt_defaults=NATIVE_ATTEMPT_DEFAULTS if args.native else None)
         check_verdicts(histories, evidence, state)
 
 

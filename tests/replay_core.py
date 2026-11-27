@@ -13,7 +13,7 @@ from trace_support import Replay, inventory_diff, scan_inventory
 
 
 RECORD_TYPES = {"node": 3, "dag": 4, "tree": 5, "commit": 6}
-DATUM_KINDS = {"i64": 3, "string": 6}
+DATUM_KINDS = {"i64": 3, "string": 6, "map": 10}
 NODE_KINDS = {"literal": 1, "subdag": 2}
 TXN_MODES = {"read": 1, "write": 2}
 BUNDLE_HEADER = struct.Struct("<4sI16sI")
@@ -74,6 +74,10 @@ def operation_for(op, args):
     if op == "datum_encode":
         if not args or args[0] not in DATUM_KINDS:
             raise ValueError("unsupported datum encoder kind")
+        if args[0] == "map":
+            if len(args) < 2 or len(args) % 2:
+                raise ValueError("map encoding needs key/value ID pairs and an output alias")
+            return Operation(("datum_kind",) + ("id",) * (len(args) - 2), "packed")
         return Operation(("datum_kind", "int" if args[0] == "i64" else "text"), "packed")
     return OPERATIONS[op]
 
@@ -195,6 +199,8 @@ class CoreHistory:
             raise ValueError("end the active transaction before starting another for this repository")
 
         native_args = [self.resolve(kind, arg) for kind, arg in zip(spec.inputs, args)]
+        if op == "datum_encode" and args[0] == "map":
+            native_args = [native_args[0], list(zip(native_args[1::2], native_args[2::2], strict=True))]
 
         status, detail, value, count, items = "ok", "", "", 0, []
         try:
@@ -232,6 +238,41 @@ class CoreHistory:
         # Safety net for invalid histories, not a modeled transition.
         self.values["txn"].clear()
         self.values["repo"].clear()
+
+
+WORKFLOW_NATIVE_DEFAULTS = {"nativeStatus": "", "nativeValue": "", "nativeCount": 0, "nativeItems": []}
+
+
+class WorkflowNative:
+    """Dispatch one public core call per native step in a workflow history."""
+
+    def __init__(self, core, directory):
+        self.history = CoreHistory(core, None, directory, status_results=False)
+
+    def run(self, op, *args):
+        row = self.history.run(op, *args)
+        return {"op": "native", "args": [op, *args], "nativeStatus": row["status"],
+                "nativeValue": row["value"], "nativeCount": row["count"], "nativeItems": row["items"]}
+
+    def resolve_id(self, alias):
+        return self.history.resolve("id", alias).hex()
+
+    def cli_operand(self, arg):
+        return self.resolve_id(arg.removeprefix("native:")) if arg.startswith("native:") else arg
+
+    def require_closed(self):
+        if self.history.values["repo"] or self.history.values["txn"]:
+            raise ValueError("end native transactions and close repositories before workflow operations")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, typ, value, traceback):
+        try:
+            if typ is None:
+                self.require_closed()
+        finally:
+            self.history.close()
 
 
 class Suite:

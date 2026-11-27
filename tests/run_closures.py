@@ -1,7 +1,7 @@
 """Collect live CLI and independent native observations for closure replay."""
 
 import argparse
-from contextlib import nullcontext
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import subprocess
@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 
 from daggerml import core
 
+from replay_core import WORKFLOW_NATIVE_DEFAULTS, WorkflowNative
 from run_builtins import READ_ONLY
 from run_composition import (
     IDENTITY,
@@ -274,10 +275,16 @@ class History:
         self.script = script
         self.scanner = scanner
         self.receipts = {}
+        self.native = WorkflowNative(core, directory)
         self.operations = {op: self.command(op) for op in ("defaults", "capture", "request", "work", "inspect")}
-        self.operations.update(graft=self.graft, replicate=self.replicate, retire=self.retire)
+        self.operations.update(graft=self.graft, replicate=self.replicate, retire=self.retire, native=self.native_step)
+
+    def native_step(self, op, *args):
+        row = self.evidence("", (), Inventory({}), Inventory({}))
+        return {**row, **self.native.run(op, *args)}
 
     def inventory(self, path):
+        self.native.require_closed()
         if not (path / "data.mdb").is_file():
             return Inventory({})
         rows = scan_inventory(self.scanner, path)
@@ -309,13 +316,14 @@ class History:
                 "selection": report.get("selection", ""), "attempt": report.get("attempt", ""),
                 "result": report.get("result", ""), "outer": report.get("return_dag", ""),
                 "value": report.get("value", 0),
-                "trace": [{**call, "sources": source_edges(call["sources"])} for call in report.get("trace", [])]}
+                "trace": [{**call, "sources": source_edges(call["sources"])} for call in report.get("trace", [])],
+                **WORKFLOW_NATIVE_DEFAULTS}
 
     def command(self, op):
         def invoke(role, *args):
             path = self.directory / role
             before = self.inventory(path)
-            argv = [RECEIPT.sub(lambda match: self.receipts[match[1]], arg) for arg in args]
+            argv = [self.native.cli_operand(RECEIPT.sub(lambda match: self.receipts[match[1]], arg)) for arg in args]
             wrapper = ["-c", READ_ONLY] if op == "inspect" else []
             process = subprocess.run([sys.executable, "-B", *wrapper, self.script, op, path, *argv],
                                      cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30)
@@ -377,8 +385,11 @@ class Processes:
         self.script = script
         self.scanner = scanner
 
+    @contextmanager
     def history(self, directory):
-        return nullcontext(History(directory, self.script, self.scanner))
+        history = History(directory, self.script, self.scanner)
+        with history.native:
+            yield history
 
 
 def main():
@@ -395,7 +406,9 @@ def main():
         observations = [replay_history(suite, directory / f"history-{i}", story)
                         for i, story in enumerate(histories)]
         defaults = History.evidence("", (), Inventory({}), Inventory({}))
-        state = evaluate(quint, args.rules, directory, observations, [args.histories], attempt_defaults=defaults)
+        imports = [args.histories, *(args.histories.with_name(name) for name in (
+            "workflow_native_fixture.qnt", "recorded_calls_fixtures.qnt"))]
+        state = evaluate(quint, args.rules, directory, observations, imports, attempt_defaults=defaults)
         check_verdicts(histories, observations, state)
 
 

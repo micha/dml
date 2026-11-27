@@ -1,5 +1,6 @@
 module composition_rules {
   import composition_histories.* from "./composition_histories"
+  import workflow_native_fixture as n from "./workflow_native_fixture"
 
   type Ref = { name: str, before: str, after: str }
   type Native = { id: str, role: str, dag: str, parents: List[str], pin: str, inputs: str }
@@ -11,7 +12,8 @@ module composition_rules {
   type Attempt = { op: str, args: List[str], code: int, error: str, commit: str, unchanged: bool,
     preserved: bool, transfer: bool, refs: List[Ref], main: str, counts: List[int], profiles: List[str],
     created: List[Native], requested: Q, producing: Q, trace: List[Getter], outcome: str, selection: str,
-    attempt: str, result: str, outer: str, value: int }
+    attempt: str, result: str, outer: str, value: int,
+    nativeStatus: str, nativeValue: str, nativeCount: int, nativeItems: List[str] }
   type Observation = { attempts: List[Attempt] }
 
   pure val addFunc = "urn:example:node-add"
@@ -250,16 +252,57 @@ module composition_rules {
     else "ok"
   }
 
+  pure def namedKeyVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val expected = namedKeyStory[i]
+    pure def output(op: str, alias: str): Attempt = rows[n::outputIndex(namedKeyStory, op, alias)]
+    pure def value(op: str, alias: str): str = output(op, alias).nativeValue
+    if (a.op != expected.op or a.args != expected.args) "wrong_step"
+    else if (i < 5) verdict(rows, i, false)
+    else if (a.op == "native") {
+      if (a.nativeStatus == "ok") "ok" else "wrong_native_status"
+    } else if (i == namedKeyReject) {
+      val old = rows[4]
+      val fixture = value("txn_ref_get", "original-attempt") == old.attempt
+        and value("txn_ref_get", "stored-attempt") == value("txn_put_object", "new-attempt")
+        and value("txn_ref_get", "stored-attempt") != old.attempt
+        and value("object_view_entry", "actual-attempt-dag") == value("object_view_entry", "old-attempt-dag")
+        and output("object_decode", "actual-attempt-commit").nativeCount == 2
+        and output("object_decode", "actual-return-commit").nativeCount == 1
+        and value("object_view_parent", "stored-owner") == old.producing.request
+        and value("object_view_parent", "stored-result-owner") == old.producing.request
+        and value("object_view_parent", "stored-result") == value("txn_put_object", "new-result")
+        and value("object_view_parent", "stored-result") != old.result
+        and value("object_view_entry", "actual-return-dag") == value("txn_put_object", "new-return")
+        and output("datum_decode", "sum-bytes").nativeCount == 3 and value("datum_decode", "sum-bytes") == "2a00000000000000"
+        and value("object_decode", "stored-call") != old.trace[0].operation
+        and value("object_decode", "stored-key") != sourceDag(old.trace[0].sources, "key")
+        and value("txn_lookup_node", "stored-key-value-node") == value("txn_lookup_node", "key-value")
+        and value("txn_lookup_node", "stored-named-value") == value("txn_lookup_node", "key-value")
+        and value("txn_lookup_node", "stored-key-role-node") == value("txn_put_object", "source-role")
+        and output("datum_decode", "key-role-bytes").nativeCount == 6
+        and value("datum_decode", "key-role-bytes") == "6275696c74696e2d6c69746572616c2d736f757263652d7631"
+        and output("datum_decode", "key-bytes").nativeCount == 6 and value("datum_decode", "key-bytes") == "61"
+      if (not(fixture)) "wrong_named_key_fixture" else rejection(a,
+        "compose: getter trace does not match the exact request inputs and keys", a.main == old.result)
+    } else if (a.code == 0 and a.error == "" and a.preserved and not(a.unchanged)
+        and crow(a, rows[4].attempt, "from-forged") and a.main == rows[4].result) "ok"
+    else "wrong_valid_composition"
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val attemptCount = row.attempts.length()
     val overflow = attemptCount == overflowStory.length()
-    if (attemptCount != story.length() and not(overflow)) List("missing_steps")
+    if (attemptCount == namedKeyStory.length())
+      range(0, attemptCount).foldl(List(), (out, i) => out.append(namedKeyVerdict(row.attempts, i)))
+    else if (attemptCount != story.length() and not(overflow)) List("missing_steps")
     else range(0, attemptCount).foldl(List(), (out, i) => out.append(verdict(row.attempts, i, overflow)))
   }
   pure def verdictAccepted(value: str): bool = value == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 2 and verdicts.length() == 2
+    evidence.length() == 3 and verdicts.length() == 3
       and verdicts[0].length() == story.length() and verdicts[1].length() == overflowStory.length()
+      and verdicts[2].length() == namedKeyStory.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (pass, value) => pass and verdictAccepted(value)))
       and evidence[0].attempts[19].outcome == "reuse" and evidence[0].attempts[25].outcome == "reuse"
       and evidence[0].attempts[35].outcome == "pending" and evidence[0].attempts[45].unchanged
@@ -270,7 +313,7 @@ module composition_rules {
   pure val old: Attempt = { op: "inspect", args: List(), code: 0, error: "", commit: "old-t", unchanged: true,
     preserved: true, transfer: false, refs: List(), main: "", counts: List(), profiles: List(), created: List(),
     requested: noQ, producing: q, trace: List(), outcome: "", selection: "", attempt: "old-t",
-    result: "old-r", outer: "old-outer", value: 84 }
+    result: "old-r", outer: "old-outer", value: 84, nativeStatus: "", nativeValue: "", nativeCount: 0, nativeItems: List() }
   pure val requested = { ...q, request: "new-q", composition: "new-c", upstream: { ...q.upstream, attempt: "new-add" } }
   pure val reused = { ...old, commit: "new-d", requested: requested, outcome: "reuse", selection: old.attempt }
   pure val controlsPass = replicaRead(reused, reused)
