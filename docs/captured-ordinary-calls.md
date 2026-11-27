@@ -7,7 +7,8 @@ This page describes the checkout-only
 It uses [the installed built-in node profiles](internal-builtins.md) and
 [public Python storage operations](spec-next/python.md). Its ordinary call
 profiles are examples, not native types, an installed dispatcher, or a worker
-protocol.
+protocol. This page describes the default exact-environment profile. For the
+opt-in intent-keyed profile, see [implementation-bound calls](implementation-bound-calls.md).
 
 ## The callable supplies the control flow
 

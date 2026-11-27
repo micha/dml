@@ -84,9 +84,9 @@ python -c 'from daggerml import core; print(core.TXN_READ)'
 ```
 
 The wheel targets the CPython ABI and platform used to build it. It includes
-[`daggerml.builtin`](docs/internal-builtins.md), a fixed versioned node-call
-module. It contains no CLI, C development files, or historical `daggerml`
-application modules. The
+[fixed versioned built-ins](docs/internal-builtins.md) and
+[implementation-bound call scopes](docs/implementation-bound-calls.md). It contains
+no CLI, C development files, or historical `daggerml` application modules. The
 standalone C build does not require Python headers; pass `-Dpython_bindings=true`
 to also build and install the binding with Meson. See the
 [Python contract](docs/spec-next/python.md) for supported operations and an example.

@@ -16,6 +16,7 @@ and the [historical draft](../spec/overview.md) do not define implemented behavi
 | Binary commit bundle, export, and atomic import | [Commit transfer](transfer.md) |
 | Public CPython binding arguments, results, errors, and handle lifetime | [Python core binding](python.md) |
 | Installed fixed built-ins, value nodes, and recorded call profiles | [Internal built-ins](../internal-builtins.md) |
+| Installed implementation closures and synchronous node-call scopes | [Implementation-bound calls](../implementation-bound-calls.md) |
 | Working vocabulary | [Glossary](glossary.md) |
 | Documentation conventions | [Writing guidelines](../documentation-guidelines.md) and [agent guide](AGENTS.md) |
 
@@ -32,9 +33,9 @@ either unpinned or with a new [local staging ref](transfer.md#atomic-staging).
 The [public headers](../../include/dml/) define the API, and the
 [entity diagram](../lmdb-entity-diagram.html) shows the implemented storage layout.
 The [Python core binding](python.md) exposes a subset of the local C operations
-through an optional CPython package. The package also records [fixed versioned
-built-ins](../internal-builtins.md) using ordinary DAGs; this does not add native
-node types or a general evaluator.
+through an optional CPython package. The package records [fixed versioned
+built-ins](../internal-builtins.md) and [implementation closures](../implementation-bound-calls.md)
+using ordinary DAGs; this does not add native node types or a general evaluator.
 
 The [feasibility checkpoint](https://github.com/micha/dml/tree/feasibility-complete)
 contains the earlier application layers and validation evidence. It does not extend
