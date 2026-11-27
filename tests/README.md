@@ -133,22 +133,24 @@ python3 -B tests/run_provenance_handoff.py "$(command -v quint)" \
 
 The [Python example](../README.md#record-two-composed-calls-in-python) uses the
 public binding. The [workflow runner](run_recorded_calls.py) launches separate
-record and inspect processes and observes the JSON report and committed LMDB
-bytes. Quint supplies the [input histories](recorded_calls_histories.qnt) and
-[judges the report](recorded_calls_rules.qnt). For split recording, the runner
-passes the exact commit ID printed by an earlier sum process, not the current
-pin target. Two sums in the same repository share a result node. Quint checks
-that each scale report refers to its selected producer commit and reports the
-same producer DAG seen in an independent inspection of that sum. Stale and
-missing pins, overflow, and a duplicate result ref must leave `data.mdb`
-unchanged.
+record and inspect processes and observes their reports, diagnostics, repository
+presence, and changes to `data.mdb`. The [Quint histories](recorded_calls_histories.qnt)
+also request individual native reads on the same repositories. The
+[rules](recorded_calls_rules.qnt) compare the CLI reports to those independent
+reads, including the commit parents, tree entries, and producer DAG edges.
 
-The [focused tests](test_recorded_calls.py) independently read both physical
-links with the public binding. They also check that inspection rejects an
-inconsistent parent and input DAG, works after the producer pins are moved or
-released, and does not recompute results. An intentionally incorrect stored sum
-checks that composition consumes the stored value. Both the workflow and
-focused tests run in the opt-in Meson gate.
+For split recording, the runner passes the exact commit ID printed by the sum
+process, not the current pin target. Quint checks that two equal-valued sums
+remain distinct producers and that read-only reports stay the same after their
+pins move or are deleted. For failed writes, Quint distinguishes stale and
+missing pins, occupied refs, overflow, and out-of-range input. It checks file
+preservation where applicable and uses native reads to verify that candidate
+values and refs were not left behind.
+
+The remaining [focused tests](test_recorded_calls.py) include forged parent and
+input DAG combinations and deliberately non-arithmetic stored values, which
+check that composition and inspection use the stored results. Both the workflow
+and focused tests run in the opt-in Meson gate.
 
 The [one-way bundle handoff](../README.md#compose-from-a-producer-in-another-repository)
 exercises the same caller on a second repository through the public binding.

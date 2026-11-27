@@ -8,6 +8,7 @@ module recorded_calls_histories {
     { a: ("7", 7), b: ("5", 5), factor: ("3", 3) },
     { a: ("-2", -2), b: ("14", 14), factor: ("-2", -2) }
   )
+  pure def coreRequest(op: str, args: List[str]): Request = { op: op, args: args }
   pure def source(op: str, args: List[str]): Request = { op: op, args: List("source").concat(args) }
   pure def worker(op: str, args: List[str]): Request = { op: op, args: List("worker").concat(args) }
   pure def requests(s: Scenario): List[Request] = List(
@@ -30,6 +31,64 @@ module recorded_calls_histories {
     source("record_scale", List("decoy", "decoy", "decoy-result", "3")),
     source("inspect", List("result")),
     source("inspect", List("decoy-result"))
+  )
+
+  // Native steps use the same source repository as the CLI, but no native
+  // handle stays open across a CLI invocation.
+  pure val rejectionOpen = coreRequest("repo_open", List("source", "existing"))
+  pure val rejectionClose = coreRequest("repo_close", List("source"))
+  pure def rejectionRead(queries: List[Request]): List[Request] = List(
+    rejectionOpen, coreRequest("txn_begin", List("source", "read", "read"))
+  ).concat(queries).concat(List(coreRequest("txn_abort", List("read")), rejectionClose))
+  pure def rejectionRef(ref: str): Request = coreRequest("txn_ref_get", List("read", ref, ref))
+  pure val rejectionDatum = coreRequest("txn_get_datum", List("read", "candidate", "stored"))
+  pure def rejectionProbe(value: str): List[Request] = List(
+    rejectionOpen,
+    coreRequest("datum_encode", List("i64", value, "packed")),
+    coreRequest("txn_begin", List("source", "write", "probe")),
+    coreRequest("txn_put_datum", List("probe", "packed", "candidate")),
+    coreRequest("txn_abort", List("probe")),
+    rejectionClose
+  )
+
+  pure val rejectionPins = rejectionRead(List(
+    rejectionRef("producer"), rejectionRef("decoy"), rejectionRef("missing"), rejectionRef("main")
+  ))
+  pure val pinRejectionRequests: List[Request] = List(
+    source("record_sum", List("producer", "7", "5")),
+    source("record_sum", List("decoy", "9", "3"))
+  ).concat(rejectionPins).concat(List(
+    source("record_scale", List("decoy", "producer", "main", "3")),
+    source("record_scale", List("missing", "producer", "main", "3"))
+  )).concat(rejectionPins)
+
+  pure val writeRejectionCases = List(
+    (source("record_sum", List("producer", "43", "77")), "43"),
+    (source("record_scale", List("producer", "producer", "producer", "41")), "41"),
+    (source("record_scale", List("producer", "producer", "main", "17")), "17"),
+    (source("record_scale", List("producer", "producer", "overflow", "4611686018427387904")), "4611686018427387904")
+  )
+  pure val writeRejectionReads = rejectionRead(List(
+    rejectionRef("producer"), rejectionRef("main"), rejectionRef("overflow"), rejectionDatum
+  ))
+  pure val writeRejectionRequests: List[Request] = writeRejectionCases.foldl(List(
+    source("record_sum", List("producer", "7", "5")),
+    source("record_scale", List("producer", "producer", "main", "3"))
+  ), (out, c) => out.concat(rejectionProbe(c._2)).append(c._1).concat(writeRejectionReads))
+
+  pure val rangeRejectionRequests = List(source("record", List("9223372036854775808", "0", "1")))
+  pure val overflowReads = rejectionRead(List(rejectionRef("main"), rejectionDatum))
+  pure def overflowRequests(a: str, b: str, factor: str, candidate: str): List[Request] =
+    List(source("record", List(a, b, factor))).concat(rejectionProbe(candidate)).concat(overflowReads)
+  pure val mainReads = rejectionRead(List(rejectionRef("main")))
+  pure val repeatRejectionRequests = List(source("record", List("2", "3", "6")))
+    .concat(mainReads).append(source("record", List("13", "17", "41"))).concat(mainReads)
+
+  pure val rejectionRequests: List[List[Request]] = List(
+    pinRejectionRequests, writeRejectionRequests, rangeRejectionRequests,
+    overflowRequests("9223372036854775807", "1", "1", "9223372036854775807"),
+    overflowRequests("-9223372036854775807", "-1", "-1", "-9223372036854775808"),
+    repeatRejectionRequests
   )
 
   // Expected IDs in export, scale and release refer only to the original
@@ -772,11 +831,99 @@ module recorded_calls_histories {
     .concat(intentTableSetup).concat(intentTableDecoy).concat(intentTableNegative).concat(intentTableReplacement)
     .concat(intentTableFlow).concat(intentTableOffline)
 
+  // One CoreHistory primitive per native step; its aliases carry IDs returned
+  // by the native reads, rather than trusting IDs in the CLI JSON.
+  pure def openNative(mode: str): List[Request] = List(
+    coreRequest("repo_open", List("source", "existing")),
+    coreRequest("txn_begin", List("source", mode, "snapshot"))
+  )
+  pure def closeNative(end: str): List[Request] = List(
+    coreRequest(end, List("snapshot")), coreRequest("repo_close", List("source"))
+  )
+  pure def refRead(ref: str, id: str): Request = coreRequest("txn_ref_get", List("snapshot", ref, id))
+  pure def viewObject(kind: str, id: str, view: str): List[Request] = List(
+    coreRequest("txn_get_object", List("snapshot", kind, id, view)),
+    coreRequest("object_decode", List(view, view))
+  )
+  type SnapshotPath = { ref: str, commitView: str, treeView: str, dag: str, parent: str }
+  pure val mainPath: SnapshotPath = { ref: "main", commitView: "main-commit", treeView: "main-tree",
+    dag: "main-dag", parent: "main-parent" }
+  pure val alternatePath: SnapshotPath = { ref: "alternate", commitView: "alternate-commit", treeView: "alternate-tree",
+    dag: "alternate-dag", parent: "alternate-parent" }
+  pure val producerPath: SnapshotPath = { ref: "producer", commitView: "producer-commit", treeView: "producer-tree",
+    dag: "producer-dag", parent: "" }
+  pure val decoyPath: SnapshotPath = { ref: "decoy", commitView: "decoy-commit", treeView: "decoy-tree",
+    dag: "decoy-dag", parent: "" }
+  pure def viewSnapshot(path: SnapshotPath, hasParent: bool): List[Request] =
+    List(refRead(path.ref, path.ref)).concat(viewObject("commit", path.ref, path.commitView))
+      .concat(viewObject("tree", path.commitView, path.treeView))
+      .append(coreRequest("object_view_entry", List(path.treeView, "0", path.dag)))
+      .concat(if (hasParent) List(coreRequest("object_view_parent", List(path.commitView, "0", path.parent))) else List())
+  pure def lookupNode(dag: str, binding: str, node: str): Request =
+    coreRequest("txn_lookup_node", List("snapshot", dag, binding, node))
+  pure def encodeNode(kind: str, target: str): Request =
+    coreRequest("object_encode", List("node", kind, target, "encoded-node"))
+  pure def viewSubdag(dag: str, input: str, producer: str): List[Request] =
+    List(lookupNode(dag, "input", input)).concat(viewObject("node", input, producer))
+      .append(encodeNode("subdag", producer))
+  pure def viewLiteral(node: str, target: str): List[Request] =
+    viewObject("node", node, target).append(encodeNode("literal", target))
+      .append(coreRequest("txn_get_datum", List("snapshot", target, target)))
+      .append(coreRequest("datum_decode", List(target)))
+
+  pure val physicalRecord: Scenario = { a: ("-23", -23), b: ("16", 16), factor: ("-3", -3) }
+  // Decoded datum kind and payload (signed I64 little-endian or UTF-8).
+  type StoredLiteral = { node: str, target: str, kind: int, payload: str }
+  pure val combinedLiterals: List[StoredLiteral] = List(
+    { node: "sum-implementation", target: "sum-version", kind: 6, payload: "6578616d706c652e73756d4031" },
+    { node: "scale-implementation", target: "scale-version", kind: 6, payload: "6578616d706c652e7363616c654031" },
+    { node: "sum-a", target: "a-value", kind: 3, payload: "e9ffffffffffffff" },
+    { node: "sum-b", target: "b-value", kind: 3, payload: "1000000000000000" },
+    { node: "scale-factor", target: "factor-value", kind: 3, payload: "fdffffffffffffff" },
+    { node: "sum-root", target: "sum-value", kind: 3, payload: "f9ffffffffffffff" },
+    { node: "scale-root", target: "scale-value", kind: 3, payload: "1500000000000000" }
+  )
+  pure val combinedGraphRequests = List(requests(physicalRecord)[0]).concat(openNative("read"))
+    .concat(viewSnapshot(mainPath, false)).concat(viewObject("dag", "main-dag", "scale-root"))
+    .concat(viewSubdag("main-dag", "scale-input", "sum-dag")).concat(viewObject("dag", "sum-dag", "sum-root"))
+    .concat(List(lookupNode("sum-dag", "implementation", "sum-implementation"),
+      lookupNode("main-dag", "implementation", "scale-implementation"), lookupNode("sum-dag", "a", "sum-a"),
+      lookupNode("sum-dag", "b", "sum-b"), lookupNode("main-dag", "factor", "scale-factor")))
+    .concat(combinedLiterals.foldl(List(), (out, fixture) => out.concat(viewLiteral(fixture.node, fixture.target))))
+    .concat(closeNative("txn_abort")).append(requests(physicalRecord)[1])
+
+  pure val splitGraphSetup = List(
+    source("record_sum", List("producer", "7", "5")), source("record_sum", List("decoy", "9", "3")),
+    source("record_scale", List("producer", "producer", "main", "3")),
+    source("record_scale", List("decoy", "decoy", "alternate", "3")), source("inspect", List("producer"))
+  ).concat(openNative("read")).concat(viewSnapshot(producerPath, false)).concat(viewSnapshot(decoyPath, false))
+    .concat(viewSnapshot(mainPath, true)).concat(viewSnapshot(alternatePath, true))
+    .concat(viewObject("dag", "producer-dag", "producer-root")).concat(viewObject("dag", "decoy-dag", "decoy-root"))
+    .concat(viewLiteral("producer-root", "producer-value"))
+    .concat(viewSubdag("main-dag", "main-input", "main-source-dag"))
+    .concat(viewSubdag("alternate-dag", "alternate-input", "alternate-source-dag"))
+    .concat(closeNative("txn_abort"))
+  pure val splitGraphReads = List(source("inspect", List()), source("inspect", List("alternate")))
+  pure val moveProducer = openNative("write").append(
+    coreRequest("txn_ref_update", List("snapshot", "producer", "decoy")))
+    .concat(closeNative("txn_commit")).concat(openNative("read"))
+    .append(refRead("producer", "moved-producer")).concat(closeNative("txn_abort"))
+  pure val releaseProducers = openNative("write").concat(List(
+    coreRequest("txn_ref_delete_expected", List("snapshot", "producer", "decoy")),
+    coreRequest("txn_ref_delete_expected", List("snapshot", "decoy", "decoy"))
+  )).concat(closeNative("txn_commit")).concat(openNative("read"))
+    .concat(List(refRead("producer", "released-producer"), refRead("decoy", "released-decoy")))
+    .concat(closeNative("txn_abort"))
+  pure val splitGraphRequests = splitGraphSetup.concat(splitGraphReads).concat(moveProducer)
+    .concat(splitGraphReads).concat(releaseProducers).concat(splitGraphReads)
+  pure val physicalRequests = List(combinedGraphRequests, splitGraphRequests)
+
   var histories: List[List[Request]]
   action init = histories' = scenarios.foldl(List(), (out, s) => out.append(requests(s)))
     .append(splitRequests).append(handoffRequests).append(returnRequests).append(durableRequests).append(retryRequests)
     .append(abandonRequests).append(reuseRequests).append(reusePublicationRequests).append(versionRequests)
     .append(selectionRequests).append(attemptRequests).append(adoptionRequests).append(policyRequests)
     .append(implementationIntentRequests).append(supersessionRequests).append(multiInputRequests).append(intentTableRequests)
+    .concat(physicalRequests).concat(rejectionRequests)
   action step = histories' = histories
 }
