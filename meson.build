@@ -207,14 +207,27 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
+  recorded_calls_modules = files('tests/recorded_calls_fixtures.qnt', 'tests/recorded_calls_stored_histories.qnt',
+                                 'tests/recorded_calls_outbound_histories.qnt')
   test(
     'recorded-calls', python,
     args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
-           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_verdicts.qnt',
-                 'tests/recorded_calls_rules.qnt', 'tests/recorded_calls_fixtures.qnt',
-                 'tests/recorded_calls_stored_histories.qnt', 'tests/recorded_calls_outbound_histories.qnt',
-                 'tests/recorded_calls_plan_histories.qnt', 'tests/recorded_calls_plan_rules.qnt',
-                 'tests/recorded_calls_receipt_histories.qnt', 'tests/recorded_calls_receipt_rules.qnt')] + quint_args,
+           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_rules.qnt')]
+          + recorded_calls_modules + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+
+  # Keep the durable plan/receipt verdict input separate to bound replay time.
+  test(
+    'recorded-calls-durable', python,
+    args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
+           files('examples/recorded_calls.py', 'tests/recorded_calls_durable_histories.qnt',
+                 'tests/recorded_calls_durable_rules.qnt', 'tests/recorded_calls_histories.qnt',
+                 'tests/recorded_calls_rules.qnt', 'tests/recorded_calls_plan_histories.qnt',
+                 'tests/recorded_calls_plan_rules.qnt', 'tests/recorded_calls_receipt_histories.qnt',
+                 'tests/recorded_calls_receipt_rules.qnt')] + recorded_calls_modules + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
