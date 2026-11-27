@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–4 and packet 5's adoption slice are complete**; see the [evidence below](#packet-1-evidence), including [adoption and deep-chain replay](#packet-5-adoption-evidence). Resume at **packet 5, policy and intent decisions**: baseline `tests/test_recorded_calls.py:1345–1545`. Tackle supersession separately. Read only the relevant methods, histories, rules, and interpreter commands; leave typed pre-open cases (including `:1324`) for packet 10.
+- **Packets 1–4 and packet 5's adoption and policy/intent slices are complete**; see the [evidence below](#packet-1-evidence), including [policy and intent replay](#packet-5-policy-and-intent-evidence). Resume at **packet 5, supersession and knowledge**: baseline `tests/test_recorded_calls.py:1591`, `:1646`, and `:1707`. Read only the relevant methods, histories, rules, and interpreter commands; leave typed pre-open cases (including `:1324`) for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–4 and packet 5's adoption slice closed 41 whole methods (7, 10, 11, 10, and 3 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1766`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–4 and packet 5's first two slices closed 45 whole methods (7, 10, 11, 10, 3, and 4 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1766`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -362,6 +362,34 @@ parents failed 1:53 (`wrong_adoption_graph`). Skipping the historical-name
 check on non-head links failed the malformed history at step 501
 (`wrong_rejection`). Imposing a 1,000-link limit failed the deep history at
 step 2110 (`wrong_inspect`).
+
+## Packet 5 policy and intent evidence
+
+The [policy](../tests/recorded_calls_policy_histories.qnt) and
+[intent](../tests/recorded_calls_intent_histories.qnt) suites use the shared
+runner. Native IDs reach the real CLI as explicit expected commits; native
+reads check persisted graphs independently of the reports. Each suite passed
+two live histories with coverage and rule controls. Four superseded Python
+methods and three unused helper methods were removed. The final local
+`scripts/check.sh --quint` gate passed all 34 suites in the Nix shell on
+aarch64 Linux with Quint 0.33.1. Step numbers are one-based within each suite.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:1345` wrong request and late collision | `reuseSteps` (policy 1): refs 25–33 and 40–48, rejects 36–37 | `existingRejectionVerdict` distinguished incompatible selection from occupied output with unchanged bytes. Native refs confirmed the distinct prior `main`, original plan and other pins stayed exact; neither unused output appeared. |
+| `:1345` captured main and distinct decisions | policy 1: valid reuse 51, native 54–104, inspect 107; repeats 108–109, native 112–204, inspect 207–208 | `reuseInspection` matched the ordered plan/policy/selection and request/prior-main parents, UUID-rooted decision DAG, and exact result-only report. Native `main` moved to the selected result. The two later decisions retained equal intent and reports except for distinct commit and UUID. |
+| `:1403` stored policy and decision validation | `readerSteps` (policy 2): native 304–707, rejects 710–722, valid read and define 736–737 | `graph` matched the actual layouts of the genuine and forged records. Exact diagnostics distinguished wrong policy parent/default, decision parents/selection/root/UUID/override/reason/fields/aliases, and malformed-basis rejection on define and request with no writes. |
+| `:1403` bypass malformed slot only on fresh | policy 2: default reject 723, refs 726–733, fresh 738, native 741–787, inspect 790 | Explicit fresh used the same malformed selection operand that default reuse rejected. `readerInspection` checked the plan and the fresh report with no selection or attempt fields. |
+| `:1470` intent versions and stored decisions | `lineage` (intent 1): valid definitions and miss 19–21, native 22–67 and 393–933, rejects 934–946, valid reports 947–948, refs 949–964 | `missLayout` matched the exact v2 request and ordered plan/definition edges; `shapeMatches` checked ancestry and each persisted defect. Exact diagnoses distinguished changed defaults/slots, aliased slots, unsupported implementation, wrong ancestor, wrong decision implementation/override/reason/slot/plan name and foreign selection. Inspect, child define and request rejections left bytes unchanged. |
+| `:1545` fresh routes, late rollback, explicit reuse | `routing` (intent 2): rejects 39–40 and refs 41–53; write/read pairs 54–57 and 64–65; native 58–63 and 66–87 | Reuse rejected a non-selection pinned in the v2 slot; the late occupied decision left no new plan or `main`. `decisionRead` required the two fresh reasons and absent selection keys. An explicit v1 reuse overrode execute-by-default, reported the exact request, attempt and result, and native `main` named that result without a pending plan. |
+
+Isolated live controls failed as intended: a constant decision UUID failed
+policy 1:208 (`wrong_decision_identity`); skipped reason validation failed
+policy 2:718 (`wrong_rejection`); a partial commit with the same occupied-ref
+diagnostic failed policy 1:37 (`storage_changed`). Accepting changed intent
+fields failed intent 1:934 (`wrong_rejection`); adding an empty selection field
+to a fresh report failed intent 2:55 (`wrong_selection_fields`); skipping the
+reuse update of `main` failed intent 2:68 (`wrong_native_status`).
 
 ## Removal dependencies and finish line
 
