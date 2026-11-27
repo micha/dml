@@ -225,27 +225,32 @@ The [recorded reuse publication history](../README.md#publish-reuse-with-a-durab
 publishes the same result ID first from a freshly staged bundle, then by explicit
 reuse. Only the reuse path leaves an inspectable record. Replay also checks
 that stale `main` and abandoned plans cannot leave a record, that the result pin
-survives, and that `main` still reports the original graph. Focused tests inspect
-the record's parent edges and check retention after collection and rollback on
-an occupied reuse ref.
+survives, and that `main` still reports the original graph. The separate
+[`recorded-calls-reuse` entry](recorded_calls_reuse_histories.qnt) stages and
+publishes a stored result whose execution would overflow. It checks the exact
+`main` move and stored proof graph, sweeps an unpinned alternate, and verifies
+rollback even when the occupied ref holds the proof the caller would create.
 
 The [version selection history](../README.md#select-a-scale-implementation-version)
 checks that the default and explicit `@1` plans have the same ID, then runs `@1`
 and `@2` through separate worker commands. The recorded calls share arguments
 and an output node, not request, call, or result IDs. Replay checks rejection
 without writes for an unsupported version and for cross-version publication
-and reuse, then publishes and reuses the matching `@2` result. The focused
-checks reject an imported request for an unsupported version and a result
-with the exact request parent but the wrong recorded implementation.
+and reuse, then publishes and reuses the matching `@2` result. The durable
+entry rejects execution of an imported future request. The reuse entry
+exercises the exact request parent with a wrong implementation in the body.
 
 The [durable selection history](../README.md#save-a-result-selection-before-publication)
 checks that selection works with stale `main`, and that publication through a
 new plan still uses the original result after its pin disappears and collection
 runs. It distinguishes two selection IDs for the same request and result,
 rejects cross-version reuse and occupied outputs without writes, and inspects
-both the selection and the completed reuse record. Focused tests check raw
-malformed records, cross-repository transfer, and which parents survive
-collection.
+both the selection and the completed reuse record. The
+[`recorded-calls-selection` entry](recorded_calls_selection_histories.qnt)
+transfers a choice without its private plan or prior tip, publishes without
+the old result pin, and checks which exact commits the proof keeps after
+collection. It also runs select, inspect, and publish against malformed
+persisted records with a valid counterpart.
 
 The [execution attempt history](../README.md#distinguish-two-executions-of-the-same-request)
 executes the same saved `@2` request twice in separate worker processes and
@@ -253,9 +258,11 @@ transfers the two distinct attempt commits. Both retain the same result ID
 printed by `work-scale`. The runner uses exact native ref deletions as fixture
 steps to simulate another writer. Quint checks rejection without writes after
 the attempt or selection pin is replaced by a same-result occurrence and checks
-publication from the surviving choice after collection. Focused tests check
-ordered parents, malformed nested records and UUIDs, and reachability with the
-reuse ref as the sole root.
+publication from the surviving choice after collection. The selection entry
+checks that reusing the same UUID produces the same attempt, reads the ordered
+native parents and literal fields, distinguishes malformed nested records and
+UUIDs, and checks reachability with the proof as the sole root. The focused
+Python boundary tests keep values the CLI cannot pass directly.
 
 The [versioned attempt selection history](../README.md#record-a-new-version-of-an-attempt-selection)
 executes new attempts after the initial choice, adopts independently on two

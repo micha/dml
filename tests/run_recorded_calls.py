@@ -328,9 +328,9 @@ class ProcessHistory:
         return {**row, "expectedCommit": request}
 
     def work_scale_attempt(self, role, pin, request_receipt, attempt_ref, occurrence_id):
-        request = self.request_receipts[request_receipt]
+        request = self.receipt_id(request_receipt, self.request_receipts)
         args = (role, pin, request_receipt, attempt_ref, occurrence_id)
-        row = self.write("work_scale_attempt", args, operands=(pin, request, attempt_ref, occurrence_id))
+        row = self.write("work_scale_attempt", args, operands=("--", pin, request, attempt_ref, occurrence_id))
         if row["commit"]:
             self.attempt_receipts[attempt_ref] = row["commit"]
         return {**row, "expectedCommit": request}
@@ -343,8 +343,8 @@ class ProcessHistory:
         return {**row, "expectedCommit": commit}
 
     def select_scale_attempt(self, role, plan_pin, plan_receipt, attempt_pin, attempt_receipt, selection_ref, alias=None):
-        plan = self.plan_receipts[plan_receipt]
-        attempt = self.attempt_receipts[attempt_receipt]
+        plan = self.receipt_id(plan_receipt, self.plan_receipts)
+        attempt = self.receipt_id(attempt_receipt, self.attempt_receipts)
         args = (role, plan_pin, plan_receipt, attempt_pin, attempt_receipt, selection_ref)
         if alias is not None:
             args += (alias,)
@@ -554,9 +554,9 @@ class ProcessHistory:
         return {**row, "expectedCommit": expected}
 
     def select_reuse(self, op, role, plan_pin, plan_receipt, result_pin, result_receipt, output):
-        plan = self.plan_receipts[plan_receipt]
-        # The original worker result, never the local staging receipt.
-        result = self.scale_receipts["worker", result_receipt]
+        plan = self.receipt_id(plan_receipt, self.plan_receipts)
+        # Use the original worker receipt or a native ID, never re-resolve the pin.
+        result = self.receipt_id(result_receipt, self.scale_receipts, "worker")
         row = self.write(op, (role, plan_pin, plan_receipt, result_pin, result_receipt, output),
                          operands=(plan_pin, plan, result_pin, result, output))
         return {**row, "expectedCommit": plan, "expectedResult": result}
@@ -575,8 +575,8 @@ class ProcessHistory:
         return row
 
     def publish_selected_scale(self, role, plan_pin, plan_receipt, selection_ref, selection_receipt, reuse_ref):
-        plan = self.plan_receipts[plan_receipt]
-        selection = self.selection_receipts[selection_receipt]
+        plan = self.receipt_id(plan_receipt, self.plan_receipts)
+        selection = self.receipt_id(selection_receipt, self.selection_receipts)
         args = (role, plan_pin, plan_receipt, selection_ref, selection_receipt, reuse_ref)
         row = self.write("publish_selected_scale", args,
                          operands=(plan_pin, plan, selection_ref, selection, reuse_ref))
