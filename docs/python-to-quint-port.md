@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–5 and the implementation-scoped slice of packet 6 are complete for CLI-representable cases**; see the [evidence below](#packet-1-evidence), including [implementation-scoped reuse tables](#packet-6-implementation-scoped-table-evidence). Resume at **packet 6, intent-scoped reuse tables**: baseline `tests/test_recorded_calls.py:2418`, `:2455`, `:2482`, `:2508`, and `:2547`. Leave typed cases, including the short raw knowledge ID from `:1646`, for packet 10.
+- **Packets 1–6 are complete for CLI-representable cases**; see the [evidence below](#packet-1-evidence), including [intent-scoped reuse tables](#packet-6-intent-scoped-table-evidence). Resume at **packet 7, argument-map, composition, and closure records**. Leave typed cases, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`, for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–5 closed 47 whole methods (7, 10, 11, 10, and 9 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The implementation-scoped slice of packet 6 closed six more methods.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–6 closed 58 whole methods (7, 10, 11, 10, 9, and 11 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -449,6 +449,36 @@ Ignoring intent genesis failed scope 1:29,
 consulting a stale table on execute-by-default failed scope 2:22
 (`decision_not_written`), and consulting a live pin instead of the stored
 table parent failed scope 3:50.
+
+## Packet 6 intent-scoped table evidence
+
+The [edit](../tests/recorded_calls_intent_table_edit_histories.qnt) and
+[route](../tests/recorded_calls_intent_table_route_histories.qnt) entries use
+existing shared CLI and native replay commands. Quint constructs and reads back
+the malformed commits, compares exact table rows in order, and checks discarded
+writes. All five live histories passed with coverage and rule controls. The
+final local `scripts/check.sh --quint` gate passed all 40 suites in the Nix
+shell on aarch64 Linux with Quint 0.33.1. Five superseded Python methods and
+their unused helpers were removed. Step numbers are one-based within each
+entry.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:2418` malformed edits and buried invalid key | `malformed` (edit 1): native 51–337, inspect/route rejects 338–347, absent refs 350–352, valid chain and hit 355–364 | `deltaMatches` verified exact stored fields, root, and ordered edges for the mismatched insertion hidden by a removal, extra and missing parents, wrong factor kind, and implementation-table basis. `guardedRejection` matched distinct diagnoses in inspect and request with unchanged bytes. A valid insert/remove chain inspected and routed to the original attempt's exact result. |
+| `:2455` remove and refill at capacity | `capacity` (edit 2): full report 330, reject 331, absent output 334, remove/refill/read 338–342 | `exactTable` matched 16 mixed-version keys in signed factor order despite reverse insertion, 15 exact remaining rows, and the same rows plus the factor-8 selection. The seventeenth insert was rejected without writes, and the old report and pin were unchanged after refill. |
+| `:2482` attempt identity and result-only selection | `identity` (edit 3): native alias and parents 39–54, inspect 57–58, reject 59–60, absent refs 63–64, retained row 69 | Native reads and `inspectVerdict` distinguished two valid selection IDs naming the same attempt, and a selection naming the result directly. `guardedRejection` required the respective identity and attempt-role errors without writes. |
+| `:2508` requested versus producing lineage | `routing` (route 1): attempt edges 17–25, hit 31, native graph 32–50, inspect 51–52, forgery 53–79, reject 80–81, genuine read 82 | `inspectHit` matched the native decision's ordered v2 plan/intent/table parents, exact v1 result under `main`, and absence of the unused plan pin. The requested and producing IDs and versions remained distinct. `forgedRejection` checked each identical-tree, single-parent substitution and its exact read-only rejection. |
+| `:2547` late output collisions | `rollback` (route 2): prior and alias 30–36, before refs 39–45, rejects 48 and 60, readbacks 51–57 and 63–69, free outputs and graph 72–95 | `collision` required the exact occupied-ref diagnosis and unchanged bytes. Native refs retained the distinct prior `main`, both table pins, producer, intent, and selection with no unused plan pin. With only the output names changed, the request published the exact result and removal created an empty table without changing the prior table. |
+
+Isolated live mutations failed as intended. Hiding a bad key with a later
+removal, allowing a seventeenth key, comparing attempt aliases by ref name,
+and accepting a result-only selection failed edit 1:338, 2:331, and 3:59–60
+(`wrong_rejection`). Reporting insertion order failed edit 2:330
+(`wrong_table_order`). Ignoring the requested implementation or following the
+live table pin instead of the stored parent failed route 1:80–81
+(`wrong_rejection`). Preserving the occupied-ref diagnostic while committing
+`main` or the failed removal's objects failed route 2:48 and 2:60
+(`storage_changed`).
 
 ## Removal dependencies and finish line
 
