@@ -206,6 +206,9 @@ class ProcessHistory:
         inputs = operation_for(op, args).inputs
         operands = [self.native_operand(arg) if i < len(inputs) and inputs[i] == "id" else arg
                     for i, arg in enumerate(args)]
+        # Some records store an immutable ID as a string literal, not an edge.
+        if op == "datum_encode" and args[0] == "string" and args[1].startswith("native:"):
+            operands[1] = self.receipt_id(args[1], {})
         with self.fixture_lock:
             observed = self.native.run(op, *operands, include_error_detail=True)
         row = evidence(op, args, code=0, stderr="", unchanged=False)
@@ -495,7 +498,7 @@ class ProcessHistory:
         elif table_receipt.startswith("sum:"):
             table = self.sum_receipts[role, table_receipt.removeprefix("sum:")]
         else:
-            table = self.table_receipts[table_receipt]
+            table = self.receipt_id(table_receipt, self.table_receipts)
         args = (role, producer_ref, intent_ref, intent_receipt, plan_ref, decision_ref, factor, table_ref, table_receipt,
                 implementation, override)
         operands = [producer_ref, producer, intent_ref, intent, plan_ref, decision_ref, factor, "--table", table_ref]

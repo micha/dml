@@ -236,7 +236,8 @@ with tempfile.TemporaryDirectory() as tmp:
   # These verdicts are wide. Keep the extra Quint evaluators out of parallel
   # replay (the main recorded-calls suite timed out on Windows).
   adoption_fixture_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt')
-  foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent', 'supersession', 'supersession-invalid']
+  foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent', 'supersession', 'supersession-invalid',
+                   'table-capacity', 'table-scope']
     extra_modules = []
     if suite in ['adoption', 'intent', 'supersession-invalid']
       extra_modules += adoption_fixture_modules
@@ -245,6 +246,8 @@ with tempfile.TemporaryDirectory() as tmp:
       extra_modules += files('tests/recorded_calls_adoption_validation.qnt')
     elif suite == 'supersession-invalid'
       extra_modules += files('tests/recorded_calls_intent_histories.qnt', 'tests/recorded_calls_intent_rules.qnt')
+    elif suite in ['table-capacity', 'table-scope']
+      extra_modules += files('tests/recorded_calls_table_fixture.qnt')
     endif
     module_suffix = suite.replace('-', '_')
     test(
