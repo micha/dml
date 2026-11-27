@@ -374,8 +374,17 @@ bindings, and parents. CLI inspection must report
 standard output and no changes to the full logical LMDB inventory. The
 original request still returns the same inspection report.
 
+The [returned-source replay](argument_map_returned_source_histories.qnt)
+records two `add@1` attempts with distinct result DAGs that both return I64
+`42`. A test-only native fixture copies a request pinned to the first attempt,
+replacing only the construction's source link with the second result DAG.
+Quint checks that the stored attempt parent, origin and MAP stay the same. CLI
+inspection must report `inspect: returned source does not match the selected attempt result`,
+with no standard output and no changes to the full logical LMDB inventory.
+The original request still returns the same inspection report.
+
 The [focused tests](test_argument_maps.py) exercise a 64-deep returned-source
-chain and reject forged returned sources and getter links.
+chain and reject a getter link from a different construction.
 
 The [versioned built-ins replay](builtins_histories.qnt) runs the
 [installed-module workflow](../docs/internal-builtins.md): a pinned v1 request
