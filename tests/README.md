@@ -310,9 +310,14 @@ retains the short raw knowledge-ID check.
 The [multi-input history](../README.md#keep-reusable-results-for-multiple-scale-requests)
 checks that exact request keys coexist and one-key adoption preserves the other
 entry and the old branch. It covers routing, rollback, and pinned inspection
-after collection and after transfer to a replica without input refs. Focused tests cover the 16-entry limit, malformed nonmatching
-ancestry, unrelated intent lineages, and decisions that claim a hit from a
-historical table that lacks the key.
+after collection and after transfer to a replica without input refs. The
+[`recorded-calls-table-capacity` entry](recorded_calls_table_capacity_histories.qnt)
+checks a full table, a one-row adoption, and rejection of result-only and
+cross-version selections. It builds oversized and mismatched table deltas with
+native writes, then checks reader rejection and explicit fresh bypass. The
+[`recorded-calls-table-scope` entry](recorded_calls_table_scope_histories.qnt)
+distinguishes intent ancestry from equal fields, tests when a table is
+consulted, and checks a forged decision whose historical table lacks the key.
 
 The [intent-scoped history](../README.md#share-selected-scale-results-across-implementations-of-one-intent)
 checks requested and producing identities independently, exact producer and

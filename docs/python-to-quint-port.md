@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–5 are complete for CLI-representable cases**; see the [evidence below](#packet-1-evidence), including [supersession and knowledge replay](#packet-5-supersession-and-knowledge-evidence). Resume at **packet 6, implementation-scoped reuse tables**: baseline `tests/test_recorded_calls.py:2252`, `:2285`, `:2302`, `:2329`, `:2351`, and `:2377`. Keep the intent-scoped table slice separate. Leave typed cases, including the short raw knowledge ID from `:1646`, for packet 10.
+- **Packets 1–5 and the implementation-scoped slice of packet 6 are complete for CLI-representable cases**; see the [evidence below](#packet-1-evidence), including [implementation-scoped reuse tables](#packet-6-implementation-scoped-table-evidence). Resume at **packet 6, intent-scoped reuse tables**: baseline `tests/test_recorded_calls.py:2418`, `:2455`, `:2482`, `:2508`, and `:2547`. Leave typed cases, including the short raw knowledge ID from `:1646`, for packet 10.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–5 closed 47 whole methods (7, 10, 11, 10, and 9 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–5 closed 47 whole methods (7, 10, 11, 10, and 9 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The implementation-scoped slice of packet 6 closed six more methods.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -419,6 +419,36 @@ same occupied-ref diagnostic failed supersession 1:45 (`storage_changed`);
 changing a decision UUID only on a knowledge read failed supersession 2:96
 (`historical_report_changed`). Skipping the declaration root check or knowledge
 genesis validation failed invalid 1:429 and 1:443 (`wrong_rejection`).
+
+## Packet 6 implementation-scoped table evidence
+
+The [capacity](../tests/recorded_calls_table_capacity_histories.qnt) and
+[scope](../tests/recorded_calls_table_scope_histories.qnt) entries replay the
+real CLI and individual native reads and writes. The shared runner can pass a
+native ID as an exact table operand or as the hexadecimal text of a stored
+request key. Quint defines the fixtures and checks the committed graphs,
+reports, and rejection diagnostics. Each entry passed three histories and its
+rule controls. Six superseded Python methods and their unused delta helper
+were removed. Shared helpers for the intent-scoped Python checks remain.
+Step numbers are one-based within each entry.
+
+| Baseline `tests/test_recorded_calls.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:2252` cap and forged insertion | `capacity` (capacity 1): inspect 332, writer reject 333, native put/read 334–379, reader reject 380 | `exactTable` matched 16 distinct request keys and each exact row. `deltaMatches` verified the ordered basis and selection parents and the seventeenth selection's exact request key. Both CLI paths diagnosed the cap without writes; the rejected writer created no ref. |
+| `:2252` adoption at capacity | capacity 1: replacement 381–402, adopt 403, read 404–405 | `inspectVerdict` required the same keys, a new selection and attempt only on the replaced row, and an identical original report. |
+| `:2285` ineligible selections | `invalidInsert` (capacity 2): fixtures/readback 4–52, rejects 53–54, native refs 57–58, valid insert/read 61–62 | `guardedRejection` distinguished result-only selection from a version mismatch with both exact pins and unchanged bytes. A matching attempt selection inserted into the same empty table. |
+| `:2302` buried key and fresh bypass | `badHistory` (capacity 3): native put/read 68–149, valid read 150, rejects 151–152, absent refs 155–157, fresh 160, native/report 163–175 | `deltaMatches` verified the malformed ancestor and valid-looking adoption at the tip; the genuine counterpart read both rows. Inspect and routing rejected the mismatched key. `freshRead` matched the original request with no table parent or table/selection report fields. |
+| `:2329` scope by lineage and version | `lineage` (scope 1): definitions and reads 22–28, rejects 29–30, explicit v1 hit 38–39, native refs 42–44 | `lineageVerdicts` distinguished equal fields in a different lineage and a different implementation in the same lineage. Explicit v1 used the exact selection and published its result without leaving a pending plan. |
+| `:2351` table consultation | `defaults` (scope 2): stale operand bypass and readback 22–24, explicit empty miss 25, absent outputs 28–30, explicit hit 33–34 and refs 37–39 | `decisionVerdict` checked `default-execution` without table/selection fields and `override-selected-reuse` with exact table and attempt evidence. A correctly pinned empty table could not satisfy explicit reuse. |
+| `:2377` historical decision table | `forgery` (scope 3): hit 22, native put/read 23–49, forged reject 50, genuine read 51 | `forgeMatches` verified identical trees and first two parents, with only the table parent changed to the empty table. Inspection rejected the forged hit and still read the genuine `default-table-hit`. |
+
+Isolated CLI mutations failed as intended: allowing a seventeenth insert
+failed capacity 1:333, allowing it only in the reader failed 1:380, and
+omitting the key/selection comparison failed 3:151 (`wrong_rejection`).
+Ignoring intent genesis failed scope 1:29,
+consulting a stale table on execute-by-default failed scope 2:22
+(`decision_not_written`), and consulting a live pin instead of the stored
+table parent failed scope 3:50.
 
 ## Removal dependencies and finish line
 
