@@ -233,15 +233,18 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
-  # These verdicts are wide. Do not make the existing replay suites compete
-  # with two more Quint evaluators (the main recorded-calls suite timed out on Windows).
-  foreach suite : ['reuse', 'selection']
+  # These verdicts are wide. Keep the extra Quint evaluators out of parallel
+  # replay (the main recorded-calls suite timed out on Windows).
+  adoption_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt',
+                           'tests/recorded_calls_adoption_validation.qnt')
+  foreach suite : ['reuse', 'selection', 'adoption']
+    extra_modules = suite == 'adoption' ? adoption_modules : []
     test(
       'recorded-calls-' + suite, python,
       args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
              files('examples/recorded_calls.py', 'tests/recorded_calls_' + suite + '_histories.qnt',
                    'tests/recorded_calls_' + suite + '_rules.qnt', 'tests/recorded_calls_histories.qnt',
-                   'tests/recorded_calls_rules.qnt')] + recorded_calls_modules + quint_args,
+                   'tests/recorded_calls_rules.qnt')] + recorded_calls_modules + extra_modules + quint_args,
       env: binding_env,
       depends: public_python_core,
       is_parallel: false,
