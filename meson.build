@@ -79,12 +79,13 @@ if get_option('python_bindings') or get_option('quint_tests')
 endif
 
 if get_option('quint_tests')
+  node = find_program(build_machine.system() == 'windows' ? 'node.exe' : 'node')
   quint_script = get_option('quint_script')
   quint_args = []
   if quint_script == ''
     quint = find_program('quint')
   else
-    quint = find_program(build_machine.system() == 'windows' ? 'node.exe' : 'node')
+    quint = node
     quint_script = meson.project_source_root() / quint_script
     if not import('fs').is_file(quint_script)
       error('Quint JavaScript entry point not found: ' + quint_script)
@@ -92,7 +93,6 @@ if get_option('quint_tests')
     quint_args = ['--quint-script', quint_script]
   endif
   trace_interpreter = files('tests/run_histories.py')
-  test('trace-interpreter', python, args: ['-B', files('tests/test_trace_interpreter.py')])
   private_python_core = python.extension_module(
     '_dml_core', 'python/dml_core.c',
     c_args: ['-DDML_PRIVATE_REPLAY'],
@@ -109,6 +109,13 @@ if get_option('quint_tests')
   # Keep headroom above the Intel macOS verdict timeout in run_histories.py.
   intel_macos = host_machine.system() == 'darwin' and host_machine.cpu_family() == 'x86_64'
   replay_timeout = intel_macos ? 330 : 210
+  test(
+    'interpreter-conformance', node,
+    args: [files('tests/check_interpreter.mjs'), python.full_path(), quint.full_path(), lmdb_inventory] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
   test(
     'quint-refs', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,

@@ -1,16 +1,20 @@
-# Python-to-Quint port: active work order and session handoff
+# Python-to-Quint port ledger
 
-**Priority: exclusive until complete.** Port the checks in the Python tests to Quint and clean up the superseded tests and machinery. No unrelated features, fixes, refactors, or tooling work. This work order owns migration scope and progress, not the product specification. The [validation policy](validation-policy.md) owns the gate; the [test guide](../tests/README.md) describes the existing interpreter and suites.
+## Authority boundary
 
-## Resume here
+This ledger records the migration scope and evidence for the superseded Python
+checks. The [validation policy](validation-policy.md) owns the gate; the
+[test guide](../tests/README.md) describes the current interpreter and suites.
 
-- Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–10 are complete**; see [typed boundary evidence](#packet-10-typed-boundary-evidence), [handle lifetime evidence](#packet-10-handle-lifetime-evidence), and the earlier evidence below. Resume at **packet 11, interpreter conformance and cleanup**. Its nine baseline methods are the only remaining Python checks.
-- The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
-- First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
-- Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
+**The port is complete.** The eleven packets below account for all 122 baseline
+methods. The [final packet](#packet-11-interpreter-conformance-evidence) removed
+the last Python test and its registration; Python remains as the replay and
+observation adapter.
 
-## How to close an obligation
+Baseline: `f595d97` on `implementation-bound-invocation`. Line numbers remain
+usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
+
+## Migration evidence criteria
 
 For each guarantee, record **baseline `file:line` and subcase → Quint history/step → rule distinguishing the wrong outcome → actual result**. A currently exercised history and sufficient rule require no new test. If a method has several guarantees, close them separately. A model check, synthetic rule control, or similar test name is not evidence that the implementation exhibits that behavior. Synthetic controls are useful *in addition* to replay.
 
@@ -26,7 +30,7 @@ Use focused validation while working and `scripts/check.sh --quint` for the fina
 6. **Live identity versus equal values.** `tests/ordinary_rules.qnt` already compares identity tokens for handoffs. Reuse that idea where identity, callback entry, no binding, or a particular failure point is the guarantee. Do not instrument private functions to answer a question a public result or native record already answers. Do not introduce fault-injection state into the installed library.
 7. **Interpreter conformance.** An interpreter cannot establish the correctness of its own verdict handling just by issuing a passing verdict. Drive known input and inspect output/exit status independently. Decide explicitly whether exact generated Quint source formatting is a contract in addition to round-trip semantics.
 
-## Proposed packets (not one prompt per test)
+## Packet scope
 
 | Packet | Scope | Context boundary |
 |---|---|---|
@@ -667,12 +671,41 @@ Isolated live controls caught a retained bytes subclass (13:6,
 `wrong_thread`), and reaping during the unrelated export (16:16,
 `wrong_python_boundary`).
 
-## Removal dependencies and finish line
+## Packet 11 interpreter conformance evidence
 
-The three argument-map replay drivers now import their public core helpers
-from [`recorded_call_fixtures.py`](../tests/recorded_call_fixtures.py), not the
-removed recorded-call Python suite. Review remaining drivers for duplicate
-orchestration and behavioral judgments; keep necessary evidence collection
-distinct from tests. Do not start an unrelated harness rewrite.
+The [independent conformance suite](../tests/README.md#interpreter-conformance)
+runs the existing interpreter and encoder but reads Quint's ITF independently.
+The scripted binding and scanner let the dispatch probe observe exact calls
+without counting incidental native effects. The verdict probe drives the real
+runner process with the public binding and checks its exit and diagnostic.
+Generated source formatting is not a contract; evidence must round-trip as
+Quint data.
 
-Complete means: all ledger obligations accounted for against live behavior or an explicit user decision; no residual Python tests or obsolete registrations; no stranded fixtures; validation and installed-consumer instructions reflect the resulting suites; final results and any exceptions reported under the validation policy. Until then, this remains the only workstream.
+| Baseline `tests/test_trace_interpreter.py` | Case | Rule and observed result |
+|---|---|---|
+| `:41` order, observations and cleanup | Dispatch probe 1 | `ordered_dispatch` matched enter, append `a`, append `b`, read and close, plus lengths `1`, `2` and the exact readback `b`, without adding fields to any observation. |
+| `:52` unknown operation / wrong arity | Dispatch probes 2–3, step 2 | `unknown_command` and `command_arity` required the distinct diagnoses, history and step numbers, prefix and close events, and no trailing read. The arity error preserved its `TypeError` cause. |
+| `:62` exact dispatch and scans / failed write / failed commit | Dispatch probe 4, steps 1–7 | `native_dispatch` matched the exact typed operands and one scan after each requested call. The failed write left the same writer in the slot and the explicit failed commit consumed it; a second writer then used the same alias with a different identity. |
+| `:89` unexpected exception | Dispatch probe 5, step 1 | `binding_exception` saw the original `RuntimeError` and its three native-looking arguments, not an API status. |
+| `:96` bundle parser | Dispatch probes 6–10 | `valid_bundle` matched the exact root, tag, frame ID and payload. Short envelope, short frame header, short payload and trailing bytes each gave its specific `ValueError`. |
+| `:106` batch boundary | `batches` | Quint reconstructed the exact 16- and 17-attempt histories and a one-step tail, with each attempt, history and scenario in the original order. |
+| `:122` ref snapshots | `refs`, `extraRefField` | Quint matched empty, old and moved snapshots with original order and duplicates. The observer showed unchanged input; an extra field was rejected with the ref-shape diagnosis. |
+| `:136` sparse columns | `columns`, `zeroInsteadOfFalse`, `missingColumn`, `extraColumn` | Quint matched nested bool fields, defaults and history boundaries. Its type checker distinguished nested `0` from the `false` default; the encoder separately rejected missing and extra columns. |
+| `:158` missing verdict | `init` and `missingVerdict`, step 1 | The complete verdict exited zero and reported success. The missing one exited 1 with the step-count diagnostic despite coverage and controls being true. |
+
+Isolated mutations caught reversed dispatch, an injected command result field,
+missing diagnostic context and cleanup, skipped scans, premature writer
+removal and failure to consume a writer, a lookalike exception converted to
+status, the wrong short-payload diagnosis, and accepted trailing bytes. The
+transport and process controls also caught reversed batches, deduplicated
+refs, treating `0` as `false`, and accepting a missing step verdict.
+
+The obsolete Python suite and Meson registration were removed. The three
+argument-map replay drivers still use the public-core helpers in
+[`recorded_call_fixtures.py`](../tests/recorded_call_fixtures.py); those helpers
+remain part of fixture construction and observation.
+
+The final `scripts/check.sh --quint` gate passed all 37 suites in the Nix
+shell on aarch64 Linux with Quint 0.33.1. A fresh installed wheel also passed
+all nine ref histories and all 16 public binding histories from outside the
+checkout with no `PYTHONPATH`. macOS and Windows were not run locally.

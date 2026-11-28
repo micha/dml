@@ -44,7 +44,7 @@
         in
         {
           default = mkDevShell [ ];
-          quint = mkDevShell [ quintCli ];
+          quint = mkDevShell [ quintCli pkgs.nodejs ];
         });
     };
 }

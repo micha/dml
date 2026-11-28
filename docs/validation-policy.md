@@ -13,10 +13,10 @@ on Linux, macOS, and Windows and retains Meson logs. It covers ref creation,
 atomic snapshot publication and rollback, caller-side conditional publication,
 binary commit transfer and the staged result round trip, read-only integrity and
 reachability checks, and explicit transactional garbage collection. It also runs
-interpreter checks, public Python boundary and lifetime replay, native
-integrity and collection fault checks, native transfer boundary and fault
-checks, and separate Quint workflow checks against the C handoff and Python
-recorded examples, including
+[independent interpreter conformance](../tests/README.md#interpreter-conformance),
+public Python boundary and lifetime replay, native integrity and collection
+fault checks, native transfer boundary and fault checks, and separate Quint
+workflow checks against the C handoff and Python recorded examples, including
 versioned built-ins, composed node calls, closure-bound dependencies,
 captured ordinary calls, and implementation-bound reuse.
 
