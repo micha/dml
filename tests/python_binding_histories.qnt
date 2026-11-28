@@ -139,8 +139,74 @@ module python_binding_histories {
       begin("source", "read"), check("txn_ref_get", List("txn", "incoming", "restored-ref"),
         { ...bytesResult, value: Saved("root") }), abort, close("source")))
 
+  pure def release(kind: str, alias: str): Check = check("release", List(kind, alias), ok)
+
+  pure val consumption = List(
+    check("repo_open", List("source", "create"), { ...handle, writes: true, creates: "source" }), begin("source", "read"),
+    check("txn_begin", List("source", "write", "second"),
+      pythonError("RuntimeError", "end the active transaction before beginning another")),
+    check("repo_close", List("source"), nativeError("invalid_state", "repository has active transactions")),
+    check("txn_commit", List("py:keep:txn"), nativeError("invalid_state", "transaction cannot be committed")),
+    check("txn_commit", List("py:keep:txn"), nativeError("invalid_argument", "transaction is null")),
+    check("txn_begin", List("source", "write", "writer"), handle), check("txn_abort", List("writer"), ok),
+    check("txn_abort", List("py:keep:txn"), ok), release("txn", "txn"),
+    check("repo_close", List("py:keep:source"), ok),
+    check("txn_begin", List("source", "read", "txn"), nativeError("invalid_argument", "invalid transaction arguments")),
+    check("repo_close", List("py:keep:source"), nativeError("invalid_argument", "repository is null")),
+    release("repo", "source"))
+
+  pure val viewDag = "000102030405060708090a0b0c0d0e0f"
+  pure val encodeTree = check("object_encode", List("tree", "snapshot", viewDag, "tree"), bytesResult)
+  pure def decodeTree(packed: str): Check = check("object_decode", List(packed, "view"),
+    { ...ok, shape: List("tuple:3", "PyCapsule", "bytes", "int"), value: Exact(low), count: 1 })
+  pure val readTreeEntry = check("object_view_entry", List("view", "0", "entry"),
+    { ...ok, shape: List("tuple:2", "bytes", "bytes"), value: Exact(viewDag), items: List(Exact("736e617073686f74")) })
+  pure val viewOwnership = List(
+    encodeTree, decodeTree("tree"), release("packed", "tree"),
+    // A distinct encoding of the same size makes stale freed bytes less likely to pass.
+    check("object_encode", List("tree", "not-snap", high, "other"), bytesResult), readTreeEntry,
+    check("object_view_entry", List("view", "-1", "entry"), pythonError("ValueError", "tree index must be nonnegative")),
+    check("object_view_entry", List("view", "1", "entry"), nativeError("invalid_argument", "invalid tree entry access")),
+    check("object_view_parent", List("view", "0", "parent"), nativeError("invalid_argument", "invalid commit parent access")),
+    check("object_view_entry", List("py:bytes:6e6f7420612076696577", "0", "entry"),
+      pythonError("TypeError", "expected a daggerml.core.object_view handle")),
+    release("view", "view"))
+
+  pure val viewSubclass = List(
+    encodeTree, check("track_packed", List("tree", "tracked"), ok), release("packed", "tree"),
+    decodeTree("tracked"), check("link_view", List("tracked", "view"), ok),
+    check("release", List("packed", "tracked"), { ...ok, finalized: List("tracked") }),
+    readTreeEntry, release("view", "view"))
+
+  pure val staged35 = putDatum("i64", List("35"), "datum")
+  pure val repositoryOwnership = writer("source").append(release("repo", "source"))
+    .concat(staged35).concat(List(
+      check("txn_commit", List("py:keep:txn"), { ...ok, writes: true }),
+      check("repo_open", List("source", "existing"), handle), check("txn_begin", List("source", "read", "reader"), handle),
+      check("txn_get_datum", List("reader", "datum", "read"), { ...bytesResult, value: SavedPacked("datum") }),
+      decode("read", 3, "2300000000000000"), check("txn_abort", List("reader"), ok), close("source"), release("txn", "txn")))
+
+  pure val afterDrop = List(begin("source", "read"),
+    check("txn_get_datum", List("txn", "datum", "absent"), nativeError("not_found", "immutable object was not found")), abort)
+  pure val ownerDrop = writer("source").concat(staged35).concat(List(readDatum("datum"), release("txn", "txn")))
+    .concat(afterDrop).append(close("source"))
+
+  pure val workerRejected = { ...pythonError("RuntimeError", "DML handle must be used on its creating thread"), onOwner: false }
+  pure val workerDrop = writer("source").concat(putObject("tree", List(), "tree"))
+    .concat(putObject("commit", List("tree"), "root")).concat(List(commit, begin("source", "write")))
+    .concat(staged35).concat(List(
+      check("repo_close", List("py:worker:source"), workerRejected),
+      check("txn_abort", List("py:worker:txn"), workerRejected),
+      check("txn_commit", List("py:worker:txn"), workerRejected),
+      readDatum("datum"), check("release", List("txn", "py:worker:txn"), { ...ok, onOwner: false }),
+      // Export does not reap: the abandoned native writer must still be live before the owner begins again.
+      check("repo_export_commit", List("source", "root", "blocked"),
+        nativeError("invalid_state", "transfer requires no active transactions"))))
+    .concat(afterDrop).concat(List(check("repo_export_commit", List("source", "root", "bundle"), bytesResult), close("source")))
+
   pure val cases = List(repository, workingWriter, canonicalMap, badMapShapes, nullUri,
-    listAndMapMembers, badListShapes, poisonedMap, nestedTransfer, bundleBoundary)
+    listAndMapMembers, badListShapes, poisonedMap, nestedTransfer, bundleBoundary,
+    consumption, viewOwnership, viewSubclass, repositoryOwnership, ownerDrop, workerDrop)
   var histories: List[List[Request]]
   action init = histories' = cases.foldl(List(), (out, history) => out.append(history.mapList(checkRow => checkRow.request)))
   action step = histories' = histories

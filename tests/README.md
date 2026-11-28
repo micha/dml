@@ -7,21 +7,22 @@ transfer, staged-import, garbage-collection, and public Python binding suites. R
 ## Direct core replay
 
 Each history is an ordered list of `{ op: str, args: List[str] }` requests.
-Each request names **one DML core function**, without the `dml_` prefix. The
-[shared adapter](replay_core.py) resolves handles, object IDs and buffers, then
-calls the matching [Python binding](../python/dml_core.c) once. Ref replay
-imports the same [public module](../docs/spec-next/python.md) that ships in the
-wheel. The transfer, staged-import, and collection suites use a private build
-with extra output-slot instrumentation, even where a public wrapper exists.
-Neither layer implicitly begins, commits or aborts transactions during replay,
-or judges the core outcome.
+Each native request names **one DML core function**, without the `dml_` prefix.
+The [shared adapter](replay_core.py) resolves handles, object IDs and buffers,
+then calls the matching [Python binding](../python/dml_core.c) once. Ref and
+Python boundary replay import the same [public module](../docs/spec-next/python.md)
+that ships in the wheel. The transfer, staged-import, and collection suites
+use a private build with extra output-slot instrumentation, even where a public
+wrapper exists. Neither layer implicitly begins, commits or aborts transactions
+or judges the outcome.
 
 For example, `txn_ref_create` with `List("writer", "main", "A")` uses the
 transaction aliased as `writer` and the commit ID aliased as `A`. A separate
 `txn_commit` request publishes the change. Repositories have distinct paths in
 the test workspace. Histories explicitly end their transactions and close their
-repositories. For packed data, bundles and IDs, an operand can reference an
-output alias or supply fixture bytes in hex. A bundle operand like `exported~1`
+repositories, or release a Python handle to exercise its destructor. For
+packed data, bundles and IDs, an operand can reference an output alias or
+supply fixture bytes in hex. A bundle operand like `exported~1`
 uses the saved bytes with one byte removed from the end.
 
 The adapter records returned statuses and values, including observed output
@@ -42,7 +43,6 @@ checkout with no `PYTHONPATH`. Set `source` to the absolute checkout path and
 executable for the platform (`lmdb_inventory.exe` on Windows).
 
 ```sh
-"$consumer_python" -IB "$source/tests/test_python_binding.py"
 "$consumer_python" -EB "$source/tests/run_histories.py" "$(command -v quint)" \
   daggerml.core "$source/build/core-check-quint/lmdb_inventory" \
   "$source/tests/ref_histories.qnt" "$source/tests/ref_rules.qnt" \
@@ -59,8 +59,16 @@ The [binding histories](python_binding_histories.qnt) pass exact Python types to
 `py`, `tuple:2`, and its two operands on a `datum_encode` request. Single
 operands can use `py:` followed by one token, such as `py:float:1.5`. Quint
 checks exception class, native status and diagnostic, Python result shape and
-values, and committed effects. The remaining focused tests exercise consumption,
-view and repository ownership, and thread-affine cleanup.
+values, and committed effects.
+
+For lifetime checks, the history can retain a capsule after close, commit,
+or abort (`py:keep:txn`) or dispatch one of those calls to the history's worker
+thread (`py:worker:txn`). Binding-only steps create a tracked bytes subclass
+(`track_packed`), attach a view backreference (`link_view`), or drop the caller's
+reference (`release`, also with a worker operand). These steps do not invoke a
+core function; any automatic cleanup comes from the public binding's destructor.
+Quint checks finalizer observations, worker placement, and readback after the
+owner resumes.
 
 ## Exercised behavior
 

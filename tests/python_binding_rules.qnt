@@ -5,7 +5,7 @@ module python_binding_rules {
   type Change = { kind: str, key: str, before: str, after: str }
   type Attempt = { op: str, args: List[str], status: str, value: str, count: int, items: List[str],
     changes: List[Change], otherChanges: List[Change], detail: str, errorClass: str, errorTypes: List[str],
-    nativeCode: int, resultTypes: List[str], paths: List[str] }
+    nativeCode: int, resultTypes: List[str], paths: List[str], onOwner: bool, finalized: List[str] }
   type Observation = { attempts: List[Attempt] }
   type Values = (bool, str) -> str
   type State = { saved: Values, paths: Set[str], verdicts: List[str] }
@@ -26,8 +26,11 @@ module python_binding_rules {
     else if (expected.detail != "" and a.detail != expected.detail) "wrong_diagnostic"
     else if (a.resultTypes != expected.shape or a.count != expected.count or not(matches(saved, a.value, expected.value)))
       "wrong_result"
-    else if (a.op == "datum_members" and (a.items.length() != expected.items.length() or
-      not(expected.items.indices().forall(i => matches(saved, a.items[i], expected.items[i]))))) "wrong_members"
+    else if ((a.op == "datum_members" or a.op == "object_view_entry") and
+      (a.items.length() != expected.items.length() or
+        not(expected.items.indices().forall(i => matches(saved, a.items[i], expected.items[i]))))) "wrong_items"
+    else if (a.onOwner != expected.onOwner) "wrong_thread"
+    else if (a.finalized != expected.finalized) "wrong_finalizers"
     else if (a.paths.length() != paths.size() or a.paths.foldl(Set(), (out, path) => out.union(Set(path))) != paths)
       "wrong_paths"
     else if ((a.changes.length() > 0) != expected.writes or a.otherChanges.length() != 0) "wrong_inventory"
@@ -59,12 +62,24 @@ module python_binding_rules {
 
   pure val missing: Attempt = { op: "repo_open", args: List("source", "existing"), status: "not_found", value: "",
     count: 0, items: List(), changes: List(), otherChanges: List(), detail: "repository path does not exist",
-    errorClass: "Error", errorTypes: List("str", "int", "str"), nativeCode: 2, resultTypes: List(), paths: List() }
+    errorClass: "Error", errorTypes: List("str", "int", "str"), nativeCode: 2, resultTypes: List(), paths: List(),
+    onOwner: true, finalized: List() }
   pure val missingRule = h::repository[0].expect
+  pure val drop: Attempt = { ...missing, op: "release", args: List("packed", "tracked"), status: "ok",
+    detail: "", errorClass: "", errorTypes: List(), nativeCode: 0, resultTypes: List("NoneType"), finalized: List("tracked") }
+  pure val entry: Attempt = { ...drop, op: "object_view_entry", args: List("view", "0", "entry"),
+    resultTypes: List("tuple:2", "bytes", "bytes"), finalized: List(), value: "000102030405060708090a0b0c0d0e0f",
+    items: List("736e617073686f74") }
   pure val controlsPass = and {
     verdict(missing, missingRule, Map(), Set()) == "ok",
     verdict({ ...missing, errorTypes: List("str", "bool", "str") }, missingRule, Map(), Set()) == "wrong_python_boundary",
     verdict({ ...missing, paths: List("source") }, missingRule, Map(), Set()) == "wrong_paths",
-    verdict({ ...missing, detail: "other not-found error" }, missingRule, Map(), Set()) == "wrong_diagnostic"
+    verdict({ ...missing, detail: "other not-found error" }, missingRule, Map(), Set()) == "wrong_diagnostic",
+    verdict(drop, { ...ok, finalized: List("tracked") }, Map(), Set()) == "ok",
+    verdict({ ...drop, finalized: List() }, { ...ok, finalized: List("tracked") }, Map(), Set()) == "wrong_finalizers",
+    verdict(drop, ok, Map(), Set()) == "wrong_finalizers",
+    verdict({ ...drop, finalized: List() }, { ...ok, onOwner: false }, Map(), Set()) == "wrong_thread",
+    verdict(entry, h::readTreeEntry.expect, Map(), Set()) == "ok",
+    verdict({ ...entry, items: List("6e6f742d736e6170") }, h::readTreeEntry.expect, Map(), Set()) == "wrong_items"
   }
 }

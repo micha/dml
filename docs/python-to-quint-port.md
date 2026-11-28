@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–9 and packet 10's typed boundary slice are complete**; see [packet 10 evidence](#packet-10-typed-boundary-evidence) and the earlier evidence below. Resume at **packet 10, handle ownership, destruction and thread affinity**. The six remaining methods in `tests/test_python_binding.py` are baseline lines 38 and 249–306. Keep the independent interpreter cases for packet 11.
+- **Packets 1–10 are complete**; see [typed boundary evidence](#packet-10-typed-boundary-evidence), [handle lifetime evidence](#packet-10-handle-lifetime-evidence), and the earlier evidence below. Resume at **packet 11, interpreter conformance and cleanup**. Its nine baseline methods are the only remaining Python checks.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–9 closed 87 whole methods (7, 10, 11, 10, 9, 11, 5, 10, and 14 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The stored and live portions of `test_builtins.py:73` are now both closed. Packet 10's typed slice closed 20 more methods (seven recorded-call methods including the two partial cases, two application methods, and 11 binding methods).
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–9 closed 87 whole methods (7, 10, 11, 10, 9, 11, 5, 10, and 14 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The stored and live portions of `test_builtins.py:73` are now both closed. Packet 10's typed slice closed 20 more methods (seven recorded-call methods including the two partial cases, two application methods, and 11 binding methods). Its handle lifetime slice closed the last six public binding methods.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -608,9 +608,9 @@ The ten core histories, eight recorded-call Python histories (157 rejection
 steps), four closure histories and eight ordinary histories passed with
 coverage and controls. These replays, the nine ref histories and the six
 remaining binding tests also passed against a freshly installed wheel without
-`PYTHONPATH`. The three old workflow Python suites were removed; the six core
-binding lifetime and consumption methods remain. Step numbers are one-based
-in each suite.
+`PYTHONPATH`. That slice removed the three old workflow Python suites and left
+six core binding lifetime and consumption methods for the next slice. Step
+numbers are one-based in each suite.
 
 | Baseline | Live history / steps | Rule and observed result |
 |---|---|---|
@@ -635,6 +635,37 @@ argument exception (binding 1:2), and a LIST result with the right items but the
 wrong Python container type (binding 6:2). Moving the short knowledge-ID check
 after repository open kept the same diagnostic and bytes but failed recorded
 Python 7:5. Accepting bool as an int failed closure 4:3 and ordinary 8:3.
+
+## Packet 10 handle lifetime evidence
+
+The [public binding histories](../tests/python_binding_histories.qnt) now
+request reference releases and one call at a time on a worker thread. The
+adapter can retain an ended capsule so retries reach the real binding. It
+reports the calling thread relative to the owner and records finalizers when
+they run. Quint checks those facts alongside native statuses and readback.
+
+All 16 binding histories passed with coverage and synthetic controls. A fresh
+installed wheel also passed those histories and all nine ref histories from
+outside the checkout without `PYTHONPATH`. The final `scripts/check.sh --quint`
+gate passed all 37 suites in the Nix shell on aarch64 Linux with Quint 0.33.1;
+macOS and Windows were not run locally. The six superseded Python methods and
+their Meson registration were removed. The independent interpreter checks remain
+for packet 11. Numbers below are one-based within `quint-python-binding`.
+
+| Baseline `tests/test_python_binding.py` | Live history / steps | Rule and observed result |
+|---|---|---|
+| `:38` live guards, consumption and closed use | `consumption` (11): live conflicts 3–4, commit/retry 5–6, fresh writer 7–8, old abort 9, closed use 11–13 | `verdict` matched the live-writer and live-close diagnostics. The first commit failed on a read transaction, the same capsule then reported a null transaction, and a fresh writer began before aborting or dropping that capsule. Aborting the consumed capsule then succeeded. A retained closed repository rejected both begin and repeated close. |
+| `:249` temporary packed bytes, view type and bounds | `viewOwnership` (12): decode 2, input release 3, entry 5, rejects 6–9 | The decoded tree had a zero reference and one entry. After releasing the packed input and encoding a different tree of the same size, the old view returned exactly the original DAG ID and `snapshot` name. Negative and out-of-range indices, parent access on a tree, and a non-view operand produced distinct diagnoses. |
+| `:263` bytes subclass with a backreference | `viewSubclass` (13): decode/backreference 4–5, release 6, entry 7 | `verdict` required the subclass finalizer on the release step, with the backreference present and the view still held. The surviving view returned the exact original entry. |
+| `:278` transaction owns repository | `repositoryOwnership` (14): repo release 3, put and commit 5–6, reopen/read 7–10 | The transaction wrote and committed after disposal of the caller's repository reference. With the ended transaction capsule still held, a fresh repository and read transaction returned the exact packed I64 `35`. |
+| `:298` owner-thread destruction | `ownerDrop` (15): staged read 5, drop 6, absence 8 | The staged datum read back before the measured owner release. Committed inventory stayed unchanged, and a fresh read found the exact ID absent. |
+| `:306` foreign rejection, foreign last release and owner reap | `workerDrop` (16): foreign calls 11–13, staged read 14, worker release 15, blocked export 16, reap/read 17–18, export 20 | Close, abort and commit each raised the creating-thread error without ending the writer. The staged datum still read back. After the measured foreign release, an owner export reported an active transaction without reaping it. The next owner begin succeeded, the staged ID was absent, and export of the same committed root then succeeded. |
+
+Isolated live controls caught a retained bytes subclass (13:6,
+`wrong_finalizers`), committing instead of rolling back on owner release (15:6,
+`wrong_inventory`), routing the foreign release to the owner (16:15,
+`wrong_thread`), and reaping during the unrelated export (16:16,
+`wrong_python_boundary`).
 
 ## Removal dependencies and finish line
 
