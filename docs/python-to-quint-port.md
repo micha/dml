@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–9 are complete for their assigned cases**; see [packet 9 evidence](#packet-9-evidence) and the earlier evidence below. Resume at **packet 10, public Python boundary**. Start with typed values, encoding and diagnostics, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`; handle ownership, destruction and thread affinity in a separate slice.
+- **Packets 1–9 and packet 10's typed boundary slice are complete**; see [packet 10 evidence](#packet-10-typed-boundary-evidence) and the earlier evidence below. Resume at **packet 10, handle ownership, destruction and thread affinity**. The six remaining methods in `tests/test_python_binding.py` are baseline lines 38 and 249–306. Keep the independent interpreter cases for packet 11.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–9 closed 87 whole methods (7, 10, 11, 10, 9, 11, 5, 10, and 14 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The stored and live portions of `test_builtins.py:73` are now both closed.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–9 closed 87 whole methods (7, 10, 11, 10, 9, 11, 5, 10, and 14 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The stored and live portions of `test_builtins.py:73` are now both closed. Packet 10's typed slice closed 20 more methods (seven recorded-call methods including the two partial cases, two application methods, and 11 binding methods).
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -595,8 +595,53 @@ while restoring the original refs and preserving the fault diagnosis failed
 ordinary 7:4 and 7:7. Binding during inspection without running or writing
 failed closures 3:6.
 
+## Packet 10 typed boundary evidence
+
+The [public core histories](../tests/python_binding_histories.qnt) reuse the
+single-call interpreter with typed operands and Python exception and result
+observations. The [recorded-call Python histories](../tests/recorded_calls_python_histories.qnt)
+and the closure and ordinary typed histories request direct calls to their
+example modules. The workflow adapters count path conversions and report them
+alongside diagnostics and storage observations. Quint makes the comparisons.
+
+The ten core histories, eight recorded-call Python histories (157 rejection
+steps), four closure histories and eight ordinary histories passed with
+coverage and controls. These replays, the nine ref histories and the six
+remaining binding tests also passed against a freshly installed wheel without
+`PYTHONPATH`. The three old workflow Python suites were removed; the six core
+binding lifetime and consumption methods remain. Step numbers are one-based
+in each suite.
+
+| Baseline | Live history / steps | Rule and observed result |
+|---|---|---|
+| `tests/test_python_binding.py:17`, `:26` | `repository` (1): missing path 1; invalid inputs 2–6; valid sized open 7–8 | `verdict` checked the native error class, status, integer error code and missing-path detail. It distinguished bad flag, embedded NUL, negative/float/small map sizes, and required an absent path until a valid 1 MiB open. |
+| `:60` | `workingWriter` (2): reject 5–7, commit/read 8–12 | The mutable buffer, repo used as transaction, and short ID had their respective Python errors; the earlier string committed, read back byte-for-byte, decoded to `kept`, and no `main` appeared. |
+| `:79`, `:91` | `canonicalMap` (3): empty 1–2, order 3–5, duplicate 6; `badMapShapes` (4): 1–8 | The MAP payload had its exact LE count and sorted pairs, and packed bytes matched across input orders. Quint distinguished native duplicate-key rejection from Python container/pair/bytes errors and bad key/value lengths. |
+| `:107` | `nullUri` (5): 1–11 | NULL required `None`, URI required bytes, and both returned exact payload and kind. Relative, NUL, invalid UTF-8, malformed escape and noncanonical URIs rejected as `invalid_payload`. |
+| `:121`, `:137` | `listAndMapMembers` (6): 1–14; `badListShapes` (7): 1–5 | Results were actual tuples, preserving duplicate LIST positions and sorted MAP pairs. Empty members and truncated, mutable, and noncollection inputs were distinguished. LIST rejected an iterator, set, bare bytes, mutable ID and long ID. |
+| `:144` | `poisonedMap` (8): put 8, commit 9, absence 11–12 | The node ID in a datum slot failed with the composite-reference detail. The poisoned commit rejected and both the earlier key and node were absent in a fresh read. |
+| `:161` | `nestedTransfer` (9): NFC and duplicate 3–9, stage 33, readback 35–50 | NFC-equivalent STRINGs packed identically and shared an ID. The nested transfer preserved the exact staged ID, bound node, both MAP edges and packed records, LIST order, and each leaf's bytes and kind. |
+| `:207` | `bundleBoundary` (10): strict inputs 8–9, bytes and conflicts 10–18, collect/abort/restore 19–27 | Exact `bytes` results and matching import ID, diagnosed active-reader conflicts, malformed bundle and occupied ref all matched. Deletion plus collection observed two removals; abort restored identical export bytes and the incoming ref. |
+| `tests/test_recorded_calls.py:763` | `reuse` (recorded Python 1–2): refs 1–27, aliases 28–33, IDs 34–43 each | `rejection` required exact `ValueError` and slot diagnosis, zero path conversions, and no repository for both reuse APIs. All ref names/types/aliases and both ID slots rejected. |
+| `:1324`, `:1971` | `adoption` (3): 1–11; `abandon` (4): 1–15 | `rejection` distinguished invalid adoption IDs, names and aliases, and abandon type/name/length and reserved-main checks. No path conversion or repository creation occurred. |
+| `:2174`, `:2195` | `receipt` (5): plan 1–11, staging 12–22, receipt 23–33; `publish` (6): subclasses 1–4, factors 5–9 | Ref grammar/type errors, bytes subclasses and bool, int subclass, string and both I64 overflow directions produced their respective diagnoses without touching the path. |
+| `:1646` raw short knowledge ID | `knowledge` (7): fixture/inspect 1–4, reject 5 | Quint saw the ready decision and required the raw 16-byte ID diagnosis, zero path conversions and unchanged `data.mdb`. |
+| `:1766` raw UUID type and short ID | `attempt` (8): setup/inspect 1–5, reject 6–7 | The incoming request matched the producer and overflowing factor. Text UUID and short raw commit bytes rejected for their own causes before path conversion and preserved `data.mdb`. |
+| `tests/test_closures.py:38` | `typedStory` (closure 4): scale 3/5/7, invocation 4/6/8 | `typedVerdict` saw the exact I64 diagnostic for bool, float and upper overflow in both positions, no path conversion, and unchanged native inventory. |
+| `tests/test_ordinary_calls.py:112` | `typedStory` (ordinary 8): 3–6 | `typedVerdict` saw the exact I64 diagnostic for bool, float, upper and lower overflow, no path conversion, and unchanged native inventory. |
+
+Isolated live controls caught creation of an empty directory despite the same
+argument exception (binding 1:2), and a LIST result with the right items but the
+wrong Python container type (binding 6:2). Moving the short knowledge-ID check
+after repository open kept the same diagnostic and bytes but failed recorded
+Python 7:5. Accepting bool as an int failed closure 4:3 and ordinary 8:3.
+
 ## Removal dependencies and finish line
 
-Three existing replay files (`tests/run_argument_map_poison.py`, `tests/run_argument_map_request_integrity.py`, `tests/run_argument_map_returned_source.py`) import fixture functions from `tests/test_recorded_calls.py`. Do not strand those imports. Review remaining drivers for duplicate orchestration and behavioral judgments; keep necessary evidence collection distinct from tests. Do not start an unrelated harness rewrite.
+The three argument-map replay drivers now import their public core helpers
+from [`recorded_call_fixtures.py`](../tests/recorded_call_fixtures.py), not the
+removed recorded-call Python suite. Review remaining drivers for duplicate
+orchestration and behavioral judgments; keep necessary evidence collection
+distinct from tests. Do not start an unrelated harness rewrite.
 
 Complete means: all ledger obligations accounted for against live behavior or an explicit user decision; no residual Python tests or obsolete registrations; no stranded fixtures; validation and installed-consumer instructions reflect the resulting suites; final results and any exceptions reported under the validation policy. Until then, this remains the only workstream.

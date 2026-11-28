@@ -196,7 +196,13 @@ module closure_histories {
     story[5]
   ))
 
+  pure val typedInputs = List("bool:true", "float:2.0", "int:9223372036854775808")
+  pure val typedStory = typedInputs.foldl(story.slice(0, 2), (out, value) => out
+    .append(source("python_call", List("defaults", "bytes:new-defaults", "int:1", value, "bytes:invalid")))
+    .append(source("python_call", List("request", "bytes:c1", "id:c1", "bytes:pending", "bytes:decision", value,
+      "int:29", "bytes:90000000-0000-4000-8000-000000000001"))))
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, forgeryStory, noBindStory)
+  action init = histories' = List(story, forgeryStory, noBindStory, typedStory)
   action step = histories' = histories
 }

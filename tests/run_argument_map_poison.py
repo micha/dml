@@ -18,7 +18,7 @@ from run_histories import (
     read_histories,
     replay_history,
 )
-from test_recorded_calls import literal, put, transaction, view
+from recorded_call_fixtures import literal, put, transaction, view
 
 
 EDIT_ROLE = b"argument-map-table-edit-v1"

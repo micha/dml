@@ -1,7 +1,7 @@
 # Quint trace interpreter
 
 [`run_histories.py`](run_histories.py) is the shared entry point for the ref,
-transfer, staged-import, and garbage-collection suites. Run it through
+transfer, staged-import, garbage-collection, and public Python binding suites. Run it through
 [`scripts/check.sh --quint`](../README.md#quint-behavior-checks).
 
 ## Direct core replay
@@ -33,7 +33,7 @@ judges these observations against expected records, dependencies, ref values,
 and transaction outcomes. Dispatch errors, missing observations or verdicts,
 and insufficient history coverage fail the suite.
 
-## Replay refs against the installed wheel
+## Replay the public binding against the installed wheel
 
 After [installing the binding](../README.md#install-the-python-binding) in a
 clean virtual environment and building the opt-in suite, run from outside the
@@ -47,10 +47,20 @@ executable for the platform (`lmdb_inventory.exe` on Windows).
   daggerml.core "$source/build/core-check-quint/lmdb_inventory" \
   "$source/tests/ref_histories.qnt" "$source/tests/ref_rules.qnt" \
   --init init --init changedInit
+"$consumer_python" -EB "$source/tests/run_histories.py" "$(command -v quint)" \
+  daggerml.core "$source/build/core-check-quint/lmdb_inventory" \
+  "$source/tests/python_binding_histories.qnt" "$source/tests/python_binding_rules.qnt" \
+  --python-boundary --quint-module "$source/tests/python_binding_fixture.qnt" \
+  --quint-module "$source/tests/python_binding_histories.qnt"
 ```
 
-The focused binding tests check Python argument rejection, error mapping,
-byte-buffer ownership, explicit handle consumption, and thread-affine cleanup.
+The [binding histories](python_binding_histories.qnt) pass exact Python types to
+`daggerml.core`. The adapter passes typed operands such as a two-item tuple as
+`py`, `tuple:2`, and its two operands on a `datum_encode` request. Single
+operands can use `py:` followed by one token, such as `py:float:1.5`. Quint
+checks exception class, native status and diagnostic, Python result shape and
+values, and committed effects. The remaining focused tests exercise consumption,
+view and repository ownership, and thread-affine cleanup.
 
 ## Exercised behavior
 
@@ -154,8 +164,7 @@ producer that stores `-17` for `2 + 3`. Inspection preserves that result and a
 stored scale result of `-98`; fresh execution with factor 6 instead computes
 `-102`. The histories also exercise an unsupported implementation, a result
 whose input DAG does not match its equal-root parent, and a literal input used
-in place of a sub-DAG edge. The workflow and remaining
-[focused tests](test_recorded_calls.py) run in the opt-in Meson gate.
+in place of a sub-DAG edge. The workflow runs in the opt-in Meson gate.
 
 The [one-way bundle handoff](../README.md#compose-from-a-producer-in-another-repository)
 exercises the same caller on a second repository through the public binding.
@@ -261,8 +270,11 @@ the attempt or selection pin is replaced by a same-result occurrence and checks
 publication from the surviving choice after collection. The selection entry
 checks that reusing the same UUID produces the same attempt, reads the ordered
 native parents and literal fields, distinguishes malformed nested records and
-UUIDs, and checks reachability with the proof as the sole root. The focused
-Python boundary tests keep values the CLI cannot pass directly.
+UUIDs, and checks reachability with the proof as the sole root. The
+[`recorded-calls-python` histories](recorded_calls_python_histories.qnt) call the
+example functions directly with values the CLI cannot pass. Quint checks the
+exception and diagnostic, that the function never converts the path, and that
+the repository is not created or changed.
 
 The [versioned attempt selection history](../README.md#record-a-new-version-of-an-attempt-selection)
 executes new attempts after the initial choice, adopts independently on two
@@ -517,7 +529,8 @@ miss; the genuine selection gives a pending request at the same output refs.
 The no-bind history observes the binder and logical callable enter during
 work, then inspects the same attempt. Inspection returns the stored 84
 without entering either one or changing the native inventory.
-The [focused Python test](test_closures.py) retains exact I64 type checks.
+Direct Python steps reject bool, float, and out-of-range I64 values in captured
+scale and invocation arguments before path conversion, with inventory unchanged.
 
 The [finite closure design model](recorded_closures_design.qnt) checks three
 captures, two equal-sum MAPs, one historical attempt, and at most one new
@@ -564,7 +577,8 @@ callbacks after exit from both poisoned and previously healthy sessions.
 The rollback history observes two failed writes after real ref updates in
 the writer: the double-phase output update and the final `main` update.
 Each failure restores the full inventory at the last committed phase.
-The [focused Python test](test_ordinary_calls.py) retains exact I64 input checks.
+Direct Python invocation rejects bool, float, and both out-of-range I64 values
+before path conversion, with inventory unchanged.
 
 The [finite ordinary call model](recorded_ordinary_design.qnt) bounds each
 path to one new outer request, two call slots, two capture versions, four MAP

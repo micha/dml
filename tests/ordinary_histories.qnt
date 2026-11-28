@@ -149,7 +149,11 @@ module ordinary_histories {
     inspect("source", "main", "@first")
   ))
 
+  pure val typedInputs = List("bool:true", "float:1.5", "int:9223372036854775808", "int:-9223372036854775809")
+  pure val typedStory = typedInputs.foldl(story.slice(0, 2), (out, value) =>
+    out.append(sourceStep("python_call", List("invoke", "bytes:capture-one", "id:capture-one", "bytes:call", value, "int:29"))))
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, pinning, execution, requestIdentity, refAliases, callbackLifecycle, lateRollback)
+  action init = histories' = List(story, pinning, execution, requestIdentity, refAliases, callbackLifecycle, lateRollback, typedStory)
   action step = histories' = histories
 }

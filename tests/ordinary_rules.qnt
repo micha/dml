@@ -17,7 +17,7 @@ module ordinary_rules {
   type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, head: str, main: str,
     refs: List[Ref], created: List[Native], profiles: List[str], report: List[Field],
     unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool, calls: List[CallEvent],
-    errorType: str, checkpointRestored: List[bool] }
+    errorType: str, pathUses: int, checkpointRestored: List[bool] }
   type Observation = { attempts: List[Attempt] }
 
   pure val none: Native = { id: "", role: "", dag: "", parents: List(), target: "", selected: "",
@@ -557,6 +557,20 @@ module ordinary_rules {
     else if (inspect and a.commit != "" and a.commit != a.head) "wrong_inspection_pin"
     else "ok"
   }
+  pure def typedVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val observed = observedStep(a, typedStory[i])
+    if (observed != "ok") observed
+    else if (i < 2) {
+      if (a.code == 0 and a.error == "" and
+        (if (i == 0) defaultsStep(a, "", v1) and a.main == "" else captureStep(a, rows[0], ""))) "ok" else "wrong_typed_fixture"
+    } else if (not(valueError(a, "a is not a signed 64-bit integer"))) "wrong_typed_diagnostic"
+    else if (a.pathUses != 0) "typed_input_reached_repository"
+    else if (not(a.unchanged) or a.commit != "" or a.main != rows[1].main or a.created != List() or a.refs != List())
+      "typed_input_changed_storage"
+    else "ok"
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val rows = row.attempts
     if (rows.length() == story.length()) range(0, story.length()).foldl(List(), (out, i) => {
@@ -591,15 +605,17 @@ module ordinary_rules {
       val observed = observedStep(rows[i], lateRollback[i])
       out.append(if (observed != "ok") observed else rollbackVerdict(rows, i))
     })
+    else if (rows.length() == typedStory.length())
+      range(0, rows.length()).foldl(List(), (out, i) => out.append(typedVerdict(rows, i)))
     else List("missing_steps")
   }
   pure def verdictAccepted(result: str): bool = result == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 7 and verdicts.length() == 7
+    evidence.length() == 8 and verdicts.length() == 8
       and verdicts[0].length() == story.length() and verdicts[1].length() == pinning.length()
       and verdicts[2].length() == execution.length() and verdicts[3].length() == requestIdentity.length()
       and verdicts[4].length() == refAliases.length() and verdicts[5].length() == callbackLifecycle.length()
-      and verdicts[6].length() == lateRollback.length()
+      and verdicts[6].length() == lateRollback.length() and verdicts[7].length() == typedStory.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (accepted, result) => accepted and verdictAccepted(result)))
       and report(evidence[0].attempts[9], "", "status") == "hit"
       and record(evidence[0].attempts[10], "double-hit").id != ""

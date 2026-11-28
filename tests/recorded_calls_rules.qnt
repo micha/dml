@@ -24,7 +24,7 @@ module recorded_calls_rules {
     selection: str, result: str, attempt: str, attemptId: str }
   type IntentReuseTable = { intent: str, genesis: str, previous: str, entries: List[IntentReuseEntry] }
   type Attempt = { op: str, args: List[str], code: int, quiet: bool, diagnosed: bool, missingRef: bool,
-    stderr: str, stdoutEmpty: bool, repoExisted: bool, repoExists: bool,
+    stderr: str, stdoutEmpty: bool, repoExisted: bool, repoExists: bool, errorType: str, pathUses: int,
     nativeStatus: str, nativeDetail: str, nativeValue: str, nativeCount: int, nativeItems: List[str],
     commit: str, calls: List[Call], reportFields: List[List[str]], stdoutHash: str, historicalReportHash: str,
     expectedCommit: str, producerCommit: str, unchanged: bool, removed: int,
@@ -2531,7 +2531,8 @@ module recorded_calls_rules {
     resultValue: 36, arguments: List(factor, input) }
   pure val recorded: Attempt = { op: "record", args: List("source", "7", "5", "3"), code: 0,
     quiet: true, diagnosed: false, missingRef: false, stderr: "", stdoutEmpty: false,
-    repoExisted: false, repoExists: false, nativeStatus: "", nativeDetail: "", nativeValue: "", nativeCount: 0,
+    repoExisted: false, repoExists: false, errorType: "", pathUses: -1,
+    nativeStatus: "", nativeDetail: "", nativeValue: "", nativeCount: 0,
     nativeItems: List(),
     commit: "commit", calls: List(), reportFields: List(), stdoutHash: "", historicalReportHash: "",
     expectedCommit: "", producerCommit: "", unchanged: false,

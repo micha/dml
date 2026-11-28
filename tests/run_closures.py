@@ -36,6 +36,7 @@ from run_histories import (
     replay_history,
 )
 from trace_support import scan_inventory
+from workflow_python import evidence_text, observe_call
 
 
 ROLE_PREFIX = "closure-example-"
@@ -281,6 +282,7 @@ class History:
         self.native = WorkflowNative(core, directory)
         self.operations = {op: self.command(op) for op in ("defaults", "capture", "request", "work", "inspect")}
         self.operations.update(graft=self.graft, replicate=self.replicate, retire=self.retire, native=self.native_step,
+                               python_call=self.python_call,
                                work_observed=self.command("work", observe=True),
                                inspect_observed=self.command("inspect", observe=True))
 
@@ -301,7 +303,8 @@ class History:
                 core.txn_abort(txn)
 
     @staticmethod
-    def evidence(op, args, before, after, *, commit="", report=None, code=0, error="", transfer=False, calls=()):
+    def evidence(op, args, before, after, *, commit="", report=None, code=0, error="", transfer=False, calls=(),
+                 error_type="", path_uses=-1):
         if commit and not IDENTITY.fullmatch(commit):
             raise ValueError(f"expected a commit ID, got {commit!r}")
         report = report or {}
@@ -322,7 +325,18 @@ class History:
                 "result": report.get("result", ""), "outer": report.get("return_dag", ""),
                 "value": report.get("value", 0),
                 "trace": [{**call, "sources": source_edges(call["sources"])} for call in report.get("trace", [])],
-                "calls": list(calls), **WORKFLOW_NATIVE_DEFAULTS}
+                "calls": list(calls), "errorType": error_type, "pathUses": path_uses, **WORKFLOW_NATIVE_DEFAULTS}
+
+    def python_call(self, role, op, *operands):
+        if op not in ("defaults", "request"):
+            raise ValueError(f"cannot invoke Python closure workflow {op!r}")
+        path = self.directory / role
+        before = self.inventory(path)
+        action = getattr(import_module(self.script.stem), op)
+        result, error_type, error, path_uses = observe_call(action, path, operands, self.receipts.__getitem__)
+        return self.evidence("python_call", (role, op, *operands), before, self.inventory(path),
+                             commit=result.hex() if type(result) is bytes else "", code=int(bool(error_type)),
+                             error=evidence_text(error), error_type=error_type, path_uses=path_uses)
 
     def command(self, op, *, observe=False):
         def invoke(role, *args):
