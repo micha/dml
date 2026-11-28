@@ -71,9 +71,9 @@ retention after releasing `incoming`. The staging suite checks that a staged
 result survives collection even when publication is stale, and that a rejected
 import leaves no new objects or refs. The collection suite checks ref ordering,
 rollback, and exact persisted removals. Native checks exercise damaged repositories,
-allocation failures, and deletion failures. These checks run in CI on Linux and
-macOS (x86-64 and ARM64) and Windows (x86-64). CI does not measure coverage or
-build a Python wheel.
+allocation failures, and deletion failures. These checks run in CI on Linux
+(x86-64 and ARM64), macOS (ARM64), and Windows (x86-64). CI does not measure
+coverage or build a Python wheel.
 
 ### Install the Python binding
 
