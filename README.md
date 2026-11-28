@@ -25,15 +25,15 @@ tests. The CI matrix uses `--quint` to build and run the checks below.
 
 ### Quint behavior checks
 
-The opt-in Nix shell supplies Python and pins [Quint](https://quint.sh/) 0.33.1
-for the TypeScript backend:
+The opt-in Nix shell supplies Python and Node.js and pins
+[Quint](https://quint.sh/) 0.33.1 for the TypeScript backend:
 
 ```sh
 nix develop .#quint -c ./scripts/check.sh --quint
 ```
 
 Without Nix, use CPython 3.10+ with its development headers and install Quint
-locally with Node.js and npm:
+locally with Node.js 18+ and npm:
 
 ```sh
 npm install --prefix build/quint-tool --no-save --ignore-scripts @informalsystems/quint@0.33.1
@@ -55,7 +55,8 @@ This builds the test executables in `build/core-check-quint/` and runs
 `quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`,
 `quint-python-binding`, the
 [provenance handoff and recorded workflow integrations](tests/README.md#process-integration),
-and focused interpreter, integrity, boundary, and fault tests.
+[independent interpreter conformance](tests/README.md#interpreter-conformance),
+and focused native integrity, boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
 native request. Ref and Python boundary replay use public `daggerml.core`;
 the other core replay suites use a private test binding. Quint checks observations

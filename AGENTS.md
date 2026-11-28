@@ -1,11 +1,5 @@
 # Agent Guide
 
-## Active work
-
-Until the Python-to-Quint port and cleanup are complete, work only on the port.
-Start each session with the [port work order](docs/python-to-quint-port.md).
-Begin implementation when asked; do not add Python tests during the port.
-
 ## Validation
 
 Follow the [validation policy](docs/validation-policy.md). The final gate is
@@ -15,6 +9,8 @@ See the [README](README.md#build-and-validation) for setup.
 Keep core replay to one C API call per step and application behavior in separate
 workflow specs. Replay runners report observations; Quint decides whether they
 satisfy the contract. Keep fault-injection state out of the installed library.
+The [Python-to-Quint port ledger](docs/python-to-quint-port.md) records where
+former Python checks are covered.
 
 ## Documentation
 

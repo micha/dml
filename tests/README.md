@@ -34,6 +34,29 @@ judges these observations against expected records, dependencies, ref values,
 and transaction outcomes. Dispatch errors, missing observations or verdicts,
 and insufficient history coverage fail the suite.
 
+## Interpreter conformance
+
+`interpreter-conformance` checks the replay tooling itself. The
+[independent Node driver](check_interpreter.mjs) runs Quint directly and reads
+its ITF output without the replay runner's ITF reader or verdict checker.
+[Dispatch cases](interpreter_dispatch.qnt) specify requests and compare raw
+observations from a scripted binding and scanner, including exact calls and
+handle identities, cleanup, and parsing valid and malformed bundle bytes.
+The normal replay suites still check behavior against the live C library.
+
+[Transport cases](interpreter_transport.qnt) compile and evaluate the actual
+encoder output to check ordering, snapshot multiplicity, defaults, and types.
+Generated Quint names and source formatting are not a contract. The Node
+process separately checks that the real runner accepts a complete verdict and
+rejects a missing step verdict even when coverage and controls both pass; see
+[requests](interpreter_verdict_histories.qnt) and [rules](interpreter_verdict.qnt).
+
+To rerun just this test after configuring the opt-in build:
+
+```sh
+meson test -C build/core-check-quint --print-errorlogs interpreter-conformance
+```
+
 ## Replay the public binding against the installed wheel
 
 After [installing the binding](../README.md#install-the-python-binding) in a
