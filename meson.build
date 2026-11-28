@@ -119,7 +119,7 @@ if get_option('quint_tests')
   test(
     'quint-refs', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
-           files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'] + quint_args,
+           files('spec/ref_histories.qnt', 'spec/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -127,24 +127,24 @@ if get_option('quint_tests')
   test(
     'quint-python-binding', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
-           files('tests/python_binding_histories.qnt', 'tests/python_binding_rules.qnt'), '--python-boundary',
-           '--quint-module', files('tests/python_binding_fixture.qnt'),
-           '--quint-module', files('tests/python_binding_histories.qnt')] + quint_args,
+           files('spec/python_binding_histories.qnt', 'spec/python_binding_rules.qnt'), '--python-boundary',
+           '--quint-module', files('spec/python_binding_fixture.qnt'),
+           '--quint-module', files('spec/python_binding_histories.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
   )
-  retention_modules = ['--quint-module', files('tests/retention_fixture.qnt'),
-                       '--quint-module', files('tests/retention_rules.qnt')]
+  retention_modules = ['--quint-module', files('spec/retention_fixture.qnt'),
+                       '--quint-module', files('spec/retention_rules.qnt')]
   foreach suite : [
-    ['transfer', 'transfer', ['--quint-module', files('tests/transfer_fixture.qnt')]],
+    ['transfer', 'transfer', ['--quint-module', files('spec/transfer_fixture.qnt')]],
     ['staged-import', 'staged_import', retention_modules],
     ['gc', 'gc', retention_modules],
   ]
     test(
       'quint-' + suite[0], python,
       args: ['-B', trace_interpreter, quint.full_path(), private_python_core, lmdb_inventory,
-             files('tests/' + suite[1] + '_histories.qnt', 'tests/' + suite[1] + '_rules.qnt')] + suite[2] + quint_args,
+             files('spec/' + suite[1] + '_histories.qnt', 'spec/' + suite[1] + '_rules.qnt')] + suite[2] + quint_args,
       timeout: replay_timeout,
     )
   endforeach
@@ -208,16 +208,16 @@ with tempfile.TemporaryDirectory() as tmp:
   test(
     'provenance-handoff', python,
     args: ['-B', files('tests/run_provenance_handoff.py'), quint.full_path(), provenance_handoff, handoff_fixture,
-           files('tests/handoff_histories.qnt', 'tests/handoff_rules.qnt')] + quint_args,
+           files('spec/handoff_histories.qnt', 'spec/handoff_rules.qnt')] + quint_args,
     timeout: replay_timeout,
   )
 
-  recorded_calls_modules = files('tests/recorded_calls_fixtures.qnt', 'tests/recorded_calls_stored_histories.qnt',
-                                 'tests/recorded_calls_outbound_histories.qnt')
+  recorded_calls_modules = files('spec/recorded_calls_fixtures.qnt', 'spec/recorded_calls_stored_histories.qnt',
+                                 'spec/recorded_calls_outbound_histories.qnt')
   test(
     'recorded-calls', python,
     args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
-           files('examples/recorded_calls.py', 'tests/recorded_calls_histories.qnt', 'tests/recorded_calls_rules.qnt')]
+           files('examples/recorded_calls.py', 'spec/recorded_calls_histories.qnt', 'spec/recorded_calls_rules.qnt')]
           + recorded_calls_modules + quint_args,
     env: binding_env,
     depends: public_python_core,
@@ -228,11 +228,11 @@ with tempfile.TemporaryDirectory() as tmp:
   test(
     'recorded-calls-durable', python,
     args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
-           files('examples/recorded_calls.py', 'tests/recorded_calls_durable_histories.qnt',
-                 'tests/recorded_calls_durable_rules.qnt', 'tests/recorded_calls_histories.qnt',
-                 'tests/recorded_calls_rules.qnt', 'tests/recorded_calls_plan_histories.qnt',
-                 'tests/recorded_calls_plan_rules.qnt', 'tests/recorded_calls_receipt_histories.qnt',
-                 'tests/recorded_calls_receipt_rules.qnt')] + recorded_calls_modules + quint_args,
+           files('examples/recorded_calls.py', 'spec/recorded_calls_durable_histories.qnt',
+                 'spec/recorded_calls_durable_rules.qnt', 'spec/recorded_calls_histories.qnt',
+                 'spec/recorded_calls_rules.qnt', 'spec/recorded_calls_plan_histories.qnt',
+                 'spec/recorded_calls_plan_rules.qnt', 'spec/recorded_calls_receipt_histories.qnt',
+                 'spec/recorded_calls_receipt_rules.qnt')] + recorded_calls_modules + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -240,7 +240,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
   # These verdicts are wide. Keep the extra Quint evaluators out of parallel
   # replay (the main recorded-calls suite timed out on Windows).
-  adoption_fixture_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt')
+  adoption_fixture_modules = files('spec/recorded_calls_adoption_fixture.qnt', 'spec/recorded_calls_adoption_checks.qnt')
   foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent', 'supersession', 'supersession-invalid',
                    'table-capacity', 'table-scope', 'intent-table-edit', 'intent-table-route', 'python']
     extra_modules = []
@@ -248,22 +248,22 @@ with tempfile.TemporaryDirectory() as tmp:
       extra_modules += adoption_fixture_modules
     endif
     if suite == 'adoption'
-      extra_modules += files('tests/recorded_calls_adoption_validation.qnt')
+      extra_modules += files('spec/recorded_calls_adoption_validation.qnt')
     elif suite == 'supersession-invalid'
-      extra_modules += files('tests/recorded_calls_intent_histories.qnt', 'tests/recorded_calls_intent_rules.qnt')
+      extra_modules += files('spec/recorded_calls_intent_histories.qnt', 'spec/recorded_calls_intent_rules.qnt')
     elif suite in ['table-capacity', 'table-scope', 'intent-table-edit', 'intent-table-route']
-      extra_modules += files('tests/recorded_calls_table_fixture.qnt')
+      extra_modules += files('spec/recorded_calls_table_fixture.qnt')
       if suite == 'intent-table-edit'
-        extra_modules += files('tests/recorded_calls_table_capacity_histories.qnt')
+        extra_modules += files('spec/recorded_calls_table_capacity_histories.qnt')
       endif
     endif
     module_suffix = suite.replace('-', '_')
     test(
       'recorded-calls-' + suite, python,
       args: ['-B', files('tests/run_recorded_calls.py'), quint.full_path(),
-             files('examples/recorded_calls.py', 'tests/recorded_calls_' + module_suffix + '_histories.qnt',
-                   'tests/recorded_calls_' + module_suffix + '_rules.qnt', 'tests/recorded_calls_histories.qnt',
-                   'tests/recorded_calls_rules.qnt')] + recorded_calls_modules + extra_modules + quint_args,
+             files('examples/recorded_calls.py', 'spec/recorded_calls_' + module_suffix + '_histories.qnt',
+                   'spec/recorded_calls_' + module_suffix + '_rules.qnt', 'spec/recorded_calls_histories.qnt',
+                   'spec/recorded_calls_rules.qnt')] + recorded_calls_modules + extra_modules + quint_args,
       env: binding_env,
       depends: public_python_core,
       is_parallel: false,
@@ -275,7 +275,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'argument-map-trace', python,
     args: ['-B', files('tests/run_argument_maps.py'), quint.full_path(),
            files('examples/recorded_argument_maps.py'), lmdb_inventory,
-           files('tests/argument_map_trace_histories.qnt', 'tests/argument_map_trace_rules.qnt'), '--native'] + quint_args,
+           files('spec/argument_map_trace_histories.qnt', 'spec/argument_map_trace_rules.qnt'), '--native'] + quint_args,
     env: binding_env,
     depends: public_python_core,
     is_parallel: false,
@@ -285,7 +285,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'argument-maps', python,
     args: ['-B', files('tests/run_argument_maps.py'), quint.full_path(),
            files('examples/recorded_argument_maps.py'), lmdb_inventory,
-           files('tests/argument_maps_histories.qnt', 'tests/argument_maps_rules.qnt')] + quint_args,
+           files('spec/argument_maps_histories.qnt', 'spec/argument_maps_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -297,7 +297,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'argument-map-budget', python,
     args: ['-B', files('tests/run_argument_maps.py'), quint.full_path(),
            files('examples/recorded_argument_maps.py'), lmdb_inventory,
-           files('tests/argument_map_budget_histories.qnt', 'tests/argument_map_budget_rules.qnt')] + quint_args,
+           files('spec/argument_map_budget_histories.qnt', 'spec/argument_map_budget_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -307,7 +307,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'argument-map-poison', python,
     args: ['-B', files('tests/run_argument_map_poison.py'), quint.full_path(),
            files('examples/recorded_argument_maps.py'), lmdb_inventory,
-           files('tests/argument_map_poison_histories.qnt', 'tests/argument_map_poison_rules.qnt')] + quint_args,
+           files('spec/argument_map_poison_histories.qnt', 'spec/argument_map_poison_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -317,8 +317,8 @@ with tempfile.TemporaryDirectory() as tmp:
     'argument-map-request-integrity', python,
     args: ['-B', files('tests/run_argument_map_request_integrity.py'), quint.full_path(),
            files('examples/recorded_argument_maps.py'), lmdb_inventory,
-           files('tests/argument_map_request_integrity_histories.qnt',
-                 'tests/argument_map_request_integrity_rules.qnt')] + quint_args,
+           files('spec/argument_map_request_integrity_histories.qnt',
+                 'spec/argument_map_request_integrity_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -328,8 +328,8 @@ with tempfile.TemporaryDirectory() as tmp:
     'argument-map-returned-source', python,
     args: ['-B', files('tests/run_argument_map_returned_source.py'), quint.full_path(),
            files('examples/recorded_argument_maps.py'), lmdb_inventory,
-           files('tests/argument_map_returned_source_histories.qnt',
-                 'tests/argument_map_returned_source_rules.qnt')] + quint_args,
+           files('spec/argument_map_returned_source_histories.qnt',
+                 'spec/argument_map_returned_source_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -339,7 +339,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'recorded-builtins', python,
     args: ['-B', files('tests/run_builtins.py'), quint.full_path(),
            files('examples/recorded_builtins.py'), lmdb_inventory,
-           files('tests/builtins_histories.qnt', 'tests/builtins_rules.qnt')] + quint_args,
+           files('spec/builtins_histories.qnt', 'spec/builtins_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -348,10 +348,10 @@ with tempfile.TemporaryDirectory() as tmp:
   test(
     'builtin-primitives', python,
     args: ['-B', files('tests/run_builtin_primitives.py'), quint.full_path(), lmdb_inventory,
-           files('tests/builtin_primitive_histories.qnt', 'tests/builtin_primitive_rules.qnt',
-                 'tests/builtin_primitive_fixture.qnt', 'tests/builtin_primitive_evidence.qnt',
-                 'tests/builtins_profile_histories.qnt', 'tests/builtins_profile_rules.qnt',
-                 'tests/builtins_values_histories.qnt', 'tests/builtins_values_rules.qnt')] + quint_args,
+           files('spec/builtin_primitive_histories.qnt', 'spec/builtin_primitive_rules.qnt',
+                 'spec/builtin_primitive_fixture.qnt', 'spec/builtin_primitive_evidence.qnt',
+                 'spec/builtins_profile_histories.qnt', 'spec/builtins_profile_rules.qnt',
+                 'spec/builtins_values_histories.qnt', 'spec/builtins_values_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -361,7 +361,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'recorded-composition', python,
     args: ['-B', files('tests/run_composition.py'), quint.full_path(),
            files('examples/recorded_composition.py'), lmdb_inventory,
-           files('tests/composition_histories.qnt', 'tests/composition_rules.qnt')] + quint_args,
+           files('spec/composition_histories.qnt', 'spec/composition_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -371,7 +371,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'recorded-closures', python,
     args: ['-B', files('tests/run_closures.py'), quint.full_path(),
            files('examples/recorded_closures.py'), lmdb_inventory,
-           files('tests/closure_histories.qnt', 'tests/closure_rules.qnt')] + quint_args,
+           files('spec/closure_histories.qnt', 'spec/closure_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -381,7 +381,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'recorded-ordinary-calls', python,
     args: ['-B', files('tests/run_ordinary_calls.py'), quint.full_path(),
            files('examples/recorded_ordinary_calls.py'), lmdb_inventory,
-           files('tests/ordinary_histories.qnt', 'tests/ordinary_rules.qnt')] + quint_args,
+           files('spec/ordinary_histories.qnt', 'spec/ordinary_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -390,8 +390,8 @@ with tempfile.TemporaryDirectory() as tmp:
   test(
     'live-call-scopes', python,
     args: ['-B', files('tests/run_builtin_primitives.py'), quint.full_path(), lmdb_inventory,
-           files('tests/live_scope_histories.qnt', 'tests/live_scope_rules.qnt',
-                 'tests/builtin_primitive_fixture.qnt', 'tests/builtin_primitive_evidence.qnt')] + quint_args,
+           files('spec/live_scope_histories.qnt', 'spec/live_scope_rules.qnt',
+                 'spec/builtin_primitive_fixture.qnt', 'spec/builtin_primitive_evidence.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -400,7 +400,7 @@ with tempfile.TemporaryDirectory() as tmp:
     'implementation-bound-calls', python,
     args: ['-B', files('tests/run_implementation_bound.py'), quint.full_path(),
            files('examples/recorded_ordinary_calls.py'), lmdb_inventory,
-           files('tests/implementation_bound_histories.qnt', 'tests/implementation_bound_rules.qnt')] + quint_args,
+           files('spec/implementation_bound_histories.qnt', 'spec/implementation_bound_rules.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,

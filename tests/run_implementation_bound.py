@@ -160,7 +160,7 @@ def main():
             row = replay_history(replay, path, history)
             evidence.append({**row, "closures": [replay.closures[dag] for dag in sorted(replay.closures)]})
         validation = evaluate(quint, args.rules, directory, evidence,
-                              [args.histories, *(Path(__file__).with_name(f"ordinary_{name}.qnt")
+                              [args.histories, *(args.histories.with_name(f"ordinary_{name}.qnt")
                                                  for name in ("histories", "rules"))], attempt_defaults=EMPTY)
         check_verdicts(histories, evidence, validation)
 
