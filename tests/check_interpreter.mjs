@@ -12,6 +12,7 @@ assert(quintArgs.length === 0 || (quintArgs.length === 2 && quintArgs[0] === '--
        'expected optional --quint-script <path>');
 const quintPrefix = quintArgs.slice(1);
 const testFile = (name) => fileURLToPath(new URL(name, import.meta.url));
+const specFile = (name) => fileURLToPath(new URL(`../spec/${name}`, import.meta.url));
 
 function run(executable, args, input) {
     const result = spawnSync(executable, args, { encoding: 'utf8', input, timeout: 30_000 });
@@ -63,7 +64,7 @@ function literal(value) {
 
 function loadFixture(directory, name) {
     const source = join(directory, `${name}.qnt`);
-    copyFileSync(testFile(`${name}.qnt`), source);
+    copyFileSync(specFile(`${name}.qnt`), source);
     return quintState(directory, source, 'requests');
 }
 
@@ -137,7 +138,7 @@ function transport(directory) {
 
 function verdicts() {
     const args = ['-B', testFile('run_histories.py'), quint, 'daggerml.core', scanner,
-                  testFile('interpreter_verdict_histories.qnt'), testFile('interpreter_verdict.qnt'), ...quintArgs];
+                  specFile('interpreter_verdict_histories.qnt'), specFile('interpreter_verdict.qnt'), ...quintArgs];
     const positive = run(python, args);
     succeeded(positive, 'complete verdict');
     assert.match(positive.stdout, /^history 1: datum_encode\(i64, 42, packed\)=ok\r?$/m);

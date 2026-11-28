@@ -23,11 +23,11 @@ Use focused validation while working and `scripts/check.sh --quint` for the fina
 ## Decisions that affect the size of the port
 
 1. **Application report versus stored graph.** CLI output and `data.mdb` byte comparisons do not independently establish exact commit parents, tree entries, DAG roots, node kinds, or object collection. Packet 1 added [individual native reads on the workflow repository](../tests/README.md#recorded-calls) through `tests/replay_core.py`. Quint can compare the native IDs with the CLI's reported IDs. Do not infer a physical edge from the application's own JSON.
-2. **Execution versus inspection.** `checkCalls` in `tests/recorded_calls_rules.qnt` correctly expects arithmetic for execution. Inspection of a deliberately stored `2 + 3 → -17`, scale-by-6 `→ -98` must return `-17` and `-98`. Use a stored-evidence rule rather than weakening the execution rule. When executing scale against the stored `-17`, the newly computed result is `-102`.
+2. **Execution versus inspection.** `checkCalls` in `spec/recorded_calls_rules.qnt` correctly expects arithmetic for execution. Inspection of a deliberately stored `2 + 3 → -17`, scale-by-6 `→ -98` must return `-17` and `-98`. Use a stored-evidence rule rather than weakening the execution rule. When executing scale against the stored `-17`, the newly computed result is `-102`.
 3. **Rejection versus cause.** `rejectedWriteVerdict` checks a diagnosed failure and unchanged state, not necessarily the expected reason. Set up the *other* guards to succeed. Distinguish no directory, an initialized empty repository, an absent ref, and a swept object. Preserve meaningful CLI exit/stdout/stderr and independent pre/post observations. An aborted transaction used to derive a candidate datum ID is a probe, not a committed write.
 4. **Persisted forgery versus fabricated observation.** A control that mutates a report tests a Quint rule. Where the Python test writes a well-formed but inconsistent record, exercise the actual reader/publisher against that record. Prove the fixture has the intended defect and include its valid counterpart. Prefer expressing construction in Quint using existing primitive writes.
 5. **Python API versus strings.** CLI text cannot represent a bytes subclass, bool versus int, a dropped last reference, or a path that raises if touched. `CoreHistory.run` prevents some invalid transitions before the public binding and discards consumed aliases. A harness error is not an observed binding rejection. Do not substitute the private replay extension for the installed binding.
-6. **Live identity versus equal values.** `tests/ordinary_rules.qnt` already compares identity tokens for handoffs. Reuse that idea where identity, callback entry, no binding, or a particular failure point is the guarantee. Do not instrument private functions to answer a question a public result or native record already answers. Do not introduce fault-injection state into the installed library.
+6. **Live identity versus equal values.** `spec/ordinary_rules.qnt` already compares identity tokens for handoffs. Reuse that idea where identity, callback entry, no binding, or a particular failure point is the guarantee. Do not instrument private functions to answer a question a public result or native record already answers. Do not introduce fault-injection state into the installed library.
 7. **Interpreter conformance.** An interpreter cannot establish the correctness of its own verdict handling just by issuing a passing verdict. Drive known input and inspect output/exit status independently. Decide explicitly whether exact generated Quint source formatting is a contract in addition to round-trip semantics.
 
 ## Packet scope
@@ -229,8 +229,8 @@ failed histories 25 and 26 step 11 (`wrong_native_status`).
 
 ## Packet 2 evidence
 
-The [stored-result](../tests/recorded_calls_stored_histories.qnt) and
-[transfer](../tests/recorded_calls_outbound_histories.qnt) histories share native
+The [stored-result](../spec/recorded_calls_stored_histories.qnt) and
+[transfer](../spec/recorded_calls_outbound_histories.qnt) histories share native
 fixture steps for `2 + 3 → -17`. Execution produces `-102`, but inspection and
 publication preserve the intentionally stored `-98`. CLI and native steps can
 share explicit ID aliases without re-resolving a mutable pin. The workflow
@@ -265,8 +265,8 @@ Changing a retained prefix byte while still truncating by one byte failed 36:29
 
 ## Packet 3 evidence
 
-The [plan histories](../tests/recorded_calls_plan_histories.qnt) and [receipt
-histories](../tests/recorded_calls_receipt_histories.qnt) run against the public
+The [plan histories](../spec/recorded_calls_plan_histories.qnt) and [receipt
+histories](../spec/recorded_calls_receipt_histories.qnt) run against the public
 binding through the workflow CLI, with independent native reads. Quint specifies
 the persisted fixtures as individual native operations. For a future request
 that the CLI planner cannot produce, the runner exposes one native bundle export
@@ -304,8 +304,8 @@ failed 11:29 (both `wrong_rejection`).
 
 ## Packet 4 evidence
 
-[Staged and direct reuse](../tests/recorded_calls_reuse_histories.qnt) and
-[result and attempt selection](../tests/recorded_calls_selection_histories.qnt)
+[Staged and direct reuse](../spec/recorded_calls_reuse_histories.qnt) and
+[result and attempt selection](../spec/recorded_calls_selection_histories.qnt)
 run in separate Meson entries with the shared recorded-calls runner. The runner
 passes immutable native IDs into existing CLI commands and does not evaluate
 fixture validity or decide the outcome. The histories make and read persisted
@@ -342,7 +342,7 @@ proof reader and writer to agree on the wrong root failed selection 1:89
 
 ## Packet 5 adoption evidence
 
-The [adoption suite](../tests/recorded_calls_adoption_histories.qnt) uses the
+The [adoption suite](../spec/recorded_calls_adoption_histories.qnt) uses the
 shared workflow runner. It passes native basis IDs into the real adoption
 command so Quint can exercise persisted forgeries. Every link of the deep
 chain is requested in Quint as an encode and a put; Python only dispatches
@@ -369,8 +369,8 @@ step 2110 (`wrong_inspect`).
 
 ## Packet 5 policy and intent evidence
 
-The [policy](../tests/recorded_calls_policy_histories.qnt) and
-[intent](../tests/recorded_calls_intent_histories.qnt) suites use the shared
+The [policy](../spec/recorded_calls_policy_histories.qnt) and
+[intent](../spec/recorded_calls_intent_histories.qnt) suites use the shared
 runner. Native IDs reach the real CLI as explicit expected commits; native
 reads check persisted graphs independently of the reports. Each suite passed
 two live histories with coverage and rule controls. Four superseded Python
@@ -397,8 +397,8 @@ reuse update of `main` failed intent 2:68 (`wrong_native_status`).
 
 ## Packet 5 supersession and knowledge evidence
 
-The [writer and offline-view](../tests/recorded_calls_supersession_histories.qnt)
-and [malformed declaration](../tests/recorded_calls_supersession_invalid_histories.qnt)
+The [writer and offline-view](../spec/recorded_calls_supersession_histories.qnt)
+and [malformed declaration](../spec/recorded_calls_supersession_invalid_histories.qnt)
 entries use the shared runner. Quint requests individual native export and
 staged import calls and compares their roots with the original decision and
 sibling IDs. The runner hashes the canonical report without `knowledge_view`;
@@ -426,8 +426,8 @@ genesis validation failed invalid 1:429 and 1:443 (`wrong_rejection`).
 
 ## Packet 6 implementation-scoped table evidence
 
-The [capacity](../tests/recorded_calls_table_capacity_histories.qnt) and
-[scope](../tests/recorded_calls_table_scope_histories.qnt) entries replay the
+The [capacity](../spec/recorded_calls_table_capacity_histories.qnt) and
+[scope](../spec/recorded_calls_table_scope_histories.qnt) entries replay the
 real CLI and individual native reads and writes. The shared runner can pass a
 native ID as an exact table operand or as the hexadecimal text of a stored
 request key. Quint defines the fixtures and checks the committed graphs,
@@ -456,8 +456,8 @@ table parent failed scope 3:50.
 
 ## Packet 6 intent-scoped table evidence
 
-The [edit](../tests/recorded_calls_intent_table_edit_histories.qnt) and
-[route](../tests/recorded_calls_intent_table_route_histories.qnt) entries use
+The [edit](../spec/recorded_calls_intent_table_edit_histories.qnt) and
+[route](../spec/recorded_calls_intent_table_route_histories.qnt) entries use
 existing shared CLI and native replay commands. Quint constructs and reads back
 the malformed commits, compares exact table rows in order, and checks discarded
 writes. All five live histories passed with coverage and rule controls. The
@@ -486,9 +486,9 @@ live table pin instead of the stored parent failed route 1:80–81
 
 ## Packet 7 evidence
 
-The [argument-map trace](../tests/argument_map_trace_histories.qnt),
-[composition](../tests/composition_histories.qnt), and
-[closure](../tests/closure_histories.qnt) suites execute the actual workflow
+The [argument-map trace](../spec/argument_map_trace_histories.qnt),
+[composition](../spec/composition_histories.qnt), and
+[closure](../spec/closure_histories.qnt) suites execute the actual workflow
 CLI. Quint specifies fixture writes and independent readback. The shared
 workflow adapter dispatches individual native calls, with MAP encoding taking
 explicit key/value datum IDs. No native handles are kept open across CLI
@@ -517,7 +517,7 @@ producer's getter binding failed recorded-closures 2:111 and 2:200
 
 ## Packet 8 evidence
 
-The separate [built-in primitives replay](../tests/builtin_primitive_histories.qnt)
+The separate [built-in primitives replay](../spec/builtin_primitive_histories.qnt)
 uses the public Python module to execute requested Recorder, NodeOperations, and
 Inspector methods. Quint constructs malformed records with single-call native
 steps and checks both reported and physical edges. The recorder dispatcher
@@ -556,11 +556,11 @@ original ID (20:24).
 
 ## Packet 9 evidence
 
-The [live scopes](../tests/live_scope_histories.qnt) use the built-in replay
+The [live scopes](../spec/live_scope_histories.qnt) use the built-in replay
 runner's public binding. Quint requests calls, copied nodes, callback behavior
 and worker-thread invocation; Python reports exact errors, value bytes, object
-identities and actual entries. The [ordinary callback and phase histories](../tests/ordinary_histories.qnt)
-and [closure no-bind history](../tests/closure_histories.qnt) use the real
+identities and actual entries. The [ordinary callback and phase histories](../spec/ordinary_histories.qnt)
+and [closure no-bind history](../spec/closure_histories.qnt) use the real
 workflows. A runner-local hook reads each actual ref update in the writer
 before throwing; Quint compares its observation with the committed prefix
 and verifies rollback. No fault state was added to installed code.
@@ -601,9 +601,9 @@ failed closures 3:6.
 
 ## Packet 10 typed boundary evidence
 
-The [public core histories](../tests/python_binding_histories.qnt) reuse the
+The [public core histories](../spec/python_binding_histories.qnt) reuse the
 single-call interpreter with typed operands and Python exception and result
-observations. The [recorded-call Python histories](../tests/recorded_calls_python_histories.qnt)
+observations. The [recorded-call Python histories](../spec/recorded_calls_python_histories.qnt)
 and the closure and ordinary typed histories request direct calls to their
 example modules. The workflow adapters count path conversions and report them
 alongside diagnostics and storage observations. Quint makes the comparisons.
@@ -642,7 +642,7 @@ Python 7:5. Accepting bool as an int failed closure 4:3 and ordinary 8:3.
 
 ## Packet 10 handle lifetime evidence
 
-The [public binding histories](../tests/python_binding_histories.qnt) now
+The [public binding histories](../spec/python_binding_histories.qnt) now
 request reference releases and one call at a time on a worker thread. The
 adapter can retain an ended capsule so retries reach the real binding. It
 reports the calling thread relative to the owner and records finalizers when

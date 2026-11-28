@@ -57,10 +57,11 @@ This builds the test executables in `build/core-check-quint/` and runs
 [provenance handoff and recorded workflow integrations](tests/README.md#process-integration),
 [independent interpreter conformance](tests/README.md#interpreter-conformance),
 and focused native integrity, boundary, and fault tests.
-The [shared trace interpreter](tests/README.md) replays one core function per
-native request. Ref and Python boundary replay use public `daggerml.core`;
-the other core replay suites use a private test binding. Quint checks observations
-against the contracts for [Python handles and errors](docs/spec-next/python.md#handles-and-errors),
+Quint modules live in [`spec/`](spec/). The [shared trace interpreter](tests/README.md)
+replays one core function per native request. Ref and Python boundary replay use
+public `daggerml.core`; the other core replay suites use a private test binding.
+Quint checks observations against the contracts for
+[Python handles and errors](docs/spec-next/python.md#handles-and-errors),
 [refs](docs/spec-next/repository.md#refs), [transfer](docs/spec-next/transfer.md),
 and [garbage collection](docs/spec-next/repository.md#explicit-garbage-collection).
 Reopened read transactions and independent LMDB scans check snapshot publication,
