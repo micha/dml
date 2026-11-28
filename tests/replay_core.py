@@ -49,8 +49,10 @@ OPERATIONS = {
     "object_view_entry": Operation(("view", "int"), "entry"),
     "datum_decode": Operation(("packed",), "datum"),
     "repo_export_commit": Operation(("repo", "id"), "bundle", observes_failure=True),
+    "repo_export_ref": Operation(("repo", "name"), "bundle", observes_failure=True),
     "repo_import_commit": Operation(("repo", "bundle"), "id", observes_failure=True),
     "repo_import_commit_staged": Operation(("repo", "bundle", "name"), "id", observes_failure=True),
+    "repo_import_commit_expected": Operation(("repo", "bundle", "name", "optional_id"), "id", observes_failure=True),
     "txn_collect_garbage": Operation(("txn",), "count", observes_failure=True),
     "txn_check_integrity": Operation(("txn",), "integrity"),
 }
@@ -126,6 +128,8 @@ class CoreHistory:
         return self.directory / alias
 
     def resolve(self, kind, arg):
+        if kind == "optional_id":
+            return None if arg == "none" else self.resolve("id", arg)
         if kind in ("packed", "id", "bundle") and arg.startswith("hex:"):
             return bytes.fromhex(arg[4:])
         if kind == "bundle" and "~" in arg:

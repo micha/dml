@@ -105,7 +105,14 @@ owner resumes.
 - **Transfer:** exact self-contained export, dependency ordering, deterministic
   re-export, independent input ordering, malformed and thin bundles, and
   explicit import, inspection and publication. The histories check datums at
-  the selected and parent snapshots. A separate history records and pins a
+  the selected and parent snapshots. The guarded receive history exports by
+  ref, moves that ref and collects the exported commit on the source, then
+  publishes the already captured bundle to a destination ref. It exercises
+  absence, same-tip retry, stale expectation, divergence, and a fast-forward
+  through the second parent. Reopen and collection checks cover both the
+  published snapshot and an unchanged destination head. See the
+  [design model](../docs/epics/remote-push-fetch.md#design-evidence) for the
+  complementary TLC check. A separate history records and pins a
   result through individual writes, rejects a distinct duplicate pin, returns
   the result, conditionally publishes it, and releases the staging ref with an
   expected target. Integrity reports and exact typed IDs show what the remaining

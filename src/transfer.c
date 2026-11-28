@@ -25,6 +25,7 @@ typedef struct {
   dml_bytes record;
   size_t wire_offset; /* Assigned in export postorder. */
   bool reachable;     /* Marked from the root during import. */
+  bool must_exist;    /* In the current ref's closure during guarded import. */
 } bundle_entry;
 
 typedef struct {
@@ -189,9 +190,9 @@ static dml_status write_bundle(const export_walk *walk, const dml_object_id *roo
   return DML_OK;
 }
 
-dml_status dml_repo_export_commit(dml_repo *repo, const dml_object_id *root,
-                                  dml_buffer *out, dml_error *error) {
-  if (root == NULL || out == NULL || out->data != NULL || out->len != 0) {
+static dml_status export_bundle(dml_repo *repo, const dml_object_id *root, const dml_bytes *ref_name,
+                                dml_buffer *out, dml_error *error) {
+  if ((root == NULL && ref_name == NULL) || out == NULL || out->data != NULL || out->len != 0) {
     return fail(error, DML_INVALID_ARGUMENT, "export requires a root and empty output buffer");
   }
   dml_error_clear(error);
@@ -199,13 +200,33 @@ dml_status dml_repo_export_commit(dml_repo *repo, const dml_object_id *root,
   dml_txn *txn = NULL;
   if (status == DML_OK) status = dml_txn_begin(repo, DML_TXN_READ, &txn, error);
   if (status != DML_OK) return status;
+  dml_object_id selected;
+  if (ref_name != NULL) {
+    status = dml_txn_read_head_id(txn, *ref_name, &selected, error);
+    root = &selected;
+  }
   export_walk walk = {.size = BUNDLE_HEADER_SIZE, .next_offset = BUNDLE_HEADER_SIZE};
-  status = walk_export(txn, &walk, root, error);
+  if (status == DML_OK) {
+    status = walk_export(txn, &walk, root, error);
+    if (status == DML_NOT_FOUND && ref_name != NULL) {
+      status = fail(error, DML_INTEGRITY_ERROR, "selected ref closure is missing an object");
+    }
+  }
   if (status == DML_OK) status = write_bundle(&walk, root, out, error);
   free(walk.stack);
   index_free(&walk.index);
   dml_txn_abort(&txn);
   return status;
+}
+
+dml_status dml_repo_export_commit(dml_repo *repo, const dml_object_id *root,
+                                  dml_buffer *out, dml_error *error) {
+  return export_bundle(repo, root, NULL, out, error);
+}
+
+dml_status dml_repo_export_ref(dml_repo *repo, dml_bytes ref_name,
+                               dml_buffer *out, dml_error *error) {
+  return export_bundle(repo, NULL, &ref_name, out, error);
 }
 
 static dml_status parse_frame(dml_bytes *tail, bundle_index *index, dml_error *error) {
@@ -301,36 +322,96 @@ static dml_status parse_bundle(dml_bytes bundle, bundle_index *index, dml_object
   return validate_closure(index, root, error);
 }
 
-static dml_status store_bundle(dml_repo *repo, const bundle_index *index,
-                                const dml_object_id *root, const dml_bytes *ref_name,
+typedef struct {
+  dml_bytes name;
+  bool guarded;
+  const dml_object_id *expected;
+} bundle_ref;
+
+/* As in validate_closure, visit referrers before dependencies. This subset
+ * must already exist byte-for-byte; do not silently repair the old history. */
+static dml_status require_old_closure(dml_txn *txn, bundle_index *index, size_t old,
+                                      dml_error *error) {
+  index->entries[old].must_exist = true;
+  for (size_t i = old + 1; i != 0;) {
+    const bundle_entry *entry = &index->entries[--i];
+    if (!entry->must_exist) continue;
+    dml_status status = dml_txn_require_stored_object(txn, entry->type, &entry->id,
+                                                      entry->record, error);
+    if (status != DML_OK) return status;
+    dml_object_refs refs;
+    dml_record_type type;
+    dml_object_id id;
+    dml_object_refs_init(&refs, entry->record.data, entry->type);
+    while (dml_object_refs_next(&refs, &type, &id)) {
+      size_t target = index_find(index, type, &id); /* Known to be earlier than i. */
+      index->entries[target].must_exist = true;
+    }
+  }
+  return DML_OK;
+}
+
+static dml_status check_expected(dml_txn *txn, bundle_index *index, const bundle_ref *ref,
+                                 dml_error *error) {
+  dml_object_id actual;
+  dml_status status = dml_txn_read_head_id(txn, ref->name, &actual, error);
+  if (status == DML_NOT_FOUND && ref->expected == NULL) {
+    dml_error_clear(error);
+    return DML_OK;
+  }
+  if (status == DML_NOT_FOUND || (status == DML_OK &&
+      (ref->expected == NULL || !id_equal(&actual, ref->expected)))) {
+    return fail(error, DML_INVALID_STATE, "destination ref differs from expectation");
+  }
+  if (status != DML_OK) return status;
+  /* Only a commit can refer to another commit, and only through its parents.
+   * Thus commit membership in the exact closure proves all-parent ancestry. */
+  size_t old = index_find(index, DML_REC_COMMIT, &actual);
+  if (old == SIZE_MAX) return fail(error, DML_INVALID_STATE, "destination ref would not fast-forward");
+  return require_old_closure(txn, index, old, error);
+}
+
+static dml_status store_bundle(dml_repo *repo, bundle_index *index,
+                                const dml_object_id *root, const bundle_ref *ref,
                                 dml_error *error) {
   dml_txn *txn = NULL;
   dml_status status = dml_txn_begin(repo, DML_TXN_WRITE, &txn, error);
+  const bool replacing = ref != NULL && ref->expected != NULL;
+  if (status == DML_OK && ref != NULL && ref->guarded) {
+    status = check_expected(txn, index, ref, error);
+    if (status == DML_OK && replacing && id_equal(root, ref->expected)) {
+      dml_txn_abort(&txn);
+      return DML_OK; /* The entire local closure already matches. */
+    }
+  }
   for (size_t i = 0; status == DML_OK && i < index->count; i++) {
     const bundle_entry *entry = &index->entries[i];
-    status = dml_txn_store_validated_object(txn, entry->type, &entry->id, entry->record, error);
+    if (!entry->must_exist) {
+      status = dml_txn_store_validated_object(txn, entry->type, &entry->id, entry->record, error);
+    }
   }
-  if (status == DML_OK && ref_name != NULL) {
-    status = dml_txn_ref_create(txn, *ref_name, root, error);
+  if (status == DML_OK && ref != NULL) {
+    status = replacing ? dml_txn_ref_update(txn, ref->name, root, error)
+                       : dml_txn_ref_create(txn, ref->name, root, error);
   }
   if (status == DML_OK) return dml_txn_commit(&txn, error);
   dml_txn_abort(&txn);
   return status;
 }
 
-static dml_status import_bundle(dml_repo *repo, dml_bytes bundle, const dml_bytes *ref_name,
+static dml_status import_bundle(dml_repo *repo, dml_bytes bundle, const bundle_ref *ref,
                                  dml_object_id *out, dml_error *error) {
   if (bundle.data == NULL || out == NULL) {
     return fail(error, DML_INVALID_ARGUMENT, "import requires bundle bytes and root ID output");
   }
   dml_error_clear(error);
   dml_status status = dml_repo_transfer_ready(repo, error);
-  if (status == DML_OK && ref_name != NULL) status = dml_name_validate(*ref_name, error);
+  if (status == DML_OK && ref != NULL) status = dml_name_validate(ref->name, error);
   if (status != DML_OK) return status;
   bundle_index index = {0};
   dml_object_id root;
   status = parse_bundle(bundle, &index, &root, error);
-  if (status == DML_OK) status = store_bundle(repo, &index, &root, ref_name, error);
+  if (status == DML_OK) status = store_bundle(repo, &index, &root, ref, error);
   if (status == DML_OK) *out = root;
   index_free(&index);
   return status;
@@ -343,5 +424,13 @@ dml_status dml_repo_import_commit(dml_repo *repo, dml_bytes bundle,
 
 dml_status dml_repo_import_commit_staged(dml_repo *repo, dml_bytes bundle, dml_bytes ref_name,
                                          dml_object_id *out, dml_error *error) {
-  return import_bundle(repo, bundle, &ref_name, out, error);
+  const bundle_ref ref = {.name = ref_name};
+  return import_bundle(repo, bundle, &ref, out, error);
+}
+
+dml_status dml_repo_import_commit_expected(dml_repo *repo, dml_bytes bundle, dml_bytes ref_name,
+                                           const dml_object_id *expected, dml_object_id *out,
+                                           dml_error *error) {
+  const bundle_ref ref = {.name = ref_name, .guarded = true, .expected = expected};
+  return import_bundle(repo, bundle, &ref, out, error);
 }

@@ -11,6 +11,9 @@
 #define FRAME_SIZE 24u
 #define MAX_FRAMES 262144u
 
+static const char head_key[] = "refs/heads/main";
+static const dml_bytes head = {(const uint8_t *)"main", sizeof("main") - 1};
+
 #define CHECK(condition) do { \
   if (!(condition)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #condition); exit(EXIT_FAILURE); } \
 } while (0)
@@ -77,6 +80,22 @@ static fixture populate(dml_repo *repo, size_t bytes_size) {
   return result;
 }
 
+static void create_head(dml_repo *repo, const dml_object_id *root) {
+  dml_txn *txn = NULL;
+  OK(dml_txn_begin(repo, DML_TXN_WRITE, &txn, NULL));
+  OK(dml_txn_ref_create(txn, head, root, NULL));
+  OK(dml_txn_commit(&txn, NULL));
+}
+
+static void require_head(dml_repo *repo, const dml_object_id *root) {
+  dml_txn *txn = NULL;
+  dml_object_id actual;
+  OK(dml_txn_begin(repo, DML_TXN_READ, &txn, NULL));
+  OK(dml_txn_ref_get(txn, head, &actual, NULL));
+  CHECK(memcmp(root->bytes, actual.bytes, sizeof(actual.bytes)) == 0);
+  dml_txn_abort(&txn);
+}
+
 static void write_u32(uint8_t *data, uint32_t value) {
   for (size_t i = 0; i < 4; i++) data[i] = (uint8_t)(value >> (i * 8));
 }
@@ -114,6 +133,16 @@ static void import_rejected(dml_repo *repo, dml_bytes input, dml_status status) 
   memset(sentinel.bytes, 0xa5, sizeof(sentinel.bytes));
   out = sentinel;
   expect(dml_repo_import_commit(repo, input, &out, NULL), status, "rejecting boundary bundle");
+  CHECK(memcmp(out.bytes, sentinel.bytes, sizeof(out.bytes)) == 0);
+}
+
+static void guarded_rejected(dml_repo *repo, dml_bytes input, const dml_object_id *expected,
+                             dml_status status) {
+  dml_object_id out, sentinel;
+  memset(sentinel.bytes, 0xa5, sizeof(sentinel.bytes));
+  out = sentinel;
+  expect(dml_repo_import_commit_expected(repo, input, head, expected, &out, NULL),
+         status, "rejecting guarded import");
   CHECK(memcmp(out.bytes, sentinel.bytes, sizeof(out.bytes)) == 0);
 }
 
@@ -161,14 +190,18 @@ static void require_schema_only(dml_repo *repo) {
   dml_txn_abort(&txn);
 }
 
-/* Raw LMDB access is confined to corrupt fixture setup and exact readback. */
+/* Raw LMDB access is confined to corrupt fixture setup and exact readback.
+ * Without an ID, prefix is the whole key. A null record means no row. */
 static void raw_row(const char *path, const char *prefix, const dml_object_id *id,
-                    const dml_buffer *replacement, bool verify) {
+                    const dml_buffer *record, bool verify, size_t expected_entries) {
   char key_data[64];
   size_t size = strlen(prefix);
   CHECK(size + DML_OBJECT_ID_HEX_SIZE + 1 <= sizeof(key_data));
   memcpy(key_data, prefix, size);
-  OK(dml_object_id_format(id, key_data + size, NULL));
+  if (id != NULL) {
+    OK(dml_object_id_format(id, key_data + size, NULL));
+    size += DML_OBJECT_ID_HEX_SIZE;
+  }
   MDB_env *env = NULL;
   MDB_txn *txn = NULL;
   MDB_dbi dbi;
@@ -177,24 +210,82 @@ static void raw_row(const char *path, const char *prefix, const dml_object_id *i
   CHECK(mdb_env_open(env, path, mode, 0) == MDB_SUCCESS);
   CHECK(mdb_txn_begin(env, NULL, mode, &txn) == MDB_SUCCESS);
   CHECK(mdb_dbi_open(txn, NULL, 0, &dbi) == MDB_SUCCESS);
-  MDB_val key = {size + DML_OBJECT_ID_HEX_SIZE, key_data};
+  MDB_val key = {size, key_data};
   if (verify) {
-    MDB_stat stats;
+    if (expected_entries != 0) {
+      MDB_stat stats;
+      CHECK(mdb_stat(txn, dbi, &stats) == MDB_SUCCESS && stats.ms_entries == expected_entries);
+    }
     MDB_val actual;
-    CHECK(mdb_stat(txn, dbi, &stats) == MDB_SUCCESS && stats.ms_entries == 2);
-    CHECK(mdb_get(txn, dbi, &key, &actual) == MDB_SUCCESS && actual.mv_size == replacement->len &&
-          memcmp(actual.mv_data, replacement->data, actual.mv_size) == 0);
+    int code = mdb_get(txn, dbi, &key, &actual);
+    if (record == NULL) {
+      CHECK(code == MDB_NOTFOUND);
+    } else {
+      CHECK(code == MDB_SUCCESS && actual.mv_size == record->len &&
+            memcmp(actual.mv_data, record->data, actual.mv_size) == 0);
+    }
     mdb_txn_abort(txn);
   } else {
-    if (replacement == NULL) {
+    if (record == NULL) {
       CHECK(mdb_del(txn, dbi, &key, NULL) == MDB_SUCCESS);
     } else {
-      MDB_val value = {replacement->len, replacement->data};
+      MDB_val value = {record->len, record->data};
       CHECK(mdb_put(txn, dbi, &key, &value, MDB_NOOVERWRITE) == MDB_SUCCESS);
     }
     CHECK(mdb_txn_commit(txn) == MDB_SUCCESS);
   }
   mdb_env_close(env);
+}
+
+static void check_guarded_damage(dml_repo *source, const char *path, const fixture *base,
+                                 dml_bytes base_bundle, const dml_buffer *conflict) {
+  dml_txn *txn = NULL;
+  OK(dml_txn_begin(source, DML_TXN_WRITE, &txn, NULL));
+  const dml_object_id tree = put_object(txn, (dml_object_input){.type = DML_REC_TREE});
+  const dml_object_id child = put_object(txn, (dml_object_input){
+    .type = DML_REC_COMMIT, .value.commit = {tree, {&base->root, 1}}
+  });
+  OK(dml_txn_ref_update(txn, head, &child, NULL));
+  OK(dml_txn_commit(&txn, NULL));
+  dml_buffer advance = {0};
+  OK(dml_repo_export_ref(source, head, &advance, NULL));
+  const dml_bytes child_bundle = {advance.data, advance.len};
+
+  /* A conflicting new commit must roll back the earlier insertion of its tree. */
+  raw_row(path, "objects/commits/", &child, conflict, false, 0);
+  dml_repo *dest = open_repo(path, false, 0);
+  guarded_rejected(dest, child_bundle, &base->root, DML_INTEGRITY_ERROR);
+  require_head(dest, &base->root);
+  OK(dml_repo_close(&dest, NULL));
+  raw_row(path, "objects/trees/", &tree, NULL, true, 0);
+  raw_row(path, "objects/commits/", &child, conflict, true, 0);
+  raw_row(path, "objects/commits/", &child, NULL, false, 0);
+
+  /* Ref-get still succeeds when a transitive datum is missing. Neither an
+   * apparent same-tip no-op nor a fast-forward may silently repair it. */
+  raw_row(path, "objects/datums/", &base->small, NULL, false, 0);
+  dest = open_repo(path, false, 0);
+  require_head(dest, &base->root);
+  guarded_rejected(dest, base_bundle, &base->root, DML_INTEGRITY_ERROR);
+  guarded_rejected(dest, child_bundle, &base->root, DML_INTEGRITY_ERROR);
+  OK(dml_repo_close(&dest, NULL));
+  raw_row(path, "objects/datums/", &base->small, NULL, true, 0);
+  raw_row(path, "objects/trees/", &tree, NULL, true, 0);
+  raw_row(path, "objects/commits/", &child, NULL, true, 0);
+
+  /* A present ref row is not absent even after its target disappears. */
+  raw_row(path, "objects/commits/", &base->root, NULL, false, 0);
+  dest = open_repo(path, false, 0);
+  guarded_rejected(dest, base_bundle, NULL, DML_INVALID_STATE);
+  guarded_rejected(dest, base_bundle, &base->root, DML_INTEGRITY_ERROR);
+  OK(dml_repo_close(&dest, NULL));
+  raw_row(path, "objects/commits/", &base->root, NULL, true, 0);
+  raw_row(path, "objects/datums/", &base->small, NULL, true, 0);
+  uint8_t head_value[DML_OBJECT_ID_SIZE];
+  memcpy(head_value, base->root.bytes, sizeof(head_value));
+  const dml_buffer expected_head = {head_value, sizeof(head_value)};
+  raw_row(path, head_key, NULL, &expected_head, true, 0);
+  dml_buffer_free(&advance);
 }
 
 int main(int argc, char **argv) {
@@ -206,8 +297,18 @@ int main(int argc, char **argv) {
   fixture extra_large = populate(oversize, 16u * MIB);
   dml_buffer wire = {0}, empty = {0};
   OK(dml_repo_export_commit(source, &large.root, &wire, NULL));
+  expect(dml_repo_export_ref(source, head, &empty, NULL), DML_NOT_FOUND, "absent export ref");
+  CHECK(empty.data == NULL && empty.len == 0);
+  create_head(source, &large.root);
+  dml_buffer by_ref = {0};
+  OK(dml_repo_export_ref(source, head, &by_ref, NULL));
+  CHECK(wire.len == by_ref.len && memcmp(wire.data, by_ref.data, wire.len) == 0);
+  dml_buffer_free(&by_ref);
   small_frame_first(&wire, &large);
-  import_rejected(dest, (dml_bytes){wire.data, wire.len}, DML_MAP_FULL);
+  const dml_bytes base_bundle = {wire.data, wire.len};
+  import_rejected(dest, base_bundle, DML_MAP_FULL);
+  require_schema_only(dest);
+  guarded_rejected(dest, base_bundle, NULL, DML_MAP_FULL);
   require_schema_only(dest);
   expect(dml_repo_export_commit(oversize, &extra_large.root, &empty, NULL), DML_INVALID_BOUNDS, "oversize export");
   CHECK(empty.data == NULL && empty.len == 0);
@@ -228,23 +329,27 @@ int main(int argc, char **argv) {
    * roll back their inserts without overwriting the existing wrong bytes. */
   dml_buffer conflict = {0};
   OK(dml_object_encode(&(dml_object_input){.type = DML_REC_COMMIT}, &conflict, NULL));
-  raw_row(argv[3], "objects/commits/", &large.root, &conflict, false);
+  raw_row(argv[3], "objects/commits/", &large.root, &conflict, false, 0);
   dest = open_repo(argv[3], false, 0);
-  import_rejected(dest, (dml_bytes){wire.data, wire.len}, DML_INTEGRITY_ERROR);
+  import_rejected(dest, base_bundle, DML_INTEGRITY_ERROR);
   OK(dml_repo_close(&dest, NULL));
-  raw_row(argv[3], "objects/commits/", &large.root, &conflict, true);
-  raw_row(argv[3], "objects/commits/", &large.root, NULL, false);
-  dml_buffer_free(&conflict);
+  raw_row(argv[3], "objects/commits/", &large.root, &conflict, true, 2);
+  raw_row(argv[3], "objects/commits/", &large.root, NULL, false, 0);
   dest = open_repo(argv[3], false, 0);
   dml_object_id imported;
-  OK(dml_repo_import_commit(dest, (dml_bytes){wire.data, wire.len}, &imported, NULL));
+  OK(dml_repo_import_commit(dest, base_bundle, &imported, NULL));
   CHECK(memcmp(imported.bytes, large.root.bytes, sizeof(imported.bytes)) == 0);
+  create_head(dest, &imported);
   OK(dml_repo_close(&dest, NULL));
+  check_guarded_damage(source, argv[3], &large, base_bundle, &conflict);
+  dml_buffer_free(&conflict);
 
   OK(dml_repo_close(&source, NULL));
-  raw_row(argv[1], "objects/datums/", &large.small, NULL, false);
+  raw_row(argv[1], "objects/datums/", &large.small, NULL, false, 0);
   source = open_repo(argv[1], false, 0);
   expect(dml_repo_export_commit(source, &large.root, &empty, NULL), DML_NOT_FOUND, "missing transitive edge");
+  CHECK(empty.data == NULL && empty.len == 0);
+  expect(dml_repo_export_ref(source, head, &empty, NULL), DML_INTEGRITY_ERROR, "broken selected ref closure");
   CHECK(empty.data == NULL && empty.len == 0);
   OK(dml_repo_close(&source, NULL));
   dml_buffer_free(&wire);
