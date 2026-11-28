@@ -333,12 +333,6 @@ with tempfile.TemporaryDirectory() as tmp:
   )
 
   test(
-    'builtins-boundaries', python,
-    args: ['-B', files('tests/test_builtins.py')],
-    env: binding_env,
-    depends: public_python_core,
-  )
-  test(
     'recorded-builtins', python,
     args: ['-B', files('tests/run_builtins.py'), quint.full_path(),
            files('examples/recorded_builtins.py'), lmdb_inventory,
@@ -403,10 +397,13 @@ with tempfile.TemporaryDirectory() as tmp:
   )
 
   test(
-    'call-scope-boundaries', python,
-    args: ['-B', files('tests/test_calls.py')],
+    'live-call-scopes', python,
+    args: ['-B', files('tests/run_builtin_primitives.py'), quint.full_path(), lmdb_inventory,
+           files('tests/live_scope_histories.qnt', 'tests/live_scope_rules.qnt',
+                 'tests/builtin_primitive_fixture.qnt', 'tests/builtin_primitive_evidence.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
+    timeout: replay_timeout,
   )
   test(
     'implementation-bound-calls', python,

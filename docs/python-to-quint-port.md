@@ -5,7 +5,7 @@
 ## Resume here
 
 - Baseline: `f595d97` on `implementation-bound-invocation`. Baseline line numbers below remain usable after deletions: e.g. `git show f595d97:tests/test_recorded_calls.py`.
-- **Packets 1–8 are complete for their assigned cases**; see [packet 8 evidence](#packet-8-evidence) and the earlier evidence below. Resume at **packet 9, live scopes and callbacks**, including the remaining built-in handles, recorder scope and closure no-bind cases. Leave typed cases, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`, for packet 10.
+- **Packets 1–9 are complete for their assigned cases**; see [packet 9 evidence](#packet-9-evidence) and the earlier evidence below. Resume at **packet 10, public Python boundary**. Start with typed values, encoding and diagnostics, including the short raw knowledge ID from `tests/test_recorded_calls.py:1646`; handle ownership, destruction and thread affinity in a separate slice.
 - The user wants reviewable behavioral evidence, not a translation from one large imperative suite into another. Quint specifies the requests, expected outcomes, and required scenarios. Python may execute a requested operation and report observed facts. Do not add Python tests, a Python driver per scenario, or Python code that decides correctness and returns a verdict disguised as evidence.
 - First try existing commands in the shared trace interpreter. Keep one core API call per core step. Use workflow commands for actual application operations. If an operation or observation is missing, identify the exact property, why the current evidence cannot distinguish right from wrong, and the smallest proposed interpreter change. Discuss it before building a workaround or weakening the check. Do not silently waive a guarantee.
 - Size work by **working context**, not method count. Approval of a packet covers its ordinary steps; do not ask for permission after each case. A context handoff should record the last completed obligation, remaining obligations, decisions, and actual validation results. Escalate a design decision, not routine continuation.
@@ -46,7 +46,7 @@ These are working estimates, not promises that every packet fits one session. Th
 
 ## Baseline obligation ledger
 
-**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–8 closed 73 whole methods (7, 10, 11, 10, 9, 11, 5, and 10 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766` and the stored-record portion of `test_builtins.py:73`.
+**Baseline: 122 Python methods in nine files; not 122 missing histories.** The line numbers identify methods, and the descriptions include their significant subcases. Read the baseline method and its helpers for exact fixture values and exception variants. Packets 1–9 closed 87 whole methods (7, 10, 11, 10, 9, 11, 5, 10, and 14 respectively), plus the CLI-representable cases of `test_recorded_calls.py:1646` and `:1766`. The stored and live portions of `test_builtins.py:73` are now both closed.
 
 ### `tests/test_recorded_calls.py` (65)
 
@@ -490,7 +490,7 @@ workflow adapter dispatches individual native calls, with MAP encoding taking
 explicit key/value datum IDs. No native handles are kept open across CLI
 operations. All four new histories passed with coverage and rule controls.
 Five Python methods and the argument-map and composition boundary registrations
-were removed; the closure I64 type and no-bind tests remain. The final local
+were removed; the closure I64 type and no-bind tests remained at that point. The final local
 `scripts/check.sh --quint` gate passed all 39 suites in the Nix shell on aarch64
 Linux with Quint 0.33.1. macOS and Windows were not run locally. The table uses
 one-based history and step numbers within each Meson entry.
@@ -523,9 +523,9 @@ passed with Quint 0.33.1, including against a fresh installed wheel outside the
 checkout. The same installed wheel passed the public binding tests and ref
 replay. The local `scripts/check.sh --quint` gate passed all 40 suites in the
 Nix shell on aarch64 Linux; macOS and Windows were not run locally. Ten Python
-methods were removed. The scope registration remains for `:234`, `:248`, and
-for the opaque, immutable handle, copied-value lifetime and inactive-recorder
-cases from `:73`.
+methods were removed. At that point, the scope registration still ran `:234`,
+`:248`, and the opaque, immutable handle, copied-value lifetime and
+inactive-recorder cases from `:73`; packet 9 ports those checks.
 
 The table gives one-based history and step numbers for `builtin-primitives`.
 
@@ -550,8 +550,53 @@ skipping a persisted source check (5:59). Values controls caught bool coercion
 seventeenth call position (21:53), and a false reported NaN payload retaining the
 original ID (20:24).
 
+## Packet 9 evidence
+
+The [live scopes](../tests/live_scope_histories.qnt) use the built-in replay
+runner's public binding. Quint requests calls, copied nodes, callback behavior
+and worker-thread invocation; Python reports exact errors, value bytes, object
+identities and actual entries. The [ordinary callback and phase histories](../tests/ordinary_histories.qnt)
+and [closure no-bind history](../tests/closure_histories.qnt) use the real
+workflows. A runner-local hook reads each actual ref update in the writer
+before throwing; Quint compares its observation with the committed prefix
+and verifies rollback. No fault state was added to installed code.
+
+The 11 scope, seven ordinary, and three closure histories passed with coverage
+and rule controls. The scope and built-in Python suites were removed, along
+with the three ordinary callback/rollback methods and the closure no-bind
+method. Typed methods and their registrations remain for packet 10. The final
+`scripts/check.sh --quint` gate passed all 39 suites on aarch64 Linux with
+Quint 0.33.1. The three replays, 17 public binding tests, and nine ref
+histories also passed against a freshly installed wheel without `PYTHONPATH`.
+The table uses one-based history and step numbers within each entry.
+
+| Baseline | Live history / steps | Rule and observed result |
+|---|---|---|
+| `tests/test_calls.py:20` nested scope and ended access | `nested` (scopes 1): invoke 8, copied value and rejection 12–13 | `sameNode` and `exactEntries` matched the original empty MAP in order at outer entry, leaf entry and return. The same object kept those bytes after exit, and the ended invocation rejected without entry. |
+| `tests/test_calls.py:31` fabricated input and foreign return | `rejectedOwnership` (scopes 2–3): equality and invocation 8–12, clean exit 15 | The substituted nodes had equal bytes and distinct identities. The fabricated input rejected before adapter entry; the foreign result rejected after one entry on the exact local node. Both clean exits diagnosed poison. |
+| `tests/test_calls.py:44` caught expired target | `expired` (scopes 4): unbind 7, invoke 9, exit 11 | Only the outer adapter entered and caught the unbound-target error. It returned the input but the outer invocation still rejected; clean exit diagnosed poison. |
+| `tests/test_calls.py:60` thread affinity | `affine` (scopes 5): worker 7, owner 8 | The worker got the scope error with no entry. The owner then entered exactly once and received the original object. |
+| `tests/test_calls.py:84` named capture | `captures` (scopes 6): put/read 3–9, native 10–12 | `facts` matched both closure URI fields and the exact `get` binding; the physical sub-DAG edge selected the unsupported getter. Wrong count, wrong slot and metadata shadowing each had their own rejection. |
+| `tests/test_calls.py:97` exact prepared builtin | `builtinTarget(false)` (scopes 7): value 13, trace inspection 17 | The public invocation returned I64 `42`. `singleCall` matched one recorded operation with the prepared argument DAG, pinned getter ID and v2 source URI. |
+| `tests/test_calls.py:111` equal copy | `builtinTarget(true)` (scopes 8): copy/read 13–15, reject 16, poisoned exit 18, empty trace 20 | The substitute had the exact same bytes as the valid prepared argument but a distinct identity. Invocation rejected on identity and poisoned the call scope, without recording any operation. |
+| `tests/test_builtins.py:73` live handle portion | `opaque` (scopes 9): list access 11, setter and attribute 12–13, exited value and DAG rejection 17–18 | Setting `value` raised `AttributeError`, `dag` was absent, and the copied I64 `42` was still readable after Recorder and transaction exit. The ended recorder could not resolve the handle. |
+| `tests/test_builtins.py:234` sources and reload | `sources` (scopes 10): reject 17 and 25, reload and DAG 33–35 | Both the foreign handle and fabricated equal value rejected; the subsequent public reload returned a distinct local object with I64 `17` and the original native DAG ID. |
+| `tests/test_builtins.py:248` reentry and rollback | `recorder` (scopes 11): inactive 5, staged read 9, reentry/exit 10–12, inventory and absence 14/17, ended reentry 20 | Reentry poisoned the live recorder. The actual staged DAG was present before failure, but no live writer remained, committed inventory was unchanged, and a fresh read found the DAG absent. The ended recorder rejected reentry. |
+| `tests/test_ordinary_calls.py:34` fabricated equal node and caught poison | `callbackLifecycle` (ordinary 6): invoke 4, prefix 5, escaped callback 6, prior main 10 | `callbackVerdict` matched the equal bytes and distinct handle, exact-add-return rejection, and subsequent poisoned callback. The committed add prefix still reported 42. The escaped callback rejected without writing, and the exact prior main survived. |
+| `tests/test_ordinary_calls.py:61` healthy ended callback | ordinary 6: invoke 7, prefix 8, escaped callback 9, prior main 10 | The guest used no invalid callbacks while active. Returning after add hit the outer completion check. The escaped callback then rejected, with unchanged inventory and the prior main. |
+| `tests/test_ordinary_calls.py:80` two late faults | `lateRollback` (ordinary 7): update/prefix/main 4–6 and 7–9 | `rollbackVerdict` matched the staged double ref update from the retained add attempt and, separately, the finished update of main from the prior result. The staged commits had the correct request/attempt ancestry. Both failures restored the exact prior inventory checkpoint, and the preserved add or double prefix and main inspected successfully. |
+| `tests/test_closures.py:62` inspect without binding | `noBindStory` (closures 3): work 5, observed inspect 6, offline inspect 7 | `noBindVerdict` saw real bind/run entries on work and neither on inspection. Both reads matched the stored I64 `84` and expected graph without changing storage. |
+
+Isolated live controls detected a copied nested return (scopes 1:8), a worker
+allowed to enter (5:7), value equality accepted instead of the exact prepared
+argument (8:16), and a committed reentry rollback (11:14). Skipping poison
+after the caught callback error failed ordinary 6:4. Committing staged records
+while restoring the original refs and preserving the fault diagnosis failed
+ordinary 7:4 and 7:7. Binding during inspection without running or writing
+failed closures 3:6.
+
 ## Removal dependencies and finish line
 
-Three existing replay files (`tests/run_argument_map_poison.py`, `tests/run_argument_map_request_integrity.py`, `tests/run_argument_map_returned_source.py`) import fixture functions from `tests/test_recorded_calls.py`. `tests/test_calls.py` also imports from it. Do not strand those imports. Review remaining drivers for duplicate orchestration and behavioral judgments; keep necessary evidence collection distinct from tests. Do not start an unrelated harness rewrite.
+Three existing replay files (`tests/run_argument_map_poison.py`, `tests/run_argument_map_request_integrity.py`, `tests/run_argument_map_returned_source.py`) import fixture functions from `tests/test_recorded_calls.py`. Do not strand those imports. Review remaining drivers for duplicate orchestration and behavioral judgments; keep necessary evidence collection distinct from tests. Do not start an unrelated harness rewrite.
 
 Complete means: all ledger obligations accounted for against live behavior or an explicit user decision; no residual Python tests or obsolete registrations; no stranded fixtures; validation and installed-consumer instructions reflect the resulting suites; final results and any exceptions reported under the validation policy. Until then, this remains the only workstream.

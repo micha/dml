@@ -448,8 +448,9 @@ binding. It checks version-specific handler entry, exact stored and reported
 edges, and independent profile forgeries written by single-call native steps.
 Other histories check typed argument rejection, canonical keys and NaN bytes,
 transaction rollback, and distinct profile IDs versus repeated call positions.
-The remaining [focused runtime tests](test_builtins.py) cover live handle
-and recorder scope behavior.
+The separate [live scope replay](live_scope_histories.qnt) uses the same
+runner. It checks built-in handle opacity, value access after exit, rejection
+of foreign and fabricated sources, and rollback after recorder reentry.
 
 The [finite design model](recorded_builtins_design.qnt) checks routing and exact
 source/trace association separately from native encoding and arithmetic:
@@ -513,8 +514,10 @@ A separate history checks two stored records: invocation arguments that
 try to override the captured scale, and a producing trace that uses equivalent
 but unpinned getters. The trace mismatch must reject even on a capture-key
 miss; the genuine selection gives a pending request at the same output refs.
-[Focused Python tests](test_closures.py) retain exact I64 type checks and
-inspection without binding work.
+The no-bind history observes the binder and logical callable enter during
+work, then inspects the same attempt. Inspection returns the stored 84
+without entering either one or changing the native inventory.
+The [focused Python test](test_closures.py) retains exact I64 type checks.
 
 The [finite closure design model](recorded_closures_design.qnt) checks three
 captures, two equal-sum MAPs, one historical attempt, and at most one new
@@ -554,9 +557,14 @@ back to the selected producer, and reports distinct requested and producing
 provenance. The ref-alias history rejects an output that shares the capture
 ref, `main`, or an absent double-selection ref. Each rejection leaves native
 storage unchanged. Retrying at the same output with a distinct absent selection
-records fresh add and double attempts and publishes a new result.
-[Focused tests](test_ordinary_calls.py) cover exact I64 inputs and adapter
-failures, and inject late update failures after real native writes.
+records fresh add and double attempts and publishes a new result. The
+callback history passes a distinct equal-valued node to the guest callback,
+checks that the caught error poisons the live session, and calls escaped
+callbacks after exit from both poisoned and previously healthy sessions.
+The rollback history observes two failed writes after real ref updates in
+the writer: the double-phase output update and the final `main` update.
+Each failure restores the full inventory at the last committed phase.
+The [focused Python test](test_ordinary_calls.py) retains exact I64 input checks.
 
 The [finite ordinary call model](recorded_ordinary_design.qnt) bounds each
 path to one new outer request, two call slots, two capture versions, four MAP
@@ -579,8 +587,10 @@ double but reusing A's double, and A still running after promotion. It verifies
 actual entries into the common facade and adapters, exact pin and MAP-miss
 rejections, rejection of a grafted equal-value source, and identical read-only
 inspection of the transferred hit without its source repository.
-[Focused ownership tests](test_calls.py) check the installed facade's scope,
-thread, and native argument binding boundaries.
+The [live scope replay](live_scope_histories.qnt) checks the same facade
+through public Scope and Recorder calls. Quint compares object identities and
+adapter entries, checks poisoned and ended scopes, and matches the recorded
+call to the exact prepared argument DAG and pinned getter binding.
 
 The [finite routing model](recorded_implementation_bound_design.qnt) covers two
 implementation versions, three MAP values, two source ledgers, one retained A

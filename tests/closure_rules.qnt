@@ -17,7 +17,7 @@ module closure_rules {
   type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, unchanged: bool,
     main: str, preserved: bool, refs: List[Ref], transfer: bool, counts: List[int], selectedRef: str,
     created: List[Native], profiles: List[str], requested: Q, producing: Q, mode: str, outcome: str,
-    selection: str, attempt: str, result: str, outer: str, value: int, trace: List[Call],
+    selection: str, attempt: str, result: str, outer: str, value: int, trace: List[Call], calls: List[str],
     nativeStatus: str, nativeValue: str, nativeCount: int, nativeItems: List[str] }
   type Observation = { attempts: List[Attempt] }
 
@@ -343,17 +343,35 @@ module closure_rules {
     } else "unknown_forgery_step"
   }
 
+  pure def noBindVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val expected = noBindStory[i]
+    if (a.op != expected.op or a.args != expected.args) "wrong_step"
+    else if (i < 4) verdict(rows, i)
+    else if (i == 4 and a.calls != List("bind-scaled-sum", "run-scaled-sum")) "wrong_work_callable_entries"
+    else if (i == 5 and a.calls != List()) "inspection_entered_logical_callable"
+    else {
+      val logical = if (i == 4) 4 else 5
+      // Apply the same graph and write-boundary rules as for ordinary CLI steps.
+      val checked = rows.replaceAt(logical, { ...a, op: story[logical].op })
+      if (i >= 5 and a.main != rows[4].main) "changed_main"
+      else verdict(checked, logical)
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val count = row.attempts.length()
     if (count == story.length()) range(0, count).foldl(List(), (out, i) => out.append(verdict(row.attempts, i)))
     else if (count == forgeryStory.length())
       range(0, count).foldl(List(), (out, i) => out.append(forgeryVerdict(row.attempts, i)))
+    else if (count == noBindStory.length())
+      range(0, count).foldl(List(), (out, i) => out.append(noBindVerdict(row.attempts, i)))
     else List("missing_steps")
   }
   pure def verdictAccepted(value: str): bool = value == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 2 and verdicts.length() == 2 and verdicts[0].length() == story.length()
-      and verdicts[1].length() == forgeryStory.length()
+    evidence.length() == 3 and verdicts.length() == 3 and verdicts[0].length() == story.length()
+      and verdicts[1].length() == forgeryStory.length() and verdicts[2].length() == noBindStory.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (pass, value) => pass and verdictAccepted(value)))
       and evidence[0].attempts[10].outcome == "reuse" and evidence[0].attempts[23].outcome == "reuse"
       and evidence[0].attempts[30].outcome == "pending" and evidence[0].attempts[32].value == 126

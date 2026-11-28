@@ -16,7 +16,8 @@ module ordinary_rules {
   type CallEvent = { op: str, handles: List[int], labels: List[str] }
   type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, head: str, main: str,
     refs: List[Ref], created: List[Native], profiles: List[str], report: List[Field],
-    unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool, calls: List[CallEvent] }
+    unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool, calls: List[CallEvent],
+    errorType: str, checkpointRestored: List[bool] }
   type Observation = { attempts: List[Attempt] }
 
   pure val none: Native = { id: "", role: "", dag: "", parents: List(), target: "", selected: "",
@@ -444,6 +445,109 @@ module ordinary_rules {
     }
   }
 
+  pure def invocationSetup(rows: List[Attempt], i: int): bool = {
+    val a = rows[i]
+    val c = record(rows[1], "capture")
+    a.code == 0 and a.error == "" and
+      (if (i == 0) defaultsStep(a, "", v1) and a.main == ""
+       else if (i == 1) captureStep(a, rows[0], "")
+       else addChain(a, c, ab(13, 29), fresh, "", fresh, "") and successChain(a, c, none, false, ""))
+  }
+
+  pure val inactive = "ordinary call session is inactive or poisoned"
+  pure def valueError(a: Attempt, message: str): bool = a.code == 1 and a.errorType == "ValueError"
+    and a.error == message and a.commit == "" and a.report == List()
+  pure def guestCalls(alias: str, poisoned: bool): List[CallEvent] = {
+    val add = handoffs.fresh.slice(0, 1).concat(List(
+      event("get-return", List(3), List("a", if (poisoned) "29" else "30")),
+      event("get-return", List(4), List("b", if (poisoned) "13" else "12"))
+    )).concat(handoffs.fresh.slice(1, 3)).concat(List(
+      event("invoke-return", List(5), List()), event("escape", List(5), List(alias))
+    ))
+    val rejected = List(event("copy", List(5, 6), List("42", "42")),
+      event("make-arguments", List(6), List("x")),
+      event("callback-error", List(), List("make-arguments", "ValueError", "double arguments require this session's exact add return")),
+      event("make-arguments", List(5), List("x")), event("callback-error", List(), List("make-arguments", "ValueError", inactive)))
+    add.concat(if (poisoned) rejected else List()).append(event("outer-return", List(5), List()))
+  }
+  pure def callbackVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val c = record(rows[1], "capture")
+    val first = rows[2]
+    if (i < 3) {
+      if (invocationSetup(rows, i)) "ok" else "wrong_callback_fixture"
+    } else if (i == 3 or i == 6) {
+      if (a.calls != guestCalls(a.args[3], i == 3)) "wrong_guest_callback_events"
+      else if (valueError(a, "outer callable did not return its second call's result node")
+        and addPrefix(a, c, if (i == 3) ab(29, 13) else ab(30, 12), fresh, "", first.commit, a.args[3])) "ok"
+      else "wrong_callback_rejection_or_prefix"
+    } else if (i == 5 or i == 8) {
+      if (valueError(a, inactive) and a.calls == List(event("make-arguments", List(5), List("x")))
+        and a.unchanged and a.refs == List() and a.created == List() and a.profiles == List() and a.main == first.commit)
+        "ok" else "wrong_escaped_callback_rejection"
+    } else {
+      val read = if (i == 9) terminalReport(a, first, first, first, "finished")
+        else prefixReport(a, rows[i - 1]) and report(a, "/add", "value") == "42"
+      if (a.code == 0 and a.error == "" and a.main == first.commit and read) "ok" else "wrong_callback_prefix_read"
+    }
+  }
+
+  pure def doublePrefix(a: Attempt, c: Native, previous: str): bool = {
+    val dq = record(a, "double-request")
+    val dt = record(a, "double-attempt")
+    a.created.length() == 6 and returns(a) == 2 and addChain(a, c, ab(31, 11), fresh, "", fresh, "")
+      and doubleQ(dq, record(a, "add-attempt"), c.env.double) and native(dt, List(dq.id)) and dt.attempt != ""
+      and leafResult(dt.result, dq, c.env.doubleMap, c.env.mapSource, 84)
+      and published(a, a.args[3], dt.id, previous, previous)
+  }
+  pure def doublePrefixReport(a: Attempt, call: Attempt): bool = {
+    val add = record(call, "add-attempt")
+    val dt = record(call, "double-attempt")
+    a.commit == call.head and report(a, "", "status") == "double"
+      and outerReport(a, "/requested", record(call, "outer-request"))
+      and report(a, "/add", "attempt") == add.id and report(a, "/add", "return_dag") == add.result.dag
+      and doubleReport(a, "/double/requested", record(call, "double-request"), add)
+      and report(a, "/double", "attempt") == dt.id and report(a, "/double", "return_dag") == dt.result.dag
+      and report(a, "/double", "value") == "84" and report(a, "", "return_dag") == ""
+  }
+  pure def rollbackVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val c = record(rows[1], "capture")
+    val first = rows[2]
+    if (i < 3) {
+      if (invocationSetup(rows, i)) "ok" else "wrong_rollback_fixture"
+    } else if (i == 3 or i == 6) {
+      val afterAdd = i == 3
+      val target = if (afterAdd) "add" else "double"
+      val at = if (afterAdd) 4 else 9
+      val ref = if (afterAdd) a.args[3] else "main"
+      val role = if (afterAdd) "ordinary-example-double-attempt-v1" else "ordinary-example-finished-v1"
+      val checkpoint = event("checkpoint", List(), List(target, a.head, first.commit))
+      // Each real update is read back in its own writer before fault injection.
+      val prefix = handoffs.fresh.slice(0, at).append(checkpoint)
+        .concat(handoffs.fresh.slice(at, if (afterAdd) 8 else 10))
+      val staged = if (a.calls.length() == prefix.length() + 2) a.calls[prefix.length()].labels else List()
+      val written = if (staged.length() == 7) staged[2] else ""
+      val parent = if (afterAdd and staged.length() == 7) staged[6] else a.head
+      val update = event("ref-updated", List(), List(ref, role, written,
+        if (afterAdd) a.head else first.commit, written, if (afterAdd) first.commit else written, parent))
+      val parentLink = if (afterAdd) event("staged-parent", List(), List(parent,
+        "ordinary-example-double-request-v1", a.head))
+        else event("staged-parent", List(), List(parent, "ordinary-example-double-attempt-v1", record(a, "double-request").id))
+      val kept = if (afterAdd) addPrefix(a, c, ab(29, 13), fresh, "", first.commit, a.args[3])
+        else doublePrefix(a, c, first.commit)
+      if (not(valueError(a, "late update fault"))) "wrong_late_fault"
+      else if (written == "" or written == a.head or written == first.commit or parent == "" or parent == written
+        or a.calls != prefix.append(update).append(parentLink)) "wrong_late_update_evidence"
+      else if (not(kept) or a.checkpointRestored != List(true)) "wrong_late_rollback_prefix"
+      else "ok"
+    } else {
+      val read = if (i == 4) prefixReport(a, rows[3]) else if (i == 7) doublePrefixReport(a, rows[6])
+        else terminalReport(a, first, first, first, "finished")
+      if (a.code == 0 and a.error == "" and a.main == first.commit and read) "ok" else "wrong_rollback_prefix_read"
+    }
+  }
+
   pure def observedStep(a: Attempt, request: Request): str = {
     val inspect = request.op == "inspect" or request.op == "inspect_observed"
     val read = inspect or request.op == "retire"
@@ -479,14 +583,23 @@ module ordinary_rules {
       val observed = observedStep(rows[i], refAliases[i])
       out.append(if (observed != "ok") observed else refAliasVerdict(rows, i))
     })
+    else if (rows.length() == callbackLifecycle.length()) range(0, callbackLifecycle.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], callbackLifecycle[i])
+      out.append(if (observed != "ok") observed else callbackVerdict(rows, i))
+    })
+    else if (rows.length() == lateRollback.length()) range(0, lateRollback.length()).foldl(List(), (out, i) => {
+      val observed = observedStep(rows[i], lateRollback[i])
+      out.append(if (observed != "ok") observed else rollbackVerdict(rows, i))
+    })
     else List("missing_steps")
   }
   pure def verdictAccepted(result: str): bool = result == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 5 and verdicts.length() == 5
+    evidence.length() == 7 and verdicts.length() == 7
       and verdicts[0].length() == story.length() and verdicts[1].length() == pinning.length()
       and verdicts[2].length() == execution.length() and verdicts[3].length() == requestIdentity.length()
-      and verdicts[4].length() == refAliases.length()
+      and verdicts[4].length() == refAliases.length() and verdicts[5].length() == callbackLifecycle.length()
+      and verdicts[6].length() == lateRollback.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (accepted, result) => accepted and verdictAccepted(result)))
       and report(evidence[0].attempts[9], "", "status") == "hit"
       and record(evidence[0].attempts[10], "double-hit").id != ""

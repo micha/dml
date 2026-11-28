@@ -190,7 +190,13 @@ module closure_histories {
       selectionArgs("try-selected", "getter-poison", "native:stored-grafted-attempt")))
     .append(request("c3", "@c3", "miss-q", "miss-d", "13", "29", "2", selectionArgs("try-selected", "t1", "@t1")))
 
+  pure val noBindStory = story.slice(0, 4).concat(List(
+    { ...story[4], op: "work_observed" },
+    { ...story[5], op: "inspect_observed" },
+    story[5]
+  ))
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, forgeryStory)
+  action init = histories' = List(story, forgeryStory, noBindStory)
   action step = histories' = histories
 }

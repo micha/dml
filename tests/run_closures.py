@@ -1,12 +1,15 @@
 """Collect live CLI and independent native observations for closure replay."""
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
+from importlib import import_module
+from io import StringIO
 import json
 from pathlib import Path
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from daggerml import core
 
@@ -277,7 +280,9 @@ class History:
         self.receipts = {}
         self.native = WorkflowNative(core, directory)
         self.operations = {op: self.command(op) for op in ("defaults", "capture", "request", "work", "inspect")}
-        self.operations.update(graft=self.graft, replicate=self.replicate, retire=self.retire, native=self.native_step)
+        self.operations.update(graft=self.graft, replicate=self.replicate, retire=self.retire, native=self.native_step,
+                               work_observed=self.command("work", observe=True),
+                               inspect_observed=self.command("inspect", observe=True))
 
     def native_step(self, op, *args):
         row = self.evidence("", (), Inventory({}), Inventory({}))
@@ -296,7 +301,7 @@ class History:
                 core.txn_abort(txn)
 
     @staticmethod
-    def evidence(op, args, before, after, *, commit="", report=None, code=0, error="", transfer=False):
+    def evidence(op, args, before, after, *, commit="", report=None, code=0, error="", transfer=False, calls=()):
         if commit and not IDENTITY.fullmatch(commit):
             raise ValueError(f"expected a commit ID, got {commit!r}")
         report = report or {}
@@ -317,26 +322,55 @@ class History:
                 "result": report.get("result", ""), "outer": report.get("return_dag", ""),
                 "value": report.get("value", 0),
                 "trace": [{**call, "sources": source_edges(call["sources"])} for call in report.get("trace", [])],
-                **WORKFLOW_NATIVE_DEFAULTS}
+                "calls": list(calls), **WORKFLOW_NATIVE_DEFAULTS}
 
-    def command(self, op):
+    def command(self, op, *, observe=False):
         def invoke(role, *args):
             path = self.directory / role
             before = self.inventory(path)
             argv = [self.native.cli_operand(RECEIPT.sub(lambda match: self.receipts[match[1]], arg)) for arg in args]
-            wrapper = ["-c", READ_ONLY] if op == "inspect" else []
-            process = subprocess.run([sys.executable, "-B", *wrapper, self.script, op, path, *argv],
-                                     cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30)
-            output = process.stdout.strip()
+            if observe:
+                code, stdout, error, calls = self.observe_cli(op, path, argv)
+            else:
+                wrapper = ["-c", READ_ONLY] if op == "inspect" else []
+                process = subprocess.run([sys.executable, "-B", *wrapper, self.script, op, path, *argv],
+                                         cwd=self.directory, capture_output=True, text=True, encoding="utf-8", timeout=30)
+                code, stdout, error, calls = process.returncode, process.stdout, process.stderr.strip(), []
+            output = stdout.strip()
             report = json.loads(output) if op == "inspect" and output else None
             after = self.inventory(path)
             if role == "source":
                 self.receipts.update(after.refs)
                 if op == "defaults" and "defaults" in after.refs:
                     self.receipts.setdefault("initial-defaults", after.refs["defaults"])
-            return self.evidence(op, (role, *args), before, after, commit=report["commit"] if report else output,
-                                 report=report, code=process.returncode, error=process.stderr.strip())
+            return self.evidence(f"{op}_observed" if observe else op, (role, *args), before, after,
+                                 commit=report["commit"] if report else output,
+                                 report=report, code=code, error=error, calls=calls)
         return invoke
+
+    def observe_cli(self, op, path, argv):
+        example = import_module(self.script.stem)
+        bind, calls = example._bind_scaled_sum, []
+
+        def observe_bind(*args, **kwargs):
+            calls.append("bind-scaled-sum")
+            scaled_sum = bind(*args, **kwargs)
+
+            def observe_run(*args, **kwargs):
+                calls.append("run-scaled-sum")
+                return scaled_sum(*args, **kwargs)
+
+            return observe_run
+
+        stdout = StringIO()
+        code, error = 0, ""
+        with (patch.object(example, "_bind_scaled_sum", observe_bind),
+              patch.object(sys, "argv", [str(self.script), op, str(path), *argv]), redirect_stdout(stdout)):
+            try:
+                example.main()
+            except SystemExit as failure:
+                code, error = (failure.code, "") if isinstance(failure.code, int) else (1, str(failure.code))
+        return code, stdout.getvalue(), error, calls
 
     def graft(self, role, kind, ref, alternate, output):
         path = self.directory / role
@@ -399,6 +433,7 @@ def main():
         parser.add_argument(name, type=absolute_path)
     args = parser.parse_args()
     quint = quint_command(args)
+    sys.path.insert(0, str(args.script.parent))
     with TemporaryDirectory(prefix="dml-closures-") as tmp:
         directory = Path(tmp)
         histories = read_histories(quint, args.histories, directory / "histories.itf.json", ["init"])

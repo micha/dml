@@ -124,7 +124,32 @@ module ordinary_histories {
     inspect("source", "retry", "@retry")
   )
 
+  pure def scripted(output: str, a: str, b: str, instructions: List[str]): Request =
+    sourceStep("invoke_callbacks", List("capture-one", "@capture-one", output, a, b).concat(instructions))
+  pure val guestAdd = List("get:a", "get:b", "invoke:add:arguments:sum")
+  pure val callbackLifecycle: List[Request] = story.slice(0, 3).concat(List(
+    scripted("poisoned", "29", "13", guestAdd.concat(List("escape:poisoned:sum", "copy:sum:foreign",
+      "make-arguments:x:foreign:invalid", "make-arguments:x:sum:valid", "return:sum"))),
+    inspect("source", "poisoned", "@poisoned"),
+    sourceStep("escaped_arguments", List("poisoned", "x")),
+    scripted("ended", "30", "12", guestAdd.concat(List("escape:ended:sum", "return:sum"))),
+    inspect("source", "ended", "@ended"),
+    sourceStep("escaped_arguments", List("ended", "x")),
+    inspect("source", "main", "@first")
+  ))
+
+  pure def refFault(output: str, a: str, b: str, checkpoint: str, ref: str, role: str): Request =
+    sourceStep("invoke_ref_fault", List("capture-one", "@capture-one", output, a, b, checkpoint, ref, role))
+  pure val lateRollback: List[Request] = story.slice(0, 3).concat(List(
+    refFault("rollback-add", "29", "13", "add", "rollback-add", "ordinary-example-double-attempt-v1"),
+    inspect("source", "rollback-add", "@rollback-add"),
+    inspect("source", "main", "@first"),
+    refFault("rollback-double", "31", "11", "double", "main", "ordinary-example-finished-v1"),
+    inspect("source", "rollback-double", "@rollback-double"),
+    inspect("source", "main", "@first")
+  ))
+
   var histories: List[List[Request]]
-  action init = histories' = List(story, pinning, execution, requestIdentity, refAliases)
+  action init = histories' = List(story, pinning, execution, requestIdentity, refAliases, callbackLifecycle, lateRollback)
   action step = histories' = histories
 }
