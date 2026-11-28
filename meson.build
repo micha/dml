@@ -101,12 +101,6 @@ if get_option('quint_tests')
   )
   binding_env = environment()
   binding_env.prepend('PYTHONPATH', meson.current_build_dir() / 'python')
-  test(
-    'python-binding', python,
-    args: ['-B', files('tests/test_python_binding.py')],
-    env: binding_env,
-    depends: public_python_core,
-  )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),

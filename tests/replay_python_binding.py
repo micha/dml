@@ -1,22 +1,59 @@
-"""Typed operands and Python-level observations for the public core binding."""
+"""Typed operands and lifetime observations for the public core binding."""
 
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 import re
+from threading import current_thread
 
 from replay_core import CoreHistory, NO_RESULT, Operation, Suite
 
 
+HANDLE_STEPS = {
+    "track_packed": Operation(("packed", "alias")),
+    "link_view": Operation(("packed", "view")),
+    "release": Operation(("alias", "alias")),
+}
+
+
+def placement(arg):
+    for tag in ("keep", "worker"):
+        if arg.startswith(f"py:{tag}:"):
+            return tag, arg.removeprefix(f"py:{tag}:")
+    return "", arg
+
+
 class BindingHistory(CoreHistory):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.owner = current_thread()
+        self.worker = None
+        self.finalized = []
+
     @staticmethod
     def operation(op, args):
+        if op in HANDLE_STEPS:
+            return HANDLE_STEPS[op]
         if op == "datum_encode" and len(args) >= 4 and args[1] == "py":
             return Operation(("datum_kind",) + ("python",) * (len(args) - 2), "packed")
         if op == "repo_open" and len(args) == 3:
             return Operation(("path", "create", "int"), "repo")
         if op == "datum_members":
             return Operation(("packed",), "members")
-        return CoreHistory.operation(op, args)
+        spec = CoreHistory.operation(op, args)
+        if args and placement(args[0])[0]:
+            if not spec.ends:
+                raise ValueError(f"handle placement is not supported for {op}")
+            # Retain the exact Python object, even if the native handle ends.
+            return replace(spec, ends="")
+        return spec
+
+    def txn_slot_unavailable(self, alias, repo):
+        # Let the public binding diagnose a second begin on the same repo.
+        return alias in self.values["txn"]
 
     def primary_repo(self, kind, arg):
+        if kind in ("repo", "txn"):
+            _, arg = placement(arg)
         if kind == "txn" and arg.startswith("py:repo:"):
             return arg.removeprefix("py:repo:")
         if kind == "path":
@@ -29,6 +66,10 @@ class BindingHistory(CoreHistory):
         return super().operands(op, spec, args)
 
     def resolve(self, kind, arg):
+        if kind == "alias":
+            return placement(arg)[1]
+        if kind in ("repo", "txn"):
+            _, arg = placement(arg)
         if arg.startswith("py:"):
             return self.typed_value([arg[3:]])
         if kind == "path":
@@ -79,12 +120,37 @@ class BindingHistory(CoreHistory):
             raise ValueError("trailing Python operand tokens")
         return value
 
+    def track_packed(self, packed, alias):
+        finalized = self.finalized
+
+        class TrackedBytes(bytes):
+            def __del__(self):
+                finalized.append(alias)
+
+        self.values["packed"][alias] = TrackedBytes(packed)
+
+    @staticmethod
+    def link_view(packed, view):
+        packed.view = view
+
+    def release(self, kind, alias):
+        # Do not resolve to an operand: CoreHistory would still own it while
+        # the step is reported, or on the wrong thread.
+        del self.values[kind][alias]
+        if kind == "txn":
+            del self.txn_repos[alias]
+
     def invoke(self, op, spec, operands):
-        call = getattr(self.core, op)
-        facts = dict(errorClass="", errorTypes=[], nativeCode=0, resultTypes=[])
+        on_owner = current_thread() is self.owner
+        facts = dict(errorClass="", errorTypes=[], nativeCode=0, resultTypes=[], onOwner=on_owner)
+        if op in HANDLE_STEPS:
+            self_method = getattr(self, op)
+            result = self_method(*operands)
+            facts["resultTypes"] = result_types(result)
+            return "ok", "", result, facts
         try:
-            result = call(*operands)
-        except (self.core.Error, TypeError, ValueError, OverflowError) as error:
+            result = getattr(self.core, op)(*operands)
+        except (self.core.Error, TypeError, ValueError, OverflowError, RuntimeError) as error:
             facts["errorClass"] = type(error).__name__
             facts["errorTypes"] = [type(arg).__name__ for arg in error.args]
             status, detail = "python_error", str(error)
@@ -104,8 +170,21 @@ class BindingHistory(CoreHistory):
         return super().observe_output(output, alias, status, result)
 
     def run(self, op, *args):
-        row = super().run(op, *args, include_error_detail=True)
-        return {**row, "paths": sorted(path.name for path in self.directory.iterdir())}
+        target = args[-1:] if op == "release" else args[:1] if op not in HANDLE_STEPS else ()
+        if target and placement(target[0])[0] == "worker":
+            if self.worker is None:
+                self.worker = ThreadPoolExecutor(max_workers=1)
+            row = self.worker.submit(super().run, op, *args, include_error_detail=True).result()
+        else:
+            row = super().run(op, *args, include_error_detail=True)
+        finalized = self.finalized[:]
+        self.finalized.clear()
+        return {**row, "finalized": finalized, "paths": sorted(path.name for path in self.directory.iterdir())}
+
+    def close(self):
+        if self.worker is not None:
+            self.worker.shutdown()
+        super().close()
 
 
 def result_types(value):
@@ -116,7 +195,7 @@ def result_types(value):
 
 class BindingSuite(Suite):
     history_type = BindingHistory
-    operations = (*Suite.operations, "datum_members")
+    operations = (*Suite.operations, "datum_members", *HANDLE_STEPS)
 
     def __init__(self, binding, scanner):
         if binding != "daggerml.core":

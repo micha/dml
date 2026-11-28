@@ -2,13 +2,13 @@ module python_binding_fixture {
   type Request = { op: str, args: List[str] }
   type Value = NoValue | Exact(str) | Saved(str) | SavedPacked(str)
   type Expected = { status: str, error: str, detail: str, shape: List[str], value: Value,
-    count: int, items: List[Value], writes: bool, creates: str }
+    count: int, items: List[Value], writes: bool, creates: str, onOwner: bool, finalized: List[str] }
   type Check = { request: Request, expect: Expected, save: str }
 
   pure def mapList(xs: List[a], f: a => b): List[b] = xs.foldl(List(), (out, x) => out.append(f(x)))
 
   pure val ok: Expected = { status: "ok", error: "", detail: "", shape: List("NoneType"),
-    value: NoValue, count: 0, items: List(), writes: false, creates: "" }
+    value: NoValue, count: 0, items: List(), writes: false, creates: "", onOwner: true, finalized: List() }
   pure val handle = { ...ok, shape: List("PyCapsule") }
   pure val bytesResult = { ...ok, shape: List("bytes") }
   pure def nativeError(status: str, detail: str): Expected =

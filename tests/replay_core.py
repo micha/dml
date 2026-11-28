@@ -217,6 +217,9 @@ class CoreHistory:
             return status, "", result, {}
         return "ok", "", result, {}
 
+    def txn_slot_unavailable(self, alias, repo):
+        return alias in self.txn_repos or repo in self.txn_repos.values()
+
     def run(self, op, *args, include_error_detail=False):
         spec = self.operation(op, args)
         has_alias = spec.output in ("txn", "packed", "id", "view", "bundle", "entry")
@@ -228,7 +231,7 @@ class CoreHistory:
             out = primary
             if out in self.values["repo"]:
                 raise ValueError("close the repository before reopening it")
-        if spec.output == "txn" and (out in self.txn_repos or primary in self.txn_repos.values()):
+        if spec.output == "txn" and self.txn_slot_unavailable(out, primary):
             raise ValueError("end the active transaction before starting another for this repository")
 
         native_args = self.operands(op, spec, args)

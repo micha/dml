@@ -52,14 +52,16 @@ DML_QUINT_SCRIPT=build/quint-tool/node_modules/@informalsystems/quint/dist/src/c
 Pass `DML_QUINT_SCRIPT=` to switch an existing build back to `quint` on `PATH`.
 
 This builds the test executables in `build/core-check-quint/` and runs
-`quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`, the
+`quint-refs`, `quint-transfer`, `quint-gc`, `quint-staged-import`,
+`quint-python-binding`, the
 [provenance handoff and recorded workflow integrations](tests/README.md#process-integration),
-and focused interpreter, Python binding, integrity, boundary, and fault tests.
+and focused interpreter, integrity, boundary, and fault tests.
 The [shared trace interpreter](tests/README.md) replays one core function per
-Quint request. Ref replay uses public `daggerml.core`; the other core replay
-suites still use a private test binding. Quint checks observations against the
-[ref contract](docs/spec-next/repository.md#refs), [transfer contract](docs/spec-next/transfer.md),
-and [garbage collection contract](docs/spec-next/repository.md#explicit-garbage-collection).
+native request. Ref and Python boundary replay use public `daggerml.core`;
+the other core replay suites use a private test binding. Quint checks observations
+against the contracts for [Python handles and errors](docs/spec-next/python.md#handles-and-errors),
+[refs](docs/spec-next/repository.md#refs), [transfer](docs/spec-next/transfer.md),
+and [garbage collection](docs/spec-next/repository.md#explicit-garbage-collection).
 Reopened read transactions and independent LMDB scans check snapshot publication,
 rollback, datum readback from imported history, and recording, transferring back,
 conditionally publishing a caller's result, and guarded staging-ref release.
