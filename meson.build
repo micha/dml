@@ -107,14 +107,6 @@ if get_option('quint_tests')
     env: binding_env,
     depends: public_python_core,
   )
-  test(
-    'recorded-calls-boundaries', python,
-    args: ['-B', files('tests/test_recorded_calls.py')],
-    env: binding_env,
-    depends: public_python_core,
-    # Suite budget for many CLI launches; Python still bounds each subprocess.
-    timeout: 90,
-  )
   lmdb_inventory = executable(
     'lmdb_inventory', 'tests/lmdb_inventory.c',
     dependencies: lmdb_proj.get_variable('lmdb_dep'),
@@ -127,6 +119,16 @@ if get_option('quint_tests')
     'quint-refs', python,
     args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
            files('tests/ref_histories.qnt', 'tests/ref_rules.qnt'), '--init', 'init', '--init', 'changedInit'] + quint_args,
+    env: binding_env,
+    depends: public_python_core,
+    timeout: replay_timeout,
+  )
+  test(
+    'quint-python-binding', python,
+    args: ['-B', trace_interpreter, quint.full_path(), 'daggerml.core', lmdb_inventory,
+           files('tests/python_binding_histories.qnt', 'tests/python_binding_rules.qnt'), '--python-boundary',
+           '--quint-module', files('tests/python_binding_fixture.qnt'),
+           '--quint-module', files('tests/python_binding_histories.qnt')] + quint_args,
     env: binding_env,
     depends: public_python_core,
     timeout: replay_timeout,
@@ -239,7 +241,7 @@ with tempfile.TemporaryDirectory() as tmp:
   # replay (the main recorded-calls suite timed out on Windows).
   adoption_fixture_modules = files('tests/recorded_calls_adoption_fixture.qnt', 'tests/recorded_calls_adoption_checks.qnt')
   foreach suite : ['reuse', 'selection', 'adoption', 'policy', 'intent', 'supersession', 'supersession-invalid',
-                   'table-capacity', 'table-scope', 'intent-table-edit', 'intent-table-route']
+                   'table-capacity', 'table-scope', 'intent-table-edit', 'intent-table-route', 'python']
     extra_modules = []
     if suite in ['adoption', 'intent', 'supersession-invalid']
       extra_modules += adoption_fixture_modules
@@ -364,18 +366,6 @@ with tempfile.TemporaryDirectory() as tmp:
     timeout: replay_timeout,
   )
 
-  test(
-    'ordinary-call-boundaries', python,
-    args: ['-B', files('tests/test_ordinary_calls.py'), lmdb_inventory],
-    env: binding_env,
-    depends: public_python_core,
-  )
-  test(
-    'closure-boundaries', python,
-    args: ['-B', files('tests/test_closures.py'), lmdb_inventory],
-    env: binding_env,
-    depends: public_python_core,
-  )
   test(
     'recorded-closures', python,
     args: ['-B', files('tests/run_closures.py'), quint.full_path(),

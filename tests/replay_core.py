@@ -18,6 +18,7 @@ NODE_KINDS = {"literal": 1, "subdag": 2}
 TXN_MODES = {"read": 1, "write": 2}
 BUNDLE_HEADER = struct.Struct("<4sI16sI")
 FRAME = struct.Struct("<HHI16s")
+NO_RESULT = object()
 
 
 @dataclass(frozen=True)
@@ -185,17 +186,44 @@ class CoreHistory:
             self.values[output][alias] = result
         return value, count, items
 
+    operation = staticmethod(operation_for)
+
+    def primary_repo(self, kind, arg):
+        if kind in ("repo", "path"):
+            return arg
+        if kind == "txn":
+            return self.txn_repos[arg]
+        return ""
+
+    def operands(self, op, spec, args):
+        native_args = [self.resolve(kind, arg) for kind, arg in zip(spec.inputs, args)]
+        if op == "datum_encode" and args[0] == "map":
+            return [native_args[0], list(zip(native_args[1::2], native_args[2::2], strict=True))]
+        if op == "datum_encode" and args[0] == "list":
+            return [native_args[0], native_args[1:]]
+        return native_args
+
+    def invoke(self, op, spec, operands):
+        try:
+            result = getattr(self.core, op)(*operands)
+        except self.core.Error as error:
+            if (len(error.args) != 3 or not isinstance(error.args[0], str)
+                    or not isinstance(error.args[1], int) or not isinstance(error.args[2], str)):
+                raise
+            status, _, detail = error.args
+            return status, detail, NO_RESULT, {}
+        if spec.observes_failure and self.status_results:
+            status, result = result
+            return status, "", result, {}
+        return "ok", "", result, {}
+
     def run(self, op, *args, include_error_detail=False):
-        spec = operation_for(op, args)
+        spec = self.operation(op, args)
         has_alias = spec.output in ("txn", "packed", "id", "view", "bundle", "entry")
         if len(args) != len(spec.inputs) + has_alias:
             raise ValueError(f"wrong argument count for {op}")
         out = args[-1] if has_alias else ""
-        primary = ""
-        if spec.inputs[0] in ("repo", "path"):
-            primary = args[0]
-        elif spec.inputs[0] == "txn":
-            primary = self.txn_repos[args[0]]
+        primary = self.primary_repo(spec.inputs[0], args[0])
         if spec.output == "repo":
             out = primary
             if out in self.values["repo"]:
@@ -203,24 +231,12 @@ class CoreHistory:
         if spec.output == "txn" and (out in self.txn_repos or primary in self.txn_repos.values()):
             raise ValueError("end the active transaction before starting another for this repository")
 
-        native_args = [self.resolve(kind, arg) for kind, arg in zip(spec.inputs, args)]
-        if op == "datum_encode" and args[0] == "map":
-            native_args = [native_args[0], list(zip(native_args[1::2], native_args[2::2], strict=True))]
-        elif op == "datum_encode" and args[0] == "list":
-            native_args = [native_args[0], native_args[1:]]
-
-        status, detail, value, count, items = "ok", "", "", 0, []
-        try:
-            result = getattr(self.core, op)(*native_args)
-        except self.core.Error as error:
-            if (len(error.args) != 3 or not isinstance(error.args[0], str)
-                    or not isinstance(error.args[1], int) or not isinstance(error.args[2], str)):
-                raise
-            status, _, detail = error.args
-        else:
-            if spec.observes_failure and self.status_results:
-                status, result = result
+        native_args = self.operands(op, spec, args)
+        status, detail, result, facts = self.invoke(op, spec, native_args)
+        value, count, items = "", 0, []
+        if result is not NO_RESULT:
             value, count, items = self.observe_output(spec.output, out, status, result)
+        if status == "ok":
             if op == "repo_open" and self.scanner is not None:
                 self.before.setdefault(primary, {})
             elif op == "txn_begin":
@@ -236,7 +252,7 @@ class CoreHistory:
             (changes if repo == primary else other_changes).extend(inventory_diff(before, after))
             self.before[repo] = after
         observed = dict(op=op, args=list(args), status=status, value=value, count=count, items=items,
-                        changes=changes, otherChanges=other_changes)
+                        changes=changes, otherChanges=other_changes, **facts)
         if include_error_detail:
             observed["detail"] = detail
         return observed
@@ -283,6 +299,9 @@ class WorkflowNative:
 
 
 class Suite:
+    history_type = CoreHistory
+    operations = (*OPERATIONS, "object_encode", "datum_encode")
+
     def __init__(self, binding, scanner):
         if binding == "daggerml.core":
             self.core = import_module(binding)
@@ -296,9 +315,9 @@ class Suite:
 
     @contextmanager
     def history(self, directory):
-        history = CoreHistory(self.core, self.scanner, directory)
+        history = self.history_type(self.core, self.scanner, directory)
         try:
-            yield Replay({op: partial(history.run, op) for op in (*OPERATIONS, "object_encode", "datum_encode")})
+            yield Replay({op: partial(history.run, op) for op in self.operations})
             if history.values["repo"] or history.values["txn"]:
                 raise ValueError("history must explicitly end transactions and close the repository")
         finally:

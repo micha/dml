@@ -27,6 +27,7 @@ from run_histories import (
     replay_step,
 )
 from trace_support import scan_inventory
+from workflow_python import evidence_text, observe_call
 
 
 PREFIX, SUFFIX = "ordinary-example-", "-v1"
@@ -36,7 +37,8 @@ NO_ENV = {"dag": "", "map": "", "mapSource": "", "list": "", "listSource": "",
           "add": "", "addMap": "", "double": "", "doubleMap": ""}
 EMPTY = {"op": "", "args": [], "commit": "", "code": 0, "error": "", "head": "", "main": "",
          "refs": [], "created": [], "profiles": [], "report": [], "unchanged": True, "preserved": True,
-         "transfer": False, "addedObjects": False, "calls": [], "errorType": "", "checkpointRestored": []}
+         "transfer": False, "addedObjects": False, "calls": [], "errorType": "", "pathUses": -1,
+         "checkpointRestored": []}
 EDITOR_OPS = {"txn_begin", "txn_ref_update", "txn_commit"}
 
 
@@ -240,7 +242,7 @@ class History:
         self.operations.update(replicate=self.replicate, retire=self.retire, graft=self.graft,
                                invoke_observed=self.invoke_observed, inspect_observed=self.inspect_observed,
                                invoke_callbacks=self.invoke_callbacks, escaped_arguments=self.escaped_arguments,
-                               invoke_ref_fault=self.invoke_ref_fault)
+                               invoke_ref_fault=self.invoke_ref_fault, python_call=self.python_call)
 
     def inventory(self, path):
         if not (path / "data.mdb").is_file():
@@ -254,7 +256,7 @@ class History:
                 core.txn_abort(txn)
 
     def evidence(self, op, args, before, after, *, commit="", head="", report=None, code=0, error="",
-                 transfer=False, remember=True, calls=(), error_type="", checkpoints=()):
+                 transfer=False, remember=True, calls=(), error_type="", path_uses=-1, checkpoints=()):
         if commit and not IDENTITY.fullmatch(commit):
             raise ValueError(f"expected a commit ID, got {commit!r}")
         if remember:
@@ -272,7 +274,7 @@ class History:
                 "profiles": after.added_builtin_profiles(before), "report": flat_report(report or {}),
                 "unchanged": before.rows == after.rows, "preserved": preserved, "transfer": transfer,
                 "addedObjects": any(key.startswith(OBJECT_PREFIX) for key in after.rows.keys() - before.rows.keys()),
-                "calls": list(calls), "errorType": error_type,
+                "calls": list(calls), "errorType": error_type, "pathUses": path_uses,
                 "checkpointRestored": [checkpoint.rows == after.rows for checkpoint in checkpoints]}
 
     def resolve(self, arg):
@@ -294,6 +296,17 @@ class History:
                                  head=after.refs.get(ref, ""), report=report, code=process.returncode,
                                  error=process.stderr.strip())
         return invoke
+
+    def python_call(self, role, op, *operands):
+        if op != "invoke":
+            raise ValueError(f"cannot invoke Python ordinary workflow {op!r}")
+        path = self.directory / role
+        before = self.inventory(path)
+        action = import_module(self.script.stem).invoke
+        result, error_type, error, path_uses = observe_call(action, path, operands, self.receipts.__getitem__)
+        return self.evidence("python_call", (role, op, *operands), before, self.inventory(path),
+                             commit=result.hex() if type(result) is bytes else "", code=int(bool(error_type)),
+                             error=evidence_text(error), error_type=error_type, path_uses=path_uses)
 
     def invoke_observed(self, role, capture, expected, output, a, b, *controls):
         example = import_module(self.script.stem)

@@ -294,6 +294,7 @@ def check_verdicts(histories, observations, state):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--init", action="append", help="history initializer (default: init)")
+    parser.add_argument("--python-boundary", action="store_true", help="observe public Python types and errors")
     parser.add_argument("--quint-module", type=Path, action="append", default=[], help="local Quint rules import")
     add_quint_arguments(parser)
     parser.add_argument("binding", help="daggerml.core import or path to the private replay extension")
@@ -304,7 +305,11 @@ def main():
     with TemporaryDirectory(prefix="dml-histories-") as tmp:
         directory = Path(tmp)
         histories = read_histories(quint, args.histories, directory / "histories.itf.json", args.init or ["init"])
-        suite = Suite(args.binding, args.scanner)
+        if args.python_boundary:
+            from replay_python_binding import BindingSuite
+            suite = BindingSuite(args.binding, args.scanner)
+        else:
+            suite = Suite(args.binding, args.scanner)
         observations = [replay_history(suite, directory / f"history-{index}", history)
                         for index, history in enumerate(histories, 1)]
         state = evaluate(quint, args.rules, directory, observations, args.quint_module)

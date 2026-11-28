@@ -18,7 +18,7 @@ module closure_rules {
     main: str, preserved: bool, refs: List[Ref], transfer: bool, counts: List[int], selectedRef: str,
     created: List[Native], profiles: List[str], requested: Q, producing: Q, mode: str, outcome: str,
     selection: str, attempt: str, result: str, outer: str, value: int, trace: List[Call], calls: List[str],
-    nativeStatus: str, nativeValue: str, nativeCount: int, nativeItems: List[str] }
+    errorType: str, pathUses: int, nativeStatus: str, nativeValue: str, nativeCount: int, nativeItems: List[str] }
   type Observation = { attempts: List[Attempt] }
 
   pure val intent = "urn:example:captured-scaled-sum"
@@ -359,6 +359,23 @@ module closure_rules {
     }
   }
 
+  pure def typedVerdict(rows: List[Attempt], i: int): str = {
+    val a = rows[i]
+    val req = typedStory[i]
+    if (a.op != req.op or a.args != req.args) "wrong_step"
+    else if (i < 2) {
+      val fixture = if (i == 0) defaultsRow(a, "", "origin-a", mapV1, 2) else captureRow(a, rows[0])
+      if (a.code == 0 and a.error == "" and a.preserved and not(a.unchanged) and fixture) "ok" else "wrong_typed_fixture"
+    } else {
+      val diagnostic = if (req.args[1] == "defaults") "captured scale is not a signed 64-bit integer"
+        else "a is not a signed 64-bit integer"
+      if (a.errorType != "ValueError" or a.error != diagnostic) "wrong_typed_diagnostic"
+      else if (a.pathUses != 0) "typed_input_reached_repository"
+      else if (not(rejectedWithoutWrite(a, a.error, rows[1].main, rows[1].selectedRef))) "typed_input_changed_storage"
+      else "ok"
+    }
+  }
+
   pure def historyVerdicts(row: Observation): List[str] = {
     val count = row.attempts.length()
     if (count == story.length()) range(0, count).foldl(List(), (out, i) => out.append(verdict(row.attempts, i)))
@@ -366,12 +383,15 @@ module closure_rules {
       range(0, count).foldl(List(), (out, i) => out.append(forgeryVerdict(row.attempts, i)))
     else if (count == noBindStory.length())
       range(0, count).foldl(List(), (out, i) => out.append(noBindVerdict(row.attempts, i)))
+    else if (count == typedStory.length())
+      range(0, count).foldl(List(), (out, i) => out.append(typedVerdict(row.attempts, i)))
     else List("missing_steps")
   }
   pure def verdictAccepted(value: str): bool = value == "ok"
   pure def coveragePass(evidence: List[Observation], verdicts: List[List[str]]): bool =
-    evidence.length() == 3 and verdicts.length() == 3 and verdicts[0].length() == story.length()
+    evidence.length() == 4 and verdicts.length() == 4 and verdicts[0].length() == story.length()
       and verdicts[1].length() == forgeryStory.length() and verdicts[2].length() == noBindStory.length()
+      and verdicts[3].length() == typedStory.length()
       and verdicts.foldl(true, (ok, row) => ok and row.foldl(true, (pass, value) => pass and verdictAccepted(value)))
       and evidence[0].attempts[10].outcome == "reuse" and evidence[0].attempts[23].outcome == "reuse"
       and evidence[0].attempts[30].outcome == "pending" and evidence[0].attempts[32].value == 126

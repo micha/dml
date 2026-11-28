@@ -13,9 +13,10 @@ on Linux, macOS, and Windows and retains Meson logs. It covers ref creation,
 atomic snapshot publication and rollback, caller-side conditional publication,
 binary commit transfer and the staged result round trip, read-only integrity and
 reachability checks, and explicit transactional garbage collection. It also runs
-focused interpreter and Python binding tests, native integrity and collection
-fault checks, native transfer boundary and fault tests, and separate Quint
-workflow checks against the C handoff and Python recorded examples, including
+interpreter checks, public Python boundary replay and lifetime checks, native
+integrity and collection fault checks, native transfer boundary and fault
+checks, and separate Quint workflow checks against the C handoff and Python
+recorded examples, including
 versioned built-ins, composed node calls, closure-bound dependencies,
 captured ordinary calls, and implementation-bound reuse.
 
@@ -52,8 +53,8 @@ are historical evidence, not a passing gate for current code.
 - Use an installed consumer or equivalent boundary check when changing native
   build or installation behavior. For handoff changes, also run the
   [process integration against the installed C library](../tests/README.md#process-integration).
-  For Python binding or packaging changes, run the focused binding tests and
-  [ref replay against the installed wheel](../tests/README.md#replay-refs-against-the-installed-wheel).
+  For Python binding or packaging changes, run the
+  [public binding checks against the installed wheel](../tests/README.md#replay-the-public-binding-against-the-installed-wheel).
   Use Valgrind when touching memory-critical paths.
 - Prefer Quint for behavior that can be checked against live observations. Keep
   core API replay separate from application-level workflow suites. Keep model

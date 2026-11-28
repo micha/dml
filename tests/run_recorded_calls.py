@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import partial
 from hashlib import sha256
+from importlib import import_module
 import json
 from os import cpu_count
 from pathlib import Path
@@ -27,6 +28,11 @@ from run_histories import (
     read_histories,
     replay_history,
 )
+from workflow_python import evidence_text, observe_call
+
+
+PYTHON_API = frozenset(("stage_reused_scale", "publish_reused_scale", "adopt_scale_attempt", "inspect",
+                        "work_scale_attempt", "abandon_scale_request", "publish_requested_scale", "publish_scale"))
 
 
 def id_evidence(value):
@@ -95,11 +101,6 @@ def intent_table_evidence(report):
                         for entry in report["entries"]]}
 
 
-def evidence_text(text):
-    # The Quint evidence writer cannot represent quotes, backslashes or non-ASCII text.
-    return text if re.fullmatch(r"[\x20-\x21\x23-\x5b\x5d-\x7e]*", text) else "hex:" + text.encode("utf-8").hex()
-
-
 def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_unchanged=True, bundle_size=-1):
     command = op.replace("_", "-")
     missing_ref = re.fullmatch(
@@ -108,7 +109,7 @@ def evidence(op, args, *, code, stderr, unchanged, bundle_present=False, bundle_
     return {"op": op, "args": list(args), "code": code, "quiet": not stderr,
             "diagnosed": stderr.startswith(f"{command}: ") and "Traceback" not in stderr,
             "missingRef": missing_ref, "stderr": evidence_text(stderr.rstrip("\n")), "stdoutEmpty": False,
-            "repoExisted": False, "repoExists": False,
+            "repoExisted": False, "repoExists": False, "errorType": "", "pathUses": -1,
             "nativeStatus": "", "nativeDetail": "", "nativeValue": "", "nativeCount": 0, "nativeItems": [],
             "commit": "", "calls": [], "reportFields": [], "stdoutHash": "", "historicalReportHash": "",
             "expectedCommit": "", "producerCommit": "", "removed": -1,
@@ -157,7 +158,7 @@ class ProcessHistory:
         self.decision_receipts = {}
         self.operations = {
             "record": self.record, "record_sum": self.record_sum, "record_scale": self.record_scale,
-            "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
+            "python_call": self.python_call, "inspect": self.inspect, "export_sum": self.export_sum, "stage_input": self.stage_input,
             "release_input": self.release_input, "collect": self.collect,
             "unlink_bundle": self.unlink_bundle, "truncate_bundle": self.truncate_bundle,
             "write_bundle": self.write_bundle,
@@ -245,6 +246,22 @@ class ProcessHistory:
                        bundle_size=-1 if bundle_after is None else len(bundle_after))
         return {**row, "stdoutEmpty": not result.stdout, "repoExisted": repo_existed,
                 "repoExists": repo.exists()}, result.stdout
+
+    def python_call(self, role, op, *operands):
+        if op not in PYTHON_API or self.native.values["repo"]:
+            raise ValueError(f"cannot invoke Python workflow {op!r}")
+        repo = self.repos[role]
+        data = repo / "data.mdb"
+        existed = repo.exists()
+        before = data.read_bytes() if data.is_file() else None
+        with self.fixture_lock:
+            action = getattr(import_module(self.example.stem), op)
+            result, error_type, error, path_uses = observe_call(action, repo, operands, self.request_receipts.__getitem__)
+        after = data.read_bytes() if data.is_file() else None
+        row = evidence("python_call", (role, op, *operands), code=int(bool(error_type)), stderr=error,
+                       unchanged=before == after)
+        return {**row, "errorType": error_type, "pathUses": path_uses, "repoExisted": existed,
+                "repoExists": repo.exists(), "commit": result.hex() if type(result) is bytes else ""}
 
     def write(self, op, args, **options):
         row, output = self.invoke(op, args, **options)
@@ -783,6 +800,7 @@ def main():
     parser.add_argument("modules", nargs="*", type=absolute_path, help="shared Quint modules")
     args = parser.parse_args()
     quint = quint_command(args)
+    sys.path.insert(0, str(args.example.parent))
     with TemporaryDirectory(prefix="dml-recorded-calls-") as tmp:
         directory = Path(tmp)
         started = monotonic()
