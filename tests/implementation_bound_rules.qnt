@@ -2,9 +2,7 @@ module implementation_bound_rules {
   import implementation_bound_histories as histories from "./implementation_bound_histories"
   import ordinary_rules as ordinary from "./ordinary_rules"
 
-  type Attempt = { op: str, args: List[str], commit: str, code: int, error: str, head: str, main: str,
-    refs: List[ordinary::Ref], created: List[ordinary::Native], profiles: List[str], report: List[ordinary::Field],
-    unchanged: bool, preserved: bool, transfer: bool, addedObjects: bool, calls: List[ordinary::CallEvent] }
+  type Attempt = ordinary::Attempt
   type Closure = { dag: str, fields: int, roleAtRoot: bool, role: str, intent: str, implementation: str,
     links: List[ordinary::Edge] }
   type Observation = { attempts: List[Attempt], closures: List[Closure] }

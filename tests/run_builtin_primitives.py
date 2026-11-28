@@ -1,6 +1,7 @@
-"""Replay requested built-in operations alongside single-call native steps."""
+"""Replay requested built-in and live call operations alongside single-call native steps."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, contextmanager
 from functools import partial
 from pathlib import Path
@@ -8,7 +9,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from daggerml import builtin, core
+from daggerml import builtin, calls, core
 
 from replay_core import DATUM_KINDS, CoreHistory
 from run_histories import (
@@ -19,12 +20,16 @@ from trace_support import Replay, scan_inventory
 
 DEFAULTS = dict(op="", args=[], status="ok", error="", value="", count=0, items=[],
                 datumKind=0, datumPayload="", datum="", entries=[], sourceDag="", sourceNode="", name="",
-                sourceUri="", binding="", func="", inputs="", returned="", trace=[], calls=[], events=[], unchanged=False)
+                sourceUri="", binding="", func="", inputs="", returned="", trace=[], calls=[], events=[], unchanged=False,
+                identity="", entered=[], caught=[], present=False, intent="", implementation="")
 INSPECTIONS = ("node", "binding", "arguments", "operation", "returned", "trace")
 COMMANDS = (
     "native", "binding_put", "rec_new", "rec_enter", "rec_exit", "rec_source", "rec_literal",
     "rec_args", "rec_call", "rec_call_observed", "rec_ops", "rec_dag", "rec_trace", "rec_return",
     "ops_literal", "ops_map_get", "ops_list_get", "inspect", "inspect_offline", "checkpoint", "compare",
+    "rec_load", "node_value", "node_has_attr", "node_set_value", "node_fabricate", "node_from_datum",
+    "call_enter", "call_exit", "call_copy", "call_bind", "call_bind_builtin", "call_unbind", "call_invoke",
+    "closure_put", "closure_inspect",
 )
 
 
@@ -44,6 +49,7 @@ def call_fields(op):
 def description_fields(row, description):
     if isinstance(description, tuple):
         row["trace"] = [op.dag.hex() for op in description]
+        row["calls"] = [dict(dag=op.dag.hex(), **call_fields(op)) for op in description]
         return
     row["value"] = description.dag.hex()
     if isinstance(description, builtin.Binding):
@@ -69,6 +75,8 @@ class History:
         self.core = CoreHistory(core, None, directory, status_results=False)
         self.scanner = scanner
         self.recorders, self.scopes, self.nodes, self.ops, self.saved = {}, {}, {}, {}, {}
+        self.call_scopes, self.call_contexts, self.bindings, self.targets = {}, {}, {}, {}
+        self.entered, self.caught = [], []
 
     def run(self, op, *args):
         row = {**DEFAULTS, "op": op, "args": list(args), "events": []}
@@ -76,7 +84,7 @@ class History:
             getattr(self, op)(row, *args)
         except core.Error as error:
             row.update(status=error.args[0], error=error.args[2])
-        except (builtin.BuiltinError, TypeError, RuntimeError) as error:
+        except (builtin.BuiltinError, calls.CallError, TypeError, RuntimeError) as error:
             row.update(status=type(error).__name__, error=str(error))
         return row
 
@@ -158,6 +166,9 @@ class History:
         self.ops[alias] = self.recorders[rec].operations(map_binding=self.id(map_binding),
                                                          list_binding=self.id(list_binding))
 
+    def rec_load(self, row, rec, dag, alias):
+        self.keep_node(row, alias, self.recorders[rec].load(self.id(dag)))
+
     def rec_dag(self, row, rec, node, alias):
         self.remember_id(row, alias, self.recorders[rec].dag(self.nodes[node]))
 
@@ -192,6 +203,97 @@ class History:
                 stack.enter_context(patch.object(obj, name, partial(deny, name)))
             self.inspect(row, *args)
 
+    def node_value(self, row, node):
+        node = self.nodes[node]
+        value_fields(row, node.value)
+        row["identity"] = str(id(node))
+
+    def node_has_attr(self, row, node, name):
+        row["present"] = hasattr(self.nodes[node], name)
+
+    def node_set_value(self, row, node, source):
+        try:
+            self.nodes[node].value = self.nodes[source].value
+        except AttributeError as error:
+            row.update(status=type(error).__name__, error=str(error))
+
+    def node_from_datum(self, row, packed, alias):
+        payload, kind = core.datum_decode(self.core.resolve("packed", packed))
+        value = builtin.Datum(kind, payload)
+        self.keep_node(row, alias, calls.Node(value))
+
+    def node_fabricate(self, row, kind, source, alias):
+        node_type = {"call": calls.Node, "recorder": builtin.ValueNode}[kind]
+        self.keep_node(row, alias, node_type(self.nodes[source].value))
+
+    def call_enter(self, row, alias):
+        stack = self.call_contexts[alias] = ExitStack()
+        self.call_scopes[alias] = stack.enter_context(calls.Scope())
+
+    def call_exit(self, row, alias):
+        self.call_contexts.pop(alias).close()
+
+    def call_copy(self, row, scope, node, alias):
+        self.keep_node(row, alias, self.call_scopes[scope].copy(self.nodes[node].value))
+
+    def call_bind(self, row, scope, target, result, nested=None, on_error="raise"):
+        # Guest adapter: optionally invoke another bound target, then return
+        # its result/input or the requested node. Record actual callback entry.
+        def adapter(node):
+            self.entered.append(dict(target=target, node=str(id(node))))
+            if nested is not None:
+                try:
+                    node = self.call_scopes[scope].invoke(self.targets[nested], node)
+                except calls.CallError as error:
+                    if on_error != "catch":
+                        raise
+                    self.caught.append(str(error))
+            return node if result == "argument" else self.nodes[result]
+
+        stack = self.bindings[target] = ExitStack()
+        self.targets[target] = stack.enter_context(self.call_scopes[scope].bind(adapter))
+
+    def call_bind_builtin(self, row, scope, target, rec, func, binding, prepared, alias):
+        stack = self.bindings[target] = ExitStack()
+        context = self.call_scopes[scope].bind_builtin(self.recorders[rec], func.encode("ascii"),
+                                                       self.id(binding), self.nodes[prepared])
+        self.targets[target], node = stack.enter_context(context)
+        self.keep_node(row, alias, node)
+
+    def call_unbind(self, row, target):
+        self.bindings.pop(target).close()
+
+    def call_invoke(self, row, scope, target, node, alias, thread="owner"):
+        invoke = partial(self.call_scopes[scope].invoke, self.targets[target], self.nodes[node])
+        entered, caught = len(self.entered), len(self.caught)
+        try:
+            if thread == "worker":
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    result = pool.submit(invoke).result()
+            elif thread == "owner":
+                result = invoke()
+            else:
+                raise ValueError(f"unknown invocation thread {thread}")
+            self.keep_node(row, alias, result)
+            row["identity"] = str(id(result))
+        finally:
+            row.update(entered=self.entered[entered:], caught=self.caught[caught:])
+
+    def closure_put(self, row, txn, intent, implementation, alias, *captures):
+        links = {name.encode("ascii"): self.id(dag) for name, dag in zip(captures[::2], captures[1::2], strict=True)}
+        self.remember_id(row, alias, calls.put_closure(self.core.resolve("txn", txn), intent=intent.encode("ascii"),
+                                                       implementation=implementation.encode("ascii"), captures=links))
+
+    def closure_inspect(self, row, txn, dag, *names):
+        try:
+            result = calls.inspect_closure(self.core.resolve("txn", txn), self.id(dag), names=tuple(map(str.encode, names)))
+        except ValueError as error:
+            row.update(status=type(error).__name__, error=str(error))
+        else:
+            row.update(value=result.dag.hex(), intent=result.intent.decode("ascii"),
+                       implementation=result.implementation.decode("ascii"),
+                       entries=[dict(name=name.hex(), id=binding.hex()) for name, binding in result.captures])
+
     def inventory(self, repo):
         return scan_inventory(self.scanner, self.core.path(repo))
 
@@ -211,8 +313,9 @@ class Suite:
         history = History(self.scanner, directory)
         try:
             yield Replay({op: partial(history.run, op) for op in COMMANDS})
-            if history.scopes or history.core.values["txn"] or history.core.values["repo"]:
-                raise ValueError("end all recorder scopes and native handles before the history ends")
+            if (history.scopes or history.call_contexts or history.bindings
+                    or history.core.values["txn"] or history.core.values["repo"]):
+                raise ValueError("end all scopes, bindings, and native handles before the history ends")
         finally:
             history.core.close()
 
