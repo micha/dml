@@ -454,6 +454,23 @@ static dml_status validate_object_references(dml_txn *txn, dml_record_type type,
   return DML_OK;
 }
 
+dml_status dml_txn_require_stored_object(dml_txn *txn, dml_record_type type,
+                                         const dml_object_id *id, dml_bytes record,
+                                         dml_error *error) {
+  char key_bytes[48];
+  MDB_val key = {object_key(type, id, key_bytes), key_bytes};
+  MDB_val value;
+  int code = mdb_get(txn->native, txn->repo->dbi, &key, &value);
+  if (code == MDB_NOTFOUND) {
+    return dml_set_error(error, DML_INTEGRITY_ERROR, code, "current ref closure is missing an object");
+  }
+  if (code != MDB_SUCCESS) return storage_error(error, code, "reading current ref closure");
+  if (value.mv_size != record.len || memcmp(value.mv_data, record.data, record.len) != 0) {
+    return dml_set_error(error, DML_INTEGRITY_ERROR, 0, "current ref closure does not match bundle bytes");
+  }
+  return DML_OK;
+}
+
 dml_status dml_txn_store_validated_object(dml_txn *txn, dml_record_type type,
                                           const dml_object_id *id, dml_bytes record,
                                           dml_error *error) {
@@ -611,16 +628,21 @@ static dml_status read_ref_id(dml_txn *txn, MDB_val *key, dml_object_id *out, dm
   return DML_OK;
 }
 
-dml_status dml_txn_ref_get(dml_txn *txn, dml_bytes name, dml_object_id *out,
-                            dml_error *error) {
+dml_status dml_txn_read_head_id(dml_txn *txn, dml_bytes name, dml_object_id *out,
+                                dml_error *error) {
   char bytes[139];
   MDB_val key;
+  dml_status status = ref_key(name, bytes, &key, error);
+  return status == DML_OK ? read_ref_id(txn, &key, out, error) : status;
+}
+
+dml_status dml_txn_ref_get(dml_txn *txn, dml_bytes name, dml_object_id *out,
+                            dml_error *error) {
   dml_object_id target;
   if (txn == NULL || out == NULL) {
     return dml_set_error(error, DML_INVALID_ARGUMENT, 0, "invalid ref get arguments");
   }
-  dml_status status = ref_key(name, bytes, &key, error);
-  if (status == DML_OK) status = read_ref_id(txn, &key, &target, error);
+  dml_status status = dml_txn_read_head_id(txn, name, &target, error);
   if (status == DML_OK) status = validate_ref_target(txn, &target, error);
   if (status == DML_OK) *out = target;
   return status;

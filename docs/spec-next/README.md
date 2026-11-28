@@ -28,8 +28,9 @@ bindings, named trees, and ordered-parent commits. An LMDB-backed repository
 stores these objects and mutable refs under local storage transactions. It can
 [check integrity and reachability](repository.md#snapshot-integrity-and-reachability)
 without writing or [collect unreachable objects explicitly](repository.md#explicit-garbage-collection).
-It can also export and atomically import self-contained binary commit bundles,
-either unpinned or with a new [local staging ref](transfer.md#atomic-staging).
+It can also export self-contained binary commit bundles by ID or local ref and
+import them unpinned, under a new [staging ref](transfer.md#atomic-staging), or
+with [guarded fast-forward publication](transfer.md#guarded-publication).
 The [public headers](../../include/dml/) define the API, and the
 [entity diagram](../lmdb-entity-diagram.html) shows the implemented storage layout.
 The [Python core binding](python.md) exposes a subset of the local C operations

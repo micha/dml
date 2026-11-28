@@ -55,16 +55,24 @@ module transfer_rules {
         kind: if (old == "") "added" else if (current == "") "removed" else "modified" }
     }).filter(row => row.before != row.after)
 
+  pure def isExport(op: str): bool = op == "repo_export_commit" or op == "repo_export_ref"
+  pure def exportRoot(s: State, op: str, args: List[str]): str =
+    if (op == "repo_export_commit") idOf(s, args[1])
+    else lookup(snapshot(s, args[0]), refKeys.get(args[1]))
+
   pure def transfer(s: State, op: str, args: List[str]): Prediction = {
     val repo = args[0]
     val stored = snapshot(s, repo)
     if (not(s.open.contains(repo))) unsupported(s)
-    else if (op == "repo_export_commit") {
-      val root = idOf(s, args[1])
+    else if (isExport(op)) {
       if (s.repo == repo) outcome(s, repo, "invalid_state")
-      else if (not(byId.keys().contains(root))) outcome(s, repo, "not_found")
-      else if (not(existsIn(stored, byId.get(root)))) outcome(s, repo, "not_found")
-      else ok({ ...s, bundles: s.bundles.put(args[2], byId.get(root).name) }, repo)
+      else if (op == "repo_export_ref" and args[1] == "bad/name") outcome(s, repo, "invalid_argument")
+      else {
+        val root = exportRoot(s, op, args)
+        if (not(byId.keys().contains(root))) outcome(s, repo, "not_found")
+        else if (not(existsIn(stored, byId.get(root)))) outcome(s, repo, "not_found")
+        else ok({ ...s, bundles: s.bundles.put(args[2], byId.get(root).name) }, repo)
+      }
     } else {
       val value = args[1]
       val input = if (s.bundles.keys().contains(value)) {status: "ok", target: s.bundles.get(value)}
@@ -72,15 +80,26 @@ module transfer_rules {
                     val fixture = variantByPacked.get(value)
                     {status: fixture.status, target: fixture.target}
                   } else {status: "unsupported_request", target: ""}
-      val status = if (s.repo == repo) "invalid_state" else input.status
+      val guarded = op == "repo_import_commit_expected"
+      val status = if (s.repo == repo) "invalid_state"
+        else if (guarded and args[2] == "bad/name") "invalid_argument" else input.status
       if (status != "ok") { ...outcome(s, repo, status), value: sentinel }
       else {
         val root = byName.get(input.target)
-        val imported = reachable(Set(root.name)).fold(stored, (out, name) => {
+        val needed = reachable(Set(root.name))
+        val imported = needed.fold(stored, (out, name) => {
           val row = byName.get(name)
           out.put(row.key, row.packed)
         })
-        withId(ok(save(s, repo, imported), repo), args[2], root.id)
+        if (not(guarded)) withId(ok(save(s, repo, imported), repo), args[2], root.id)
+        else {
+          val key = refKeys.get(args[2])
+          val old = lookup(stored, key)
+          val expected = if (args[3] == "none") "" else idOf(s, args[3])
+          if (old != expected or (old != "" and not(needed.contains(byId.get(old).name))))
+            { ...outcome(s, repo, "invalid_state"), value: sentinel }
+          else withId(ok(save(s, repo, imported.put(key, root.id)), repo), args[4], root.id)
+        }
       }
     }
   }
@@ -104,12 +123,17 @@ module transfer_rules {
     "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
     "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48")
 
+  pure def liveRefs(rows: Inventory): Set[str] = refKeys.keys().map(name => refKeys.get(name)).intersect(rows.keys())
+  pure def liveObjects(rows: Inventory): Set[str] = reachable(liveRefs(rows).map(key => byId.get(rows.get(key)).name))
+  pure def unreachableObjects(rows: Inventory): List[Object] = {
+    val live = liveObjects(rows)
+    objects.select(row => existsIn(rows, row) and not(live.contains(row.name)))
+  }
+
   pure def checkIntegrity(s: State): Prediction = {
-    val rootKeys = refKeys.keys().map(name => refKeys.get(name)).intersect(s.staged.keys())
-    val roots = rootKeys.map(key => byId.get(s.staged.get(key)).name)
-    val live = reachable(roots)
-    val dead = objects.select(row => existsIn(s.staged, row) and not(live.contains(row.name)))
-    val report = List(decimal[rootKeys.size()], "0", "0", "0", decimal[live.size()], "0", "0", decimal[dead.length()], "0")
+    val dead = unreachableObjects(s.staged)
+    val report = List(decimal[liveRefs(s.staged).size()], "0", "0", "0", decimal[liveObjects(s.staged).size()],
+      "0", "0", decimal[dead.length()], "0")
     { ...ok(s, s.repo), items: dead.foldl(report, (out, row) => out.concat(List(row.tag, row.id))) }
   }
 
@@ -147,7 +171,11 @@ module transfer_rules {
       if (row.kind != kind or not(existsIn(s.staged, row))) unsupported(s)
       else { ...ok({ ...s, buffers: s.buffers.put(alias, row) }, repo), value: row.packed }
     } else if (op == "txn_check_integrity" and s.mode == "read") checkIntegrity(s)
-    else unsupported(s)
+    else if (op == "txn_collect_garbage" and s.mode == "write" and not(s.poisoned)) {
+      val dead = unreachableObjects(s.staged)
+      val kept = s.staged.keys().exclude(dead.foldl(Set(), (removed, row) => removed.union(Set(row.key))))
+      { ...ok({ ...s, staged: kept.mapBy(key => s.staged.get(key)) }, repo), count: dead.length() }
+    } else unsupported(s)
   }
 
   pure def viewStep(s: State, op: str, args: List[str]): Prediction =
@@ -182,7 +210,7 @@ module transfer_rules {
     } else if (op == "repo_close") ok({ ...s, open: s.open.exclude(Set(args[0])) }, args[0])
     else if (op == "txn_begin" and s.txn == "" and s.open.contains(args[0]))
       ok({ ...s, repo: args[0], mode: args[1], txn: args[2], staged: snapshot(s, args[0]) }, args[0])
-    else if (Set("repo_export_commit", "repo_import_commit").contains(op)) transfer(s, op, args)
+    else if (isExport(op) or Set("repo_import_commit", "repo_import_commit_expected").contains(op)) transfer(s, op, args)
     else if (Set("object_decode", "datum_decode", "object_view_parent", "object_view_entry").contains(op))
       viewStep(s, op, args)
     else txnStep(s, op, args)
@@ -217,8 +245,8 @@ module transfer_rules {
     if (p.status == "unsupported_request") "request"
     else if (p.status != a.status) "status"
     else if (not(sameDiff(a, expected))) "inventory"
-    else if (a.op == "repo_export_commit" and p.status == "ok") {
-      val root = byId.get(idOf(s, a.args[1]))
+    else if (isExport(a.op) and p.status == "ok") {
+      val root = byId.get(exportRoot(s, a.op, a.args))
       if (not(exportMatches(a, root))) "bundle"
       else if (seen.keys().contains(root.id) and seen.get(root.id) != a.value) "determinism"
       else "pass"
@@ -234,7 +262,7 @@ module transfer_rules {
     observed.attempts.foldl({ state: initial, seen: Map(), verdicts: List() }, (out, a) => {
       val p = predict(out.state, a)
       val v = verdict(out.state, p, a, out.seen)
-      val seen = if (v == "pass" and a.op == "repo_export_commit" and a.status == "ok")
+      val seen = if (v == "pass" and isExport(a.op) and a.status == "ok")
         out.seen.put(a.items[0], a.value) else out.seen
       { state: p.state, seen: seen, verdicts: out.verdicts.append(v) }
     }).verdicts
@@ -277,6 +305,37 @@ module transfer_rules {
     direct.length() > 0 and reordered.length() > 0
   }
 
+  pure def guardedRoundTrip(evidence: List[Observation]): bool = evidence.select(row => {
+    val a = row.attempts
+    val publish = "repo_import_commit_expected"
+    val root = byName.get("root").id
+    val old = byName.get("oldHead").id
+    val thin = variants.select(v => v.name == "thin").head().packed
+    all {
+      has(a, "repo_export_ref", List("source", "incoming", "missingRef"), "not_found", ""),
+      has(a, "repo_export_ref", List("source", "bad/name", "invalidRef"), "invalid_argument", ""),
+      has(a, "repo_export_ref", List("dest", "main", "busyExport"), "invalid_state", ""),
+      hasMatch(a, x => x.op == "repo_export_ref" and x.args == List("source", "pinned", "candidate")
+        and exportMatches(x, byName.get("root"))),
+      has(a, publish, List("dest", "prior", "incoming", "none", "busyPush"), "invalid_state", sentinel),
+      has(a, publish, List("dest", "prior", "bad/name", "none", "invalidPushRef"), "invalid_argument", sentinel),
+      has(a, publish, List("dest", "prior", "incoming", "oldHead", "absent"), "invalid_state", sentinel),
+      has(a, publish, List("dest", "prior", "incoming", "none", "created"), "ok", old),
+      has(a, publish, List("dest", "prior", "incoming", "none", "staleSameTip"), "invalid_state", sentinel),
+      has(a, publish, List("dest", thin, "incoming", "oldHead", "thinSameTip"), "invalid_payload", sentinel),
+      has(a, publish, List("dest", "prior", "incoming", "oldHead", "sameTip"), "ok", old),
+      has(a, publish, List("dest", "divergent", "incoming", "oldHead", "notFastForward"), "invalid_state", sentinel),
+      has(a, publish, List("dest", "candidate", "incoming", "ancestor", "staleFastForward"), "invalid_state", sentinel),
+      has(a, "repo_export_commit", List("source", "root", "collectedSourceTip"), "not_found", ""),
+      hasMatch(a, x => x.op == "repo_export_ref" and x.args == List("source", "pinned", "movedTip")
+        and exportMatches(x, byName.get("other"))),
+      has(a, publish, List("dest", "candidate", "incoming", "oldHead", "fastForward"), "ok", root),
+      has(a, "txn_ref_get", List("snapshot", "incoming", "tip"), "ok", root),
+      has(a, "txn_ref_get", List("snapshot", "main", "tip"), "ok", byName.get("keep").id),
+      hasMatch(a, x => x.op == "txn_collect_garbage" and x.status == "ok" and x.count == 5)
+    }
+  }).length() > 0
+
   pure def coveragePass(evidence: List[Observation], _verdicts: List[List[str]]): bool = {
     val ids = byName
     val allAttempts = evidence.foldl(List(), (out, row) => out.concat(row.attempts))
@@ -315,6 +374,7 @@ module transfer_rules {
       hasMatch(allAttempts, a => a.op == "datum_decode" and a.value == ids.get("first").payload),
       hasMatch(allAttempts, a => a.op == "datum_decode" and a.value == ids.get("fifth").payload),
       roundTrips(evidence),
+      guardedRoundTrip(evidence),
       rounds
     }
   }

@@ -627,6 +627,34 @@ static PyObject *repo_import_commit(PyObject *self, PyObject *args) {
   dml_status status = dml_repo_import_commit(repo->repo, bundle, &root, NULL);
   return output_result(status, id_bytes(&root));
 }
+
+static PyObject *repo_export_ref(PyObject *self, PyObject *args) {
+  (void)self;
+  PyObject *capsule, *name_obj;
+  if (!PyArg_ParseTuple(args, "OO:repo_export_ref", &capsule, &name_obj)) return NULL;
+  repo_handle *repo = get_repo(capsule);
+  dml_bytes name;
+  if (repo == NULL || !read_bytes(name_obj, &name)) return NULL;
+  dml_buffer packed = {0};
+  dml_status status = dml_repo_export_ref(repo->repo, name, &packed, NULL);
+  return output_result(status, take_buffer(&packed));
+}
+
+static PyObject *repo_import_commit_expected(PyObject *self, PyObject *args) {
+  (void)self;
+  PyObject *capsule, *bundle_obj, *name_obj, *expected_obj;
+  if (!PyArg_ParseTuple(args, "OOOO:repo_import_commit_expected",
+                        &capsule, &bundle_obj, &name_obj, &expected_obj)) return NULL;
+  repo_handle *repo = get_repo(capsule);
+  dml_bytes bundle, name;
+  dml_object_id expected, root;
+  if (repo == NULL || !read_bytes(bundle_obj, &bundle) || !read_bytes(name_obj, &name) ||
+      (expected_obj != Py_None && !read_id(expected_obj, &expected))) return NULL;
+  memset(root.bytes, 0xa5, sizeof(root.bytes));
+  dml_status status = dml_repo_import_commit_expected(repo->repo, bundle, name,
+      expected_obj == Py_None ? NULL : &expected, &root, NULL);
+  return output_result(status, id_bytes(&root));
+}
 #endif
 
 static PyObject *repo_export_commit(PyObject *self, PyObject *args) {
@@ -847,6 +875,8 @@ static PyMethodDef methods[] = {
   {"txn_collect_garbage", txn_collect_garbage, METH_O, NULL},
 #ifdef DML_PRIVATE_REPLAY
   {"repo_import_commit", repo_import_commit, METH_VARARGS, NULL},
+  {"repo_export_ref", repo_export_ref, METH_VARARGS, NULL},
+  {"repo_import_commit_expected", repo_import_commit_expected, METH_VARARGS, NULL},
   {"txn_check_integrity", txn_check_integrity, METH_O, NULL},
 #endif
   {NULL, NULL, 0, NULL},

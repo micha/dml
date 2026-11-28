@@ -29,3 +29,9 @@ porcelain remain open.
 
 The atomic publication example illustrates where semantics belong; it is not
 a promise of a new core function or signature.
+
+## Remote push and fetch
+
+**Status:** Epic started; design open. See the
+[remote push and fetch epic](epics/remote-push-fetch.md) for the proposed scope
+and first validation milestone.

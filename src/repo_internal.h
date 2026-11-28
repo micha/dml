@@ -5,6 +5,16 @@
 
 dml_status dml_repo_transfer_ready(dml_repo *repo, dml_error *error);
 
+/* Read only the ref row, not its target; NOT_FOUND means the row is absent. */
+dml_status dml_txn_read_head_id(dml_txn *txn, dml_bytes name, dml_object_id *out,
+                                dml_error *error);
+
+/* Compare with a validated bundle frame without creating or replacing a row.
+ * Missing or differing bytes are repository integrity failures. */
+dml_status dml_txn_require_stored_object(dml_txn *txn, dml_record_type type,
+                                         const dml_object_id *id, dml_bytes record,
+                                         dml_error *error);
+
 /* Visit the current transaction view in the required mode. Type is zero for
  * an unrecognized key; otherwise suffix follows the object/ref prefix. Bytes
  * are borrowed until the next update or transaction end, including after the

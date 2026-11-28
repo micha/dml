@@ -16,6 +16,11 @@ module transfer_histories {
   pure def read(txn: str, ref: str, id: str): Request = call("txn_ref_get", List(txn, ref, id))
   pure def exportBundle(repo: str, id: str, alias: str): Request = call("repo_export_commit", List(repo, id, alias))
   pure def importBundle(repo: str, bundle: str, id: str): Request = call("repo_import_commit", List(repo, bundle, id))
+  pure def exportRef(repo: str, ref: str, alias: str): Request = call("repo_export_ref", List(repo, ref, alias))
+  pure def publish(bundle: str, ref: str, expected: str, id: str): Request =
+    call("repo_import_commit_expected", List("dest", bundle, ref, expected, id))
+  pure def collect(repo: str): List[Request] = List(begin(repo, "write", "collect"),
+    call("txn_collect_garbage", List("collect")), commit("collect"))
   pure def fetch(txn: str, kind: str, id: str, packed: str): Request =
     call("txn_get_object", List(txn, kind, id, packed))
   pure def decode(packed: str, view: str): Request = call("object_decode", List(packed, view))
@@ -96,6 +101,23 @@ module transfer_histories {
   pure val alternative = variants.select(v => v.name == "alternative").head().packed
   pure val badVariants = variants.select(v => v.status != "ok")
   pure val minimal = variants.select(v => v.name == "valid").head().packed
+  pure val thin = variants.select(v => v.name == "thin").head().packed
+  pure val conditionalPublication = seedBoth.concat(List(
+    exportRef("source", "incoming", "missingRef"), exportRef("source", "bad/name", "invalidRef"),
+    exportRef("source", "pinned", "candidate"), exportBundle("source", "root", "byId"),
+    exportBundle("source", "oldHead", "prior"), exportRef("source", "main", "divergent"),
+    begin("dest", "read", "busy"), exportRef("dest", "main", "busyExport"),
+    publish("prior", "incoming", "none", "busyPush"), abort("busy"),
+    publish("prior", "bad/name", "none", "invalidPushRef"), publish("prior", "incoming", "oldHead", "absent"),
+    publish("prior", "incoming", "none", "created"), publish("prior", "incoming", "none", "staleSameTip"),
+    publish(thin, "incoming", "oldHead", "thinSameTip"), publish("prior", "incoming", "oldHead", "sameTip"),
+    publish("divergent", "incoming", "oldHead", "notFastForward"),
+    publish("candidate", "incoming", "ancestor", "staleFastForward"),
+    begin("source", "write", "move"), update("move", "pinned", "other"), commit("move")))
+    .concat(collect("source"))
+    .concat(List(exportBundle("source", "root", "collectedSourceTip"), exportRef("source", "pinned", "movedTip"),
+      publish("candidate", "incoming", "oldHead", "fastForward"), importBundle("dest", "divergent", "dangling")))
+    .concat(collect("dest")).concat(snapshot("incoming", true)).concat(snapshot("main", false)).concat(finish)
 
   var histories: List[List[Request]]
   action init = histories' = List(
@@ -114,7 +136,8 @@ module transfer_histories {
       exportBundle("dest", "keep", "busyBundle"), abort("busy"),
       exportBundle("dest", "ffffffffffffffffffffffffffffffff", "missingBundle")))
       .concat(badVariants.foldl(List(), (out, fixture) => out.append(importBundle("dest", fixture.packed, fixture.name))))
-      .concat(List(importBundle("dest", minimal, "minimal"), importBundle("dest", minimal, "minimalAgain"), close("dest")))
+      .concat(List(importBundle("dest", minimal, "minimal"), importBundle("dest", minimal, "minimalAgain"), close("dest"))),
+    conditionalPublication
   )
   action step = histories' = histories
 }

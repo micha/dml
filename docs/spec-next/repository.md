@@ -263,8 +263,9 @@ Public declarations are in [repo.h](../../include/dml/repo.h).
 - `dml_repo_close()` MUST reject a repository with active transactions. A successful
   close consumes and nulls its handle.
 
-These local transaction guarantees do not establish remote publication atomicity,
-compare-and-swap ref updates or exactly-once external execution.
+The ref primitives above do not combine import, expectation checks and publication.
+For the receiving side of a fast-forward push, see [guarded publication](transfer.md#guarded-publication).
+Neither contract provides exactly-once external execution.
 
 ## Informative example: current capability
 

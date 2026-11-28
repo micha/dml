@@ -19,6 +19,11 @@ refers to them. The final frame MUST be the commit named in the bundle header.
   stored packed bytes and object IDs. Export of unchanged objects under the same
   root is deterministic; a particular order among independent frames is not a
   wire requirement. Missing or invalid dependencies cause export to fail.
+- `dml_repo_export_ref()` resolves a local ref and exports the exact same
+  bundle from that read transaction. Later changes to the source ref or
+  collection of its old objects do not change the exported bytes. The bundle
+  header identifies the selected commit. An absent ref is distinct from a
+  present ref with missing objects.
 - `dml_repo_import_commit()` validates the framing, packed records, IDs, order,
   and exact root closure before writing. It MUST reject omitted objects even if
   the destination has them. It MUST use one write transaction and leave the
@@ -28,11 +33,10 @@ refers to them. The final frame MUST be the commit named in the bundle header.
 - Export and unpinned import do not change refs. A bundle includes no refs and
   is external data, not a stored LMDB record. It does not capture resources
   addressed by URIs.
-- The repository handle MUST have no active transactions for export or either
-  form of import. Export takes an empty `dml_buffer`; on success the caller owns
-  it and frees it with `dml_buffer_free()`. Import borrows its input bytes for the
-  duration of the call and writes the returned root ID only after committing
-  successfully.
+- The repository handle MUST have no active transactions for import or export.
+  Export takes an empty `dml_buffer`; on success the caller owns it and frees it
+  with `dml_buffer_free()`. Import borrows its input bytes for the duration of
+  the call and writes the root ID only on success.
 
 ### Atomic staging
 
@@ -48,6 +52,29 @@ an approval of the commit. With atomic staging, [garbage collection](repository.
 cannot run between the insertion and creation of the ref. The ref retains the
 bundle closure while it targets the root. Unpinned import followed by a separate
 ref creation has no such guarantee.
+
+### Guarded publication
+
+`dml_repo_import_commit_expected()` is the receiving operation for fast-forward
+push. It validates the self-contained bundle like unpinned import. In one
+receiver write transaction it MUST compare the named local ref against the
+caller-supplied expectation, import the needed objects, and publish the ref.
+Passing `NULL` for `expected` requires no stored ref row; otherwise the stored
+16-byte ID MUST match. The comparison is by value, not by ref generation.
+
+If the ref exists and the expectation matches, the old tip MUST equal the bundle
+root or be reachable from it by following one or more commit parent edges. All
+parents count, not just first parents. Before any insertion the receiver MUST
+check that the old tip and its entire closure already exist byte-for-byte as
+encoded in the bundle. It does not scan unrelated repository contents. A dangling
+ref is not an absent ref, and guarded publication does not repair the old
+history. Matching same-tip publication validates the expectation, bundle and
+stored closure, then returns the root ID without writing anything.
+
+A successful publication leaves the new ref retaining the complete bundle
+closure. A rejection leaves the destination and the returned root ID slot
+unchanged by this call. Only the named ref can be created or updated. These
+operations do not implement a remote transport, remote tracking, or fetch.
 
 ## Binary format version 1
 
@@ -83,14 +110,15 @@ origin or authenticity.
 
 | Condition | Status |
 | --- | --- |
-| Null required argument, nonempty export output, or invalid staging ref name | `invalid_argument` |
-| Active repository transaction or existing staging ref | `invalid_state` |
+| Null required argument, nonempty export output, or invalid ref name | `invalid_argument` |
+| Active repository transaction, existing staging ref, mismatched publication expectation, or non-fast-forward publication | `invalid_state` |
 | Wrong bundle magic/version or nonzero frame reserved field | `invalid_header` |
 | Truncation, invalid framing length/count, size limit, or trailing bytes | `invalid_bounds` |
 | Unsupported frame type or mismatch with its packed type | `invalid_kind` |
 | Incorrect frame ID or final commit ID differing from the header | `integrity_error` |
 | Duplicate, absent, misordered, or unrelated frame; final frame is not a commit | `invalid_payload` |
-| Missing stored object during export | `not_found` |
+| Absent source ref, or missing stored object during export by commit ID | `not_found` |
+| Malformed ref value, missing object in the selected source ref's closure, or missing or differing bytes in the matched old tip's closure during guarded publication | `integrity_error` |
 
 Packed-record and repository failures otherwise preserve their underlying status
 (for example `map_full` on import). Apart from the order of checks specified
